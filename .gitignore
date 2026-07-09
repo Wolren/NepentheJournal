@@ -1,0 +1,55 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# Android
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+.cxx/
+*.hprof
+
+# KMP / Kotlin Native
+*.klib
+*.ktm
+*.konan
+*.dsym
+
+# Couchbase Lite
+*.cblite2/
+*.sqlite
+*.sqlite3
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Debug / logs
+*.log
+captures/
+
+# Environment
+.env
+.env.local
