@@ -26,7 +26,8 @@ data class DiscoveredPeer(
     val host: String,
     val port: Int,
     val isTrusted: Boolean,
-    val fingerprint: String?
+    val fingerprint: String?,
+    val pairingToken: String? = null
 )
 
 interface LanDiscoveryService {

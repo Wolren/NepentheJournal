@@ -192,3 +192,8 @@ Enable test data via any of:
 ## License
 
 GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+## Acknowledgments
+
+- **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)) — this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
+- **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)) — public substance reference data accessed via their GraphQL API.

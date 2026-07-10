@@ -1,7 +1,15 @@
 package app.journal.model
 import kotlinx.serialization.Serializable
 
-/** Conflict: APPEND_ONLY — device-keyed IDs prevent structural conflicts */
+/** Stomach fullness at time of ingestion. Affects absorption rate. */
+enum class StomachFullness(val label: String) {
+    EMPTY("Empty"),
+    LIGHT("Light snack"),
+    MODERATE("Moderate meal"),
+    FULL("Full meal")
+}
+
+/** Conflict: APPEND_ONLY. Device-keyed IDs prevent structural conflicts */
 @Serializable
 data class Dose(
     override val id: String,
@@ -16,5 +24,9 @@ data class Dose(
     val unit: String,
     val timestamp: Long,
     val redosing: Boolean = false,
-    val notes: String? = null
+    val notes: String? = null,
+    val isDoseEstimate: Boolean = false,
+    val estimatedDoseStandardDeviation: Double? = null,
+    val customUnitId: String? = null,
+    val stomachFullness: StomachFullness? = null
 ) : VaultDocument

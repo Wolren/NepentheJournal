@@ -1,0 +1,102 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx3g
+  GRADLE_CACHE_KEY: kotlin-2.4-gradle-9.5
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Compile common + desktop sources
+        run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
+
+      - name: Run common + desktop tests
+        run: ./gradlew composeApp:desktopTest --no-daemon
+
+      - name: Compile Android sources
+        run: |
+          ./gradlew composeApp:compileKotlinAndroid \
+            -x checkDebugAarMetadata \
+            --no-daemon
+
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Build Android debug APK
+        run: |
+          ./gradlew composeApp:assembleDebug \
+            -x checkDebugAarMetadata \
+            --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: nepenthe-debug-apk
+          path: composeApp/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  ios-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Compile iOS framework (simulator)
+        run: |
+          ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 --no-daemon
+
+      - name: Compile iOS framework (device)
+        run: |
+          ./gradlew :composeApp:linkDebugFrameworkIosArm64 --no-daemon
+
+      - name: Verify Xcode project builds
+        run: |
+          cd iosApp
+          xcodebuild -project iosApp.xcodeproj \
+            -scheme "Nepenthe Journal" \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            build | xcpretty

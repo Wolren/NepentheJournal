@@ -20,27 +20,34 @@ kotlin {
     }
 
     sourceSets {
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.materialIconsExtended)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization)
-            implementation(libs.kotlinx.datetime)
-            // Community Edition — all SQL++ query + local storage features.
-            // Switch to libs.kotbase.ee when adding P2P sync (Enterprise required).
-            implementation(libs.kotbase.couchbase.lite)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content)
-            implementation(libs.ktor.serialization)
-            implementation(libs.multiplatform.settings)
+        val commonMain by getting {
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.materialIconsExtended)
+                implementation(compose.ui)
+                implementation(compose.components.resources)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.serialization)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.kotbase.couchbase.lite)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content)
+                implementation(libs.ktor.serialization)
+                implementation(libs.multiplatform.settings)
+            }
         }
-        androidMain.dependencies {
-            implementation(libs.androidx.activity)
-            implementation(libs.ktor.client.cio)
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.androidx.activity)
+                implementation(libs.ktor.client.cio)
+            }
         }
         val desktopMain by getting {
             dependencies {
@@ -49,21 +56,43 @@ kotlin {
                 implementation(libs.logback.classic)
             }
         }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
+        val desktopTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.ktor.client.cio)
+            }
         }
+        iosMain {
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+            }
+        }
+
+        // Shared JVM source set for both Android and Desktop
+        val jvmMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.serialization)
+                implementation(libs.jmdns)
+            }
+        }
+        // Wire jvmMain into both Android and Desktop
+        androidMain.dependsOn(jvmMain)
+        desktopMain.dependsOn(jvmMain)
     }
 }
 
 android {
     namespace = "app.journal"
-    compileSdk = 35
+    compileSdk = 36
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain/res")
+    sourceSets["main"].res.srcDirs("src/androidMain")
     defaultConfig {
-        applicationId = "app.journal.psychonautica"
+        applicationId = "app.journal.nepenthe"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
     }
@@ -84,8 +113,17 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg
             )
-            packageName = "Psychonautica Journal"
+            packageName = "Nepenthe Journal"
             packageVersion = "0.1.0"
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/desktopMain/resources/icon.png"))
+            }
+            macOS {
+                iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+            }
         }
     }
 }

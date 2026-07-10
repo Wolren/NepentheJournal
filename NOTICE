@@ -1,0 +1,34 @@
+Nepenthe Journal
+Copyright (C) 2026 Wolren
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+This project is a derivative work of **PsychonautWiki Journal**
+(https://github.com/isaakhanimann/psychonautwiki-journal-android),
+Copyright (C) 2022 Isaak Hanimann, licensed under GPL-3.0-or-later.
+
+Modifications and additions by Wolren include:
+- Ported from Android-only (Jetpack Compose) to Compose Multiplatform
+  (desktop + Android + iOS)
+- Replaced Couchbase Lite with JSON-file persistence
+- Added P2P sync via Ktor (local network, no cloud relay)
+- Complete UI rewrite in Compose Multiplatform
+- New features: tolerance dashboard, activity heatmap, custom theme
+  editor, custom substance editor, timeline visualization
+
+The PsychonautWiki substance reference data (dosage, duration,
+interaction data) is sourced from the public PsychonautWiki GraphQL
+API and is used under fair use / public data principles.

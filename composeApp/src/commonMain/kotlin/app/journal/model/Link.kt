@@ -1,7 +1,7 @@
 package app.journal.model
 import kotlinx.serialization.Serializable
 
-/** Conflict: SET_UNION_MERGE — union of edges, deduplicate by (fromId, toId, type) */
+/** Conflict: SET_UNION_MERGE. Union of edges, deduplicate by (fromId, toId, type) */
 @Serializable
 data class Link(
     override val id: String,

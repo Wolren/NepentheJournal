@@ -5,9 +5,9 @@ import kotlinx.serialization.json.*
 
 /**
  * Manual import fallback for sources without public APIs:
- *   - Dose.wiki   — no confirmed structured API
- *   - Erowid      — primarily HTML; no public REST/GraphQL API
- *   - Effect Index — effectindex.com; no confirmed public API
+ *   - Dose.wiki   : no confirmed structured API
+ *   - Erowid      : primarily HTML; no public REST/GraphQL API
+ *   - Effect Index : effectindex.com; no confirmed public API
  *
  * Expected format: JSON array of objects with at minimum { "name": "..." }
  * Optional: "dosageBands", "durationProfile", "summary" (same shape as Substance fields)

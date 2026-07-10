@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * P2P Sync orchestration. Real Couchbase Lite / Kotbase API patterns:
  *
- * HOST (URLEndpointListener — Enterprise Edition required):
+ * HOST (URLEndpointListener. Enterprise Edition required):
  *   val listenerConfig = URLEndpointListenerConfiguration(
  *       collections = db.collections,
  *       port = config.listenerPort,     // 0 = auto-assign
@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.Flow
  *   listener.start()
  *   // listener.urls[0] → wss://192.168.x.x:4984 to advertise via mDNS
  *
- * CLIENT (Replicator — Community Edition sufficient):
+ * CLIENT (Replicator. Community Edition sufficient):
  *   val endpoint = URLEndpoint("wss://${peer.host}:${peer.port}/")
  *   val replConfig = ReplicatorConfiguration(endpoint)
  *       .addCollections(db.collections, CollectionConfiguration(
@@ -49,6 +49,7 @@ interface SyncEngine {
     suspend fun stopHosting()
     suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean = false): Result<Unit>
     suspend fun disconnectFrom(deviceId: String)
+    suspend fun revokeTrustedDevice(deviceId: String) {}
     fun observeStatus(): Flow<SyncStatusSnapshot>
 }
 
@@ -60,7 +61,9 @@ data class SyncStatusSnapshot(
     val activeConnections: List<ConnectedPeer>,
     val lastSyncAt: Long?,
     val pendingConflicts: Int,
-    val lastError: String?
+    val lastError: String?,
+    val pairingToken: String? = null,
+    val pairedDeviceCount: Int = 0
 )
 
 data class ConnectedPeer(val deviceId: String, val displayName: String, val direction: SyncDirection)

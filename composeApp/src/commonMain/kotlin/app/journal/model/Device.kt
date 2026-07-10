@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 enum class TrustLevel  { TRUSTED, REVOKED, PENDING }
 enum class DiscoveryMode { MANUAL, LAN_AUTO_DISCOVERY, HYBRID }
 
-/** Conflict: LOCAL_WINS_NEVER_MERGE — never replicate Device docs to peers */
+/** Conflict: LOCAL_WINS_NEVER_MERGE. Never replicate Device docs to peers */
 @Serializable
 data class Device(
     override val id: String,

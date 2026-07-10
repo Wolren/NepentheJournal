@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
 /**
- * Pairing flow — token + TLS certificate fingerprint, no passwords:
+ * Pairing flow: token + TLS certificate fingerprint, no passwords:
  *
  * HOST:
  *  1. generatePairingOffer() → displays 6-char token + QR

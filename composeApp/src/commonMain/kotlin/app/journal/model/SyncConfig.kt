@@ -3,7 +3,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Conflict: LOCAL_WINS_NEVER_MERGE
- * Filter out of outbound replication — never push SyncConfig to peers.
+ * Filter out of outbound replication. Never push SyncConfig to peers.
  */
 @Serializable
 data class SyncConfig(

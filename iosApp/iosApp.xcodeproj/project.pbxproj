@@ -1,0 +1,269 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+ 		5683A2DDC71E17A116C47B38 /* iosApp/iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5948C520EABC6EC47BDA118D /* iosApp/iOSApp.swift */; };
+ 		B146E4D5A209E0285005A04F /* iosApp/ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA153FDAFC96F87354F4FBC6 /* iosApp/ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+ 		5948C520EABC6EC47BDA118D /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
+ 		DA153FDAFC96F87354F4FBC6 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+ 		4A1A617D94D75FFBF8CFCEEF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = file.plist; path = Info.plist; sourceTree = "<group>"; };
+ 		B4101648CE1D6ED9685A1D98 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+ 		ADB176AAD440D8EC8C39E562 /* composeApp.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = composeApp.framework; sourceTree = "<group>"; };
+ 		A367DECED4660A8E0EC5824F /* Nepenthe Journal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nepenthe Journal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+ 		1EE2F8AC284A1E28A75F0062 = {
+ 			isa = PBXFrameworksBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = ();
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+ 		21241F1BFC3E9EBBACA0A22A = {
+ 			isa = PBXGroup;
+ 			children = (
+ 				B4101648CE1D6ED9685A1D98,
+ 				DA153FDAFC96F87354F4FBC6,
+ 				4A1A617D94D75FFBF8CFCEEF,
+ 				5948C520EABC6EC47BDA118D,
+ 				AF39DD055C3EF8226FBE929D,
+ 				FE0A091FDBFB3E9C31B7A1BD,
+ 			);
+ 			sourceTree = "<group>";
+ 			path = iosApp;
+ 		};
+ 		AF39DD055C3EF8226FBE929D = {
+ 			isa = PBXGroup;
+ 			children = ();
+ 			name = Frameworks;
+ 			sourceTree = "<group>";
+ 		};
+ 		FE0A091FDBFB3E9C31B7A1BD = {
+ 			isa = PBXGroup;
+ 			children = (
+ 				A367DECED4660A8E0EC5824F,
+ 			);
+ 			name = Products;
+ 			sourceTree = "<group>";
+ 		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+ 		906993ECC467095AD8130F99 = {
+ 			isa = PBXNativeTarget;
+ 			buildConfigurationList = E11C65E2217CBCC6E03616A5;
+ 			buildPhases = (
+ 				02B34FB16CBE78BA0E8AC28E,
+ 				1EE2F8AC284A1E28A75F0062,
+ 				9D8BB8030B9C3621C743D596,
+ 				30E4CC6DA8FAEF5D0D61E0F8,
+ 			);
+ 			buildRules = ();
+ 			dependencies = ();
+ 			name = "Nepenthe Journal";
+ 			productName = NepentheJournal;
+ 			productReference = A367DECED4660A8E0EC5824F;
+ 			productType = "com.apple.product-type.application";
+ 		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+ 		D8A4613F194AF9A13DFEBB3B = {
+ 			isa = PBXProject;
+ 			buildConfigurationList = 23274EDFE6B9CA73B4FFCD48;
+ 			compatibilityVersion = "Xcode 14.0";
+ 			developmentRegion = "en";
+ 			hasScannedForEncodings = 0;
+ 			knownRegions = ("en", "Base",);
+ 			mainGroup = 21241F1BFC3E9EBBACA0A22A;
+ 			productRefGroup = FE0A091FDBFB3E9C31B7A1BD;
+ 			projectDirPath = "";
+ 			projectRoot = "";
+ 			targets = (
+ 				906993ECC467095AD8130F99,
+ 			);
+ 		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+ 		9D8BB8030B9C3621C743D596 = {
+ 			isa = PBXResourcesBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = ();
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+ 		30E4CC6DA8FAEF5D0D61E0F8 = {
+ 			isa = PBXShellScriptBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = ();
+ 			inputFileListPaths = ();
+ 			inputPaths = ();
+ 			name = "Build Kotlin Framework";
+ 			outputFileListPaths = ();
+ 			outputPaths = ();
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 			shellPath = /bin/sh;
+ 			shellScript = "cd "$SRCROOT/.."\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+ 		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+ 		02B34FB16CBE78BA0E8AC28E = {
+ 			isa = PBXSourcesBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = (
+ 				B146E4D5A209E0285005A04F /* ContentView.swift in Sources */,
+ 				5683A2DDC71E17A116C47B38 /* iOSApp.swift in Sources */,
+ 			);
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+ 		2B3A73863AC3C495CBF4F7D5 = {
+ 			isa = XCBuildConfiguration;
+ 			buildSettings = {
+ 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+ 				CODE_SIGN_STYLE = Automatic;
+ 				CURRENT_PROJECT_VERSION = 1;
+ 				ENABLE_PREVIEWS = YES;
+ 				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+ 				INFOPLIST_FILE = iosApp/Info.plist;
+ 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+ 				MARKETING_VERSION = 0.1.0;
+ 				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					composeApp,
+				);
+ 				PRODUCT_BUNDLE_IDENTIFIER = app.journal.nepenthe;
+ 				PRODUCT_NAME = "Nepenthe Journal";
+ 				SWIFT_VERSION = 5.0;
+ 				TARGETED_DEVICE_FAMILY = "1,2";
+ 			};
+ 			name = Debug;
+ 		};
+ 		A31D28949BDD742EA7E83DF1 = {
+ 			isa = XCBuildConfiguration;
+ 			buildSettings = {
+ 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+ 				CODE_SIGN_STYLE = Automatic;
+ 				CURRENT_PROJECT_VERSION = 1;
+ 				ENABLE_PREVIEWS = YES;
+ 				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
+				);
+ 				INFOPLIST_FILE = iosApp/Info.plist;
+ 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+ 				MARKETING_VERSION = 0.1.0;
+ 				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					composeApp,
+				);
+ 				PRODUCT_BUNDLE_IDENTIFIER = app.journal.nepenthe;
+ 				PRODUCT_NAME = "Nepenthe Journal";
+ 				SWIFT_VERSION = 5.0;
+ 				TARGETED_DEVICE_FAMILY = "1,2";
+ 			};
+ 			name = Release;
+ 		};
+ 		23274EDFE6B9CA73B4FFCD48 = {
+ 			isa = XCBuildConfiguration;
+ 			buildSettings = {
+ 				ALWAYS_SEARCH_USER_PATHS = NO;
+ 				CLANG_ANALYZER_NONNULL = YES;
+ 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+ 				CLANG_ENABLE_MODULES = YES;
+ 				CLANG_ENABLE_OBJC_ARC = YES;
+ 				COPY_PHASE_STRIP = NO;
+ 				DEBUG_INFORMATION_FORMAT = dwarf;
+ 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+ 				ENABLE_TESTABILITY = YES;
+ 				GCC_DYNAMIC_NO_PIC = NO;
+ 				GCC_OPTIMIZATION_LEVEL = 0;
+ 				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+ 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+ 				ONLY_ACTIVE_ARCH = YES;
+ 				SDKROOT = iphoneos;
+ 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+ 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+ 			};
+ 			name = Debug;
+ 		};
+ 		712DAF117662E2F08486A1C0 = {
+ 			isa = XCBuildConfiguration;
+ 			buildSettings = {
+ 				ALWAYS_SEARCH_USER_PATHS = NO;
+ 				CLANG_ANALYZER_NONNULL = YES;
+ 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+ 				CLANG_ENABLE_MODULES = YES;
+ 				CLANG_ENABLE_OBJC_ARC = YES;
+ 				COPY_PHASE_STRIP = NO;
+ 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+ 				ENABLE_NS_ASSERTIONS = NO;
+ 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+ 				GCC_OPTIMIZATION_LEVEL = s;
+ 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+ 				MTL_ENABLE_DEBUG_INFO = NO;
+ 				SDKROOT = iphoneos;
+ 				SWIFT_COMPILATION_MODE = wholemodule;
+ 				VALIDATE_PRODUCT = YES;
+ 			};
+ 			name = Release;
+ 		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+ 		23274EDFE6B9CA73B4FFCD48 = {
+ 			isa = XCConfigurationList;
+ 			buildConfigurations = (
+ 				23274EDFE6B9CA73B4FFCD48,
+ 				712DAF117662E2F08486A1C0,
+ 			);
+ 			defaultConfigurationIsVisible = 0;
+ 			defaultConfigurationName = Release;
+ 		};
+ 		E11C65E2217CBCC6E03616A5 = {
+ 			isa = XCConfigurationList;
+ 			buildConfigurations = (
+ 				2B3A73863AC3C495CBF4F7D5,
+ 				A31D28949BDD742EA7E83DF1,
+ 			);
+ 			defaultConfigurationIsVisible = 0;
+ 			defaultConfigurationName = Release;
+ 		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = D8A4613F194AF9A13DFEBB3B;
+}

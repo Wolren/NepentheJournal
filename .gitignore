@@ -53,3 +53,10 @@ captures/
 # Environment
 .env
 .env.local
+# Cache files - delete to force refresh
+*_cache.json
+scripts/*_cache.json
+scripts/smw_only_seed.json
+unified_seed.json
+scripts/__pycache__/
+*.pyc
