@@ -59,10 +59,10 @@ enum class Screen(
     val filledIcon: ImageVector,
     val outlinedIcon: ImageVector
 ) {
-    DASHBOARD("Dashboard", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
+    DASHBOARD("Board", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
     SESSIONS("Sessions", Icons.AutoMirrored.Filled.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
-    SUBSTANCES("Substances", Icons.Filled.Science, Icons.Outlined.Science),
-    SAFER("Safer Use", Icons.Default.Warning, Icons.Default.Warning),
+    SUBSTANCES("Drugs", Icons.Filled.Science, Icons.Outlined.Science),
+    SAFER("Safe", Icons.Default.Warning, Icons.Default.Warning),
     SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 

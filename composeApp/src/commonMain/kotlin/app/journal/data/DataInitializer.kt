@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.model.*
+import app.journal.util.readBundledResource
 import kotlinx.coroutines.*
 
 /**
@@ -137,12 +138,11 @@ object DataInitializer {
 
     private fun tryLoadSeed(repo: JournalRepository): Boolean {
         return try {
-            val stream = DataInitializer::class.java.getResourceAsStream(SEED_RESOURCE)
+            val text = readBundledResource(SEED_RESOURCE)
                 ?: run {
-                    println("Seed resource $SEED_RESOURCE not found on classpath")
+                    println("Seed resource $SEED_RESOURCE not found")
                     return false
                 }
-            val text = stream.reader().readText()
             val snapshot = JournalJson.json.decodeFromString<JournalSnapshot>(text)
             // Normalize substance classes (case, plural, joined-string cleanup)
             val normalizedSnapshot = snapshot.copy(

@@ -3,6 +3,7 @@ package app.journal.ingest
 import app.journal.data.JournalRepository
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.readBundledResource
 import kotlinx.serialization.json.Json
 
 /**
@@ -29,13 +30,11 @@ object DoseWikiIngestor {
     fun ensureIngested(repo: JournalRepository) {
         if (ingested) return
 
-        val stream = DoseWikiIngestor::class.java.getResourceAsStream(RESOURCE_PATH)
+        val text = readBundledResource(RESOURCE_PATH)
             ?: run {
-                println("DoseWiki: resource $RESOURCE_PATH not found on classpath")
+                println("DoseWiki: resource $RESOURCE_PATH not found")
                 return
             }
-
-        val text = stream.reader().readText()
         val substances: List<DoseWikiSubstance> = try {
             json.decodeFromString(text)
         } catch (e: Exception) {
