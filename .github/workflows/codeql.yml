@@ -45,7 +45,8 @@ jobs:
         run: |
           ./gradlew composeApp:compileKotlinDesktop \
             -x checkDebugAarMetadata \
-            --no-daemon
+            --no-daemon \
+            --no-build-cache
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
