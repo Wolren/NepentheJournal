@@ -43,7 +43,7 @@ subprojects {
                 "org.apache.httpcomponents:httpmime:4.5.14",
                 "org.apache.httpcomponents:httpcore:4.4.16",
                 // Commons Lang - uncontrolled recursion
-                "org.apache.commons:commons-lang3:3.19.0"
+                "org.apache.commons:commons-lang3:3.20.0"
             )
         }
     }
