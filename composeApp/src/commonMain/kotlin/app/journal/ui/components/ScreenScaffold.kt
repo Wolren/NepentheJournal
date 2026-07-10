@@ -39,7 +39,7 @@ fun ScreenScaffold(
     val keyHandler = if (onBack != null) {
         Modifier.onPreviewKeyEvent { event ->
             if (event.key == Key.Escape) {
-                onBack()
+                try { onBack() } catch (_: Exception) { }
                 true
             } else false
         }
@@ -47,6 +47,7 @@ fun ScreenScaffold(
 
     Scaffold(
         modifier = modifier.then(keyHandler),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -60,7 +61,7 @@ fun ScreenScaffold(
                     if (navigationIcon != null) {
                         navigationIcon()
                     } else if (onBack != null) {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { try { onBack() } catch (_: Exception) { } }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back"

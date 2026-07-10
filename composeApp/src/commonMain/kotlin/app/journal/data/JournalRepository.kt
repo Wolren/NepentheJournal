@@ -142,6 +142,42 @@ class JournalRepository internal constructor() : IngestRepository {
     val toleranceVersion: StateFlow<Int> = _toleranceVersion.asStateFlow()
     private fun bumpToleranceVersion() { _toleranceVersion.update { it + 1 } }
 
+    // ---- Sync from Snapshot (bulk) ----
+
+    /**
+     * Bulk-apply a JournalSnapshot directly into backing maps,
+     * performing a single sync pass at the end instead of one
+     * per entity. Use for seed loading and migration — avoids
+     * O(n) StateFlow emissions for each of hundreds of entities.
+     */
+    fun applySnapshot(snapshot: JournalSnapshot) {
+        snapshot.sessions.forEach { _sessionsMap[it.id] = it }
+        snapshot.substances.forEach { _substancesMap[it.id] = it }
+        snapshot.doses.forEach { _dosesMap[it.id] = it }
+        snapshot.notes.forEach { _notesMap[it.id] = it }
+        snapshot.timelineEvents.forEach { _timelineEventsMap[it.id] = it }
+        snapshot.interactions.forEach { _interactionsMap[it.id] = it }
+        snapshot.effects.forEach { _effectsMap[it.id] = it }
+        snapshot.customUnits.forEach { _customUnitsMap[it.id] = it }
+
+        // Single sync pass after all maps are populated
+        syncSessions()
+        syncSubstances()
+        syncDoses()
+        syncNotes()
+        syncTimelineEvents()
+        syncInteractions()
+        syncEffects()
+        syncCustomUnits()
+
+        // Rebuild all indices from scratch
+        rebuildAllIndices()
+
+        // Apply preferences
+        setShulginRating(snapshot.useShulginRating)
+        setSubstanceColors(snapshot.useSubstanceColors)
+    }
+
     // ---- Mutation counter for auto-save debounce (4.1) ----
     private val _mutationCount = MutableStateFlow(0L)
     val mutationCount: StateFlow<Long> = _mutationCount.asStateFlow()

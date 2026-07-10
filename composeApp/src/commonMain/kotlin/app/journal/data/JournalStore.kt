@@ -41,7 +41,7 @@ expect class JournalStore(repo: JournalRepository) {
  */
 object JournalJson {
     val json = Json {
-        prettyPrint = true
+        prettyPrint = false
         ignoreUnknownKeys = true
         encodeDefaults = true
     }

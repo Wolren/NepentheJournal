@@ -17,24 +17,36 @@ data class InteractionCheckResult(
 
 /**
  * Checks pairwise interactions using an indexed map for O(1) lookups.
- * Builds a map from sorted-pair-key to Interaction once, then resolves
- * each pair via map get instead of linear scan.
+ *
+ * The index is cached across calls: if the interaction list content hasn't
+ * changed (checked by hashCode), the cached index is reused instead of
+ * rebuilding it from scratch. This avoids O(N) index rebuild on every
+ * composable recomposition when the same interaction list is used.
  */
 object InteractionChecker {
 
+    // ---- Cached index ----
+    private var cachedInteractionHash: Int = 0
+    private var cachedIndex: Map<String, Interaction> = emptyMap()
+
     /**
-     * Build an interaction index map keyed by "substanceAId|substanceBId"
-     * where IDs are sorted to make the key order-independent.
+     * Build or retrieve the cached interaction index.
+     * Rebuilds only when [allInteractions] content (by hashCode) differs.
      */
     private fun indexInteractions(allInteractions: List<Interaction>): Map<String, Interaction> {
+        val hash = allInteractions.hashCode()
+        if (hash == cachedInteractionHash && cachedIndex.isNotEmpty()) {
+            return cachedIndex
+        }
         val map = mutableMapOf<String, Interaction>()
         for (interaction in allInteractions) {
             val a = interaction.substanceAId
             val b = interaction.substanceBId
             val key = if (a < b) "$a|$b" else "$b|$a"
-            // Only store the first match for each pair (avoids duplicates)
             if (key !in map) map[key] = interaction
         }
+        cachedInteractionHash = hash
+        cachedIndex = map
         return map
     }
 

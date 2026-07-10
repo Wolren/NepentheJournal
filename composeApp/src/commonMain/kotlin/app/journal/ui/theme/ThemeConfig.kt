@@ -49,7 +49,7 @@ data class ThemeConfig(
     }
 }
 
-enum class BaseTheme { DARK, LIGHT, SYSTEM }
+enum class BaseTheme { DARK, LIGHT, SYSTEM, CUSTOM }
 enum class CardStyle { ELEVATED, FILLED, OUTLINED }
 enum class CornerRadius { SMALL, MEDIUM, LARGE }
 

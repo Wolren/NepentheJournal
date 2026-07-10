@@ -62,8 +62,8 @@ object DataInitializer {
         val subCount = repo.substances.value.size
         val sessionCount = repo.sessions.value.size
 
-        // Step 4: If still empty (no seed, no disk) and test mode, generate fuzz
-        if (subCount == 0 && sessionCount == 0 && isTestDataEnabled()) {
+        // Step 4: If test mode, generate fuzz sessions on top of seed/disk data.
+        if (isTestDataEnabled() && subCount >= 2) {
             FuzzSeed.generate(repo)
             store.save()
             println("Generated fuzz test data (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)")
@@ -76,7 +76,8 @@ object DataInitializer {
         }
 
         // Rebuild query indices after loading everything
-        repo.rebuildIndices()
+        // (applySnapshot already rebuilds indices; incremental mutations
+        // from DoseWikiIngestor and migrateOldIds maintain them.)
 
         if (subCount > 0 || sessionCount > 0) {
             println("Initialized: $subCount substances, $sessionCount sessions")
@@ -150,7 +151,7 @@ object DataInitializer {
                     sub.copy(substanceClass = SubstanceClassNormalizer.normalize(sub.substanceClass))
                 }
             )
-            JournalJson.apply(repo, normalizedSnapshot)
+            repo.applySnapshot(normalizedSnapshot)
             val count = normalizedSnapshot.substances.size
             // Report class normalization stats
             val distinctBefore = snapshot.substances.flatMap { it.substanceClass }.distinct().size

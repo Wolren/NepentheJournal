@@ -46,32 +46,21 @@ fun LiveSessionScreen(
     val repo = remember { JournalRepository.instance }
     val listState = rememberLazyListState()
 
-    // Live timer
-    var now by remember { mutableStateOf(currentTimeMillis()) }
-    var elapsedMs by remember { mutableStateOf(now - session.startTime) }
-
-    LaunchedEffect(session.id) {
-        while (true) {
-            delay(1000L)
-            now = currentTimeMillis()
-            elapsedMs = now - session.startTime
-        }
+    // Scoped data: only collect the flows we actually need,
+    // filter down to this session immediately to avoid full-list recomposition
+    val allDoses by repo.doses.collectAsState()
+    val sessionDoses = remember(allDoses, session.id) {
+        allDoses.filter { it.sessionId == session.id }.sortedBy { it.timestamp }
     }
 
-    // Data
-    val doses by repo.doses.collectAsState()
-    val sessionDoses = remember(doses, session.id) {
-        doses.filter { it.sessionId == session.id }.sortedBy { it.timestamp }
-    }
-
-    val timelineEvents by repo.timelineEvents.collectAsState()
-    val sessionEvents = remember(timelineEvents, session.id) {
-        timelineEvents.filter { it.sessionId == session.id }.sortedBy { it.timestamp }
+    val allTimelineEvents by repo.timelineEvents.collectAsState()
+    val sessionEvents = remember(allTimelineEvents, session.id) {
+        allTimelineEvents.filter { it.sessionId == session.id }.sortedBy { it.timestamp }
     }
 
     val allSubstances by repo.substances.collectAsState()
 
-    // Interaction warnings
+    // Interaction warnings (scoped to session's substances)
     val usedSubstances = remember(sessionDoses, allSubstances) {
         val ids = sessionDoses.map { it.substanceId }.distinct()
         allSubstances.filter { it.id in ids }
@@ -84,6 +73,14 @@ fun LiveSessionScreen(
     var showDoseDialog by remember { mutableStateOf(false) }
     var showMoodDialog by remember { mutableStateOf(false) }
     var showCrisisDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showEndConfirm by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+    var editTitle by remember { mutableStateOf(session.title.ifBlank { "Live Session" }) }
+    var editTags by remember { mutableStateOf(session.tags.joinToString(", ")) }
+    var editSet by remember { mutableStateOf(session.set ?: "") }
+    var editSetting by remember { mutableStateOf(session.setting ?: "") }
+    var editIntention by remember { mutableStateOf(session.intention ?: "") }
 
     // Auto-scroll to bottom when new events come in
     LaunchedEffect(sessionEvents.size) {
@@ -114,20 +111,95 @@ fun LiveSessionScreen(
             onDismiss = { showCrisisDialog = false },
         )
     }
+    if (showEditDialog) {
+        LiveSessionEditDialog(
+            title = editTitle,
+            tags = editTags,
+            setText = editSet,
+            settingText = editSetting,
+            intention = editIntention,
+            onTitleChange = { editTitle = it },
+            onTagsChange = { editTags = it },
+            onSetChange = { editSet = it },
+            onSettingChange = { editSetting = it },
+            onIntentionChange = { editIntention = it },
+            onSave = {
+                val now = currentTimeMillis()
+                repo.upsertSession(session.copy(
+                    title = editTitle,
+                    tags = editTags.split(",").map { it.trim() }.filter { it.isNotBlank() },
+                    set = editSet.ifBlank { null },
+                    setting = editSetting.ifBlank { null },
+                    intention = editIntention.ifBlank { null },
+                    updatedAt = now
+                ))
+                showEditDialog = false
+            },
+            onDismiss = { showEditDialog = false },
+        )
+    }
+    if (showEndConfirm) {
+        AlertDialog(
+            onDismissRequest = { showEndConfirm = false },
+            title = { Text("End session?") },
+            text = { Text("Set the session end time to now and return to the session list.") },
+            confirmButton = {
+                AppTextButton(onClick = {
+                    val now = currentTimeMillis()
+                    repo.upsertSession(session.copy(endTime = now, updatedAt = now))
+                    showEndConfirm = false
+                    onBack()
+                }) { Text("End") }
+            },
+            dismissButton = {
+                AppTextButton(onClick = { showEndConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     ScreenScaffold(
         title = session.title.ifBlank { "Live Session" },
         onBack = onBack,
         actions = {
-            IconButton(onClick = { showCrisisDialog = true }) {
-                Icon(Icons.Default.Emergency, contentDescription = "Get help",
-                    tint = MaterialTheme.colorScheme.error)
+            Box {
+                IconButton(onClick = { showCrisisDialog = true }) {
+                    Icon(Icons.Default.Emergency, contentDescription = "Get help",
+                        tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Session menu")
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Edit session info") },
+                        onClick = {
+                            menuExpanded = false
+                            editTitle = session.title.ifBlank { "Live Session" }
+                            editTags = session.tags.joinToString(", ")
+                            editSet = session.set ?: ""
+                            editSetting = session.setting ?: ""
+                            editIntention = session.intention ?: ""
+                            showEditDialog = true
+                        },
+                        leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("End session") },
+                        onClick = { menuExpanded = false; showEndConfirm = true },
+                        leadingIcon = { Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
             }
         }
     ) {
         // Main timer
         item {
-            TimerCard(elapsedMs)
+            TimerCard(session.startTime)
         }
 
         // Interaction warnings banner
@@ -228,7 +300,18 @@ fun LiveSessionScreen(
 }
 
 @Composable
-private fun TimerCard(elapsedMs: Long) {
+private fun TimerCard(startTime: Long) {
+    // Self-contained timer: only this card recomposes each second,
+    // not the entire LiveSessionScreen.
+    var elapsedMs by remember { mutableStateOf(currentTimeMillis() - startTime) }
+
+    LaunchedEffect(startTime) {
+        while (true) {
+            delay(1000L)
+            elapsedMs = currentTimeMillis() - startTime
+        }
+    }
+
     val totalSec = elapsedMs / 1000
     val hours = totalSec / 3600
     val mins = (totalSec % 3600) / 60
@@ -446,6 +529,7 @@ private fun QuickDoseDialog(
 ) {
     val now = currentTimeMillis()
     var selectedSubstanceId by remember { mutableStateOf("") }
+    var customSubstanceName by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("mg") }
     var route by remember { mutableStateOf("Oral") }
@@ -453,6 +537,11 @@ private fun QuickDoseDialog(
 
     val roaOptions = listOf("Oral", "Sublingual", "Insufflated", "Inhaled",
         "Vaporized", "Intranasal", "Intramuscular", "Intravenous", "Rectal")
+
+    val chosenSubstanceId = if (selectedSubstanceId.isNotBlank()) selectedSubstanceId
+        else if (customSubstanceName.isNotBlank()) "live:${customSubstanceName.lowercase().replace(" ", "_")}"
+        else ""
+    val canSubmit = chosenSubstanceId.isNotBlank() && amount.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -493,6 +582,16 @@ private fun QuickDoseDialog(
                     Text("No substances in database. Add one first.",
                         color = MaterialTheme.colorScheme.error)
                 }
+
+                // Quick-add a custom substance not in the database
+                OutlinedTextField(
+                    value = customSubstanceName,
+                    onValueChange = { customSubstanceName = it; if (it.isNotBlank()) selectedSubstanceId = "" },
+                    label = { Text("Or type a new substance name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = selectedSubstanceId.isBlank()
+                )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = amount, onValueChange = { amount = it },
@@ -538,11 +637,24 @@ private fun QuickDoseDialog(
         confirmButton = {
             AppTextButton(
                 onClick = {
-                    if (selectedSubstanceId.isNotBlank() && amount.isNotBlank()) {
+                    if (canSubmit) {
+                        // Create substance on the fly if it's a custom name
+                        if (selectedSubstanceId.isBlank() && customSubstanceName.isNotBlank()) {
+                            val now2 = currentTimeMillis()
+                            val subId = "live:${customSubstanceName.lowercase().replace(" ", "_")}"
+                            repo.upsertSubstance(Substance(
+                                id = subId,
+                                name = customSubstanceName,
+                                createdAt = now2, updatedAt = now2,
+                                deviceOrigin = "desktop",
+                                cachedAt = now2, sourceVersion = "live",
+                            ))
+                            selectedSubstanceId = subId
+                        }
                         val dose = Dose(
                             id = "dose:live:${now}_${session.id}",
                             sessionId = session.id,
-                            substanceId = selectedSubstanceId,
+                            substanceId = chosenSubstanceId,
                             routeOfAdministration = route,
                             amount = amount.toDoubleOrNull() ?: 0.0,
                             unit = unit,
@@ -553,13 +665,16 @@ private fun QuickDoseDialog(
                         repo.upsertDose(dose)
 
                         // Also add a timeline event for the dose
-                        val sub = substances.find { it.id == selectedSubstanceId }
+                        val sub = substances.find { it.id == chosenSubstanceId }
+                            ?: Substance(id = chosenSubstanceId, name = customSubstanceName.ifBlank { chosenSubstanceId },
+                                createdAt = now, updatedAt = now, deviceOrigin = "desktop",
+                                cachedAt = now, sourceVersion = "live")
                         repo.upsertTimelineEvent(TimelineEvent(
                             id = "event:dose:${now}_${session.id}",
                             sessionId = session.id,
                             timestamp = now,
                             eventType = TimelineEventType.NOTE,
-                            label = "Dose: ${sub?.name ?: selectedSubstanceId}",
+                            label = "Dose: ${sub.name}",
                             body = "${amount} ${unit} $route".takeIf { it.isNotBlank() },
                             createdAt = now, updatedAt = now,
                             deviceOrigin = "desktop",
@@ -568,7 +683,7 @@ private fun QuickDoseDialog(
                         onDismiss()
                     }
                 },
-                enabled = selectedSubstanceId.isNotBlank() && amount.isNotBlank(),
+                enabled = canSubmit,
             ) { Text("Log") }
         },
         dismissButton = {
@@ -660,6 +775,52 @@ private fun QuickMoodDialog(
                     onDismiss()
                 }
             ) { Text("Save") }
+        },
+        dismissButton = {
+            AppTextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun LiveSessionEditDialog(
+    title: String,
+    tags: String,
+    setText: String,
+    settingText: String,
+    intention: String,
+    onTitleChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onSetChange: (String) -> Unit,
+    onSettingChange: (String) -> Unit,
+    onIntentionChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Session info") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = title, onValueChange = onTitleChange,
+                    label = { Text("Title") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = tags, onValueChange = onTagsChange,
+                    label = { Text("Tags (comma-separated)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = setText, onValueChange = onSetChange,
+                    label = { Text("Set (mindset)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = settingText, onValueChange = onSettingChange,
+                    label = { Text("Setting (environment)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = intention, onValueChange = onIntentionChange,
+                    label = { Text("Intention") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            AppTextButton(onClick = onSave) { Text("Save") }
         },
         dismissButton = {
             AppTextButton(onClick = onDismiss) { Text("Cancel") }

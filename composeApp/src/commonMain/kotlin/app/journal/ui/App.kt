@@ -53,6 +53,7 @@ import app.journal.ui.substances.SubstanceDetailScreen
 import app.journal.ui.substances.SubstanceScreen
 import app.journal.ui.theme.LocalThemeConfig
 import app.journal.ui.theme.ThemeManager
+import app.journal.ui.SystemBackHandler
 
 enum class Screen(
     val label: String,
@@ -91,16 +92,46 @@ fun App() {
             colorScheme = colorScheme,
             shapes = themeConfig.shapes
         ) {
-            val editingSession = editingSessionId?.let { id ->
-                if (id == "__new__") null
-                else remember { JournalRepository.instance }.getSession(id)
-            }
-            val editingSubstance = editingSubstanceId?.let { id ->
-                if (id == "__new__") null
-                else remember { JournalRepository.instance }.getSubstance(id)
+            // Root Surface ensures the entire window is always filled with
+            // the theme background color — no white flash during transitions.
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = colorScheme.background
+            ) {
+                val editingSession = editingSessionId?.let { id ->
+                    if (id == "__new__") null
+                    else remember { JournalRepository.instance }.getSession(id)
+                }
+                val editingSubstance = editingSubstanceId?.let { id ->
+                    if (id == "__new__") null
+                    else remember { JournalRepository.instance }.getSubstance(id)
+                }
+
+                // Capture overlay IDs before AnimatedContent so they remain
+                // valid during exit animations even after the state is cleared.
+                val stableTimelineId = selectedTimelineSessionId
+                val stableSubstanceId = selectedSubstanceId
+                val stableLiveId = liveSessionId
+
+            // Intercept system back button (Android) / map to overlay back
+            SystemBackHandler {
+                when {
+                    liveSessionId != null -> liveSessionId = null
+                    editingSessionId != null -> editingSessionId = null
+                    selectedTimelineSessionId != null -> selectedTimelineSessionId = null
+                    editingSubstanceId != null -> editingSubstanceId = null
+                    selectedSubstanceId != null -> selectedSubstanceId = null
+                    showCalendar -> showCalendar = false
+                }
             }
 
             // Overlays with crossfade + slide animations (4.2)
+            // Detect software rendering — skip animations to avoid tearing/flashing
+            val isSoftwareRender = remember {
+                System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE" ||
+                System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE_FAST"
+            }
+            val animDuration = if (isSoftwareRender) 0 else 200
             AnimatedContent(
                 targetState = when {
                     liveSessionId != null -> "live_session"
@@ -113,20 +144,20 @@ fun App() {
                 },
                 transitionSpec = {
                     if (targetState == "main") {
-                        // Returning to main: fade main in, slide overlay down
-                        fadeIn(animationSpec = tween(200)) togetherWith
-                        slideOutVertically { it / 4 }
+                        // Slide only — no fadeIn to avoid white flash from
+                        // transparent background showing through while overlay slides out.
+                        slideInVertically(animationSpec = tween(animDuration)) { it / 4 } togetherWith
+                        slideOutVertically(animationSpec = tween(animDuration)) { it / 4 }
                     } else {
-                        // Opening overlay: slide overlay up, fade main out
-                        slideInVertically { it / 4 } togetherWith
-                        fadeOut(animationSpec = tween(200))
+                        slideInVertically(animationSpec = tween(animDuration)) { it / 4 } togetherWith
+                        fadeOut(animationSpec = tween(animDuration))
                     }
                 },
                 label = "navOverlay"
             ) { state ->
             when (state) {
                 "live_session" -> {
-                    val session = liveSessionId?.let { id ->
+                    val session = stableLiveId?.let { id ->
                         if (id == "__new__") null
                         else JournalRepository.instance.getSession(id)
                     }
@@ -162,10 +193,13 @@ fun App() {
                         )
                     }
                     "timeline" -> {
-                        SessionTimelineScreen(
-                            sessionId = selectedTimelineSessionId!!,
-                            onBack = { selectedTimelineSessionId = null }
-                        )
+                        val id = stableTimelineId
+                        if (id != null) {
+                            SessionTimelineScreen(
+                                sessionId = id,
+                                onBack = { selectedTimelineSessionId = null }
+                            )
+                        }
                     }
                     "editor_substance" -> {
                         SubstanceEditorScreen(
@@ -174,7 +208,7 @@ fun App() {
                         )
                     }
                     "detail_substance" -> {
-                        val id = selectedSubstanceId
+                        val id = stableSubstanceId
                         if (id != null) {
                             SubstanceDetailScreen(
                                 substanceId = id,
@@ -193,7 +227,7 @@ fun App() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
-                            if (selectedScreen != Screen.SUBSTANCES) {
+                            if (selectedScreen == Screen.SESSIONS) {
                                 TopAppBar(
                                     title = {
                                         Text(
@@ -225,7 +259,7 @@ fun App() {
                         },
                         bottomBar = {
                             NavigationBar(
-                                containerColor = Color.Transparent,
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 contentColor = MaterialTheme.colorScheme.onSurface
                             ) {
                                 Screen.entries.forEach { screen ->
@@ -268,6 +302,7 @@ fun App() {
                     }
                     }
                 }
+            }
             }
         }
     }

@@ -28,8 +28,13 @@ fun SessionEditorScreen(
     val repo = remember { JournalRepository.instance }
     val substances by repo.substances.collectAsState()
     val useShulgin by repo.useShulginRating.collectAsState()
-    val allInteractions by repo.interactions.collectAsState()
     val isEditing = sessionToEdit != null
+
+    // Snapshot interactions once — doesn't cause recomposition on every
+    // interaction change. Interactions are loaded from seed and rarely
+    // change at runtime. The InteractionChecker caches its index by
+    // content hash, so rebuild is skipped even on sessionDoses change.
+    val allInteractions = remember { repo.interactions.value }
 
     // Form state
     var title by remember { mutableStateOf(sessionToEdit?.title ?: "") }
@@ -121,7 +126,7 @@ fun SessionEditorScreen(
     }
 
     // Compute interaction warnings from current doses
-    val interactionCheckResult = remember(sessionDoses, allInteractions) {
+    val interactionCheckResult = remember(sessionDoses) {
         if (sessionDoses.size >= 2) {
             val substanceIds = sessionDoses.map { it.substanceId }.distinct()
             InteractionChecker.checkPairwise(substanceIds, allInteractions)

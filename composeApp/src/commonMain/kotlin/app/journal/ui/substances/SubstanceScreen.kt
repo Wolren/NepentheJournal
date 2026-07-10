@@ -76,6 +76,21 @@ fun SubstanceScreen(
         result
     }
 
+    // Precompute dose stats per substance once instead of filtering per card.
+    // Map: substanceId -> (distinctSessionCount, lastUsedTimestamp)
+    val substanceDoseStats = remember(allDoses) {
+        val sessionIdsPerSub = mutableMapOf<String, MutableSet<String>>()
+        val lastUsedPerSub = mutableMapOf<String, Long>()
+        for (dose in allDoses) {
+            sessionIdsPerSub.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+            val existing = lastUsedPerSub[dose.substanceId] ?: 0L
+            if (dose.timestamp > existing) lastUsedPerSub[dose.substanceId] = dose.timestamp
+        }
+        sessionIdsPerSub.mapValues { (key, sessionIds) ->
+            Pair(sessionIds.size, lastUsedPerSub[key])
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
             // Search bar with category filter as trailing icon
@@ -198,11 +213,9 @@ fun SubstanceScreen(
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(results, key = { it.id }) { substance ->
-                        val dosesForSub = remember(substance.id, allDoses) {
-                            allDoses.filter { it.substanceId == substance.id }
-                        }
-                        val sessionCount = dosesForSub.map { it.sessionId }.distinct().size
-                        val lastUsed = dosesForSub.maxOfOrNull { it.timestamp }
+                        val stats = substanceDoseStats[substance.id]
+                        val sessionCount = stats?.first ?: 0
+                        val lastUsed = stats?.second
                         val lastUsedDaysAgo = lastUsed?.let {
                             ((currentTimeMillis() - it) / 86400000L).toInt()
                         }

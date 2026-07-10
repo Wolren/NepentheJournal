@@ -36,8 +36,9 @@ fun DashboardScreen() {
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
 
-    val toleranceVersion by repo.toleranceVersion.collectAsState()
-    val toleranceAll = remember(toleranceVersion) { ToleranceCalculator.calculate(repo) }
+    // Tolerance derived from dose data — uses the same dose state so only
+    // one recomposition when doses change (not double from toleranceVersion).
+    val toleranceAll = remember(doses, substances) { ToleranceCalculator.calculate(repo) }
     val toleranceList = remember(toleranceAll) {
         // Cap NONE-level items to 5 to avoid endless scrolling
         val nonNone = toleranceAll.filter { it.level != ToleranceLevel.NONE }
@@ -135,7 +136,7 @@ fun DashboardScreen() {
                         Icon(Icons.Default.Timeline, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                             modifier = Modifier.size(48.dp))
-                        Text("No tolerance data yet",
+                        Text("No sessions data yet",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("Log a session with substances to track tolerance",

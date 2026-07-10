@@ -1,6 +1,7 @@
 package app.journal.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
@@ -14,8 +15,16 @@ class ThemeManager private constructor() {
     private val _config = MutableStateFlow(ThemeDefaults.Dark)
     val config: StateFlow<ThemeConfig> = _config.asStateFlow()
 
+    // Cache computed ColorScheme to avoid blend/contrast math on every
+    // recomposition. Recomputes only when config content changes.
+    private var cachedConfigHash: Int = 0
+    private var cachedDarkScheme: ColorScheme? = null
+    private var cachedLightScheme: ColorScheme? = null
+
     fun update(newConfig: ThemeConfig) {
         _config.value = newConfig
+        // Invalidate cache so next colorScheme() call recomputes
+        cachedConfigHash = 0
     }
 
     fun presetDark() { update(ThemeDefaults.Dark) }
@@ -24,37 +33,54 @@ class ThemeManager private constructor() {
     /**
      * Builds a full Material3 ColorScheme from the editable ThemeConfig,
      * deriving container/on-* colors with proper contrast instead of naive alpha copies.
+     *
+     * Result is cached: only recomputes when the underlying ThemeConfig content changes.
      */
-    fun colorScheme(isDark: Boolean) = with(_config.value) {
-        val bg = background ?: if (isDark) Color(0xFF0E1511) else Color(0xFFF3F8EF)
-        val surf = surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
+    fun colorScheme(isDark: Boolean): ColorScheme {
+        val cfg = _config.value
+        val hash = cfg.hashCode() xor if (isDark) 1 else 0
+        if (hash == cachedConfigHash) {
+            val cached = if (isDark) cachedDarkScheme else cachedLightScheme
+            if (cached != null) return cached
+        }
+        return recomputeColorScheme(cfg, isDark).also {
+            if (hash != cachedConfigHash) {
+                cachedConfigHash = hash
+            }
+            if (isDark) cachedDarkScheme = it else cachedLightScheme = it
+        }
+    }
+
+    private fun recomputeColorScheme(cfg: ThemeConfig, isDark: Boolean): ColorScheme {
+        val bg = cfg.background ?: if (isDark) Color(0xFF0E1511) else Color(0xFFF3F8EF)
+        val surf = cfg.surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
 
-        base.copy(
-            primary = primary,
-            onPrimary = contrastColor(primary),
-            primaryContainer = blend(bg, primary, if (isDark) 0.30f else 0.16f),
-            onPrimaryContainer = contrastColor(blend(bg, primary, if (isDark) 0.30f else 0.16f)),
-            secondary = secondary,
-            onSecondary = contrastColor(secondary),
-            secondaryContainer = blend(bg, secondary, if (isDark) 0.30f else 0.16f),
-            onSecondaryContainer = contrastColor(blend(bg, secondary, if (isDark) 0.30f else 0.16f)),
-            tertiary = tertiary,
-            onTertiary = contrastColor(tertiary),
-            tertiaryContainer = blend(bg, tertiary, if (isDark) 0.30f else 0.16f),
-            onTertiaryContainer = contrastColor(blend(bg, tertiary, if (isDark) 0.30f else 0.16f)),
-            error = error,
-            onError = contrastColor(error),
-            errorContainer = blend(bg, error, 0.30f),
-            onErrorContainer = contrastColor(blend(bg, error, 0.30f)),
+        return base.copy(
+            primary = cfg.primary,
+            onPrimary = contrastColor(cfg.primary),
+            primaryContainer = blend(bg, cfg.primary, if (isDark) 0.30f else 0.16f),
+            onPrimaryContainer = contrastColor(blend(bg, cfg.primary, if (isDark) 0.30f else 0.16f)),
+            secondary = cfg.secondary,
+            onSecondary = contrastColor(cfg.secondary),
+            secondaryContainer = blend(bg, cfg.secondary, if (isDark) 0.30f else 0.16f),
+            onSecondaryContainer = contrastColor(blend(bg, cfg.secondary, if (isDark) 0.30f else 0.16f)),
+            tertiary = cfg.tertiary,
+            onTertiary = contrastColor(cfg.tertiary),
+            tertiaryContainer = blend(bg, cfg.tertiary, if (isDark) 0.30f else 0.16f),
+            onTertiaryContainer = contrastColor(blend(bg, cfg.tertiary, if (isDark) 0.30f else 0.16f)),
+            error = cfg.error,
+            onError = contrastColor(cfg.error),
+            errorContainer = blend(bg, cfg.error, 0.30f),
+            onErrorContainer = contrastColor(blend(bg, cfg.error, 0.30f)),
             background = bg,
             onBackground = contrastColor(bg),
             surface = surf,
             onSurface = contrastColor(surf),
-            surfaceVariant = blend(surf, primary, if (isDark) 0.12f else 0.06f),
-            onSurfaceVariant = contrastColor(blend(surf, primary, if (isDark) 0.12f else 0.06f)),
-            outline = blend(surf, primary, if (isDark) 0.28f else 0.18f),
-            outlineVariant = blend(surf, primary, if (isDark) 0.16f else 0.10f)
+            surfaceVariant = blend(surf, cfg.primary, if (isDark) 0.12f else 0.06f),
+            onSurfaceVariant = contrastColor(blend(surf, cfg.primary, if (isDark) 0.12f else 0.06f)),
+            outline = blend(surf, cfg.primary, if (isDark) 0.28f else 0.18f),
+            outlineVariant = blend(surf, cfg.primary, if (isDark) 0.16f else 0.10f)
         )
     }
 
@@ -63,6 +89,7 @@ class ThemeManager private constructor() {
         BaseTheme.DARK -> true
         BaseTheme.LIGHT -> false
         BaseTheme.SYSTEM -> isSystemInDarkTheme()
+        BaseTheme.CUSTOM -> isSystemInDarkTheme()
     }
 
     companion object {

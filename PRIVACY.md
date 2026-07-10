@@ -16,7 +16,9 @@ Nepenthe Journal is an offline-first journal app. Your data stays on your device
 
 ## Where data is stored
 
-All data is stored **locally on your device** in the app's private data directory. No data is uploaded to any cloud server, third-party service, or remote database.
+All journal data is stored **locally on your device** in the app's private data directory. There is no connected server — nothing is uploaded, synced, or sent without your explicit action.
+
+You can manually export your full journal data at any time via **Settings > Data** (JSON, CSV, or ZIP). Sharing those exports is entirely at your discretion — nothing leaves your device until you explicitly choose to export and share it.
 
 ## P2P sync (optional)
 

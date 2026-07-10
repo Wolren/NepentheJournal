@@ -88,7 +88,8 @@ android {
     namespace = "app.journal"
     compileSdk = 36
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    sourceSets["main"].res.srcDirs("src/androidMain")
+    sourceSets["main"].res.srcDirs("src/androidMain/res")
+    sourceSets["main"].assets.srcDirs("src/androidMain/assets")
     defaultConfig {
         applicationId = "app.journal.nepenthe"
         minSdk = 26

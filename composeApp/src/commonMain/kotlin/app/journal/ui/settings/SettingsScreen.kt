@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
@@ -82,6 +83,11 @@ fun SettingsScreen() {
     var manualHost by remember { mutableStateOf("") }
     var manualPort by remember { mutableStateOf("4984") }
     var syncExpanded by remember { mutableStateOf(false) }
+    var dataExpanded by remember { mutableStateOf(false) }
+    var aboutExpanded by remember { mutableStateOf(false) }
+    var legalExpanded by remember { mutableStateOf(false) }
+    var privacyExpanded by remember { mutableStateOf(false) }
+    var libraryExpanded by remember { mutableStateOf(false) }
     var logLines by remember { mutableStateOf(listOf("Sync engine ready")) }
     var dataStatus by remember { mutableStateOf<String?>(null) }
     var fetchStatus by remember { mutableStateOf<String?>(null) }
@@ -106,153 +112,168 @@ fun SettingsScreen() {
                             Icon(Icons.Default.Palette, null, tint = MaterialTheme.colorScheme.primary)
                             Text("Theme", style = MaterialTheme.typography.titleMedium)
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (!themeExpanded) {
-                                Surface(shape = CircleShape, color = Color(editPrimary).copy(alpha = 0.3f), modifier = Modifier.padding(end = 8.dp)) {
-                                    Text(
-                                        when (editBaseTheme) { BaseTheme.DARK -> "Dark"; BaseTheme.LIGHT -> "Light"; BaseTheme.SYSTEM -> "System" },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            AppTonalButton(onClick = { themeExpanded = !themeExpanded }) {
-                                Text(if (themeExpanded) "Done" else "Edit")
-                            }
-                            AppTonalButton(
-                                onClick = {
-                                    val d = if (editBaseTheme == BaseTheme.LIGHT) ThemeDefaults.Light else ThemeDefaults.Dark
-                                    editBaseTheme = d.baseTheme
-                                    editPrimary = d.primaryColor
-                                    editSecondary = d.secondaryColor
-                                    editTertiary = d.tertiaryColor
-                                    editBgColor = 0xFF0E1511L
-                                    applyTheme()
-                                },
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            ) {
-                                Text("Reset")
-                            }
-                        }
-                    }
-                    if (!themeExpanded) {
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Primary", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.size(12.dp).clip(CircleShape).background(Color(editPrimary)))
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Secondary", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.size(12.dp).clip(CircleShape).background(Color(editSecondary)))
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Tertiary", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.size(12.dp).clip(CircleShape).background(Color(editTertiary)))
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("BG", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.size(12.dp).clip(CircleShape).background(Color(editBgColor)))
-                            }
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Cards", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(editCardStyle.name.lowercase().take(4), style = MaterialTheme.typography.labelSmall)
-                            }
+                        AppTonalButton(onClick = { themeExpanded = !themeExpanded }) {
+                            Text("Manage")
                         }
                     }
                     if (themeExpanded) {
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
                         HorizontalDivider()
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
+
+                        // Base selection
                         Text("Base", style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            BaseTheme.entries.forEach { mode ->
-                                FilterChip(selected = editBaseTheme == mode,
-                                    onClick = { editBaseTheme = mode; applyTheme() },
-                                    label = { Text(when (mode) { BaseTheme.DARK -> "Dark"; BaseTheme.LIGHT -> "Light"; BaseTheme.SYSTEM -> "System" })}
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text("Presets", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            AppTonalButton(onClick = {
-                                editBaseTheme = BaseTheme.DARK
-                                editPrimary = ThemeDefaults.Dark.primaryColor
-                                editSecondary = ThemeDefaults.Dark.secondaryColor
-                                editTertiary = ThemeDefaults.Dark.tertiaryColor
-                                editBgColor = 0xFF0E1511L
-                                applyTheme()
-                            }) { Text("Forest (Dark)") }
-                            AppTonalButton(onClick = {
-                                editBaseTheme = BaseTheme.LIGHT
-                                editPrimary = ThemeDefaults.Light.primaryColor
-                                editSecondary = ThemeDefaults.Light.secondaryColor
-                                editTertiary = ThemeDefaults.Light.tertiaryColor
-                                editBgColor = 0xFFF3F8EFL
-                                applyTheme()
-                            }) { Text("Meadow (Light)") }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Text("Colors", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        ColorPickerField("Primary", editPrimary, onPick = { editPrimary = it; applyTheme() })
-                        QuickSwatches(current = editPrimary, onPick = { editPrimary = it; applyTheme() })
-                        ColorPickerField("Secondary", editSecondary, onPick = { editSecondary = it; applyTheme() })
-                        QuickSwatches(current = editSecondary, onPick = { editSecondary = it; applyTheme() })
-                        ColorPickerField("Tertiary", editTertiary, onPick = { editTertiary = it; applyTheme() })
-                        QuickSwatches(current = editTertiary, onPick = { editTertiary = it; applyTheme() })
-                        Spacer(Modifier.height(8.dp))
-                        ColorPickerField("Background", editBgColor, onPick = { editBgColor = it; applyTheme() })
-                        Spacer(Modifier.height(12.dp))
-                        Text("Background image", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        OutlinedTextField(
-                            value = editBgImage ?: "",
-                            onValueChange = { editBgImage = it; applyTheme() },
-                            placeholder = { Text("Image URL or file path") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = if (editBgImage != null) {
-                                { AppIconButton(onClick = { editBgImage = null; applyTheme() }, icon = Icons.Default.Close, contentDescription = "Clear") }
-                            } else null
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Opacity", style = MaterialTheme.typography.bodySmall)
-                            Slider(
-                                value = editBgOpacity,
-                                onValueChange = { editBgOpacity = it; applyTheme() },
-                                modifier = Modifier.weight(1f),
-                                valueRange = 0f..1f
+                            // Dark — applies Forest preset
+                            FilterChip(
+                                selected = editBaseTheme == BaseTheme.DARK,
+                                onClick = {
+                                    editBaseTheme = BaseTheme.DARK
+                                    editPrimary = ThemeDefaults.Dark.primaryColor
+                                    editSecondary = ThemeDefaults.Dark.secondaryColor
+                                    editTertiary = ThemeDefaults.Dark.tertiaryColor
+                                    editBgColor = 0xFF0E1511L
+                                    applyTheme()
+                                },
+                                label = { Text("Dark") }
                             )
-                            Text("%.0f%%".format(editBgOpacity * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                            // Light — applies Meadow preset
+                            FilterChip(
+                                selected = editBaseTheme == BaseTheme.LIGHT,
+                                onClick = {
+                                    editBaseTheme = BaseTheme.LIGHT
+                                    editPrimary = ThemeDefaults.Light.primaryColor
+                                    editSecondary = ThemeDefaults.Light.secondaryColor
+                                    editTertiary = ThemeDefaults.Light.tertiaryColor
+                                    editBgColor = 0xFFF3F8EFL
+                                    applyTheme()
+                                },
+                                label = { Text("Light") }
+                            )
+                            FilterChip(
+                                selected = editBaseTheme == BaseTheme.SYSTEM,
+                                onClick = { editBaseTheme = BaseTheme.SYSTEM; applyTheme() },
+                                label = { Text("System") }
+                            )
+                            FilterChip(
+                                selected = editBaseTheme == BaseTheme.CUSTOM,
+                                onClick = { editBaseTheme = BaseTheme.CUSTOM },
+                                label = { Text("Custom") }
+                            )
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text("Cards & shapes", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Style: ", style = MaterialTheme.typography.bodySmall)
-                            CardStyle.entries.forEach { style ->
-                                FilterChip(selected = editCardStyle == style,
-                                    onClick = { editCardStyle = style; applyTheme() },
-                                    label = { Text(style.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
-                                    modifier = Modifier.padding(end = 4.dp))
+
+                        // Customization only shows when Custom is selected
+                        if (editBaseTheme == BaseTheme.CUSTOM) {
+                            Spacer(Modifier.height(8.dp))
+                            HorizontalDivider()
+                            Spacer(Modifier.height(8.dp))
+                            Text("Presets", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                AppTonalButton(onClick = {
+                                    editPrimary = ThemeDefaults.Dark.primaryColor
+                                    editSecondary = ThemeDefaults.Dark.secondaryColor
+                                    editTertiary = ThemeDefaults.Dark.tertiaryColor
+                                    editBgColor = 0xFF0E1511L
+                                    applyTheme()
+                                }) { Text("Forest (Dark)") }
+                                AppTonalButton(onClick = {
+                                    editPrimary = ThemeDefaults.Light.primaryColor
+                                    editSecondary = ThemeDefaults.Light.secondaryColor
+                                    editTertiary = ThemeDefaults.Light.tertiaryColor
+                                    editBgColor = 0xFFF3F8EFL
+                                    applyTheme()
+                                }) { Text("Meadow (Light)") }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Colors", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            ColorPickerField("Primary", editPrimary, onPick = { editPrimary = it; applyTheme() })
+                            QuickSwatches(current = editPrimary, onPick = { editPrimary = it; applyTheme() })
+                            ColorPickerField("Secondary", editSecondary, onPick = { editSecondary = it; applyTheme() })
+                            QuickSwatches(current = editSecondary, onPick = { editSecondary = it; applyTheme() })
+                            ColorPickerField("Tertiary", editTertiary, onPick = { editTertiary = it; applyTheme() })
+                            QuickSwatches(current = editTertiary, onPick = { editTertiary = it; applyTheme() })
+                            Spacer(Modifier.height(8.dp))
+                            ColorPickerField("Background", editBgColor, onPick = { editBgColor = it; applyTheme() })
+                            Spacer(Modifier.height(12.dp))
+                            Text("Background image", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = editBgImage ?: "",
+                                onValueChange = { editBgImage = it; applyTheme() },
+                                placeholder = { Text("Image URL or file path") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                trailingIcon = if (editBgImage != null) {
+                                    { AppIconButton(onClick = { editBgImage = null; applyTheme() }, icon = Icons.Default.Close, contentDescription = "Clear") }
+                                } else null
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Opacity", style = MaterialTheme.typography.bodySmall)
+                                Slider(
+                                    value = editBgOpacity,
+                                    onValueChange = { editBgOpacity = it; applyTheme() },
+                                    modifier = Modifier.weight(1f),
+                                    valueRange = 0f..1f
+                                )
+                                Text("%.0f%%".format(editBgOpacity * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Cards & shapes", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Style: ", style = MaterialTheme.typography.bodySmall)
+                                CardStyle.entries.forEach { style ->
+                                    FilterChip(selected = editCardStyle == style,
+                                        onClick = { editCardStyle = style; applyTheme() },
+                                        label = { Text(style.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
+                                        modifier = Modifier.padding(end = 4.dp))
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Corners: ", style = MaterialTheme.typography.bodySmall)
+                                CornerRadius.entries.forEach { radius ->
+                                    FilterChip(selected = editCornerRadius == radius,
+                                        onClick = { editCornerRadius = radius; applyTheme() },
+                                        label = { Text(radius.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
+                                        modifier = Modifier.padding(end = 4.dp))
+                                }
                             }
                         }
-                        Spacer(Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Corners: ", style = MaterialTheme.typography.bodySmall)
-                            CornerRadius.entries.forEach { radius ->
-                                FilterChip(selected = editCornerRadius == radius,
-                                    onClick = { editCornerRadius = radius; applyTheme() },
-                                    label = { Text(radius.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
-                                    modifier = Modifier.padding(end = 4.dp))
+
+                        // Bottom actions — only in Custom mode
+                        if (editBaseTheme == BaseTheme.CUSTOM) {
+                            Spacer(Modifier.height(12.dp))
+                            HorizontalDivider()
+                            Spacer(Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AppButton(
+                                    onClick = { themeExpanded = false },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Apply") }
+                                AppTonalButton(
+                                    onClick = {
+                                        editBaseTheme = ThemeDefaults.Dark.baseTheme
+                                        editPrimary = ThemeDefaults.Dark.primaryColor
+                                        editSecondary = ThemeDefaults.Dark.secondaryColor
+                                        editTertiary = ThemeDefaults.Dark.tertiaryColor
+                                        editBgColor = 0xFF0E1511L
+                                        editCardStyle = ThemeDefaults.Dark.cardStyle
+                                        editCornerRadius = ThemeDefaults.Dark.cornerRadius
+                                        editBgImage = null
+                                        editBgOpacity = 0.3f
+                                        applyTheme()
+                                    },
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                ) { Text("Reset") }
                             }
                         }
                     }
@@ -305,151 +326,172 @@ fun SettingsScreen() {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Storage, null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Data", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("$sessionCount sessions | $substanceCount substances")
-                    Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.saveFile("sessions-export.json", "JSON files", listOf("json"))
-                                    if (path != null) {
-                                        try {
-                                            val json = ExportImport.exportSessions(repo)
-                                            PlatformFile.writeText(path, json)
-                                            dataStatus = "Exported ${repo.sessions.value.size} sessions"
-                                        } catch (e: Exception) {
-                                            dataStatus = "Export failed: ${e.message}"
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Export", maxLines = 1)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { dataExpanded = !dataExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Storage, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Data", style = MaterialTheme.typography.titleMedium)
                         }
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.openFile("JSON files", listOf("json"))
-                                    if (path != null) {
-                                        try {
-                                            val content = PlatformFile.readText(path)
-                                            val count = ExportImport.importSessions(repo, content)
-                                            dataStatus = "Imported $count sessions"
-                                        } catch (e: Exception) {
-                                            dataStatus = "Import failed: ${e.message}"
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Import", maxLines = 1)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("$sessionCount sessions | $substanceCount substances",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 8.dp))
+                            Icon(
+                                if (dataExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                    if (dataStatus != null) {
+                    if (dataExpanded) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("Export / Import", style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(4.dp))
-                        Text(dataStatus!!, style = MaterialTheme.typography.labelSmall,
-                            color = if (dataStatus!!.startsWith("Import") || dataStatus!!.startsWith("Export"))
-                                MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.error)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
-                    Text("CSV Export (analysis)", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.height(4.dp))
-                    Text("One row per entity, R/Pandas-friendly format.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.saveFile("sessions.csv", "CSV files", listOf("csv"))
-                                    if (path != null) {
-                                        try {
-                                            val csv = CsvExporter.exportSessionsCsv(repo)
-                                            PlatformFile.writeText(path, csv)
-                                            dataStatus = "Exported ${repo.sessions.value.size} sessions as CSV"
-                                        } catch (e: Exception) {
-                                            dataStatus = "CSV export failed: ${e.message}"
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.saveFile("sessions-export.json", "JSON files", listOf("json"))
+                                        if (path != null) {
+                                            try {
+                                                val json = ExportImport.exportSessions(repo)
+                                                PlatformFile.writeText(path, json)
+                                                dataStatus = "Exported ${repo.sessions.value.size} sessions"
+                                            } catch (e: Exception) {
+                                                dataStatus = "Export failed: ${e.message}"
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Sessions CSV", maxLines = 1)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Export", maxLines = 1)
+                            }
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.openFile("JSON files", listOf("json"))
+                                        if (path != null) {
+                                            try {
+                                                val content = PlatformFile.readText(path)
+                                                val count = ExportImport.importSessions(repo, content)
+                                                dataStatus = "Imported $count sessions"
+                                            } catch (e: Exception) {
+                                                dataStatus = "Import failed: ${e.message}"
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Import", maxLines = 1)
+                            }
                         }
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.saveFile("doses.csv", "CSV files", listOf("csv"))
-                                    if (path != null) {
-                                        try {
-                                            val csv = CsvExporter.exportDosesCsv(repo)
-                                            PlatformFile.writeText(path, csv)
-                                            dataStatus = "Exported doses as CSV"
-                                        } catch (e: Exception) {
-                                            dataStatus = "CSV export failed: ${e.message}"
-                                        }
-                                    }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Doses CSV", maxLines = 1)
+                        if (dataStatus != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(dataStatus!!, style = MaterialTheme.typography.labelSmall,
+                                color = if (dataStatus!!.startsWith("Import") || dataStatus!!.startsWith("Export"))
+                                    MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.error)
                         }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.saveFile("substances.csv", "CSV files", listOf("csv"))
-                                    if (path != null) {
-                                        try {
-                                            val csv = CsvExporter.exportSubstancesCsv(repo)
-                                            PlatformFile.writeText(path, csv)
-                                            dataStatus = "Exported ${repo.substances.value.size} substances as CSV"
-                                        } catch (e: Exception) {
-                                            dataStatus = "CSV export failed: ${e.message}"
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("CSV Export (analysis)", style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.height(4.dp))
+                        Text("One row per entity, R/Pandas-friendly format.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.saveFile("sessions.csv", "CSV files", listOf("csv"))
+                                        if (path != null) {
+                                            try {
+                                                val csv = CsvExporter.exportSessionsCsv(repo)
+                                                PlatformFile.writeText(path, csv)
+                                                dataStatus = "Exported ${repo.sessions.value.size} sessions as CSV"
+                                            } catch (e: Exception) {
+                                                dataStatus = "CSV export failed: ${e.message}"
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Substances CSV", maxLines = 1)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Sessions CSV", maxLines = 1)
+                            }
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.saveFile("doses.csv", "CSV files", listOf("csv"))
+                                        if (path != null) {
+                                            try {
+                                                val csv = CsvExporter.exportDosesCsv(repo)
+                                                PlatformFile.writeText(path, csv)
+                                                dataStatus = "Exported doses as CSV"
+                                            } catch (e: Exception) {
+                                                dataStatus = "CSV export failed: ${e.message}"
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Doses CSV", maxLines = 1)
+                            }
                         }
-                        AppOutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    val path = FilePicker.saveFile("nepenthe-export.zip", "ZIP archives", listOf("zip"))
-                                    if (path != null) {
-                                        try {
-                                            val count = ZipExporter.exportAll(repo, path)
-                                            dataStatus = "Exported $count CSV files as zip"
-                                        } catch (e: Exception) {
-                                            dataStatus = "ZIP export failed: ${e.message}"
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.saveFile("substances.csv", "CSV files", listOf("csv"))
+                                        if (path != null) {
+                                            try {
+                                                val csv = CsvExporter.exportSubstancesCsv(repo)
+                                                PlatformFile.writeText(path, csv)
+                                                dataStatus = "Exported ${repo.substances.value.size} substances as CSV"
+                                            } catch (e: Exception) {
+                                                dataStatus = "CSV export failed: ${e.message}"
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("All (Zip)", maxLines = 1)
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Substances CSV", maxLines = 1)
+                            }
+                            AppOutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val path = FilePicker.saveFile("nepenthe-export.zip", "ZIP archives", listOf("zip"))
+                                        if (path != null) {
+                                            try {
+                                                val count = ZipExporter.exportAll(repo, path)
+                                                dataStatus = "Exported $count CSV files as zip"
+                                            } catch (e: Exception) {
+                                                dataStatus = "ZIP export failed: ${e.message}"
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("All (Zip)", maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -528,44 +570,63 @@ fun SettingsScreen() {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.MenuBook, null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Substance library", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("PsychonautWiki substance dataset (effects + interactions). Runs once; you only add your own on top.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Substance database loaded from bundled seed resource. Run scripts/smw_dump.py to refresh.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppButton(
-                            onClick = {
-                                scope.launch {
-                                    isFetching = true
-                                    fetchStatus = "Reimporting from seed..."
-                                    val store = JournalStore(repo)
-                                    repo.clearAll()
-                                    store.load()
-                                    isFetching = false
-                                    fetchStatus = "Reloaded from disk / seed"
-                                }
-                            },
-                            enabled = !isFetching,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Reimport seed data")
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { libraryExpanded = !libraryExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.MenuBook, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Substance library", style = MaterialTheme.typography.titleMedium)
                         }
+                        Icon(
+                            if (libraryExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    if (fetchStatus != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(fetchStatus!!, style = MaterialTheme.typography.labelSmall,
-                            color = if (fetchStatus!!.startsWith("Loaded")) MaterialTheme.colorScheme.primary
-                            else if (fetchStatus!!.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (libraryExpanded) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("PsychonautWiki substance dataset (effects + interactions). Runs once; you only add your own on top.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Substance database loaded from bundled seed resource. Run scripts/smw_dump.py to refresh.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AppButton(
+                                onClick = {
+                                    scope.launch {
+                                        isFetching = true
+                                        fetchStatus = "Reimporting from seed..."
+                                        try {
+                                            val store = JournalStore(repo)
+                                            repo.clearAll()
+                                            store.load()
+                                            fetchStatus = "Reloaded from disk / seed"
+                                        } catch (e: Exception) {
+                                            fetchStatus = "Reimport failed: ${e.message}"
+                                        }
+                                        isFetching = false
+                                    }
+                                },
+                                enabled = !isFetching,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Reimport seed data")
+                            }
+                        }
+                        if (fetchStatus != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(fetchStatus!!, style = MaterialTheme.typography.labelSmall,
+                                color = if (fetchStatus!!.startsWith("Loaded")) MaterialTheme.colorScheme.primary
+                                else if (fetchStatus!!.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
@@ -577,153 +638,227 @@ fun SettingsScreen() {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("About", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text("Nepenthe Journal v0.1.0")
-                    Text("Offline-first psychoactive substance session tracker",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("by Wolren", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text("GNU GPLv3 License", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary)
-                    Text("Compose Multiplatform + Ktor (P2P sync)",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Derived from PsychonautWiki Journal by Isaak Hanimann",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("All data stored locally on device. No cloud, no accounts, no tracking.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                    Spacer(Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { aboutExpanded = !aboutExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text("Pledge", style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                "Your data is yours. This app will never have ads, " +
-                                "subscriptions, or telemetry. No accounts, no cloud, " +
-                                "no tracking. Always.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                            )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("About", style = MaterialTheme.typography.titleMedium)
                         }
+                        Icon(
+                            if (aboutExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                    if (aboutExpanded) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("Nepenthe Journal v0.1.0")
+                        Text("Offline-first psychoactive substance session tracker",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("by Wolren", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(4.dp))
+                        Text("GNU GPLv3 License", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text("Compose Multiplatform + Ktor (P2P sync)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Derived from PsychonautWiki Journal by Isaak Hanimann",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("All data stored locally on device. No cloud, no accounts, no tracking.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    Spacer(Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AppOutlinedButton(
-                            onClick = {
-                                try {
-                                    val uri = java.net.URI("https://github.com/Wolren/nepenthe-journal")
-                                    java.awt.Desktop.getDesktop().browse(uri)
-                                } catch (_: Exception) { }
-                            },
-                            modifier = Modifier.weight(1f)
+                        Spacer(Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Filled.OpenInNew, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Source", maxLines = 1)
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text("Pledge", style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Your data is yours. This app will never have ads, " +
+                                    "subscriptions, or telemetry. No accounts, no cloud, " +
+                                    "no tracking. Always.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                )
+                            }
                         }
-                        AppOutlinedButton(
-                            onClick = {
-                                try {
-                                    val uri = java.net.URI("https://ko-fi.com/wolren")
-                                    java.awt.Desktop.getDesktop().browse(uri)
-                                } catch (_: Exception) { }
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Filled.FavoriteBorder, null, modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Ko-fi", maxLines = 1, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val uriHandler = LocalUriHandler.current
+                            AppOutlinedButton(
+                                onClick = { uriHandler.openUri("https://github.com/Wolren/NepentheJournal") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Source", maxLines = 1)
+                            }
+                            AppOutlinedButton(
+                                onClick = { uriHandler.openUri("https://ko-fi.com/wolren") },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Ko-fi", maxLines = 1, color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f))
+                            }
                         }
                     }
                 }
             }
         }
 
-        // ================ LEGAL & PRIVACY ================
+        // ================ LEGAL ================
         item {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Shield, null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Legal & Privacy", style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { legalExpanded = !legalExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Dangerous, null, tint = MaterialTheme.colorScheme.error)
+                            Text("Legal", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Icon(
+                            if (legalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                    if (legalExpanded) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
 
-                    Spacer(Modifier.height(12.dp))
+                        Text("Medical disclaimer", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "This app is not a medical device and does not diagnose, treat, cure, " +
+                            "or prevent any medical condition. The substance reference data is sourced " +
+                            "from PsychonautWiki and is provided for harm reduction and informational " +
+                            "purposes only.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Text("Medical disclaimer", style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "This app is not a medical device and does not diagnose, treat, cure, " +
-                        "or prevent any medical condition. The substance reference data is sourced " +
-                        "from PsychonautWiki and is provided for harm reduction and informational " +
-                        "purposes only.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        Spacer(Modifier.height(12.dp))
 
-                    Spacer(Modifier.height(12.dp))
+                        Text("Healthcare reminder", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "If you have concerns about your health or substance use, consult " +
+                            "a qualified healthcare professional. In an emergency, call emergency " +
+                            "services immediately (EU: 112, US: 911, UK: 999).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Text("Healthcare reminder", style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "If you have concerns about your health or substance use, consult " +
-                        "a qualified healthcare professional. In an emergency, call emergency " +
-                        "services immediately (EU: 112, US: 911, UK: 999).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        Spacer(Modifier.height(12.dp))
 
-                    Spacer(Modifier.height(12.dp))
+                        Text("License", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Nepenthe Journal is free software: you can redistribute it and/or modify " +
+                            "it under the terms of the GNU General Public License as published by " +
+                            "the Free Software Foundation, either version 3 of the License, or " +
+                            "(at your option) any later version.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
 
-                    Text("Privacy & data", style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "All journal data is stored locally on your device. No data is uploaded " +
-                        "to any cloud server, third party, or remote database. The app contains " +
-                        "no analytics, telemetry, or tracking software.\n\n" +
-                        "Optional P2P sync transmits data directly between your own devices " +
-                        "over your local network only. No data passes through any external relay.\n\n" +
-                        "Full privacy policy: PRIVACY.md in the app repository.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        // ================ PRIVACY ================
+        item {
+            Card(modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { privacyExpanded = !privacyExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Shield, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Privacy", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Icon(
+                            if (privacyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (privacyExpanded) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
 
-                    Spacer(Modifier.height(12.dp))
+                        Text("Privacy & data", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "All journal data is stored locally on your device. " +
+                            "There is no connected server — nothing is uploaded, synced, or sent " +
+                            "without your explicit action.\n\n" +
+                            "The app contains no analytics, no telemetry, and no tracking software. " +
+                            "No data is collected or transmitted automatically.\n\n" +
+                            "You can manually export your full journal data at any time via " +
+                            "Settings > Data (JSON, CSV, or ZIP). Sharing those exports is " +
+                            "entirely at your discretion — nothing leaves your device until " +
+                            "you explicitly choose to export and share it.\n\n" +
+                            "Optional P2P sync transmits data directly between your own devices " +
+                            "over your local network only. No data passes through any external relay.\n\n" +
+                            "Full privacy policy: PRIVACY.md in the app repository.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
 
-                    Text("Business model pledge", style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "This app will never include advertisements, subscription tiers, " +
-                        "or paid features. All functionality is and will always be free. " +
-                        "No telemetry, no accounts, no cloud dependency. Your data is yours.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        Spacer(Modifier.height(12.dp))
+
+                        Text("Business model pledge", style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "This app will never include:\n\n" +
+                            "  - Advertisements of any kind\n" +
+                            "  - Subscription tiers or paid features\n" +
+                            "  - Telemetry, analytics, or crash reporting\n" +
+                            "  - Account requirements or cloud dependency\n\n" +
+                            "All functionality is and will always be free. " +
+                            "This is a firm commitment, not a current-state description.\n\n" +
+                            "You own your data. Manual export is always available — " +
+                            "nothing leaves your device unless you explicitly choose to share it.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -745,8 +880,12 @@ fun SettingsScreen() {
                     AppOutlinedButton(
                         onClick = {
                             scope.launch {
-                                app.journal.data.DataInitializer.resetWithTestData(repo)
-                                dataStatus = "Test data loaded (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)"
+                                try {
+                                    app.journal.data.DataInitializer.resetWithTestData(repo)
+                                    dataStatus = "Test data loaded (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)"
+                                } catch (e: Exception) {
+                                    dataStatus = "Test data failed: ${e.message}"
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()

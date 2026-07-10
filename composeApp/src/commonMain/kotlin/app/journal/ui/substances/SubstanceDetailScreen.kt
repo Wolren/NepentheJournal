@@ -9,13 +9,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -86,11 +85,13 @@ fun SubstanceDetailScreen(
                         onClick = { menuExpanded = false; onEdit(substanceId) },
                         leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                        onClick = { menuExpanded = false; showDeleteConfirm = true },
-                        leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error) }
-                    )
+                    if (substance.deviceOrigin != "system") {
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            onClick = { menuExpanded = false; showDeleteConfirm = true },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error) }
+                        )
+                    }
                 }
             }
         }
@@ -408,6 +409,8 @@ private fun DetailRow(label: String, value: String) {
 @Composable
 private fun EffectsSection(substance: Substance) {
     val effects = substance.effects
+    var selectedEffect by remember { mutableStateOf<String?>(null) }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth()
@@ -421,35 +424,67 @@ private fun EffectsSection(substance: Substance) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 110.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp),
-                    userScrollEnabled = false
+                val displayEffects = effects.filterNot { it.matches(Regex(".+effect ?\\d+", RegexOption.IGNORE_CASE)) }.sorted()
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(effects.size) { i ->
-                        val effect = effects[i]
+                    for (effect in displayEffects) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            onClick = { selectedEffect = effect },
+                            shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.wrapContentSize()
+                            tonalElevation = 1.dp
                         ) {
                             Text(
                                 effect,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                             )
                         }
                     }
                 }
-                Text("${effects.size} effects reported on PsychonautWiki.",
+                Text("${displayEffects.size} effects reported on PsychonautWiki.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp))
             }
         }
+    }
+
+    val uriHandler = LocalUriHandler.current
+
+    // Effect detail dialog
+    selectedEffect?.let { effectName ->
+        AlertDialog(
+            onDismissRequest = { selectedEffect = null },
+            title = { Text(effectName, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Text(
+                    "This effect is reported for ${substance.name} on PsychonautWiki. " +
+                    "Would you like to read more about it?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val query = "${effectName} ${substance.name}".replace(" ", "_")
+                    uriHandler.openUri("https://psychonautwiki.org/w/index.php?search=$query")
+                    selectedEffect = null
+                }) {
+                    Text("Read more")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedEffect = null }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 }
 
