@@ -1,11 +1,13 @@
 package app.journal.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /**
  * Molecular properties from PubChem.
  * Every pure compound gets a CID that uniquely identifies it at the chemical level.
  */
+@Immutable
 @Serializable
 data class ChemicalProperties(
     val cid: Long,
@@ -23,6 +25,7 @@ data class ChemicalProperties(
  * Cross-database identifiers from Wikidata.
  * Links this substance to ChEMBL, DrugBank, IUPHAR, and other pharmacological databases.
  */
+@Immutable
 @Serializable
 data class WikidataRefs(
     val qid: String? = null,
@@ -38,6 +41,7 @@ data class WikidataRefs(
 /**
  * Single bioactivity measurement from ChEMBL.
  */
+@Immutable
 @Serializable
 data class Bioactivity(
     val type: String, // IC50, Ki, EC50, Kd
@@ -51,6 +55,7 @@ data class Bioactivity(
 /**
  * ChEMBL molecule data including bioactivities against molecular targets.
  */
+@Immutable
 @Serializable
 data class ChemblData(
     val prefName: String? = null,
@@ -71,6 +76,7 @@ data class ChemblData(
  *
  * The oldId field preserves the previous pwiki: name for migration.
  */
+@Immutable
 @Serializable
 data class Substance(
     override val id: String,

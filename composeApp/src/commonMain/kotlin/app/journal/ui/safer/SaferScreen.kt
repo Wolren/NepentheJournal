@@ -44,14 +44,15 @@ fun SaferScreen() {
                             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        "This app is not a medical device and does not diagnose, treat, cure, " +
-                        "or prevent any medical condition. The information provided is for harm " +
-                        "reduction and educational purposes only. Always consult a qualified " +
-                        "healthcare professional for medical advice.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
-                    )
+                                    SelectableText(
+                                        text = "This app is not a medical device and does not diagnose, treat, cure, " +
+                                        "or prevent any medical condition. The information provided is for harm " +
+                                        "reduction and educational purposes only. Always consult a qualified " +
+                                        "healthcare professional for medical advice.",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f)
+                                        )
+                                    )
                 }
             }
         }
@@ -127,13 +128,14 @@ fun SaferScreen() {
                             fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        "If you are concerned about your substance use or health, contact a " +
+                    SelectableText(
+                        text = "If you are concerned about your substance use or health, contact a " +
                         "healthcare professional or support service. In an emergency, call " +
                         "emergency services immediately.\n\n" +
                         "EU: 112  |  US: 911  |  UK: 111 (non-emergency) / 999 (emergency)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                        )
                     )
                 }
             }
@@ -165,8 +167,12 @@ private fun SaferSection(
                 Text(title, style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
-                Text(body, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SelectableText(
+                    text = body,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
             }
         }
     }

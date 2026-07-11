@@ -3,6 +3,7 @@ package app.journal.ui.dashboard
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -36,9 +37,11 @@ fun DashboardScreen() {
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
 
-    // Tolerance derived from dose data — uses the same dose state so only
-    // one recomposition when doses change (not double from toleranceVersion).
-    val toleranceAll = remember(doses, substances) { ToleranceCalculator.calculate(repo) }
+    // Tolerance derived from dose data. Keys on toleranceVersion so the
+    // calculation only re-runs when doses mutate, not on every recomposition.
+    // ToleranceCalculator internally caches by version for further safety.
+    val toleranceVersion by repo.toleranceVersion.collectAsState()
+    val toleranceAll = remember(toleranceVersion) { ToleranceCalculator.calculate(repo) }
     val toleranceList = remember(toleranceAll) {
         // Cap NONE-level items to 5 to avoid endless scrolling
         val nonNone = toleranceAll.filter { it.level != ToleranceLevel.NONE }
@@ -123,8 +126,10 @@ fun DashboardScreen() {
                 }
             }
 
-            items(toleranceList, key = { it.substanceId }) { info ->
-                ToleranceCard(info)
+            itemsIndexed(toleranceList, key = { _, info -> info.substanceId }) { _, info ->
+                AnimatedListItem {
+                    ToleranceCard(info)
+                }
             }
         } else {
             // Empty state

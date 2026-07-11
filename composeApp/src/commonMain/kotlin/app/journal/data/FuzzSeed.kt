@@ -205,10 +205,12 @@ object FuzzSeed {
             }
         }
 
-        // Insert everything
-        sessions.forEach { repo.upsertSession(it) }
-        allDoses.forEach { repo.upsertDose(it) }
-        allTimelineEvents.forEach { repo.upsertTimelineEvent(it) }
+        // Insert everything in a single bulk pass (reduces StateFlow from 177 to 4)
+        repo.bulkInsert(
+            sessions = sessions,
+            doses = allDoses,
+            timelineEvents = allTimelineEvents
+        )
 
         // Add interactions from the real seed data for substances present
         if (substances.size >= 3) {

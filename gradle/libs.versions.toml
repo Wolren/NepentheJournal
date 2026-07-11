@@ -11,6 +11,7 @@ multiplatform-settings = "1.3.0"
 logback                 = "1.5.38"
 ktor-server            = "3.5.1"
 jmdns                  = "3.6.3"
+coil                   = "3.0.4"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "kotlinx-coroutines" }
@@ -27,9 +28,13 @@ androidx-activity       = { module = "androidx.activity:activity-compose",      
 multiplatform-settings  = { module = "com.russhwolf:multiplatform-settings",    version.ref = "multiplatform-settings" }
 logback-classic         = { module = "ch.qos.logback:logback-classic",          version.ref = "logback" }
 ktor-server-cio         = { module = "io.ktor:ktor-server-cio",                version.ref = "ktor-server" }
+ktor-server-netty        = { module = "io.ktor:ktor-server-netty",              version.ref = "ktor-server" }
 ktor-server-core        = { module = "io.ktor:ktor-server-core",               version.ref = "ktor-server" }
 ktor-server-content     = { module = "io.ktor:ktor-server-content-negotiation",version.ref = "ktor-server" }
+ktor-server-test-host   = { module = "io.ktor:ktor-server-test-host",           version.ref = "ktor-server" }
 jmdns                   = { module = "org.jmdns:jmdns",                        version.ref = "jmdns" }
+coil-compose            = { module = "io.coil-kt.coil3:coil-compose",           version.ref = "coil" }
+coil-network-ktor       = { module = "io.coil-kt.coil3:coil-network-ktor3",    version.ref = "coil" }
 
 [plugins]
 kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",       version.ref = "kotlin" }

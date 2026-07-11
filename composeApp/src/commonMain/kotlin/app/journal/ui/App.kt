@@ -14,6 +14,7 @@
 package app.journal.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.IntOffset
+import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.model.Session
 import app.journal.util.currentTimeMillis
@@ -51,7 +54,9 @@ import app.journal.ui.settings.SettingsScreen
 import app.journal.ui.substances.SubstanceEditorScreen
 import app.journal.ui.substances.SubstanceDetailScreen
 import app.journal.ui.substances.SubstanceScreen
+import app.journal.ui.theme.BackgroundImage
 import app.journal.ui.theme.LocalThemeConfig
+import app.journal.ui.theme.NepentheTypography
 import app.journal.ui.theme.ThemeManager
 import app.journal.ui.SystemBackHandler
 
@@ -69,7 +74,7 @@ enum class Screen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App() {
+fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 
@@ -85,225 +90,235 @@ fun App() {
     var liveSessionId by remember { mutableStateOf<String?>(null) }
 
     CompositionLocalProvider(LocalThemeConfig provides themeConfig) {
+        CompositionLocalProvider(LocalRepo provides repo) {
         val isDark = themeManager.isDarkTheme()
         val colorScheme = themeManager.colorScheme(isDark)
 
         MaterialTheme(
             colorScheme = colorScheme,
+            typography = NepentheTypography,
             shapes = themeConfig.shapes
         ) {
-            // Root Surface ensures the entire window is always filled with
-            // the theme background color — no white flash during transitions.
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = colorScheme.background
             ) {
-                val editingSession = editingSessionId?.let { id ->
-                    if (id == "__new__") null
-                    else remember { JournalRepository.instance }.getSession(id)
-                }
-                val editingSubstance = editingSubstanceId?.let { id ->
-                    if (id == "__new__") null
-                    else remember { JournalRepository.instance }.getSubstance(id)
-                }
+                Box(Modifier.fillMaxSize()) {
+                    // Background image layer (renders behind content)
+                    BackgroundImage(
+                        imagePath = themeConfig.backgroundImagePath,
+                        opacity = themeConfig.backgroundOpacity
+                    )
 
-                // Capture overlay IDs before AnimatedContent so they remain
-                // valid during exit animations even after the state is cleared.
-                val stableTimelineId = selectedTimelineSessionId
-                val stableSubstanceId = selectedSubstanceId
-                val stableLiveId = liveSessionId
-
-            // Intercept system back button (Android) / map to overlay back
-            SystemBackHandler {
-                when {
-                    liveSessionId != null -> liveSessionId = null
-                    editingSessionId != null -> editingSessionId = null
-                    selectedTimelineSessionId != null -> selectedTimelineSessionId = null
-                    editingSubstanceId != null -> editingSubstanceId = null
-                    selectedSubstanceId != null -> selectedSubstanceId = null
-                    showCalendar -> showCalendar = false
-                }
-            }
-
-            // Overlays with crossfade + slide animations (4.2)
-            // Detect software rendering — skip animations to avoid tearing/flashing
-            val isSoftwareRender = remember {
-                System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE" ||
-                System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE_FAST"
-            }
-            val animDuration = if (isSoftwareRender) 0 else 200
-            AnimatedContent(
-                targetState = when {
-                    liveSessionId != null -> "live_session"
-                    editingSessionId != null -> "editor_session"
-                    selectedTimelineSessionId != null -> "timeline"
-                    editingSubstanceId != null -> "editor_substance"
-                    selectedSubstanceId != null -> "detail_substance"
-                    showCalendar -> "calendar"
-                    else -> "main"
-                },
-                transitionSpec = {
-                    if (targetState == "main") {
-                        // Slide only — no fadeIn to avoid white flash from
-                        // transparent background showing through while overlay slides out.
-                        slideInVertically(animationSpec = tween(animDuration)) { it / 4 } togetherWith
-                        slideOutVertically(animationSpec = tween(animDuration)) { it / 4 }
-                    } else {
-                        slideInVertically(animationSpec = tween(animDuration)) { it / 4 } togetherWith
-                        fadeOut(animationSpec = tween(animDuration))
-                    }
-                },
-                label = "navOverlay"
-            ) { state ->
-            when (state) {
-                "live_session" -> {
-                    val session = stableLiveId?.let { id ->
+                    // Foreground content
+                    val editingSession = editingSessionId?.let { id ->
                         if (id == "__new__") null
-                        else JournalRepository.instance.getSession(id)
+                        else repo.getSession(id)
                     }
-                    if (session != null) {
-                        LiveSessionScreen(
-                            session = session,
-                            onBack = { liveSessionId = null }
-                        )
-                    } else {
-                        // Create a new session then navigate to live session
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Starting session...")
-                        }
-                        LaunchedEffect(Unit) {
-                            val now = currentTimeMillis()
-                            val newSession = Session(
-                                id = "session:live:${now}",
-                                title = "Live Session",
-                                startTime = now,
-                                tags = emptyList(),
-                                createdAt = now, updatedAt = now,
-                                deviceOrigin = platformDeviceOrigin()
-                            )
-                            JournalRepository.instance.upsertSession(newSession)
-                            liveSessionId = newSession.id
+                    val editingSubstance = editingSubstanceId?.let { id ->
+                        if (id == "__new__") null
+                        else repo.getSubstance(id)
+                    }
+
+                    val stableTimelineId = selectedTimelineSessionId
+                    val stableSubstanceId = selectedSubstanceId
+                    val stableLiveId = liveSessionId
+
+                    SystemBackHandler {
+                        when {
+                            liveSessionId != null -> liveSessionId = null
+                            editingSessionId != null -> editingSessionId = null
+                            selectedTimelineSessionId != null -> selectedTimelineSessionId = null
+                            editingSubstanceId != null -> editingSubstanceId = null
+                            selectedSubstanceId != null -> selectedSubstanceId = null
+                            showCalendar -> showCalendar = false
                         }
                     }
-                }
-                "editor_session" -> {
-                        SessionEditorScreen(
-                            sessionToEdit = editingSession,
-                            onBack = { editingSessionId = null }
-                        )
+
+                    val isSoftwareRender = remember {
+                        System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE" ||
+                        System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE_FAST"
                     }
-                    "timeline" -> {
-                        val id = stableTimelineId
-                        if (id != null) {
-                            SessionTimelineScreen(
-                                sessionId = id,
-                                onBack = { selectedTimelineSessionId = null }
-                            )
-                        }
+                    val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember {
+                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 10000f)
+                        else spring(dampingRatio = 0.8f, stiffness = 260f)
                     }
-                    "editor_substance" -> {
-                        SubstanceEditorScreen(
-                            substanceToEdit = editingSubstance,
-                            onBack = { editingSubstanceId = null }
-                        )
+                    val fadeSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = remember {
+                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 10000f)
+                        else spring(dampingRatio = 0.8f, stiffness = 260f)
                     }
-                    "detail_substance" -> {
-                        val id = stableSubstanceId
-                        if (id != null) {
-                            SubstanceDetailScreen(
-                                substanceId = id,
-                                onBack = { selectedSubstanceId = null },
-                                onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null }
-                            )
-                        }
-                    }
-                    "calendar" -> {
-                        CalendarScreen(
-                            onBack = { showCalendar = false },
-                            onSessionTap = { id -> selectedTimelineSessionId = id; showCalendar = false }
-                        )
-                    }
-                    "main" -> {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = {
-                            if (selectedScreen == Screen.SESSIONS) {
-                                TopAppBar(
-                                    title = {
-                                        Text(
-                                            selectedScreen.label,
-                                            style = MaterialTheme.typography.titleLarge
-                                        )
-                                    },
-                                actions = {
-                                    when (selectedScreen) {
-                                        Screen.SESSIONS -> SessionListScreen.TopActions(
-                                            showFavoritesOnly = showFavoritesOnly,
-                                            showArchived = showArchived,
-                                            onToggleFavorites = { showFavoritesOnly = !showFavoritesOnly },
-                                            onToggleArchived = { showArchived = !showArchived },
-                                            onCalendarClick = { showCalendar = true },
-                                            useRelativeTime = useRelativeTime,
-                                            onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
-                                        )
-                                        else -> Unit
-                                    }
-                                },
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = Color.Transparent,
-                                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
+
+                    AnimatedContent(
+                        targetState = when {
+                            liveSessionId != null -> "live_session"
+                            editingSessionId != null -> "editor_session"
+                            selectedTimelineSessionId != null -> "timeline"
+                            editingSubstanceId != null -> "editor_substance"
+                            selectedSubstanceId != null -> "detail_substance"
+                            showCalendar -> "calendar"
+                            else -> "main"
+                        },
+                        transitionSpec = {
+                            if (targetState == "main") {
+                                slideInVertically(animationSpec = slideSpec) { it / 4 } togetherWith
+                                slideOutVertically(animationSpec = slideSpec) { it / 4 }
+                            } else {
+                                slideInVertically(animationSpec = slideSpec) { it / 4 } togetherWith
+                                fadeOut(animationSpec = fadeSpec)
                             }
                         },
-                        bottomBar = {
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ) {
-                                Screen.entries.forEach { screen ->
-                                    NavigationBarItem(
-                                        selected = selectedScreen == screen,
-                                        onClick = { selectedScreen = screen },
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selectedScreen == screen) screen.filledIcon else screen.outlinedIcon,
-                                                contentDescription = screen.label
-                                            )
-                                        },
-                                        label = { Text(screen.label) }
+                        label = "navOverlay"
+                    ) { state ->
+                        when (state) {
+                            "live_session" -> {
+                                val session = stableLiveId?.let { id ->
+                                    if (id == "__new__") null
+                                    else JournalRepository.instance.getSession(id)
+                                }
+                                if (session != null) {
+                                    LiveSessionScreen(
+                                        session = session,
+                                        onBack = { liveSessionId = null }
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("Starting session...")
+                                    }
+                                    LaunchedEffect(Unit) {
+                                        val now = currentTimeMillis()
+                                        val newSession = Session(
+                                            id = "session:live:${now}",
+                                            title = "Live Session",
+                                            startTime = now,
+                                            tags = emptyList(),
+                                            createdAt = now, updatedAt = now,
+                                            deviceOrigin = platformDeviceOrigin()
+                                        )
+                                        JournalRepository.instance.upsertSession(newSession)
+                                        liveSessionId = newSession.id
+                                    }
+                                }
+                            }
+                            "editor_session" -> {
+                                SessionEditorScreen(
+                                    sessionToEdit = editingSession,
+                                    onBack = { editingSessionId = null }
+                                )
+                            }
+                            "timeline" -> {
+                                val id = stableTimelineId
+                                if (id != null) {
+                                    SessionTimelineScreen(
+                                        sessionId = id,
+                                        onBack = { selectedTimelineSessionId = null }
                                     )
                                 }
                             }
-                        }
-                    ) { innerPadding ->
-                        Box(Modifier.padding(innerPadding).fillMaxSize()) {
-                            when (selectedScreen) {
-                                Screen.DASHBOARD   -> DashboardScreen()
-                                Screen.SESSIONS    -> SessionListScreen(
-                                    onNewSession = { editingSessionId = "__new__" },
-                                    onEditSession = { id -> editingSessionId = id },
-                                    onSessionClick = { id -> selectedTimelineSessionId = id },
-                                    onLiveSession = { liveSessionId = "__new__" },
-                                    showFavoritesOnly = showFavoritesOnly,
-                                    showArchived = showArchived,
-                                    useRelativeTime = useRelativeTime,
-                                    onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
+                            "editor_substance" -> {
+                                SubstanceEditorScreen(
+                                    substanceToEdit = editingSubstance,
+                                    onBack = { editingSubstanceId = null }
                                 )
-                                Screen.SUBSTANCES  -> SubstanceScreen(
-                                    onSubstanceClick = { id -> selectedSubstanceId = id },
-                                    onNewSubstance = { editingSubstanceId = "__new__" }
+                            }
+                            "detail_substance" -> {
+                                val id = stableSubstanceId
+                                if (id != null) {
+                                    SubstanceDetailScreen(
+                                        substanceId = id,
+                                        onBack = { selectedSubstanceId = null },
+                                        onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null }
+                                    )
+                                }
+                            }
+                            "calendar" -> {
+                                CalendarScreen(
+                                    onBack = { showCalendar = false },
+                                    onSessionTap = { id -> selectedTimelineSessionId = id; showCalendar = false }
                                 )
-                                Screen.SAFER        -> SaferScreen()
-                                Screen.SETTINGS    -> SettingsScreen()
+                            }
+                            "main" -> {
+                                Scaffold(
+                                    modifier = Modifier.fillMaxSize(),
+                                    topBar = {
+                                        if (selectedScreen == Screen.SESSIONS) {
+                                            TopAppBar(
+                                                title = {
+                                                    Text(
+                                                        selectedScreen.label,
+                                                        style = MaterialTheme.typography.titleLarge
+                                                    )
+                                                },
+                                                actions = {
+                                                    when (selectedScreen) {
+                                                        Screen.SESSIONS -> SessionListScreen.TopActions(
+                                                            showFavoritesOnly = showFavoritesOnly,
+                                                            showArchived = showArchived,
+                                                            onToggleFavorites = { showFavoritesOnly = !showFavoritesOnly },
+                                                            onToggleArchived = { showArchived = !showArchived },
+                                                            onCalendarClick = { showCalendar = true },
+                                                            useRelativeTime = useRelativeTime,
+                                                            onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
+                                                        )
+                                                        else -> Unit
+                                                    }
+                                                },
+                                                colors = TopAppBarDefaults.topAppBarColors(
+                                                    containerColor = Color.Transparent,
+                                                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            )
+                                        }
+                                    },
+                                    bottomBar = {
+                                        NavigationBar(
+                                            containerColor = MaterialTheme.colorScheme.surface,
+                                            contentColor = MaterialTheme.colorScheme.onSurface
+                                        ) {
+                                            Screen.entries.forEach { screen ->
+                                                NavigationBarItem(
+                                                    selected = selectedScreen == screen,
+                                                    onClick = { selectedScreen = screen },
+                                                    icon = {
+                                                        Icon(
+                                                            imageVector = if (selectedScreen == screen) screen.filledIcon else screen.outlinedIcon,
+                                                            contentDescription = screen.label
+                                                        )
+                                                    },
+                                                    label = { Text(screen.label) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                ) { innerPadding ->
+                                    Box(Modifier.padding(innerPadding).fillMaxSize()) {
+                                        when (selectedScreen) {
+                                            Screen.DASHBOARD -> DashboardScreen()
+                                            Screen.SESSIONS -> SessionListScreen(
+                                                onNewSession = { editingSessionId = "__new__" },
+                                                onEditSession = { id -> editingSessionId = id },
+                                                onSessionClick = { id -> selectedTimelineSessionId = id },
+                                                onLiveSession = { liveSessionId = "__new__" },
+                                                showFavoritesOnly = showFavoritesOnly,
+                                                showArchived = showArchived,
+                                                useRelativeTime = useRelativeTime,
+                                                onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
+                                            )
+                                            Screen.SUBSTANCES -> SubstanceScreen(
+                                                onSubstanceClick = { id -> selectedSubstanceId = id },
+                                                onNewSubstance = { editingSubstanceId = "__new__" }
+                                            )
+                                            Screen.SAFER -> SaferScreen()
+                                            Screen.SETTINGS -> SettingsScreen()
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                    }
                 }
-            }
             }
         }
     }
+}
 }

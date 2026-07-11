@@ -13,6 +13,36 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
 /**
+ * Press-animation modifier. Wraps a composable in a scale animation that
+ * shrinks slightly on press and springs back on release.
+ *
+ * @param scaleWhenPressed animation target scale (e.g. 0.97f for buttons, 0.90f for icon buttons)
+ */
+@Composable
+private fun Modifier.pressScale(
+    scaleWhenPressed: Float = 0.97f,
+    interactionSource: MutableInteractionSource
+): Modifier {
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (isPressed) scaleWhenPressed else 1f,
+        label = "press_scale"
+    )
+    return this.graphicsLayer { scaleX = scale; scaleY = scale }
+}
+
+/**
+ * Internal helper: renders a leading icon with spacing if [icon] is provided.
+ */
+@Composable
+private fun RowScope.IconSlot(icon: ImageVector?, contentDescription: String?) {
+    if (icon != null) {
+        Icon(icon, contentDescription, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+    }
+}
+
+/**
  * Filled button with press animation and theme shape.
  * Replaces bare [Button].
  */
@@ -28,12 +58,9 @@ fun AppButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "btn_scale")
-
     Button(
         onClick = onClick,
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.pressScale(interactionSource = interactionSource),
         enabled = enabled,
         colors = colors ?: ButtonDefaults.buttonColors(),
         interactionSource = interactionSource,
@@ -61,12 +88,9 @@ fun AppOutlinedButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "btn_scale")
-
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.pressScale(interactionSource = interactionSource),
         enabled = enabled,
         colors = colors ?: ButtonDefaults.outlinedButtonColors(),
         interactionSource = interactionSource,
@@ -94,12 +118,9 @@ fun AppTonalButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "btn_scale")
-
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.pressScale(interactionSource = interactionSource),
         enabled = enabled,
         colors = colors ?: ButtonDefaults.filledTonalButtonColors(),
         interactionSource = interactionSource,
@@ -125,12 +146,9 @@ fun AppTextButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "btn_scale")
-
     TextButton(
         onClick = onClick,
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.pressScale(interactionSource = interactionSource),
         enabled = enabled,
         interactionSource = interactionSource,
         shape = MaterialTheme.shapes.small,
@@ -142,7 +160,7 @@ fun AppTextButton(
 }
 
 /**
- * Icon button with press animation.
+ * Icon button with press animation (tighter scale for compact feel).
  * Replaces bare [IconButton].
  */
 @Composable
@@ -155,26 +173,12 @@ fun AppIconButton(
     tint: androidx.compose.ui.graphics.Color = LocalContentColor.current
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.90f else 1f, label = "icon_scale")
-
     IconButton(
         onClick = onClick,
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.pressScale(scaleWhenPressed = 0.90f, interactionSource = interactionSource),
         enabled = enabled,
         interactionSource = interactionSource
     ) {
         Icon(icon, contentDescription, tint = tint)
-    }
-}
-
-/**
- * Internal helper: renders a leading icon with spacing if [icon] is provided.
- */
-@Composable
-private fun RowScope.IconSlot(icon: ImageVector?, contentDescription: String?) {
-    if (icon != null) {
-        Icon(icon, contentDescription, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
     }
 }

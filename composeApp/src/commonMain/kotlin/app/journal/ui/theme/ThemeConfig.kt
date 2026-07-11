@@ -1,5 +1,6 @@
 package app.journal.ui.theme
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -8,6 +9,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class ThemeConfig(
     val baseTheme: BaseTheme = BaseTheme.DARK,

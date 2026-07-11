@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -186,14 +187,16 @@ fun SessionListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    items(filteredSessions, key = { it.id }) { session ->
-                        SessionCard(
-                            session = session,
-                            useRelativeTime = useRelativeTime,
-                            onClick = { onSessionClick(session.id) },
-                            onDelete = { showDeleteConfirm = session.id },
-                            onEdit = { onEditSession(session.id) }
-                        )
+                    itemsIndexed(filteredSessions, key = { _, s -> s.id }) { _, session ->
+                        AnimatedListItem {
+                            SessionCard(
+                                session = session,
+                                useRelativeTime = useRelativeTime,
+                                onClick = { onSessionClick(session.id) },
+                                onDelete = { showDeleteConfirm = session.id },
+                                onEdit = { onEditSession(session.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -365,16 +368,14 @@ private fun SessionCard(
     val subColor = remember(session.title) { AdaptiveColors.colorFor(session.title) }
     val accent = subColor.getComposeColor(isDark)
 
-    Card(
+    HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)
+        ) {
             // Accent bar colored by session title (substance identity)
             Surface(
                 modifier = Modifier.fillMaxHeight().width(4.dp),
@@ -398,14 +399,12 @@ private fun SessionCard(
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                             if (session.isFavorite) {
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                                ) {
-                                    Text("*", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp))
-                                }
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = "Favorite",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
 
@@ -477,15 +476,17 @@ private fun SessionCard(
                         doses.forEach { dose ->
                             val substance = repo.getSubstance(dose.substanceId)
                             if (substance != null) {
+                                val doseColor = app.journal.ui.theme.AdaptiveColors.colorFor(substance.name)
+                                val doseAccent = doseColor.getComposeColor(isDark)
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MaterialTheme.colorScheme.surface
+                                    color = doseAccent.copy(alpha = 0.15f)
                                 ) {
                                     Text(
-                                        text = "${substance.name} ${dose.amount}${dose.unit}",
+                                        text = "${substance.name} ${dose.amount} ${dose.unit}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Medium,
+                                        color = doseAccent,
+                                        fontWeight = FontWeight.SemiBold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                                     )
                                 }

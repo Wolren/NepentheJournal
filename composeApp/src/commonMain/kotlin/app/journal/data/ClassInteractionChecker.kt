@@ -75,49 +75,58 @@ object ClassInteractionChecker {
     /**
      * Check all substances against each other for class-based interactions.
      * Each substance should have its `interactionClasses` populated.
+     * Precomputes lowercase class sets for O(1) containment checks.
      */
     fun check(substances: List<Substance>): List<ClassBasedWarning> {
         if (substances.size < 2) return emptyList()
-
-        val result = mutableListOf<ClassBasedWarning>()
-
-        for (i in substances.indices) {
-            for (j in i + 1 until substances.size) {
-                val a = substances[i]
-                val b = substances[j]
-                val classesA = a.interactionClasses.map { it.lowercase() }
-                val classesB = b.interactionClasses.map { it.lowercase() }
-
-                var best: Rule? = null
-                for (rule in RULES) {
-                    val matches = (rule.classA in classesA && rule.classB in classesB) ||
-                                  (rule.classA in classesB && rule.classB in classesA)
-                    if (matches && (best == null || rule.level.ordinal > best.level.ordinal)) {
-                        best = rule
-                    }
-                }
-
-                if (best != null) {
-                    result.add(ClassBasedWarning(
-                        level = best.level,
-                        substanceA = a.name,
-                        substanceB = b.name,
-                        message = best.message,
-                    ))
-                }
-            }
+        // Precompute lowercase class sets once per substance
+        val classSets = substances.map { sub ->
+            sub.interactionClasses.mapTo(mutableSetOf()) { it.lowercase() }
         }
-
-        // Sort most severe first
-        result.sortByDescending { it.level.ordinal }
-        return result
+        return scanPairsWithSets(substances, classSets) { classesA, classesB ->
+            matchRuleWithSet(classesA, classesB)
+        }
     }
 
     /**
      * Check a single substance against a list of others.
      */
     fun checkAgainst(substance: Substance, others: List<Substance>): List<ClassBasedWarning> {
-        val combined = listOf(substance) + others.filter { it.id != substance.id }
-        return check(combined.distinctBy { it.id })
+        val combined = (listOf(substance) + others).distinctBy { it.id }
+        // Precompute lowercase class sets once
+        val classSets = combined.map { sub ->
+            sub.interactionClasses.mapTo(mutableSetOf()) { it.lowercase() }
+        }
+        return scanPairsWithSets(combined, classSets) { classesA, classesB ->
+            matchRuleWithSet(classesA, classesB)
+        }
+    }
+
+    /**
+     * Pair-scanning kernel using precomputed Set<String> for O(1) containment.
+     */
+    private fun scanPairsWithSets(
+        substances: List<Substance>,
+        classSets: List<Set<String>>,
+        matcher: (classesA: Set<String>, classesB: Set<String>) -> Rule?
+    ): List<ClassBasedWarning> {
+        val result = mutableListOf<ClassBasedWarning>()
+        for (i in substances.indices) {
+            for (j in i + 1 until substances.size) {
+                matcher(classSets[i], classSets[j])?.let { rule ->
+                    result.add(ClassBasedWarning(rule.level, substances[i].name, substances[j].name, rule.message))
+                }
+            }
+        }
+        result.sortByDescending { it.level.ordinal }
+        return result
+    }
+
+    private fun matchRuleWithSet(classesA: Set<String>, classesB: Set<String>): Rule? {
+        return RULES.fold(null as Rule?) { best, rule ->
+            val matches = (rule.classA in classesA && rule.classB in classesB) ||
+                          (rule.classA in classesB && rule.classB in classesA)
+            if (matches && (best == null || rule.level.ordinal > best.level.ordinal)) rule else best
+        }
     }
 }

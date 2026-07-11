@@ -12,11 +12,12 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import java.security.SecureRandom
+import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 
 /**
@@ -43,19 +44,58 @@ class KtorSyncClient(
     private val client: HttpClient = buildHttpClient(trustedFingerprint)
 
     private fun buildHttpClient(trustedFingerprint: String?): HttpClient {
+        return if (trustedFingerprint != null) {
+            buildPinnedClient(trustedFingerprint)
+        } else {
+            buildPairingClient()
+        }
+    }
+
+    /**
+     * Build an HTTP client that pins a specific certificate by SHA-256 fingerprint.
+     */
+    private fun buildPinnedClient(fingerprintHex: String): HttpClient {
+        val pinTrustManager = object : X509TrustManager {
+            override fun checkClientTrusted(certs: Array<out X509Certificate>?, authType: String?) {
+                certs?.let { checkPinned(it, fingerprintHex) }
+            }
+            override fun checkServerTrusted(certs: Array<out X509Certificate>?, authType: String?) {
+                certs?.let { checkPinned(it, fingerprintHex) }
+            }
+            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+        }
+        return HttpClient(CIO) {
+            install(ContentNegotiation) { json(json) }
+            engine { https { trustManager = pinTrustManager } }
+        }
+    }
+
+    /**
+     * Build an HTTP client that accepts any certificate (TOFU mode for pairing).
+     */
+    private fun buildPairingClient(): HttpClient {
         val trustAll = object : X509TrustManager {
             override fun checkClientTrusted(certs: Array<out X509Certificate>?, authType: String?) {}
             override fun checkServerTrusted(certs: Array<out X509Certificate>?, authType: String?) {}
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
         }
-
         return HttpClient(CIO) {
             install(ContentNegotiation) { json(json) }
-            engine {
-                https {
-                    trustManager = trustAll
-                }
-            }
+            engine { https { trustManager = trustAll } }
+        }
+    }
+
+    private fun checkPinned(certs: Array<out X509Certificate>, expectedFingerprint: String) {
+        val match = certs.any { cert ->
+            val md = MessageDigest.getInstance("SHA-256")
+            md.update(cert.encoded)
+            val fp = md.digest().joinToString("") { "%02x".format(it) }
+            fp.equals(expectedFingerprint, ignoreCase = true)
+        }
+        if (!match) {
+            throw java.security.cert.CertificateException(
+                "Certificate pinning failed: no cert matches fingerprint $expectedFingerprint"
+            )
         }
     }
 

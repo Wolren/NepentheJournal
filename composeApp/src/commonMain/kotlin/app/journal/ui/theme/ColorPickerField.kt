@@ -26,11 +26,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.journal.ui.components.*
+import app.journal.ui.theme.ColorUtils
 
 /**
  * A compact color field: a swatch that opens an HSV picker dialog on tap.
  * The picker is dependency-free (Canvas + sliders) and works on every
  * Compose Multiplatform target. [value] is an ARGB [Long] (0xAARRGGBB).
+ *
+ * Color math (HSV/hex) lives in [ColorUtils].
  */
 @Composable
 fun ColorPickerField(
@@ -77,13 +80,13 @@ private fun ColorPickerDialog(
     var argb by remember { mutableStateOf(initial) }
     val color = Color(argb)
     // HSV state
-    var hue by remember { mutableStateOf(color.toHsvHue()) }
-    var sat by remember { mutableStateOf(color.toHsvSat()) }
-    var valueBri by remember { mutableStateOf(color.toHsvVal()) }
+    var hue by remember { mutableStateOf(ColorUtils.toHsvHue(color)) }
+    var sat by remember { mutableStateOf(ColorUtils.toHsvSat(color)) }
+    var valueBri by remember { mutableStateOf(ColorUtils.toHsvVal(color)) }
     var alpha by remember { mutableStateOf((initial ushr 24).toInt().coerceIn(0, 255)) }
 
     // Keep ARGB in sync with HSV/alpha
-    fun sync() { argb = hsvToArgb(hue, sat, valueBri, alpha) }
+    fun sync() { argb = ColorUtils.hsvToArgb(hue, sat, valueBri, alpha) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -134,7 +137,7 @@ private fun ColorPickerDialog(
                         val h = size.height
                         // white -> hue color across X
                         drawRect(brush = Brush.horizontalGradient(
-                            colors = listOf(Color.White, hueColor(hue))))
+                            colors = listOf(Color.White, ColorUtils.hueColor(hue))))
                         // black from bottom (Y inverted)
                         drawRect(brush = Brush.verticalGradient(
                             colors = listOf(Color.Transparent, Color.Black),
@@ -160,7 +163,7 @@ private fun ColorPickerDialog(
                     valueRange = 0f..360f,
                     modifier = Modifier.fillMaxWidth(),
                     colors = SliderDefaults.colors(
-                        thumbColor = hueColor(hue),
+                        thumbColor = ColorUtils.hueColor(hue),
                         activeTrackColor = MaterialTheme.colorScheme.outlineVariant
                     )
                 )
@@ -185,15 +188,15 @@ private fun ColorPickerDialog(
                 }
 
                 // Hex field (live)
-                var hexInput by remember(argb) { mutableStateOf(argb.toHex()) }
+                var hexInput by remember(argb) { mutableStateOf(ColorUtils.toHexColor(argb)) }
                 OutlinedTextField(
                     value = hexInput,
                     onValueChange = { input ->
                         hexInput = input.uppercase().take(9)
-                        parseArgb(input)?.let { parsed ->
+                        ColorUtils.parseArgb(input)?.let { parsed ->
                             argb = parsed
                             val c = Color(parsed)
-                            hue = c.toHsvHue(); sat = c.toHsvSat(); valueBri = c.toHsvVal()
+                            hue = ColorUtils.toHsvHue(c); sat = ColorUtils.toHsvSat(c); valueBri = ColorUtils.toHsvVal(c)
                             alpha = (parsed ushr 24).toInt().coerceIn(0, 255)
                         }
                     },
@@ -229,70 +232,4 @@ private fun HueTrack(modifier: Modifier) {
     }
 }
 
-// ---------- HSV <-> ARGB helpers ----------
-
-private fun hueColor(h: Float): Color {
-    val c = hsvToArgb(h, 1f, 1f, 255)
-    return Color(c)
-}
-
-private fun hsvToArgb(h: Float, s: Float, v: Float, a: Int): Long {
-    val hh = (h % 360f).coerceAtLeast(0f)
-    val c = v * s
-    val x = c * (1f - kotlin.math.abs((hh / 60f) % 2f - 1f))
-    val m = v - c
-    val (r, g, b) = when {
-        hh < 60f -> Triple(c, x, 0f)
-        hh < 120f -> Triple(x, c, 0f)
-        hh < 180f -> Triple(0f, c, x)
-        hh < 240f -> Triple(0f, x, c)
-        hh < 300f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    val ri = ((r + m) * 255).toInt().coerceIn(0, 255)
-    val gi = ((g + m) * 255).toInt().coerceIn(0, 255)
-    val bi = ((b + m) * 255).toInt().coerceIn(0, 255)
-    val ai = a.coerceIn(0, 255)
-    return (ai.toLong() shl 24) or (ri.toLong() shl 16) or (gi.toLong() shl 8) or bi.toLong()
-}
-
-private fun Color.toHsvHue(): Float {
-    val r = red; val g = green; val b = blue
-    val max = maxOf(r, g, b); val min = minOf(r, g, b)
-    val d = max - min
-    if (d == 0f) return 0f
-    val h = when (max) {
-        r -> ((g - b) / d) % 6f
-        g -> (b - r) / d + 2f
-        else -> (r - g) / d + 4f
-    }
-    return ((h * 60f) + 360f) % 360f
-}
-
-private fun Color.toHsvSat(): Float {
-    val max = maxOf(red, green, blue)
-    if (max == 0f) return 0f
-    return (max - minOf(red, green, blue)) / max
-}
-
-private fun Color.toHsvVal(): Float = maxOf(red, green, blue)
-
-private fun Long.toHex(): String {
-    val c = Color(this)
-    val a = (this ushr 24).toInt() and 0xFF
-    fun two(v: Float) = ((v * 255).toInt().coerceIn(0, 255)).toString(16).padStart(2, '0')
-    return "#${two(c.alpha)}${two(c.red)}${two(c.green)}${two(c.blue)}".uppercase()
-}
-
-private fun parseArgb(hex: String): Long? {
-    val clean = hex.removePrefix("#")
-    val (a, rg, gg, bg) = when (clean.length) {
-        8 -> listOf(clean.substring(0, 2), clean.substring(2, 4), clean.substring(4, 6), clean.substring(6, 8))
-        6 -> listOf("FF", clean.substring(0, 2), clean.substring(2, 4), clean.substring(4, 6))
-        else -> return null
-    }
-    return try {
-        val aI = a.toInt(16); val rI = rg.toInt(16); val gI = gg.toInt(16); val bI = bg.toInt(16)
-        (aI.toLong() shl 24) or (rI.toLong() shl 16) or (gI.toLong() shl 8) or bI.toLong()
-    } catch (e: Exception) { null }
-}
+// All color math (HSV/hex) moved to ColorUtils.kt

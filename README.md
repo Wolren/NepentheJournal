@@ -1,6 +1,6 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)]()
-[![Compose Multiplatform](https://img.shields.io/badge/Compose-1.12.0--beta01-3794EF?logo=jetpackcompose&logoColor=white)]()
+[![Compose Multiplatform](https://img.shields.io/badge/Compose-1.11.1-3794EF?logo=jetpackcompose&logoColor=white)]()
 [![Desktop](https://img.shields.io/badge/Target-Desktop-6DB33F?logo=openjdk&logoColor=white)]()
 [![Android](https://img.shields.io/badge/Target-Android-3DDC84?logo=android&logoColor=white)]()
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)]()
@@ -151,7 +151,7 @@ Enable test data via any of:
 
 | Layer | Choice |
 |-------|--------|
-| UI Framework | Compose Multiplatform (JetBrains) 1.12.0-beta01 |
+| UI Framework | Compose Multiplatform (JetBrains) 1.11.1 |
 | Language | Kotlin 2.4.0 |
 | Build System | Gradle 9.5.0 + AGP 9.1.0 |
 | Persistence | JSON file via kotlinx.serialization |

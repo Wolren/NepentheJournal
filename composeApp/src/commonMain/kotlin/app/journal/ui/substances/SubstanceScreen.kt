@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -212,7 +213,8 @@ fun SubstanceScreen(
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(results, key = { it.id }) { substance ->
+                    itemsIndexed(results, key = { _, s -> s.id }) { _, substance ->
+                        AnimatedListItem {
                         val stats = substanceDoseStats[substance.id]
                         val sessionCount = stats?.first ?: 0
                         val lastUsed = stats?.second
@@ -226,6 +228,7 @@ fun SubstanceScreen(
                             sessionCount = sessionCount,
                             lastUsedDaysAgo = lastUsedDaysAgo
                         )
+                        }
                     }
                     // Add custom substance button at the bottom
                     item {
@@ -264,14 +267,10 @@ private fun SubstanceCard(
 ) {
     val color = app.journal.ui.theme.AdaptiveColors.colorFor(substance.name)
 
-    Card(
+    HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
@@ -284,18 +283,19 @@ private fun SubstanceCard(
             Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
+                SelectableText(
                     text = substance.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
                 if (substance.aliases.isNotEmpty()) {
-                    Text(
+                    SelectableText(
                         text = substance.aliases.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        maxLines = 1
                     )
                 }
                 // Usage stats
@@ -303,23 +303,25 @@ private fun SubstanceCard(
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (sessionCount > 0) {
-                            Text(
-                                "$sessionCount session${if (sessionCount != 1) "s" else ""}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
+                            SelectableText(
+                                text = "$sessionCount session${if (sessionCount != 1) "s" else ""}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             )
                         }
                         if (lastUsedDaysAgo != null) {
-                            Text(
-                                when {
+                            SelectableText(
+                                text = when {
                                     lastUsedDaysAgo == 0 -> "Used today"
                                     lastUsedDaysAgo == 1 -> "Used yesterday"
                                     lastUsedDaysAgo < 7 -> "${lastUsedDaysAgo}d ago"
                                     lastUsedDaysAgo < 30 -> "${lastUsedDaysAgo / 7}w ago"
                                     else -> "${lastUsedDaysAgo / 30}mo ago"
                                 },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             )
                         }
                     }

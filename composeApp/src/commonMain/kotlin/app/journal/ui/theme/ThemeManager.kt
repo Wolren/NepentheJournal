@@ -55,20 +55,25 @@ class ThemeManager private constructor() {
         val bg = cfg.background ?: if (isDark) Color(0xFF0E1511) else Color(0xFFF3F8EF)
         val surf = cfg.surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
+        val d = if (isDark) 0.30f else 0.16f
+
+        fun container(accent: Color): Color = blend(bg, accent, d)
+        fun surfaceVariant(accent: Color, factor: Float = if (isDark) 0.12f else 0.06f): Color =
+            blend(surf, accent, factor)
 
         return base.copy(
             primary = cfg.primary,
             onPrimary = contrastColor(cfg.primary),
-            primaryContainer = blend(bg, cfg.primary, if (isDark) 0.30f else 0.16f),
-            onPrimaryContainer = contrastColor(blend(bg, cfg.primary, if (isDark) 0.30f else 0.16f)),
+            primaryContainer = container(cfg.primary),
+            onPrimaryContainer = contrastColor(container(cfg.primary)),
             secondary = cfg.secondary,
             onSecondary = contrastColor(cfg.secondary),
-            secondaryContainer = blend(bg, cfg.secondary, if (isDark) 0.30f else 0.16f),
-            onSecondaryContainer = contrastColor(blend(bg, cfg.secondary, if (isDark) 0.30f else 0.16f)),
+            secondaryContainer = container(cfg.secondary),
+            onSecondaryContainer = contrastColor(container(cfg.secondary)),
             tertiary = cfg.tertiary,
             onTertiary = contrastColor(cfg.tertiary),
-            tertiaryContainer = blend(bg, cfg.tertiary, if (isDark) 0.30f else 0.16f),
-            onTertiaryContainer = contrastColor(blend(bg, cfg.tertiary, if (isDark) 0.30f else 0.16f)),
+            tertiaryContainer = container(cfg.tertiary),
+            onTertiaryContainer = contrastColor(container(cfg.tertiary)),
             error = cfg.error,
             onError = contrastColor(cfg.error),
             errorContainer = blend(bg, cfg.error, 0.30f),
@@ -77,10 +82,10 @@ class ThemeManager private constructor() {
             onBackground = contrastColor(bg),
             surface = surf,
             onSurface = contrastColor(surf),
-            surfaceVariant = blend(surf, cfg.primary, if (isDark) 0.12f else 0.06f),
-            onSurfaceVariant = contrastColor(blend(surf, cfg.primary, if (isDark) 0.12f else 0.06f)),
-            outline = blend(surf, cfg.primary, if (isDark) 0.28f else 0.18f),
-            outlineVariant = blend(surf, cfg.primary, if (isDark) 0.16f else 0.10f)
+            surfaceVariant = surfaceVariant(cfg.primary),
+            onSurfaceVariant = contrastColor(surfaceVariant(cfg.primary)),
+            outline = surfaceVariant(cfg.primary, if (isDark) 0.28f else 0.18f),
+            outlineVariant = surfaceVariant(cfg.primary, if (isDark) 0.16f else 0.10f)
         )
     }
 

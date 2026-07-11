@@ -12,8 +12,11 @@
  */
 
 package app.journal.model
+
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class CheckIn(
     val timestamp: Long,
@@ -33,6 +36,7 @@ enum class ShulginRating(val label: String, val numericValue: Int) {
     PLUS_PLUS_PLUS_PLUS("++++", 9)
 }
 
+@Immutable
 @Serializable
 data class Session(
     override val id: String,

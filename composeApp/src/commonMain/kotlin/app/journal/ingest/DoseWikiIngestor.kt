@@ -43,41 +43,24 @@ object DoseWikiIngestor {
         }
 
         val now = currentTimeMillis()
-        var effectCount = 0
+        var totalEffectCount = 0
         var substanceUpdateCount = 0
+
+        // Build O(1) name lookup index: lowercase name + aliases -> Substance
+        val lookupByName = buildLookup(repo)
 
         for (dw in substances) {
             val name = dw.title
-            // Find matching substance in repo by name or alias
-            val existing = findSubstance(repo, name, dw.identification?.alternative_names.orEmpty())
+            val existing = findSubstance(lookupByName, name, dw.identification?.alternative_names.orEmpty())
             if (existing == null) continue
 
-            val updates = mutableMapOf<String, Any>()
+            val effectNames = mutableListOf<String>()
             var modified = false
 
             // --- Primary: ingest subjective effects ---
             if (dw.subjective_effects != null) {
-                val effectNames = mutableListOf<String>()
-
-                // Cognitive effects
-                dw.subjective_effects.cognitive?.forEach { (_, group) ->
-                    group.effects?.forEach { eff ->
-                        effectNames.add(eff.name)
-                        upsertEffect(repo, eff, "cognitive", existing.id, now)
-                        effectCount++
-                    }
-                }
-
-                // Physical effects
-                dw.subjective_effects.physical?.forEach { (_, group) ->
-                    group.effects?.forEach { eff ->
-                        effectNames.add(eff.name)
-                        upsertEffect(repo, eff, "physical", existing.id, now)
-                        effectCount++
-                    }
-                }
-
-                // Sensory effects
+                totalEffectCount += ingestEffectCategory(repo, dw.subjective_effects.cognitive, "cognitive", existing.id, now, effectNames)
+                totalEffectCount += ingestEffectCategory(repo, dw.subjective_effects.physical, "physical", existing.id, now, effectNames)
                 dw.subjective_effects.sensory?.let { sensory ->
                     listOfNotNull(
                         sensory.auditory, sensory.gustatory, sensory.tactile,
@@ -87,15 +70,10 @@ object DoseWikiIngestor {
                             group.effects?.forEach { eff ->
                                 effectNames.add(eff.name)
                                 upsertEffect(repo, eff, "sensory", existing.id, now)
-                                effectCount++
+                                totalEffectCount++
                             }
                         }
                     }
-                }
-
-                // Update substance's effects list if it's currently empty
-                if (existing.effects.isEmpty() && effectNames.isNotEmpty()) {
-                    // We don't store effects on Substance directly anymore — use Effect model
                 }
             }
 
@@ -129,41 +107,60 @@ object DoseWikiIngestor {
 
         ingested = true
         println(
-            "DoseWiki: ingested $effectCount effects for $substanceUpdateCount substances " +
+            "DoseWiki: ingested $totalEffectCount effects for $substanceUpdateCount substances " +
             "($RESOURCE_PATH)"
         )
     }
 
     /**
-     * Find a substance by exact name or alias match.
+     * Build an O(1) name-to-substance lookup from name + aliases.
+     */
+    private fun buildLookup(repo: JournalRepository): Map<String, Substance> =
+        buildMap {
+            for (sub in repo.substances.value) {
+                put(sub.name.lowercase(), sub)
+                for (alias in sub.aliases) {
+                    put(alias.lowercase(), sub)
+                }
+            }
+        }
+
+    /**
+     * Find a substance by exact name or alias match using O(1) map lookup.
      */
     private fun findSubstance(
-        repo: JournalRepository,
+        lookup: Map<String, Substance>,
         name: String,
         aliases: List<String>,
     ): Substance? {
-        // Try exact name match first
-        val byName = repo.substances.value.find {
-            it.name.equals(name, ignoreCase = true)
+        lookup[name.lowercase()]?.let { return it }
+        for (alias in aliases) {
+            lookup[alias.lowercase()]?.let { return it }
         }
-        if (byName != null) return byName
+        return null
+    }
 
-        // Try alias match
-        val byAlias = repo.substances.value.find { sub ->
-            sub.aliases.any { alias ->
-                alias.equals(name, ignoreCase = true) ||
-                aliases.any { it.equals(alias, ignoreCase = true) }
+    /**
+     * Ingest effects from a single category (cognitive/physical) into the repo.
+     * Returns the number of effects ingested.
+     */
+    private fun ingestEffectCategory(
+        repo: JournalRepository,
+        effects: Map<String, DoseWikiEffectGroup>?,
+        category: String,
+        substanceId: String,
+        now: Long,
+        effectNames: MutableList<String>,
+    ): Int {
+        var count = 0
+        effects?.forEach { (_, group) ->
+            group.effects?.forEach { eff ->
+                effectNames.add(eff.name)
+                upsertEffect(repo, eff, category, substanceId, now)
+                count++
             }
         }
-        if (byAlias != null) return byAlias
-
-        // Try matching our name or alias against DoseWiki's aliases
-        val byDwAlias = repo.substances.value.find { sub ->
-            aliases.any { alias ->
-                sub.name.equals(alias, ignoreCase = true)
-            }
-        }
-        return byDwAlias
+        return count
     }
 
     /**

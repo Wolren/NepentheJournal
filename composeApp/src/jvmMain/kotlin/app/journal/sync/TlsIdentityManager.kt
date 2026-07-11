@@ -17,6 +17,10 @@ import javax.net.ssl.X509TrustManager
  * On first run, generates an RSA 2048-bit key pair + self-signed X.509 cert
  * stored in a PKCS12 keystore at ~/.psychonautica/identity.p12.
  *
+ * The keystore password is derived from the device's user.home + a fixed salt
+ * to avoid hardcoding credentials in the binary. Override via env var
+ * NEPENTHE_TLS_PASSWORD for testing/debugging.
+ *
  * The fingerprint (SHA-256 of the DER-encoded cert) is used as the device ID
  * and for certificate pinning during pairing.
  */
@@ -24,7 +28,32 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
 
     private val storeFile: File get() = File(dataDir, "identity.p12")
     val alias: String = "nepenthe"
-    val password: CharArray = "nepenthe-identity".toCharArray()
+
+    /**
+     * Keystore password derived from device identity + salt.
+     * Override with NEPENTHE_TLS_PASSWORD env var for testing.
+     */
+    val password: CharArray by lazy {
+        val envPw = System.getenv("NEPENTHE_TLS_PASSWORD")
+        if (envPw != null && envPw.length >= 8) {
+            envPw.toCharArray()
+        } else {
+            derivePassword()
+        }
+    }
+
+    private fun derivePassword(): CharArray {
+        val seed = System.getProperty("user.home", "unknown") +
+                    System.getProperty("os.name", "unknown")
+        val md = MessageDigest.getInstance("SHA-256")
+        md.update(seed.toByteArray())
+        md.update("::nepenthe-tls-v1::".toByteArray())
+        val hash = md.digest()
+        // Base64url-encode the first 192 bits for a 32-char password
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        return (0 until 32).map { chars[(hash[it % hash.size].toInt() and 0xFF) % chars.length] }
+            .joinToString("").toCharArray()
+    }
 
     /** Ensure identity exists, generating it if needed. Returns the fingerprint. */
     fun ensureIdentity(): String {
@@ -47,7 +76,7 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
         val ks = loadKeyStore()
         val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
         kmf.init(ks, password)
-        val sslContext = SSLContext.getInstance("TLS")
+        val sslContext = SSLContext.getInstance("TLSv1.2")
         sslContext.init(kmf.keyManagers, null, SecureRandom())
         return sslContext
     }
@@ -68,7 +97,7 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
             }
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf(cert)
         }
-        val sslContext = SSLContext.getInstance("TLS")
+        val sslContext = SSLContext.getInstance("TLSv1.2")
         sslContext.init(null, arrayOf(pinTrustManager), SecureRandom())
         return sslContext
     }
@@ -80,7 +109,7 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
             override fun checkServerTrusted(certs: Array<X509Certificate>, authType: String) {}
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
         }
-        val sslContext = SSLContext.getInstance("TLS")
+        val sslContext = SSLContext.getInstance("TLSv1.2")
         sslContext.init(null, arrayOf(trustAll), SecureRandom())
         return sslContext
     }

@@ -411,10 +411,17 @@ fun SessionEditorScreen(
             item {
                 InteractionWarnings(
                     result = interactionCheckResult,
-                    substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: id },
+                    substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: stripPrefix(id) },
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
     }
+}
+
+private fun stripPrefix(id: String): String {
+    if (id.startsWith("pwiki:")) {
+        return id.removePrefix("pwiki:").replace("_", " ").replaceFirstChar { it.uppercase() }
+    }
+    return id
 }

@@ -8,11 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.InteractionCheckResult
-import app.journal.data.JournalRepository
 import app.journal.model.InteractionRisk
 
 /**
@@ -65,16 +63,8 @@ private fun InteractionGroup(
     riskLevel: InteractionRisk,
     substanceNameLookup: (String) -> String
 ) {
-    val color = when (riskLevel) {
-        InteractionRisk.DANGEROUS -> Color(0xFFD32F2F)
-        InteractionRisk.UNSAFE -> Color(0xFFFF9800)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val bgColor = when (riskLevel) {
-        InteractionRisk.DANGEROUS -> Color(0xFFD32F2F).copy(alpha = 0.1f)
-        InteractionRisk.UNSAFE -> Color(0xFFFF9800).copy(alpha = 0.1f)
-        else -> Color.Transparent
-    }
+    val color = InteractionColors.color(riskLevel)
+    val bgColor = InteractionColors.backgroundColor(riskLevel)
 
     Card(
         shape = RoundedCornerShape(8.dp),
@@ -130,11 +120,7 @@ fun InlineInteractionWarning(
     otherSubstanceName: String,
     modifier: Modifier = Modifier
 ) {
-    val color = when (level) {
-        InteractionRisk.DANGEROUS -> Color(0xFFD32F2F)
-        InteractionRisk.UNSAFE -> Color(0xFFFF9800)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val color = InteractionColors.color(level)
 
     Row(
         modifier = modifier,

@@ -36,6 +36,8 @@ kotlin {
                 implementation(libs.ktor.client.content)
                 implementation(libs.ktor.serialization)
                 implementation(libs.multiplatform.settings)
+                implementation(libs.coil.compose)
+                implementation(libs.coil.network.ktor)
             }
         }
         val commonTest by getting {
@@ -60,6 +62,10 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.server.netty)
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.test.host)
+                implementation(libs.ktor.serialization)
             }
         }
         iosMain {
@@ -72,7 +78,7 @@ kotlin {
         val jvmMain by creating {
             dependsOn(commonMain)
             dependencies {
-                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.server.netty)
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.serialization)
                 implementation(libs.jmdns)

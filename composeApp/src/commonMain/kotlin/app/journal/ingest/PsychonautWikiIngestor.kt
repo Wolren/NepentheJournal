@@ -26,24 +26,28 @@ class PsychonautWikiIngestor(
             val substance = normalize(s, nowMs)
             repository.upsertSubstance(substance)
             val substanceId = substance.id
-            s.dangerousInteractions.forEach { r ->
-                repository.upsertInteraction(Interaction(
-                    id = interactionId(substanceId, "pwiki:${r.name.lowercase().replace(" ", "_")}"),
-                    substanceAId = substanceId,
-                    substanceBId = "pwiki:${r.name.lowercase().replace(" ", "_")}",
-                    riskLevel = InteractionRisk.DANGEROUS, sources = listOf("psychonautwiki"),
-                    createdAt = nowMs, updatedAt = nowMs
-                ))
-            }
-            s.unsafeInteractions.forEach { r ->
-                repository.upsertInteraction(Interaction(
-                    id = interactionId(substanceId, "pwiki:${r.name.lowercase().replace(" ", "_")}"),
-                    substanceAId = substanceId,
-                    substanceBId = "pwiki:${r.name.lowercase().replace(" ", "_")}",
-                    riskLevel = InteractionRisk.UNSAFE, sources = listOf("psychonautwiki"),
-                    createdAt = nowMs, updatedAt = nowMs
-                ))
-            }
+            storeInteractions(substanceId, s.dangerousInteractions, InteractionRisk.DANGEROUS, nowMs)
+            storeInteractions(substanceId, s.unsafeInteractions, InteractionRisk.UNSAFE, nowMs)
+            storeInteractions(substanceId, s.uncertainInteractions, InteractionRisk.UNCERTAIN, nowMs)
+        }
+    }
+
+    private fun storeInteractions(
+        substanceId: String,
+        refs: List<PwikiRef>,
+        riskLevel: InteractionRisk,
+        nowMs: Long
+    ) {
+        for (r in refs) {
+            val targetId = "pwiki:${r.name.lowercase().replace(" ", "_")}"
+            repository.upsertInteraction(Interaction(
+                id = interactionId(substanceId, targetId),
+                substanceAId = substanceId,
+                substanceBId = targetId,
+                riskLevel = riskLevel,
+                sources = listOf("psychonautwiki"),
+                createdAt = nowMs, updatedAt = nowMs
+            ))
         }
     }
 

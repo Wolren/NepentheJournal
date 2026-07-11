@@ -193,6 +193,16 @@ def _first(props: dict[str, list[str]], key: str, default: Any | None = None) ->
     return default
 
 
+def clean_wiki_markup(text: str) -> str:
+    """Strip MediaWiki [[Target|Display]] and [[Target]] markup."""
+    import re
+    # [[Target|Display]] -> Display
+    text = re.sub(r'\[\[([^|\]]+)\|([^\]]+)\]\]', r'\2', text)
+    # [[Target]] -> Target
+    text = re.sub(r'\[\[([^\]]+)\]\]', r'\1', text)
+    return text
+
+
 def _format_range(min_val: str | None, max_val: str | None, units: str) -> str:
     parts = []
     if min_val:
@@ -250,16 +260,16 @@ def smw_to_substance(
     cross_tols: list[str] = []
     ct = _first(props, "Cross-tolerance")
     if ct:
-        cross_tols.append(ct)
+        cross_tols.append(clean_wiki_markup(ct))
     tft = _first(props, "Time_to_full_tolerance")
     if tft:
-        cross_tols.append(f"Full tolerance: {tft}")
+        cross_tols.append(f"Full tolerance: {clean_wiki_markup(tft)}")
     tzt = _first(props, "Time_to_zero_tolerance")
     if tzt:
-        cross_tols.append(f"Zero tolerance: {tzt}")
+        cross_tols.append(f"Zero tolerance: {clean_wiki_markup(tzt)}")
     tht = _first(props, "Time_to_half_tolerance")
     if tht:
-        cross_tols.append(f"Half tolerance: {tht}")
+        cross_tols.append(f"Half tolerance: {clean_wiki_markup(tht)}")
 
     # Toxicity (may be multiple)
     toxicity = [str(t) for t in props.get("Toxicity", [])]

@@ -24,169 +24,109 @@ object CsvExporter {
         val tags: List<String> = emptyList()
     )
 
-    // ---- CSV helpers ----
+    // ---- Table definitions ----
 
-    /**
-     * CSV field escaping per RFC 4180.
-     * Fields containing commas, quotes, or newlines are quoted and inner quotes doubled.
-     */
-    fun escapeField(value: String?): String {
-        val s = value ?: return ""
-        return if (s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r')) {
-            "\"${s.replace("\"", "\"\"")}\""
-        } else s
-    }
-
-    private fun csvLine(vararg fields: String?): String =
-        fields.joinToString(",") { escapeField(it) }
-
-    private fun csvLineList(fields: List<String?>): String =
-        fields.joinToString(",") { escapeField(it) }
-
-    // ---- Sessions CSV ----
-
-    private val sessionHeaders = listOf(
+    private val sessionTable = CsvTable(listOf(
         "id", "title", "date", "start_time", "end_time",
         "duration_hours", "tags", "set", "setting",
         "intention", "outcome", "rating", "shulgin_rating",
         "consumer", "is_favorite", "is_archived",
         "substances", "dose_count"
-    )
-
-    private fun sessionToRow(df: SessionDataRow): List<String?> = listOf(
-        df.id, df.title, df.date, df.startTime, df.endTime,
-        df.durationHours?.toString(), df.tags, df.set, df.setting,
-        df.intention, df.outcome, df.rating?.toString(), df.shulginRating,
-        df.consumerName, if (df.isFavorite) "true" else "false",
-        if (df.isArchived) "true" else "false",
-        df.substanceNames, df.doseCount.toString()
-    )
-
-    /**
-     * Exports all sessions matching [filter] as CSV string.
-     */
-    fun exportSessionsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
-        val sb = StringBuilder()
-        sb.appendLine(csvLineList(sessionHeaders))
-
-        val allRows = repo.sessionsDataFrame()
-        val filtered = if (filter == null) allRows else applyFilter(repo, allRows, filter)
-
-        for (row in filtered) {
-            sb.appendLine(csvLineList(sessionToRow(row)))
-        }
-        return sb.toString()
+    )) { df: SessionDataRow ->
+        listOf(
+            df.id, df.title, df.date, df.startTime, df.endTime,
+            df.durationHours?.toString(), df.tags, df.set, df.setting,
+            df.intention, df.outcome, df.rating?.toString(), df.shulginRating,
+            df.consumerName, if (df.isFavorite) "true" else "false",
+            if (df.isArchived) "true" else "false",
+            df.substanceNames, df.doseCount.toString()
+        )
     }
 
-    // ---- Doses CSV ----
-
-    private val doseHeaders = listOf(
+    private val doseTable = CsvTable(listOf(
         "id", "session_id", "substance_id", "substance_name",
         "route", "amount", "unit", "timestamp_ms",
         "is_redose", "is_estimate", "notes"
-    )
-
-    private fun doseToRow(df: DoseDataRow): List<String?> = listOf(
-        df.id, df.sessionId, df.substanceId, df.substanceName,
-        df.route, df.amount.toString(), df.unit, df.timestamp.toString(),
-        if (df.redosing) "true" else "false",
-        if (df.isEstimate) "true" else "false",
-        df.notes
-    )
-
-    fun exportDosesCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
-        val sb = StringBuilder()
-        sb.appendLine(csvLineList(doseHeaders))
-
-        val allRows = repo.dosesDataFrame()
-        val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
-
-        for (row in allRows) {
-            if (filteredSessionIds == null || row.sessionId in filteredSessionIds) {
-                sb.appendLine(csvLineList(doseToRow(row)))
-            }
-        }
-        return sb.toString()
+    )) { df: DoseDataRow ->
+        listOf(
+            df.id, df.sessionId, df.substanceId, df.substanceName,
+            df.route, df.amount.toString(), df.unit, df.timestamp.toString(),
+            if (df.redosing) "true" else "false",
+            if (df.isEstimate) "true" else "false",
+            df.notes
+        )
     }
 
-    // ---- Substances CSV ----
-
-    private val substanceHeaders = listOf(
+    private val substanceTable = CsvTable(listOf(
         "id", "name", "aliases", "class", "cid",
         "molecular_formula", "molecular_weight", "iupac_name",
         "log_p", "routes", "effects", "toxicity",
         "addiction_potential"
-    )
-
-    private fun substanceToRow(df: SubstanceDataRow): List<String?> = listOf(
-        df.id, df.name, df.aliases, df.substanceClass,
-        df.cid?.toString(), df.molecularFormula, df.molecularWeight,
-        df.iupacName, df.logP?.toString(), df.routes, df.effects,
-        df.toxicity, df.addictionPotential
-    )
-
-    fun exportSubstancesCsv(repo: JournalRepository): String {
-        val sb = StringBuilder()
-        sb.appendLine(csvLineList(substanceHeaders))
-
-        for (row in repo.substancesDataFrame()) {
-            sb.appendLine(csvLineList(substanceToRow(row)))
-        }
-        return sb.toString()
+    )) { df: SubstanceDataRow ->
+        listOf(
+            df.id, df.name, df.aliases, df.substanceClass,
+            df.cid?.toString(), df.molecularFormula, df.molecularWeight,
+            df.iupacName, df.logP?.toString(), df.routes, df.effects,
+            df.toxicity, df.addictionPotential
+        )
     }
 
-    // ---- Timeline events CSV ----
-
-    private val eventHeaders = listOf(
+    private val eventTable = CsvTable(listOf(
         "id", "session_id", "timestamp_ms", "event_type",
         "label", "body", "intensity"
-    )
-
-    private fun eventToRow(event: TimelineEvent): List<String?> = listOf(
-        event.id, event.sessionId, event.timestamp.toString(),
-        event.eventType.name, event.label, event.body,
-        event.intensity?.toString()
-    )
-
-    fun exportTimelineEventsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
-        val sb = StringBuilder()
-        sb.appendLine(csvLineList(eventHeaders))
-
-        val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
-
-        for (event in repo.timelineEvents.value) {
-            if (filteredSessionIds == null || event.sessionId in filteredSessionIds) {
-                sb.appendLine(csvLineList(eventToRow(event)))
-            }
-        }
-        return sb.toString()
+    )) { event: TimelineEvent ->
+        listOf(
+            event.id, event.sessionId, event.timestamp.toString(),
+            event.eventType.name, event.label, event.body,
+            event.intensity?.toString()
+        )
     }
 
-    // ---- Notes CSV ----
-
-    private val noteHeaders = listOf(
+    private val noteTable = CsvTable(listOf(
         "id", "session_id", "title", "body", "tags",
         "is_pinned", "created_at", "updated_at"
-    )
+    )) { note: Note ->
+        listOf(
+            note.id, note.sessionId, note.title, note.body,
+            note.tags.joinToString(";"), if (note.isPinned) "true" else "false",
+            note.createdAt.toString(), note.updatedAt.toString()
+        )
+    }
 
-    private fun noteToRow(note: Note): List<String?> = listOf(
-        note.id, note.sessionId, note.title, note.body,
-        note.tags.joinToString(";"), if (note.isPinned) "true" else "false",
-        note.createdAt.toString(), note.updatedAt.toString()
-    )
+    // ---- Public export functions ----
+
+    fun exportSessionsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+        val allRows = repo.sessionsDataFrame()
+        val filtered = if (filter == null) allRows else applyFilter(repo, allRows, filter)
+        return sessionTable.render(filtered)
+    }
+
+    fun exportDosesCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+        val allRows = repo.dosesDataFrame()
+        val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
+        val filtered = if (filteredSessionIds != null)
+            allRows.filter { it.sessionId in filteredSessionIds }
+        else allRows
+        return doseTable.render(filtered)
+    }
+
+    fun exportSubstancesCsv(repo: JournalRepository): String =
+        substanceTable.render(repo.substancesDataFrame())
+
+    fun exportTimelineEventsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+        val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
+        val filtered = if (filteredSessionIds != null)
+            repo.timelineEvents.value.filter { it.sessionId in filteredSessionIds }
+        else repo.timelineEvents.value
+        return eventTable.render(filtered)
+    }
 
     fun exportNotesCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
-        val sb = StringBuilder()
-        sb.appendLine(csvLineList(noteHeaders))
-
         val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
-
-        for (note in repo.notes.value) {
-            if (filteredSessionIds == null || note.sessionId in filteredSessionIds) {
-                sb.appendLine(csvLineList(noteToRow(note)))
-            }
-        }
-        return sb.toString()
+        val filtered = if (filteredSessionIds != null)
+            repo.notes.value.filter { it.sessionId in filteredSessionIds }
+        else repo.notes.value
+        return noteTable.render(filtered)
     }
 
     // ---- Filter helpers ----

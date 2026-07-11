@@ -4,7 +4,7 @@ import app.journal.data.JournalRepository
 import app.journal.model.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.cio.*
+import io.ktor.server.netty.*
 import io.ktor.server.engine.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -14,16 +14,19 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.security.KeyStore
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * TLS + HMAC-authenticated sync server with data validation.
  * All traffic encrypted via self-signed TLS certificate.
  * All data-changing endpoints require HMAC-SHA256 signed requests.
  *
+ * Pairing endpoint has per-IP rate limiting to prevent token brute force.
+ *
  * Endpoints:
  *   GET  /info              — public (device info)
  *   GET  /pairing/start     — public (returns token for pairing)
- *   POST /pairing/verify    — public (complete pairing, exchange secrets)
+ *   POST /pairing/verify    — public with rate limiting (complete pairing)
  *   POST /sync/push         — HMAC-authenticated (requires trusted device)
  *   GET  /sync/pull         — HMAC-authenticated (requires trusted device)
  */
@@ -42,6 +45,24 @@ class KtorSyncServer(
     }
     private val deviceId: String by lazy { "desktop-${fingerprint.take(8)}" }
 
+    // ---- Rate limiting for pairing endpoint ----
+    // Track pairing attempts per client IP: max 5 within 120s window
+    private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
+    private val maxPairingAttempts = 5
+    private val pairingWindowMs = 120_000L // 2 minutes
+
+    private fun isRateLimited(clientIp: String): Boolean {
+        val now = System.currentTimeMillis()
+        val (count, windowStart) = pairingAttempts.getOrDefault(clientIp, Pair(0, now))
+        if (now - windowStart > pairingWindowMs) {
+            pairingAttempts[clientIp] = Pair(1, now)
+            return false
+        }
+        if (count >= maxPairingAttempts) return true
+        pairingAttempts[clientIp] = Pair(count + 1, windowStart)
+        return false
+    }
+
     val actualPort: Int get() = port
 
     suspend fun start(): Result<HostingInfo> = withContext(Dispatchers.IO) {
@@ -50,14 +71,16 @@ class KtorSyncServer(
             val ks = tlsIdentity.loadKeyStore()
             val pw = tlsIdentity.password
 
-            server = embeddedServer(CIO, configure = {
+            server = embeddedServer(Netty, configure = {
                 sslConnector(
                     keyStore = ks,
                     keyAlias = tlsIdentity.alias,
                     keyStorePassword = { pw },
                     privateKeyPassword = { pw }
-                ) { }
-                connectors = connectors.map { it.withPort(port) }.toMutableList()
+                ) {
+                    this.port = port
+                    this.host = "0.0.0.0"
+                }
             }) {
                 routing {
                     // ---- Public: device info ----
@@ -89,6 +112,15 @@ class KtorSyncServer(
 
                     // ---- Public: pairing verification with user-entered token ----
                     post("/pairing/verify") {
+                        val clientIp = call.request.local.remoteHost
+                        if (isRateLimited(clientIp)) {
+                            call.respondText(
+                                json.encodeToString(PairingResultResponse(false, error = "Too many attempts. Try again later.")),
+                                ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                            )
+                            return@post
+                        }
+
                         val bodyText = call.receiveText()
                         if (bodyText.length > 4096) {
                             call.respondText(

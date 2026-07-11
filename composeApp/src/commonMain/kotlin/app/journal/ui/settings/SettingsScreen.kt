@@ -1,5 +1,7 @@
 package app.journal.ui.settings
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -102,7 +104,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { themeExpanded = !themeExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -325,7 +327,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { dataExpanded = !dataExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -503,7 +505,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -569,7 +571,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { libraryExpanded = !libraryExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -637,7 +639,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { aboutExpanded = !aboutExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -689,12 +691,13 @@ fun SettingsScreen() {
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                                 Spacer(Modifier.height(2.dp))
-                                Text(
-                                    "Your data is yours. This app will never have ads, " +
+                                SelectableText(
+                                    text = "Your data is yours. This app will never have ads, " +
                                     "subscriptions, or telemetry. No accounts, no cloud, " +
                                     "no tracking. Always.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                    )
                                 )
                             }
                         }
@@ -730,7 +733,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { legalExpanded = !legalExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -754,13 +757,14 @@ fun SettingsScreen() {
                         Text("Medical disclaimer", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "This app is not a medical device and does not diagnose, treat, cure, " +
+                        SelectableText(
+                            text = "This app is not a medical device and does not diagnose, treat, cure, " +
                             "or prevent any medical condition. The substance reference data is sourced " +
                             "from PsychonautWiki and is provided for harm reduction and informational " +
                             "purposes only.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -768,12 +772,13 @@ fun SettingsScreen() {
                         Text("Healthcare reminder", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "If you have concerns about your health or substance use, consult " +
+                        SelectableText(
+                            text = "If you have concerns about your health or substance use, consult " +
                             "a qualified healthcare professional. In an emergency, call emergency " +
                             "services immediately (EU: 112, US: 911, UK: 999).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -781,13 +786,14 @@ fun SettingsScreen() {
                         Text("License", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Nepenthe Journal is free software: you can redistribute it and/or modify " +
+                        SelectableText(
+                            text = "Nepenthe Journal is free software: you can redistribute it and/or modify " +
                             "it under the terms of the GNU General Public License as published by " +
                             "the Free Software Foundation, either version 3 of the License, or " +
                             "(at your option) any later version.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
                 }
@@ -799,7 +805,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { privacyExpanded = !privacyExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -823,21 +829,22 @@ fun SettingsScreen() {
                         Text("Privacy & data", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "All journal data is stored locally on your device. " +
+                        SelectableText(
+                            text = "All journal data is stored locally on your device. " +
                             "There is no connected server — nothing is uploaded, synced, or sent " +
                             "without your explicit action.\n\n" +
                             "The app contains no analytics, no telemetry, and no tracking software. " +
                             "No data is collected or transmitted automatically.\n\n" +
                             "You can manually export your full journal data at any time via " +
-                            "Settings > Data (JSON, CSV, or ZIP). Sharing those exports is " +
+                            "\"Settings > Data (JSON, CSV, or ZIP)\". Sharing those exports is " +
                             "entirely at your discretion — nothing leaves your device until " +
                             "you explicitly choose to export and share it.\n\n" +
                             "Optional P2P sync transmits data directly between your own devices " +
                             "over your local network only. No data passes through any external relay.\n\n" +
                             "Full privacy policy: PRIVACY.md in the app repository.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
 
                         Spacer(Modifier.height(12.dp))
@@ -845,8 +852,8 @@ fun SettingsScreen() {
                         Text("Business model pledge", style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            "This app will never include:\n\n" +
+                        SelectableText(
+                            text = "This app will never include:\n\n" +
                             "  - Advertisements of any kind\n" +
                             "  - Subscription tiers or paid features\n" +
                             "  - Telemetry, analytics, or crash reporting\n" +
@@ -855,8 +862,9 @@ fun SettingsScreen() {
                             "This is a firm commitment, not a current-state description.\n\n" +
                             "You own your data. Manual export is always available — " +
                             "nothing leaves your device unless you explicitly choose to share it.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
                     }
                 }

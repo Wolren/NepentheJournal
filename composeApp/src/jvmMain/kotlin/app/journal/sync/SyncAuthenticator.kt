@@ -20,6 +20,24 @@ private val secureRandom = SecureRandom()
 
 class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
 
+    // ---- Nonce replay protection ----
+    // Bounded set of recently seen nonces to prevent replay attacks within the timestamp window.
+    // Uses ConcurrentHashMap.newKeySet() for thread-safe add-and-check.
+    private val seenNonces = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Check and record a nonce for replay protection.
+     * Returns true if the nonce is valid (within window + not seen before).
+     */
+    private fun checkAndRecordNonce(nonce: String, timestamp: Long): Boolean {
+        val now = System.currentTimeMillis()
+        if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
+        return seenNonces.add(nonce)
+    }
+
+    /** Clear all seen nonces (e.g. on re-pairing). */
+    fun clearSeenNonces() { seenNonces.clear() }
+
     // ---- Pairing tokens ----
 
     private data class PendingPairing(
@@ -27,7 +45,7 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         val createdAt: Long,
         val ttlSeconds: Long = 120L
     ) {
-        val isExpired: Boolean get() = System.currentTimeMillis() - createdAt > ttlSeconds * 1000
+        val isExpired: Boolean get() = System.currentTimeMillis() - createdAt >= ttlSeconds * 1000
     }
 
     @Volatile
@@ -98,9 +116,8 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         val (timestampStr, nonce, signature) = parts
         val timestamp = timestampStr.toLongOrNull() ?: return false
 
-        // Check timestamp window
-        val now = System.currentTimeMillis()
-        if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
+        // Check timestamp window + nonce replay
+        if (!checkAndRecordNonce(nonce, timestamp)) return false
 
         // Verify HMAC
         val expected = hmac(secret, "$deviceId:$timestamp:$nonce:$body")

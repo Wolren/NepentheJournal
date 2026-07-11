@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -164,8 +165,10 @@ fun SessionTimelineScreen(
                 Text("Timeline Events", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
             }
-            items(events, key = { it.id }) { event ->
-                EventCard(event, session.startTime)
+            itemsIndexed(events, key = { _, e -> e.id }) { _, event ->
+                AnimatedListItem {
+                    EventCard(event, session.startTime)
+                }
             }
         } else {
             item {
@@ -191,9 +194,11 @@ fun SessionTimelineScreen(
                 Text("Substances", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
             }
-            items(doses, key = { it.id }) { dose ->
-                val substance = repo.getSubstance(dose.substanceId)
-                DoseTimelineCard(dose, substance)
+            itemsIndexed(doses, key = { _, d -> d.id }) { _, dose ->
+                AnimatedListItem {
+                    val substance = repo.getSubstance(dose.substanceId)
+                    DoseTimelineCard(dose, substance)
+                }
             }
         }
 

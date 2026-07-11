@@ -89,7 +89,7 @@ object DataInitializer {
      * then patches any existing doses, interactions, or session data that
      * still reference the old IDs.
      */
-    private fun migrateOldIds(repo: JournalRepository) {
+    internal fun migrateOldIds(repo: JournalRepository) {
         // Build mapping: old pwiki:xxx ID -> new cid:xxxx ID
         val idMap = mutableMapOf<String, String>()
         for (sub in repo.substances.value) {
@@ -123,11 +123,12 @@ object DataInitializer {
             val newB = idMap[interaction.substanceBId] ?: interaction.substanceBId
             if (newA != interaction.substanceAId || newB != interaction.substanceBId) {
                 val sortedIds = listOf(newA, newB).sorted()
+                // Preserve the original interaction ID — it's just a unique key,
+                // the canonical pairing is defined by the substanceAId/substanceBId fields.
                 repo.upsertInteraction(
                     interaction.copy(
                         substanceAId = sortedIds[0],
-                        substanceBId = sortedIds[1],
-                        id = "interaction:${sortedIds[0]}:${sortedIds[1]}"
+                        substanceBId = sortedIds[1]
                     )
                 )
                 patchedInteractions++
