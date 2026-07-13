@@ -1,6 +1,7 @@
 # Gradle
 .gradle/
 build/
+.kotlin/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -60,3 +61,9 @@ scripts/smw_only_seed.json
 unified_seed.json
 scripts/__pycache__/
 *.pyc
+
+# Hermes
+.hermes/
+
+# Large external data files
+scripts/pdsp_ki_database.csv
