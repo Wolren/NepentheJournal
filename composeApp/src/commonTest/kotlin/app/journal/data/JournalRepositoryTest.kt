@@ -2,6 +2,8 @@ package app.journal.data
 
 import app.journal.model.*
 import kotlin.test.*
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 class JournalRepositoryTest {
 
@@ -320,17 +322,168 @@ class JournalRepositoryTest {
     // ==================== Derived flows ====================
 
     @Test
-    fun recentSessionsReturnsMostRecent() {
+    fun recentSessionsReturnsMostRecent() = runBlocking {
         val repo = JournalRepository()
         repo.upsertSession(sampleSession("s:1", 1000L))
         repo.upsertSession(sampleSession("s:2", 2000L))
         repo.upsertSession(sampleSession("s:3", 3000L))
         repo.upsertSession(sampleSession("s:4", 4000L))
         repo.upsertSession(sampleSession("s:5", 5000L))
-        repo.upsertSession(sampleSession("s:6", 6000L)) // 6th, should be cut off
-        val recent = repo.recentSessions
-        // Can't easily test Flow in commonTest without coroutines test lib,
-        // but at least verify the class doesn't crash
-        assertNotNull(repo)
+        repo.upsertSession(sampleSession("s:6", 6000L))
+        val recent = repo.recentSessions.first()
+        assertEquals(5, recent.size)
+        assertEquals("s:6", recent[0].id)
+        assertEquals("s:5", recent[1].id)
+        assertEquals("s:2", recent[4].id)
+    }
+
+    // ==================== applyBatch ====================
+
+    @Test
+    fun applyBatchPopulatesAllCollections() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.applyBatch(
+            sessions = listOf(sampleSession("s:1")),
+            doses = listOf(sampleDose("d:1", "sub:1", "s:1", 1000L)),
+            notes = listOf(Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test", sessionId = "s:1", body = "n")),
+            timelineEvents = listOf(TimelineEvent(id = "e:1", sessionId = "s:1", timestamp = 1000L,
+                eventType = TimelineEventType.ONSET, label = "Start", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test")),
+            interactions = listOf(Interaction(id = "i:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                substanceAId = "sub:1", substanceBId = "sub:2", riskLevel = InteractionRisk.UNSAFE)),
+            effects = listOf(Effect(id = "ef:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                name = "Euphoria", substanceIds = listOf("sub:1"))),
+            customUnits = listOf(CustomUnit(id = "u:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                substanceId = "sub:1", name = "tab"))
+        )
+        assertEquals(1, repo.sessions.value.size)
+        assertEquals(1, repo.doses.value.size)
+        assertEquals(1, repo.notes.value.size)
+        assertEquals(1, repo.timelineEvents.value.size)
+        assertEquals(1, repo.interactions.value.size)
+        assertEquals(1, repo.effects.value.size)
+        assertEquals(1, repo.customUnits.value.size)
+    }
+
+    @Test
+    fun applyBatchBuildsCorrectIndices() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSubstance(sampleSubstance("sub:2", "MDMA"))
+        repo.applyBatch(
+            sessions = listOf(
+                sampleSession("s:1", 1000L),
+                Session(id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                    title = "S2", startTime = 2000L, tags = listOf("deep"))
+            ),
+            doses = listOf(
+                sampleDose("d:1", "sub:1", "s:1", 1000L),
+                sampleDose("d:2", "sub:2", "s:1", 1500L)
+            )
+        )
+        // Session indices
+        assertEquals(2, repo.sessions.value.size)
+        val tagged = repo.sessionIdsWithTag("deep")
+        assertEquals(1, tagged.size, "only session s:2 has 'deep' tag")
+        assertEquals("s:2", tagged.first())
+        // Dose indices
+        assertEquals(2, repo.dosesForSession("s:1").size)
+        assertEquals(1, repo.sessionIdsForSubstance("sub:1").size)
+        assertTrue("s:1" in repo.sessionIdsForSubstance("sub:1"))
+        assertEquals(1, repo.sessionIdsForSubstance("sub:2").size)
+        assertTrue("s:1" in repo.sessionIdsForSubstance("sub:2"))
+    }
+
+    @Test
+    fun applyBatchEmptyListsAreNoop() {
+        val repo = JournalRepository()
+        repo.applyBatch() // all defaults = empty lists
+        assertTrue(repo.sessions.value.isEmpty())
+        assertTrue(repo.doses.value.isEmpty())
+        assertTrue(repo.substances.value.isEmpty())
+    }
+
+    @Test
+    fun applyBatchThenIndividualUpsertPreservesIndices() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.applyBatch(
+            sessions = listOf(sampleSession("s:1")),
+            doses = listOf(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        )
+        // Add a second dose individually
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
+        assertEquals(2, repo.dosesForSession("s:1").size)
+        assertEquals(1, repo.sessionIdsForSubstance("sub:1").size)
+        assertTrue("s:1" in repo.sessionIdsForSubstance("sub:1"))
+    }
+
+    // ==================== substanceDoseStats ====================
+
+    @Test
+    fun substanceDoseStatsStartsEmpty() {
+        val repo = JournalRepository()
+        assertTrue(repo.substanceDoseStats.isEmpty())
+    }
+
+    @Test
+    fun substanceDoseStatsUpdatesOnUpsertDose() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        val stats = repo.substanceDoseStats
+        assertEquals(1, stats.size)
+        val (count, lastUsed) = stats["sub:1"]!!
+        assertEquals(1, count)
+        assertEquals(1000L, lastUsed)
+    }
+
+    @Test
+    fun substanceDoseStatsMultipleDosesSameSession() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
+        val stats = repo.substanceDoseStats
+        val (count, lastUsed) = stats["sub:1"]!!
+        assertEquals(2, count)  // each dose counted separately
+        assertEquals(2000L, lastUsed)
+    }
+
+    @Test
+    fun substanceDoseStatsRecalculatesOnDeleteDose() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
+        repo.deleteDose("d:1")
+        val stats = repo.substanceDoseStats
+        val (count, lastUsed) = stats["sub:1"]!!
+        assertEquals(1, count)
+        assertEquals(2000L, lastUsed)
+    }
+
+    @Test
+    fun substanceDoseStatsRecalculatesOnDeleteSession() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.deleteSession("s:1")
+        assertTrue(repo.substanceDoseStats.isEmpty(), "dose stats should be empty after session deletion removes all doses")
+    }
+
+    @Test
+    fun substanceDoseStatsMultipleSubstances() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSubstance(sampleSubstance("sub:2", "MDMA"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:2", "s:1", 2000L))
+        assertEquals(2, repo.substanceDoseStats.size)
     }
 }

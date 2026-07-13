@@ -1,6 +1,7 @@
 package app.journal.util
 
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
@@ -32,8 +33,12 @@ actual object ZipExporter {
                     zos.closeEntry()
                 }
             }
+            Log.withTag("ZipExporter").i { "Exported all data to $outputPath" }
             5
-        } catch (_: Exception) { 0 }
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export all data to $outputPath" }
+            0
+        }
     }
 
     actual fun exportSessionsZip(
@@ -52,7 +57,11 @@ actual object ZipExporter {
                 zos.write(content.encodeToByteArray())
                 zos.closeEntry()
             }
+            Log.withTag("ZipExporter").i { "Exported sessions to $outputPath" }
             1
-        } catch (_: Exception) { 0 }
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export sessions to $outputPath" }
+            0
+        }
     }
 }

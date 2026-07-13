@@ -4,6 +4,9 @@ import kotlin.test.*
 import java.io.File
 import java.security.KeyStore
 import java.security.cert.X509Certificate
+import org.bouncycastle.asn1.x509.GeneralName
+import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.Extension
 
 class TlsIdentityManagerTest {
 
@@ -120,5 +123,22 @@ class TlsIdentityManagerTest {
         val mgr = TlsIdentityManager(testDir.absolutePath)
         val pw = mgr.password
         assertTrue(pw.size >= 8, "derived password should be at least 8 chars, got ${pw.size}")
+    }
+
+    // ==================== Certificate SAN ====================
+
+    @Test
+    fun certificateContainsSubjectAlternativeNameLocalhost() {
+        val mgr = TlsIdentityManager(testDir.absolutePath)
+        mgr.ensureIdentity()
+        val cert = mgr.certificate
+
+        val sans = cert.getSubjectAlternativeNames()
+        assertNotNull(sans, "certificate must have SubjectAlternativeNames extension")
+
+        val dnsNames = sans.filter { (it[0] as? Int) == GeneralName.dNSName }
+            .map { it[1] as? String }
+        assertTrue(dnsNames.contains("localhost"),
+            "SAN must include dNSName:localhost, got: $dnsNames")
     }
 }

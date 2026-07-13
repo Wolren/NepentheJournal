@@ -29,68 +29,20 @@ import app.journal.ui.components.*
 
 @Composable
 fun SubstanceScreen(
+    viewModel: SubstanceScreenViewModel = remember { SubstanceScreenViewModel.create() },
     onSubstanceClick: (String) -> Unit = {},
     onNewSubstance: () -> Unit = {}
 ) {
-    val repo = remember { JournalRepository.instance }
-    val substances by repo.substances.collectAsState(initial = emptyList())
-    val allDoses by repo.doses.collectAsState()
+    val substances by viewModel.realSubstances.collectAsState(initial = emptyList())
+    val results by viewModel.results.collectAsState(initial = emptyList())
+    val allCategories by viewModel.allCategories.collectAsState(initial = emptyList())
     val themeManager = remember { ThemeManager.instance }
     val isDark = themeManager.isDarkTheme()
-    var query by remember { mutableStateOf("") }
-    var activeCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val substanceDoseStats = viewModel.substanceDoseStats
+
+    val query by viewModel.query.collectAsState()
+    val activeCategories by viewModel.activeCategories.collectAsState()
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
-
-    // Extract all unique substance classes across substances with real data
-    val realSubstances = remember(substances) {
-        substances.filter { sub ->
-            sub.routesOfAdministration.isNotEmpty() ||
-            sub.effects.isNotEmpty() ||
-            sub.dosageBands.isNotEmpty()
-        }
-    }
-    val allCategories = remember(realSubstances) {
-        realSubstances.flatMap { it.substanceClass }.distinct().sorted()
-    }
-
-    // Filtered results (excluding category entries with no consumption data)
-    val results = remember(query, realSubstances, activeCategories) {
-        var result = realSubstances
-
-        // Category filter
-        if (activeCategories.isNotEmpty()) {
-            result = result.filter { sub ->
-                sub.substanceClass.any { it in activeCategories }
-            }
-        }
-
-        // Text search
-        if (query.isNotBlank()) {
-            val q = query.lowercase()
-            result = result.filter { sub ->
-                sub.name.lowercase().contains(q) ||
-                sub.aliases.any { it.lowercase().contains(q) } ||
-                sub.substanceClass.any { it.lowercase().contains(q) }
-            }
-        }
-
-        result
-    }
-
-    // Precompute dose stats per substance once instead of filtering per card.
-    // Map: substanceId -> (distinctSessionCount, lastUsedTimestamp)
-    val substanceDoseStats = remember(allDoses) {
-        val sessionIdsPerSub = mutableMapOf<String, MutableSet<String>>()
-        val lastUsedPerSub = mutableMapOf<String, Long>()
-        for (dose in allDoses) {
-            sessionIdsPerSub.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
-            val existing = lastUsedPerSub[dose.substanceId] ?: 0L
-            if (dose.timestamp > existing) lastUsedPerSub[dose.substanceId] = dose.timestamp
-        }
-        sessionIdsPerSub.mapValues { (key, sessionIds) ->
-            Pair(sessionIds.size, lastUsedPerSub[key])
-        }
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -98,13 +50,13 @@ fun SubstanceScreen(
             Box {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { viewModel.query.value = it },
                     placeholder = { Text("Search substances...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (query.isNotEmpty()) {
-                                IconButton(onClick = { query = "" }) {
+                                IconButton(onClick = { viewModel.query.value = "" }) {
                                     Icon(Icons.Default.Close, contentDescription = "Clear")
                                 }
                             }
@@ -132,7 +84,7 @@ fun SubstanceScreen(
                             Text("All categories",
                                 fontWeight = if (activeCategories.isEmpty()) FontWeight.Bold else FontWeight.Normal)
                         },
-                        onClick = { activeCategories = emptySet(); categoryDropdownExpanded = false },
+                        onClick = { viewModel.activeCategories.value = emptySet(); categoryDropdownExpanded = false },
                         leadingIcon = {
                             if (activeCategories.isEmpty()) {
                                 Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
@@ -156,7 +108,7 @@ fun SubstanceScreen(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                 },
                                 onClick = {
-                                    activeCategories = if (isSelected) activeCategories - category
+                                    viewModel.activeCategories.value = if (isSelected) activeCategories - category
                                         else activeCategories + category
                                 },
                                 leadingIcon = {

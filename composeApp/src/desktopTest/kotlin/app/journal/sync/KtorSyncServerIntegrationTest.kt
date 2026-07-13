@@ -10,14 +10,17 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import io.ktor.server.websocket.*
+import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 import java.io.File
 
 /**
  * Integration tests for Sync server routing logic using Ktor's testApplication.
- * Tests all endpoints: /info, /pairing/verify, /sync/push, /sync/pull
+ * Tests all endpoints: /info, /pairing/verify, /sync/push, /sync/pull, /sync/ws
  * including authentication, validation, and rate limiting.
  * No real server or TLS needed — testApplication routes requests in-process.
  */
@@ -25,7 +28,9 @@ class KtorSyncServerIntegrationTest {
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-routes-${System.nanoTime()}")
-    private val trustStore = DeviceTrustStore(testDir.absolutePath)
+    private val trustStore = DeviceTrustStore(testDir.absolutePath).also {
+        DeviceTrustStore.pbkdf2Iterations = 1000
+    }
     private val authenticator = SyncAuthenticator(trustStore)
 
     @BeforeTest
@@ -45,9 +50,15 @@ class KtorSyncServerIntegrationTest {
 
     /**
      * Build the routing module used by all tests.
-     * Mirrors KtorSyncServer's routing.
+     * Mirrors KtorSyncServer's routing including the WebSocket endpoint.
      */
     private fun Application.testRouting() {
+        install(WebSockets) {
+            pingPeriod = 15.seconds
+            timeout = 15.seconds
+            maxFrameSize = Long.MAX_VALUE
+        }
+
         routing {
             get("/info") {
                 call.respondText(
@@ -124,6 +135,52 @@ class KtorSyncServerIntegrationTest {
                     return@get
                 }
                 call.respondText("""{"success":true,"sessions":[],"doses":[]}""", ContentType.Application.Json)
+            }
+
+            // ---- WebSocket: continuous sync endpoint ----
+            webSocket("/sync/ws") {
+                val callerDeviceId = call.request.queryParameters["deviceId"] ?: run {
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing deviceId"))
+                    return@webSocket
+                }
+                val authHeader = call.request.queryParameters["auth"] ?: run {
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing auth"))
+                    return@webSocket
+                }
+                if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Untrusted device"))
+                    return@webSocket
+                }
+                if (!authenticator.verifyRequest(callerDeviceId, "ws", authHeader)) {
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Authentication failed"))
+                    return@webSocket
+                }
+
+                for (frame in incoming) {
+                    if (frame is Frame.Text) {
+                        val text = frame.readText()
+                        val msg = try {
+                            wsJson.decodeFromString<WsMessage>(text)
+                        } catch (_: Exception) {
+                            outgoing.send(Frame.Text(
+                                wsJson.encodeToString(WsAck(0, error = "Malformed"))
+                            ))
+                            continue
+                        }
+                        when (msg) {
+                            is WsDelta -> {
+                                outgoing.send(Frame.Text(
+                                    wsJson.encodeToString(WsAck(seq = msg.seq))
+                                ))
+                            }
+                            is WsPing -> {
+                                outgoing.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
+                            }
+                            is WsPong -> { /* ignore */ }
+                            is WsAck -> { /* ignore */ }
+                        }
+                    }
+                }
             }
         }
     }
@@ -251,14 +308,29 @@ class KtorSyncServerIntegrationTest {
         assertEquals(HttpStatusCode.OK, response.status)
     }
 
+    // ==================== /sync/ws (WebSocket) ====================
+
+    @Test
+    fun `ws rejects unauthenticated connections`() = testApplication {
+        application { testRouting() }
+        // WS without auth should not upgrade successfully
+        val response = client.get("/sync/ws?deviceId=unknown&auth=bad")
+        assertNotEquals(HttpStatusCode.OK, response.status,
+            "unauthenticated WS should not succeed (upgrade fails)")
+    }
+
+    @Test
+    fun `ws endpoint returns non-200 for missing auth`() = testApplication {
+        application { testRouting() }
+        val response = client.get("/sync/ws")
+        assertNotEquals(HttpStatusCode.OK, response.status,
+            "WS without query params should not succeed")
+    }
+
     // ==================== Helpers ====================
 
     /** Pairs a test device and returns (deviceId, sharedSecret). */
     private fun pairTestDevice(): Pair<String, String> {
-        val token = authenticator.generatePairingToken(60L)
-        // We need to call the server endpoint, but testApplication client
-        // isn't available here. Instead, directly add the peer to trust store
-        // and get the shared secret back.
         val secret = authenticator.generateSharedSecret()
         trustStore.addPeer(DeviceTrustStore.TrustedPeer(
             deviceId = "test-client-auth", displayName = "Auth Test",

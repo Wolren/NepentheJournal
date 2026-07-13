@@ -36,6 +36,22 @@ interface IJournalRepository : IngestRepository {
     val toleranceVersion: StateFlow<Int>
     val mutationCount: StateFlow<Long>
 
+    // ---- Obsidian vault config ----
+    val obsidianVaultPath: StateFlow<String>
+    val obsidianAutoExport: StateFlow<Boolean>
+    val obsidianSubfolder: StateFlow<String>
+    val obsidianFileOrganization: StateFlow<String>
+
+    // ---- Display preferences ----
+    val showSessionsTrendChart: StateFlow<Boolean>
+
+    fun setObsidianVaultPath(path: String)
+    fun setObsidianAutoExport(enabled: Boolean)
+    fun setObsidianSubfolder(folder: String)
+    fun setObsidianFileOrganization(org: String)
+
+    fun setShowSessionsTrendChart(enabled: Boolean)
+
     // ---- Derived flows ----
     val recentSessions: Flow<List<Session>>
     val totalSessionCount: Flow<Int>
@@ -63,6 +79,7 @@ interface IJournalRepository : IngestRepository {
 
     // ---- Interactions ----
     override fun upsertInteraction(interaction: Interaction)
+    fun getInteraction(id: String): Interaction?
 
     // ---- Effects ----
     override fun upsertEffect(effect: Effect)
@@ -80,10 +97,20 @@ interface IJournalRepository : IngestRepository {
 
     // ---- Notes ----
     fun upsertNote(note: Note)
+    fun deleteNote(id: String)
     fun notesForSession(sessionId: String): List<Note>
+
+    /**
+     * Atomically upsert a note, merging conflict siblings if the note body differs
+     * from the existing version. Runs under the repository lock to prevent
+     * TOCTOU races between read and write.
+     * @return the resolved note (with conflict siblings if applicable), or null if skipped
+     */
+    fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note?
 
     // ---- Timeline Events ----
     fun upsertTimelineEvent(event: TimelineEvent)
+    fun deleteTimelineEvent(id: String)
     fun eventsForSession(sessionId: String): List<TimelineEvent>
 
     // ---- Query indices ----
@@ -92,6 +119,12 @@ interface IJournalRepository : IngestRepository {
     fun sessionIdsWithTag(tag: String): List<String>
     fun sessionIdsWithAnyTag(tags: List<String>): Set<String>
     fun rebuildIndices()
+
+    /**
+     * Precomputed dose stats per substance: (distinctSessionCount, lastUsedTimestamp).
+     * Maintained incrementally. Returns empty map if no doses.
+     */
+    val substanceDoseStats: Map<String, Pair<Int, Long>>
 
     // ---- DataFrame export ----
     fun sessionsDataFrame(): List<SessionDataRow>

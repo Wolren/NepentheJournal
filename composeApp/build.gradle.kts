@@ -20,7 +20,7 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -38,27 +38,30 @@ kotlin {
                 implementation(libs.multiplatform.settings)
                 implementation(libs.coil.compose)
                 implementation(libs.coil.network.ktor)
+                implementation(libs.vico.compose)
+                implementation(libs.vico.compose.m3)
+                implementation(libs.kermit.core)
             }
         }
-        val commonTest by getting {
+        val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
-        val androidMain by getting {
+        val androidMain = getByName("androidMain") {
             dependencies {
                 implementation(libs.androidx.activity)
                 implementation(libs.ktor.client.cio)
             }
         }
-        val desktopMain by getting {
+        val desktopMain = getByName("desktopMain") {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.ktor.client.cio)
                 implementation(libs.logback.classic)
             }
         }
-        val desktopTest by getting {
+        val desktopTest = getByName("desktopTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.ktor.client.cio)
@@ -75,13 +78,19 @@ kotlin {
         }
 
         // Shared JVM source set for both Android and Desktop
-        val jvmMain by creating {
+        val jvmMain = create("jvmMain") {
             dependsOn(commonMain)
             dependencies {
                 implementation(libs.ktor.server.netty)
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.serialization)
+                implementation(libs.ktor.server.websockets)
+                implementation(libs.ktor.server.cio)
                 implementation(libs.jmdns)
+                implementation(libs.bouncycastle.bcpkix)
+                implementation(libs.ktor.client.websockets)
+                implementation(libs.ktor.client.cio)
+                implementation(libs.kermit.io)
             }
         }
         // Wire jvmMain into both Android and Desktop
@@ -103,7 +112,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
-    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,*.properties}" } }
     buildTypes { getByName("release") { isMinifyEnabled = false } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -6,19 +6,18 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.websocket.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.security.cert.CertificateException
-import java.security.cert.X509Certificate
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import javax.net.ssl.X509TrustManager
 
 /**
  * TLS-enabled sync client with HMAC request signing and certificate pinning.
@@ -41,62 +40,10 @@ class KtorSyncClient(
     private val json = Json { ignoreUnknownKeys = true }
     private val canSign: Boolean get() = sharedSecret != null
 
-    private val client: HttpClient = buildHttpClient(trustedFingerprint)
-
-    private fun buildHttpClient(trustedFingerprint: String?): HttpClient {
-        return if (trustedFingerprint != null) {
-            buildPinnedClient(trustedFingerprint)
-        } else {
-            buildPairingClient()
-        }
-    }
-
-    /**
-     * Build an HTTP client that pins a specific certificate by SHA-256 fingerprint.
-     */
-    private fun buildPinnedClient(fingerprintHex: String): HttpClient {
-        val pinTrustManager = object : X509TrustManager {
-            override fun checkClientTrusted(certs: Array<out X509Certificate>?, authType: String?) {
-                certs?.let { checkPinned(it, fingerprintHex) }
-            }
-            override fun checkServerTrusted(certs: Array<out X509Certificate>?, authType: String?) {
-                certs?.let { checkPinned(it, fingerprintHex) }
-            }
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        }
-        return HttpClient(CIO) {
-            install(ContentNegotiation) { json(json) }
-            engine { https { trustManager = pinTrustManager } }
-        }
-    }
-
-    /**
-     * Build an HTTP client that accepts any certificate (TOFU mode for pairing).
-     */
-    private fun buildPairingClient(): HttpClient {
-        val trustAll = object : X509TrustManager {
-            override fun checkClientTrusted(certs: Array<out X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(certs: Array<out X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        }
-        return HttpClient(CIO) {
-            install(ContentNegotiation) { json(json) }
-            engine { https { trustManager = trustAll } }
-        }
-    }
-
-    private fun checkPinned(certs: Array<out X509Certificate>, expectedFingerprint: String) {
-        val match = certs.any { cert ->
-            val md = MessageDigest.getInstance("SHA-256")
-            md.update(cert.encoded)
-            val fp = md.digest().joinToString("") { "%02x".format(it) }
-            fp.equals(expectedFingerprint, ignoreCase = true)
-        }
-        if (!match) {
-            throw java.security.cert.CertificateException(
-                "Certificate pinning failed: no cert matches fingerprint $expectedFingerprint"
-            )
-        }
+    // Plain HTTP client — no TLS. HMAC auth secures requests on LAN.
+    private val client: HttpClient = HttpClient(CIO) {
+        install(ContentNegotiation) { json(json) }
+        install(WebSockets)
     }
 
     // ---- Pairing endpoints (no auth needed) ----
@@ -104,7 +51,7 @@ class KtorSyncClient(
     suspend fun requestHostInfo(host: String, port: Int): Result<HostInfo> =
         withContext(Dispatchers.IO) {
             try {
-                val response = client.get("https://$host:$port/pairing/start")
+                val response = client.get("http://$host:$port/pairing/start")
                 val info = response.body<HostInfo>()
                 Result.success(info)
             } catch (e: Exception) {
@@ -121,7 +68,7 @@ class KtorSyncClient(
         clientFingerprint: String
     ): Result<DevicePairingResult> = withContext(Dispatchers.IO) {
         try {
-            val response = client.post("https://$host:$port/pairing/verify") {
+            val response = client.post("http://$host:$port/pairing/verify") {
                 contentType(ContentType.Application.Json)
                 setBody(PairingVerifyRequestRaw(
                     token = token,
@@ -164,20 +111,21 @@ class KtorSyncClient(
                 sessions = changed(repo.sessions.value, since) { it.updatedAt },
                 doses = changed(repo.doses.value, since) { it.updatedAt },
                 substances = changed(repo.substances.value, since) { it.updatedAt },
-                effects = emptyList(),
+                effects = changed(repo.effects.value, since) { it.updatedAt },
                 interactions = changed(repo.interactions.value, since) { it.updatedAt },
                 notes = changed(repo.notes.value, since) { it.updatedAt },
-                timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt }
+                timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
+                customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
             )
 
             val bodyText = json.encodeToString(batch)
             val authHeader = authenticateRequest(deviceId, bodyText)
 
-            val response = client.post("https://$host:$port/sync/push") {
+            val response = client.post("http://$host:$port/sync/push") {
                 contentType(ContentType.Application.Json)
                 header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                 header(SyncAuthenticator.AUTH_HEADER, authHeader)
-                setBody(batch)
+                setBody(bodyText)
             }.body<SyncResponse>()
 
             // Atomic exchange: apply server's changes returned in push response
@@ -199,7 +147,7 @@ class KtorSyncClient(
             val uri = "/sync/pull?since=$since"
             val authHeader = authenticateRequest(deviceId, uri)
 
-            val response = client.get("https://$host:$port$uri") {
+            val response = client.get("http://$host:$port$uri") {
                 header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                 header(SyncAuthenticator.AUTH_HEADER, authHeader)
             }.body<SyncResponse>()
@@ -215,19 +163,23 @@ class KtorSyncClient(
     suspend fun fetchHostInfo(host: String, port: Int): Result<HostInfo> =
         withContext(Dispatchers.IO) {
             try {
-                client.get("https://$host:$port/info").body<HostInfo>().let { Result.success(it) }
+                client.get("http://$host:$port/info").body<HostInfo>().let { Result.success(it) }
             } catch (e: Exception) {
                 Result.failure(e)
             }
         }
 
     private suspend fun applyPull(response: SyncResponse) {
-        response.sessions.forEach { repo.upsertSession(it) }
-        response.doses.forEach { repo.upsertDose(it) }
-        response.substances.forEach { repo.upsertSubstance(it) }
-        response.interactions.forEach { repo.upsertInteraction(it) }
-        response.notes.forEach { repo.upsertNote(it) }
-        response.timelineEvents.forEach { repo.upsertTimelineEvent(it) }
+        repo.applyBatch(
+            sessions = response.sessions,
+            doses = response.doses,
+            substances = response.substances,
+            effects = response.effects,
+            interactions = response.interactions,
+            notes = response.notes,
+            timelineEvents = response.timelineEvents,
+            customUnits = response.customUnits
+        )
     }
 
     private fun authenticateRequest(deviceId: String, body: String): String {
@@ -249,6 +201,33 @@ class KtorSyncClient(
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
         return mac.doFinal(data.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Connect to a peer's WebSocket sync endpoint.
+     * Uses the same HMAC scheme as HTTP: deviceId + timestamp + nonce + "ws" signed with sharedSecret.
+     * @param onDelta callback invoked for each received [WsDelta]
+     * @return the established [WebSocketSession] for sending further messages
+     */
+    suspend fun connectWs(
+        host: String,
+        port: Int,
+        callerDeviceId: String = this.deviceId,
+        onDelta: (WsDelta) -> Unit
+    ): WebSocketSession {
+        if (!canSign) throw IllegalStateException("No shared secret — pair this device first")
+
+        val authHeader = authenticateRequest(callerDeviceId, "ws")
+        val wsUrl = "ws://$host:$port/sync/ws?deviceId=$callerDeviceId&auth=$authHeader"
+        return client.webSocketSession(wsUrl)
+    }
+
+    /**
+     * Serialize and send a [WsDelta] over an active WebSocket session.
+     */
+    suspend fun sendDelta(session: WebSocketSession, delta: WsDelta) {
+        val text = wsJson.encodeToString(delta)
+        session.send(Frame.Text(text))
     }
 
     fun close() { client.close() }

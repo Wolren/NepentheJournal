@@ -2,6 +2,7 @@ package app.journal.data
 
 import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.SubstanceClassNormalizer
+import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.readBundledResource
 import kotlinx.coroutines.*
@@ -66,13 +67,13 @@ object DataInitializer {
         if (isTestDataEnabled() && subCount >= 2) {
             FuzzSeed.generate(repo)
             store.save()
-            println("Generated fuzz test data (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)")
+            Log.withTag("DataInit").i { "Generated fuzz test data (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)" }
         }
 
         // Step 5: Wire debounced auto-save (4.1) — saves 2s after every mutation
         if (scope != null) {
             autoSaveJob = repo.autoSave(store, scope)
-            println("Auto-save enabled (debounce 2000ms)")
+            Log.withTag("DataInit").i { "Auto-save enabled (debounce 2000ms)" }
         }
 
         // Rebuild query indices after loading everything
@@ -80,7 +81,7 @@ object DataInitializer {
         // from DoseWikiIngestor and migrateOldIds maintain them.)
 
         if (subCount > 0 || sessionCount > 0) {
-            println("Initialized: $subCount substances, $sessionCount sessions")
+        Log.withTag("DataInit").i { "Initialized: $subCount substances, $sessionCount sessions" }
         }
     }
 
@@ -104,7 +105,7 @@ object DataInitializer {
             return
         }
 
-        println("Migrating ${idMap.size} substance ID mappings...")
+        Log.withTag("DataInit").i { "Migrating ${idMap.size} substance ID mappings..." }
 
         // Patch doses that reference old IDs
         var patchedDoses = 0
@@ -135,14 +136,14 @@ object DataInitializer {
             }
         }
 
-        println("  Patched $patchedDoses doses, $patchedInteractions interactions")
+        Log.withTag("DataInit").i { "  Patched $patchedDoses doses, $patchedInteractions interactions" }
     }
 
     private fun tryLoadSeed(repo: JournalRepository): Boolean {
         return try {
             val text = readBundledResource(SEED_RESOURCE)
                 ?: run {
-                    println("Seed resource $SEED_RESOURCE not found")
+                    Log.withTag("DataInit").w { "Seed resource $SEED_RESOURCE not found" }
                     return false
                 }
             val snapshot = JournalJson.json.decodeFromString<JournalSnapshot>(text)
@@ -157,15 +158,15 @@ object DataInitializer {
             // Report class normalization stats
             val distinctBefore = snapshot.substances.flatMap { it.substanceClass }.distinct().size
             val distinctAfter = normalizedSnapshot.substances.flatMap { it.substanceClass }.distinct().size
-            println("Normalized substance classes: $distinctBefore -> $distinctAfter distinct labels")
+            Log.withTag("DataInit").i { "Normalized substance classes: $distinctBefore -> $distinctAfter distinct labels" }
             if (count > 0) {
-                println("Loaded $count substances from bundled seed ($SEED_RESOURCE)")
+                Log.withTag("DataInit").i { "Loaded $count substances from bundled seed ($SEED_RESOURCE)" }
                 true
             } else {
                 false
             }
         } catch (e: Exception) {
-            System.err.println("Failed to load seed resource: ${e.message}")
+            Log.withTag("DataInit").e { "Failed to load seed resource: ${e.message}" }
             false
         }
     }

@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.pow
 
 class ThemeManager private constructor() {
 
@@ -122,4 +123,4 @@ fun blend(base: Color, overlay: Color, ratio: Float): Color {
     )
 }
 
-private fun Float.pow(e: Float): Float = Math.pow(this.toDouble(), e.toDouble()).toFloat()
+private fun Float.pow(e: Float): Float = this.toDouble().pow(e.toDouble()).toFloat()

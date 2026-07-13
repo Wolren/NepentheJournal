@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import app.journal.model.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -9,17 +10,22 @@ import io.ktor.server.engine.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
+import io.ktor.websocket.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * TLS + HMAC-authenticated sync server with data validation.
- * All traffic encrypted via self-signed TLS certificate.
- * All data-changing endpoints require HMAC-SHA256 signed requests.
+ * Plain-HTTP plus HMAC-authenticated sync server.
+ *
+ * All data-changing endpoints require HMAC-SHA256 signed requests via
+ * [SyncAuthenticator]. No TLS — on a LAN the HMAC provides message
+ * integrity and authentication between devices that already share a
+ * secret established during pairing.
  *
  * Pairing endpoint has per-IP rate limiting to prevent token brute force.
  *
@@ -40,16 +46,17 @@ class KtorSyncServer(
 ) {
     private var server: EmbeddedServer<*, *>? = null
     private val json = Json { ignoreUnknownKeys = true }
-    private val fingerprint: String by lazy {
-        try { TlsIdentityManager().ensureIdentity() } catch (_: Exception) { "unknown" }
-    }
-    private val deviceId: String by lazy { "desktop-${fingerprint.take(8)}" }
+    private val wsJson = Json { ignoreUnknownKeys = true; classDiscriminator = "#type"; serializersModule = wsModule }
+
+    /** Stable device identity derived from the self-signed cert fingerprint. */
+    val fingerprint: String by lazy { tlsIdentity.ensureIdentity() }
+    val deviceId: String by lazy { "device-${fingerprint.take(16)}" }
+    val deviceName: String by lazy { platformDeviceName() }
 
     // ---- Rate limiting for pairing endpoint ----
-    // Track pairing attempts per client IP: max 5 within 120s window
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
     private val maxPairingAttempts = 5
-    private val pairingWindowMs = 120_000L // 2 minutes
+    private val pairingWindowMs = 120_000L
 
     private fun isRateLimited(clientIp: String): Boolean {
         val now = System.currentTimeMillis()
@@ -67,43 +74,37 @@ class KtorSyncServer(
 
     suspend fun start(): Result<HostingInfo> = withContext(Dispatchers.IO) {
         try {
-            val fingerprint = tlsIdentity.ensureIdentity()
-            val ks = tlsIdentity.loadKeyStore()
-            val pw = tlsIdentity.password
+            val fp = fingerprint // force identity generation
+            val deviceName = deviceName
 
-            server = embeddedServer(Netty, configure = {
-                sslConnector(
-                    keyStore = ks,
-                    keyAlias = tlsIdentity.alias,
-                    keyStorePassword = { pw },
-                    privateKeyPassword = { pw }
-                ) {
-                    this.port = port
-                    this.host = "0.0.0.0"
+            server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+                install(WebSockets) {
+                    pingPeriod = 15.seconds
+                    timeout = 15.seconds
+                    maxFrameSize = Long.MAX_VALUE
                 }
-            }) {
+
                 routing {
                     // ---- Public: device info ----
                     get("/info") {
                         call.respondText(
                             json.encodeToString(HostInfo(
                                 deviceId = deviceId,
-                                deviceName = "Desktop (Windows)",
-                                fingerprint = fingerprint,
+                                deviceName = deviceName,
+                                fingerprint = fp,
                                 protocolVersion = 2
                             )),
                             ContentType.Application.Json
                         )
                     }
 
-                    // ---- Public: pairing start (returns host info, NOT the token) ----
+                    // ---- Public: pairing start ----
                     get("/pairing/start") {
-                        // Returns only device info. Token must be entered visually by the user.
                         call.respondText(
                             json.encodeToString(HostInfo(
                                 deviceId = deviceId,
-                                deviceName = "Desktop (Windows)",
-                                fingerprint = fingerprint,
+                                deviceName = deviceName,
+                                fingerprint = fp,
                                 protocolVersion = 2
                             )),
                             ContentType.Application.Json
@@ -165,8 +166,8 @@ class KtorSyncServer(
                             ?: authenticator.generateSharedSecret().also {
                                 trustStore.addPeer(DeviceTrustStore.TrustedPeer(
                                     deviceId = deviceId,
-                                    displayName = "Desktop (Windows)",
-                                    fingerprint = fingerprint,
+                                    displayName = deviceName,
+                                    fingerprint = fp,
                                     sharedSecret = it,
                                     pairedAt = System.currentTimeMillis()
                                 ))
@@ -178,8 +179,8 @@ class KtorSyncServer(
                                 deviceId = clientDeviceId,
                                 sharedSecret = hostSecret,
                                 hostDeviceId = deviceId,
-                                hostDeviceName = "Desktop (Windows)",
-                                hostFingerprint = fingerprint
+                                hostDeviceName = deviceName,
+                                hostFingerprint = fp
                             )),
                             ContentType.Application.Json
                         )
@@ -197,7 +198,7 @@ class KtorSyncServer(
                             )
                             return@post
                         }
-                        val (deviceId, body) = auth
+                        val (callerDeviceId, body) = auth
 
                         if (body.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
                             call.respondText(
@@ -227,8 +228,7 @@ class KtorSyncServer(
                         }
 
                         handlePush(batch)
-                        trustStore.updateLastSeen(deviceId)
-                        // Atomic exchange: also return server changes since client's timestamp
+                        trustStore.updateLastSeen(callerDeviceId)
                         val exchangeResponse = handlePull(batch.since)
                         call.respondText(
                             json.encodeToString(exchangeResponse),
@@ -246,7 +246,7 @@ class KtorSyncServer(
                             )
                             return@get
                         }
-                        val (deviceId, _) = auth
+                        val (callerDeviceId, _) = auth
 
                         val sinceStr = call.request.queryParameters["since"]
                         val since = sinceStr?.toLongOrNull() ?: 0L
@@ -259,17 +259,79 @@ class KtorSyncServer(
                         }
 
                         val response = handlePull(since)
-                        trustStore.updateLastSeen(deviceId)
+                        trustStore.updateLastSeen(callerDeviceId)
                         call.respondText(json.encodeToString(response), ContentType.Application.Json)
+                    }
+
+                    // ---- Authenticated: WebSocket continuous sync ----
+                    webSocket("/sync/ws") {
+                        val callerDeviceId = call.request.queryParameters["deviceId"]
+                        val authHeader = call.request.queryParameters["auth"]
+                        if (callerDeviceId == null || authHeader == null) {
+                            close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing deviceId or auth"))
+                            return@webSocket
+                        }
+                        if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
+                            close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Untrusted device"))
+                            return@webSocket
+                        }
+                        if (!authenticator.verifyRequest(callerDeviceId, "ws", authHeader)) {
+                            close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Authentication failed"))
+                            return@webSocket
+                        }
+
+                        for (frame in incoming) {
+                            if (frame is Frame.Text) {
+                                val text = frame.readText()
+                                val msg = try {
+                                    wsJson.decodeFromString<WsMessage>(text)
+                                } catch (_: Exception) {
+                                    outgoing.send(Frame.Text(
+                                        wsJson.encodeToString(WsAck(0, error = "Malformed frame"))
+                                    ))
+                                    continue
+                                }
+                                when (msg) {
+                                    is WsDelta -> {
+                                        val validationError = validateWsDelta(msg)
+                                        if (validationError != null) {
+                                            outgoing.send(Frame.Text(
+                                                wsJson.encodeToString(WsAck(seq = msg.seq, error = validationError))
+                                            ))
+                                            continue
+                                        }
+                                        repo.applyBatch(
+                                            sessions = msg.sessions,
+                                            doses = msg.doses,
+                                            substances = msg.substances,
+                                            effects = msg.effects,
+                                            interactions = msg.interactions,
+                                            notes = msg.notes,
+                                            timelineEvents = msg.timelineEvents,
+                                            customUnits = msg.customUnits
+                                        )
+                                        outgoing.send(Frame.Text(
+                                            wsJson.encodeToString(WsAck(seq = msg.seq))
+                                        ))
+                                        trustStore.updateLastSeen(callerDeviceId)
+                                    }
+                                    is WsPing -> {
+                                        outgoing.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
+                                    }
+                                    is WsPong -> { /* ignore */ }
+                                    is WsAck -> { /* ignore */ }
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             server!!.start(wait = false)
-            Result.success(HostingInfo("0.0.0.0", port, fingerprint))
+            Log.withTag("KtorSyncServer").i { "Server started on 0.0.0.0:$port (fingerprint=$fp)" }
+            Result.success(HostingInfo("0.0.0.0", port, fp))
         } catch (e: Exception) {
-            System.err.println("KtorSyncServer start failed: ${e.message}")
-            e.printStackTrace()
+            Log.withTag("KtorSyncServer").e(e) { "Server start failed: ${e.message}" }
             Result.failure(e)
         }
     }
@@ -301,66 +363,20 @@ class KtorSyncServer(
 
     // ---- Data validation ----
 
-    private fun validateBatch(batch: SyncBatch): String? {
-        val maxItems = 500
-        if (batch.sessions.size > maxItems) return "Too many sessions (max $maxItems)"
-        if (batch.doses.size > maxItems) return "Too many doses (max $maxItems)"
-        if (batch.substances.size > 100) return "Too many substances (max 100)"
-        if (batch.notes.size > maxItems) return "Too many notes (max $maxItems)"
-        if (batch.timelineEvents.size > maxItems) return "Too many events (max $maxItems)"
-        if (batch.interactions.size > 100) return "Too many interactions (max 100)"
-
-        val maxFieldLen = 65536
-        for (s in batch.sessions) {
-            if (s.id.length > 128) return "Session ID too long"
-            if (s.title.length > 500) return "Session title too long"
-            if ((s.set?.length ?: 0) > maxFieldLen) return "Session set too long"
-            if ((s.setting?.length ?: 0) > maxFieldLen) return "Session setting too long"
-            if ((s.intention?.length ?: 0) > maxFieldLen) return "Session intention too long"
-            if ((s.outcome?.length ?: 0) > maxFieldLen) return "Session outcome too long"
-            if (s.tags.size > 50) return "Too many session tags"
-            if (s.tags.any { it.length > 100 }) return "Session tag too long"
-            if (s.rating != null && (s.rating < 1 || s.rating > 10)) return "Invalid rating"
-        }
-        for (d in batch.doses) {
-            if (d.id.length > 128) return "Dose ID too long"
-            if (d.sessionId.length > 128) return "Dose sessionId too long"
-            if (d.substanceId.length > 128) return "Dose substanceId too long"
-            if (d.routeOfAdministration.length > 50) return "Invalid ROA length"
-            if (d.unit.length > 20) return "Invalid unit length"
-            if (d.amount < 0 || d.amount > 1_000_000) return "Invalid dose amount"
-            if (d.notes?.length ?: 0 > maxFieldLen) return "Dose notes too long"
-        }
-        for (n in batch.notes) {
-            if (n.id.length > 128) return "Note ID too long"
-            if (n.body.length > maxFieldLen) return "Note body too long"
-            if (n.title?.length ?: 0 > 500) return "Note title too long"
-            if (n.tags.size > 50) return "Too many note tags"
-        }
-        for (s in batch.substances) {
-            if (s.id.length > 128) return "Substance ID too long"
-            if (s.name.length > 200) return "Substance name too long"
-            if (s.aliases.any { it.length > 200 }) return "Substance alias too long"
-            if ((s.summary?.length ?: 0) > maxFieldLen) return "Substance summary too long"
-        }
-        for (i in batch.interactions) {
-            if (i.id.length > 128) return "Interaction ID too long"
-            if (i.substanceAId.length > 128) return "Interaction substanceAId too long"
-            if (i.substanceBId.length > 128) return "Interaction substanceBId too long"
-            if (i.description?.length ?: 0 > maxFieldLen) return "Interaction description too long"
-        }
-        for (t in batch.timelineEvents) {
-            if (t.id.length > 128) return "TimelineEvent ID too long"
-            if (t.label.length > 200) return "TimelineEvent label too long"
-            if (t.body?.length ?: 0 > maxFieldLen) return "TimelineEvent body too long"
-        }
-        return null
-    }
+    private fun validateBatch(batch: SyncBatch): String? = validateSyncBatch(batch)
 
     private fun handlePush(batch: SyncBatch) {
         var conflicts = 0
-        batch.substances.forEach { repo.upsertSubstance(it) }
-        batch.doses.forEach { repo.upsertDose(it) }
+        // Batch-apply entities without conflict logic
+        repo.applyBatch(
+            substances = batch.substances,
+            doses = batch.doses,
+            interactions = batch.interactions,
+            timelineEvents = batch.timelineEvents,
+            effects = batch.effects,
+            customUnits = batch.customUnits
+        )
+        // Sessions and notes need individual handling for conflict resolution
         batch.sessions.forEach { session ->
             val existing = repo.getSession(session.id)
             if (existing != null && existing.updatedAt > session.updatedAt) {
@@ -386,8 +402,6 @@ class KtorSyncServer(
             repo.upsertNote(resolved)
             if (resolved.conflictSiblings.isNotEmpty()) conflicts++
         }
-        batch.interactions.forEach { repo.upsertInteraction(it) }
-        batch.timelineEvents.forEach { repo.upsertTimelineEvent(it) }
         onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${batch.deviceName}")
     }
 
@@ -399,6 +413,8 @@ class KtorSyncServer(
         interactions = repo.interactions.value.filter { it.updatedAt > since },
         notes = repo.notes.value.filter { it.updatedAt > since },
         timelineEvents = repo.timelineEvents.value.filter { it.updatedAt > since },
+        effects = repo.effects.value.filter { it.updatedAt > since },
+        customUnits = repo.customUnits.value.filter { it.updatedAt > since },
         conflictsCreated = repo.notes.value.count { it.conflictSiblings.isNotEmpty() }
     )
 }

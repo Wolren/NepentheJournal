@@ -18,7 +18,8 @@ data class SyncBatch(
     val effects: List<Effect> = emptyList(),
     val interactions: List<Interaction> = emptyList(),
     val notes: List<Note> = emptyList(),
-    val timelineEvents: List<TimelineEvent> = emptyList()
+    val timelineEvents: List<TimelineEvent> = emptyList(),
+    val customUnits: List<CustomUnit> = emptyList()
 )
 
 @Serializable
@@ -32,6 +33,7 @@ data class SyncResponse(
     val interactions: List<Interaction> = emptyList(),
     val notes: List<Note> = emptyList(),
     val timelineEvents: List<TimelineEvent> = emptyList(),
+    val customUnits: List<CustomUnit> = emptyList(),
     val conflictsCreated: Int = 0
 )
 

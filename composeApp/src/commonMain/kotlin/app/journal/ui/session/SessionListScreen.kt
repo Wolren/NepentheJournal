@@ -31,49 +31,28 @@ import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun SessionListScreen(
+    viewModel: SessionListViewModel = remember { SessionListViewModel.create() },
     onNewSession: () -> Unit = {},
     onEditSession: (String) -> Unit = {},
     onSessionClick: (String) -> Unit = {},
     onLiveSession: () -> Unit = {},
-    showFavoritesOnly: Boolean = false,
-    showArchived: Boolean = false,
     useRelativeTime: Boolean = true,
     onToggleTimeFormat: () -> Unit = {}
 ) {
-    val repo = remember { JournalRepository.instance }
-    val sessions by repo.sessions.collectAsState(initial = emptyList())
-    var filterTags by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
+    val allSessions by viewModel.sessions.collectAsState(initial = emptyList())
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
-    var consumerFilter by remember { mutableStateOf<String?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
     var tagDropdownExpanded by remember { mutableStateOf(false) }
 
-    val allTags = remember(sessions) {
-        sessions.flatMap { it.tags }.distinct().sorted()
-    }
-
-    val allConsumers = remember(sessions) {
-        sessions.mapNotNull { it.consumerName }.distinct().sorted()
-    }
-
-    val filteredSessions = remember(sessions, filterTags, showFavoritesOnly, showArchived, consumerFilter, searchQuery) {
-        var result = sessions
-        if (filterTags.isNotEmpty()) result = result.filter { s -> s.tags.any { it in filterTags } }
-        if (showFavoritesOnly) result = result.filter { it.isFavorite }
-        if (!showArchived) result = result.filter { !it.isArchived }
-        if (consumerFilter != null) result = result.filter { it.consumerName == consumerFilter }
-        if (searchQuery.isNotBlank()) {
-            val q = searchQuery.lowercase()
-            result = result.filter { s ->
-                s.title.lowercase().contains(q) ||
-                s.tags.any { it.lowercase().contains(q) } ||
-                s.intention?.lowercase()?.contains(q) == true
-            }
-        }
-        result.sortedByDescending { it.startTime }
-    }
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val filterTags by viewModel.filterTags.collectAsState()
+    val consumerFilter by viewModel.consumerFilter.collectAsState()
+    val showFavs by viewModel.showFavoritesOnly.collectAsState()
+    val showArch by viewModel.showArchived.collectAsState()
+    val allTags by viewModel.allTags.collectAsState(initial = emptyList())
+    val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -81,13 +60,13 @@ fun SessionListScreen(
             Box {
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { viewModel.searchQuery.value = it },
                     placeholder = { Text("Search sessions...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
+                                IconButton(onClick = { viewModel.searchQuery.value = "" }) {
                                     Icon(Icons.Default.Close, contentDescription = "Clear")
                                 }
                             }
@@ -112,7 +91,7 @@ fun SessionListScreen(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Clear all filters", fontWeight = if (filterTags.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = { filterTags = emptySet(); tagDropdownExpanded = false },
+                        onClick = { viewModel.filterTags.value = emptySet(); tagDropdownExpanded = false },
                         leadingIcon = {
                             if (filterTags.isEmpty()) {
                                 Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
@@ -133,7 +112,7 @@ fun SessionListScreen(
                             DropdownMenuItem(
                                 text = { Text(tag, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
-                                    filterTags = if (isSelected) filterTags - tag else filterTags + tag
+                                    viewModel.filterTags.value = if (isSelected) filterTags - tag else filterTags + tag
                                 },
                                 leadingIcon = {
                                     if (isSelected) {
@@ -152,7 +131,7 @@ fun SessionListScreen(
 
             // Count row
             Text(
-                text = "${filteredSessions.size} session${if (filteredSessions.size != 1) "s" else ""}",
+                text = "${sessions.size} session${if (sessions.size != 1) "s" else ""}",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -160,7 +139,7 @@ fun SessionListScreen(
             Spacer(Modifier.height(4.dp))
 
             // Session list
-            if (filteredSessions.isEmpty()) {
+            if (sessions.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -174,7 +153,7 @@ fun SessionListScreen(
                             text = when {
                                 searchQuery.isNotBlank() -> "No sessions match \"$searchQuery\""
                                 filterTags.isNotEmpty() -> "No sessions with selected tags"
-                                showFavoritesOnly -> "No favorite sessions"
+                                showFavs -> "No favorite sessions"
                                 else -> "No sessions yet"
                             },
                             style = MaterialTheme.typography.bodyLarge,
@@ -187,7 +166,7 @@ fun SessionListScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    itemsIndexed(filteredSessions, key = { _, s -> s.id }) { _, session ->
+                    itemsIndexed(sessions, key = { _, s -> s.id }) { _, session ->
                         AnimatedListItem {
                             SessionCard(
                                 session = session,
@@ -258,7 +237,7 @@ fun SessionListScreen(
                         createdAt = now, updatedAt = now,
                         deviceOrigin = "desktop"
                     )
-                    repo.upsertSession(session)
+                    viewModel.repo.upsertSession(session)
                     onSessionClick(session.id)
                 }) { Text("Start") }
             },
@@ -276,7 +255,7 @@ fun SessionListScreen(
             text = { Text("This will also remove all doses, notes, and timeline events for this session.") },
             confirmButton = {
                 AppTextButton(onClick = {
-                    showDeleteConfirm?.let { repo.deleteSession(it) }
+                    showDeleteConfirm?.let { viewModel.repo.deleteSession(it) }
                     showDeleteConfirm = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
@@ -398,14 +377,6 @@ private fun SessionCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            if (session.isFavorite) {
-                                Icon(
-                                    Icons.Default.Star,
-                                    contentDescription = "Favorite",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
                         }
 
                         Spacer(Modifier.height(2.dp))
@@ -424,7 +395,7 @@ private fun SessionCard(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         if (session.rating != null || session.shulginRating != null) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -439,29 +410,11 @@ private fun SessionCard(
                                 )
                             }
                         }
-                        var menuExpanded by remember { mutableStateOf(false) }
-                        Box {
-                            IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(32.dp)) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "Menu",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp))
-                            }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false },
-                                offset = DpOffset(0.dp, 0.dp)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Edit") },
-                                    onClick = { menuExpanded = false; onEdit() },
-                                    leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                                    onClick = { menuExpanded = false; onDelete() },
-                                    leadingIcon = { Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error) }
-                                )
-                            }
+                        // Edit button
+                        IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -495,6 +448,37 @@ private fun SessionCard(
                     }
                 }
 
+                // Dose composition bar
+                if (doses.isNotEmpty()) {
+                    val totalAmount = doses.sumOf { it.amount }
+                    if (totalAmount > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            doses.forEachIndexed { i, dose ->
+                                val substance = repo.getSubstance(dose.substanceId)
+                                val fraction = (dose.amount / totalAmount).toFloat()
+                                if (fraction > 0.01f) {
+                                    val color = if (substance != null)
+                                        app.journal.ui.theme.AdaptiveColors.colorFor(substance.name).getComposeColor(isDark)
+                                    else MaterialTheme.colorScheme.primary
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .weight(fraction.coerceAtLeast(0.02f)),
+                                        color = if (i % 2 == 0) color else color.copy(alpha = 0.7f),
+                                        shape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
+                                                else if (i == doses.lastIndex) RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
+                                                else RoundedCornerShape(0.dp)
+                                    ) {}
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Tags
                 if (session.tags.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
@@ -508,6 +492,19 @@ private fun SessionCard(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.align(Alignment.CenterVertically))
                         }
+                    }
+                }
+
+                // Favorite heart at bottom-right
+                if (session.isFavorite) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Icon(
+                            Icons.Default.Favorite,
+                            contentDescription = "Favorite",
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }

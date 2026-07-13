@@ -23,7 +23,8 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     // ---- Nonce replay protection ----
     // Bounded set of recently seen nonces to prevent replay attacks within the timestamp window.
     // Uses ConcurrentHashMap.newKeySet() for thread-safe add-and-check.
-    private val seenNonces = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val seenNonces = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val MAX_SEEN_NONCES = 50_000
 
     /**
      * Check and record a nonce for replay protection.
@@ -32,7 +33,15 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     private fun checkAndRecordNonce(nonce: String, timestamp: Long): Boolean {
         val now = System.currentTimeMillis()
         if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
-        return seenNonces.add(nonce)
+        // Bound the set: prune entries whose timestamps are already outside the
+        // window, then reject replay only if this exact nonce is still present.
+        if (seenNonces.size > MAX_SEEN_NONCES) {
+            val cutoff = now - TIMESTAMP_WINDOW_MS
+            seenNonces.entries.removeIf { it.value < cutoff }
+            if (seenNonces.size > MAX_SEEN_NONCES) seenNonces.clear()
+        }
+        // putIfAbsent returns null only when the nonce was not already present.
+        return seenNonces.putIfAbsent(nonce, timestamp) == null
     }
 
     /** Clear all seen nonces (e.g. on re-pairing). */

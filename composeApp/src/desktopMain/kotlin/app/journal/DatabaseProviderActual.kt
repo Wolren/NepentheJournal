@@ -1,4 +1,5 @@
 package app.journal.data
+import app.journal.log.Log
 import com.couchbase.lite.CouchbaseLite
 import com.couchbase.lite.Database
 import com.couchbase.lite.DatabaseConfiguration
@@ -14,21 +15,41 @@ import java.io.File
 actual class DatabaseProvider actual constructor(private val vaultName: String) {
     private var db: Database? = null
     actual fun open() {
-        CouchbaseLite.init()
-        val cfg = DatabaseConfiguration().apply {
-            directory = File(System.getProperty("user.home"), ".psychonautica").absolutePath
+        try {
+            CouchbaseLite.init()
+            val cfg = DatabaseConfiguration().apply {
+                directory = File(System.getProperty("user.home"), ".psychonautica").absolutePath
+            }
+            db = Database(vaultName, cfg)
+            setupCollections()
+            Log.withTag("DB").i { "Opened Couchbase vault: $vaultName" }
+        } catch (e: Exception) {
+            Log.withTag("DB").e(e) { "Failed to open Couchbase vault: $vaultName" }
+            throw e
         }
-        db = Database(vaultName, cfg)
-        setupCollections()
     }
-    actual fun close() { db?.close(); db = null }
+    actual fun close() {
+        try {
+            db?.close()
+            Log.withTag("DB").i { "Closed Couchbase vault: $vaultName" }
+        } catch (e: Exception) {
+            Log.withTag("DB").e(e) { "Error closing Couchbase vault: $vaultName" }
+        }
+        db = null
+    }
     private fun setupCollections() {
         val d = db ?: return
-        val scope = "_default"
-        listOf(
-            "sessions","doses","timelineEvents","notes",
-            "substances","effects","interactions",
-            "links","persons","attachments","devices","syncConfigs"
-        ).forEach { d.createCollection(it, scope) }
+        try {
+            val scope = "_default"
+            listOf(
+                "sessions","doses","timelineEvents","notes",
+                "substances","effects","interactions",
+                "links","persons","attachments","devices","syncConfigs"
+            ).forEach { d.createCollection(it, scope) }
+            Log.withTag("DB").d { "Setup collections for $vaultName" }
+        } catch (e: Exception) {
+            Log.withTag("DB").e(e) { "Failed to setup collections for $vaultName" }
+            throw e
+        }
     }
 }

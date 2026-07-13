@@ -12,6 +12,10 @@ logback                 = "1.5.38"
 ktor-server            = "3.5.1"
 jmdns                  = "3.6.3"
 coil                   = "3.0.4"
+vico                   = "3.2.3"
+kermit                 = "2.1.0"
+
+bouncycastle = "1.78.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "kotlinx-coroutines" }
@@ -35,6 +39,13 @@ ktor-server-test-host   = { module = "io.ktor:ktor-server-test-host",           
 jmdns                   = { module = "org.jmdns:jmdns",                        version.ref = "jmdns" }
 coil-compose            = { module = "io.coil-kt.coil3:coil-compose",           version.ref = "coil" }
 coil-network-ktor       = { module = "io.coil-kt.coil3:coil-network-ktor3",    version.ref = "coil" }
+vico-compose            = { module = "com.patrykandpatrick.vico:compose",            version.ref = "vico" }
+vico-compose-m3         = { module = "com.patrykandpatrick.vico:compose-m3",         version.ref = "vico" }
+bouncycastle-bcpkix     = { module = "org.bouncycastle:bcpkix-jdk18on",       version.ref = "bouncycastle" }
+ktor-server-websockets  = { module = "io.ktor:ktor-server-websockets",        version.ref = "ktor-server" }
+ktor-client-websockets  = { module = "io.ktor:ktor-client-websockets",        version.ref = "ktor" }
+kermit-core             = { module = "co.touchlab:kermit",                   version.ref = "kermit" }
+kermit-io               = { module = "co.touchlab:kermit-io",                version.ref = "kermit" }
 
 [plugins]
 kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",       version.ref = "kotlin" }

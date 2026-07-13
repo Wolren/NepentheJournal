@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.log.Log
 import app.journal.util.currentTimeMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 data class JournalSnapshot(
-    val version: Int = 4,
+    val version: Int = CURRENT_VERSION,
     val savedAt: Long,
     val sessions: List<Session> = emptyList(),
     val substances: List<Substance> = emptyList(),
@@ -23,8 +24,17 @@ data class JournalSnapshot(
     val effects: List<Effect> = emptyList(),
     val customUnits: List<CustomUnit> = emptyList(),
     val useShulginRating: Boolean = false,
-    val useSubstanceColors: Boolean = true
-)
+    val useSubstanceColors: Boolean = true,
+    val obsidianVaultPath: String = "",
+    val obsidianAutoExport: Boolean = false,
+    val obsidianSubfolder: String = "Nepenthe",
+    val obsidianFileOrganization: String = "flat",
+    val showSessionsTrendChart: Boolean = false
+) {
+    companion object {
+        const val CURRENT_VERSION = 5
+    }
+}
 
 /**
  * Handles loading/saving JournalRepository state to a JSON file.
@@ -57,20 +67,36 @@ object JournalJson {
             interactions = repo.interactions.value,
             effects = repo.effects.value,
             customUnits = repo.customUnits.value,
-            useShulginRating = repo.useShulginRating.value
+            useShulginRating = repo.useShulginRating.value,
+            useSubstanceColors = repo.useSubstanceColors.value,
+            obsidianVaultPath = repo.obsidianVaultPath.value,
+            obsidianAutoExport = repo.obsidianAutoExport.value,
+            obsidianSubfolder = repo.obsidianSubfolder.value,
+            obsidianFileOrganization = repo.obsidianFileOrganization.value,
+            showSessionsTrendChart = repo.showSessionsTrendChart.value
         )
     }
 
     fun apply(repo: JournalRepository, snapshot: JournalSnapshot) {
-        snapshot.sessions.forEach { repo.upsertSession(it) }
-        snapshot.substances.forEach { repo.upsertSubstance(it) }
-        snapshot.doses.forEach { repo.upsertDose(it) }
-        snapshot.notes.forEach { repo.upsertNote(it) }
-        snapshot.timelineEvents.forEach { repo.upsertTimelineEvent(it) }
-        snapshot.interactions.forEach { repo.upsertInteraction(it) }
-        snapshot.effects.forEach { repo.upsertEffect(it) }
-        snapshot.customUnits.forEach { repo.upsertCustomUnit(it) }
+        if (snapshot.version != JournalSnapshot.CURRENT_VERSION) {
+            Log.withTag("JournalStore").w { "JournalSnapshot version mismatch: file v${snapshot.version}, app v${JournalSnapshot.CURRENT_VERSION}. Data may not load correctly." }
+        }
+        repo.applyBatch(
+            sessions = snapshot.sessions,
+            substances = snapshot.substances,
+            doses = snapshot.doses,
+            notes = snapshot.notes,
+            timelineEvents = snapshot.timelineEvents,
+            interactions = snapshot.interactions,
+            effects = snapshot.effects,
+            customUnits = snapshot.customUnits
+        )
         repo.setShulginRating(snapshot.useShulginRating)
         repo.setSubstanceColors(snapshot.useSubstanceColors)
+        repo.setObsidianVaultPath(snapshot.obsidianVaultPath)
+        repo.setObsidianAutoExport(snapshot.obsidianAutoExport)
+        repo.setObsidianSubfolder(snapshot.obsidianSubfolder)
+        repo.setObsidianFileOrganization(snapshot.obsidianFileOrganization)
+        repo.setShowSessionsTrendChart(snapshot.showSessionsTrendChart)
     }
 }

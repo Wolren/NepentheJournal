@@ -28,4 +28,8 @@ actual object PlatformFile {
             return File(path).readText()
         }
     }
+
+    actual fun dataDir(): String {
+        return NepentheApp.appContext.filesDir.absolutePath
+    }
 }

@@ -8,4 +8,6 @@ package app.journal.util
 expect object PlatformFile {
     fun writeText(path: String, content: String)
     fun readText(path: String): String
+    /** Platform-specific app data directory path. */
+    fun dataDir(): String
 }

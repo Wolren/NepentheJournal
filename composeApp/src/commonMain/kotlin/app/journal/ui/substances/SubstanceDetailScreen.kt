@@ -18,6 +18,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,7 +44,8 @@ import kotlinx.datetime.toLocalDateTime
 fun SubstanceDetailScreen(
     substanceId: String,
     onBack: () -> Unit,
-    onEdit: (String) -> Unit = {}
+    onEdit: (String) -> Unit = {},
+    onCompanion: () -> Unit = {},
 ) {
     val repo = remember { JournalRepository.instance }
     val substance = remember(substanceId) { repo.getSubstance(substanceId) }
@@ -86,6 +89,11 @@ fun SubstanceDetailScreen(
                     offset = DpOffset(0.dp, 0.dp)
                 ) {
                     DropdownMenuItem(
+                        text = { Text("Usage history") },
+                        onClick = { menuExpanded = false; onCompanion() },
+                        leadingIcon = { Icon(Icons.Default.Timeline, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Edit") },
                         onClick = { menuExpanded = false; onEdit(substanceId) },
                         leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) }
@@ -116,16 +124,29 @@ fun SubstanceDetailScreen(
                     )
                 }
                 Spacer(Modifier.height(4.dp))
-                if (substance.substanceClass.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        substance.substanceClass.forEach { cls ->
-                            SuggestionChip(
-                                onClick = {},
-                                label = { Text(cls, style = MaterialTheme.typography.labelSmall) }
-                            )
+                    if (substance.substanceClass.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            substance.substanceClass.forEach { cls ->
+                                val clsColor = substanceClassColor(cls)
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = clsColor.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        cls,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = clsColor,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
                     }
-                }
             }
 
             // Summary
@@ -223,6 +244,11 @@ fun SubstanceDetailScreen(
                 }
             }
 
+            // Pharmacology (binding affinities: Ki, Kd, IC50, EC50)
+            item {
+                PharmacologySection(substance = substance)
+            }
+
             // Routes
             if (substance.routesOfAdministration.isNotEmpty()) {
                 item {
@@ -252,6 +278,14 @@ fun SubstanceDetailScreen(
                 }
             }
 
+            // FDA drug interaction data
+            item {
+                OpenFdaInteractionCard(
+                    substanceId = substanceId,
+                    substanceName = substance.name
+                )
+            }
+
             // Cross-tolerances
             if (substance.crossTolerances.isNotEmpty()) {
                 item {
@@ -265,7 +299,7 @@ fun SubstanceDetailScreen(
                         !it.startsWith("Zero tolerance:")
                     }.map { cleanWikiMarkup(it) }
 
-                    SectionCard(title = "Tolerance & Cross-Tolerance") {
+                    SectionCard(title = "Tolerance") {
                         if (toleranceTimes.isNotEmpty()) {
                             toleranceTimes.forEach { entry ->
                                 val icon = when {
@@ -327,15 +361,50 @@ fun SubstanceDetailScreen(
             // Addiction potential
             if (substance.addictionPotential != null) {
                 item {
+                    val apText = substance.addictionPotential ?: ""
+                    val apSeverity = when {
+                        apText.contains("High") -> 3
+                        apText.contains("Moderate") -> 2
+                        apText.contains("Low") -> 1
+                        else -> 0
+                    }
+                    val apColor = when (apSeverity) {
+                        3 -> MaterialTheme.colorScheme.error
+                        2 -> MaterialTheme.colorScheme.tertiary
+                        1 -> Color(0xFF66BB6A)
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                     SectionCard(
                         title = "Addiction Potential",
-                        accentColor = when {
-                            substance.addictionPotential.contains("High") -> MaterialTheme.colorScheme.error
-                            substance.addictionPotential.contains("Moderate") -> MaterialTheme.colorScheme.tertiary
-                            else -> null
-                        }
+                        accentColor = apColor
                     ) {
-                        SelectableText(substance.addictionPotential ?: "", style = MaterialTheme.typography.bodyMedium)
+                        if (apSeverity > 0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                listOf("Low", "Moderate", "High").forEachIndexed { i, label ->
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                                            color = if (i <= apSeverity - 1) apColor.copy(alpha = 0.6f)
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(2.dp)
+                                                ) {}
+                                        Spacer(Modifier.height(2.dp))
+                                    Text(label, style = MaterialTheme.typography.labelSmall,
+                                        color = if (i == apSeverity - 1) apColor
+                                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(6.dp))
+                        }
+                        SelectableText(apText, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -385,36 +454,15 @@ fun SubstanceDetailScreen(
                 }
             }
 
-            // Ingestion history (doses of this substance)
+            // Ingestion history (doses of this substance) — timeline chart + stats
             item {
-                val now = currentTimeMillis()
-                val dayMs = 86400000L
                 if (allDosesForSubstance.isNotEmpty()) {
-                    val totalDoseLast30 = allDosesForSubstance.filter { now - it.timestamp < 30L * dayMs }
-                        .sumOf { it.amount }
-                    val lastDose = allDosesForSubstance.maxByOrNull { it.timestamp }
-
                     SectionCard(title = "Ingestion History") {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("All time doses:", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${allDosesForSubstance.size}", style = MaterialTheme.typography.bodySmall)
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Last 30 days:", style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("$totalDoseLast30 ${lastDose?.unit ?: "dose"}", style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (lastDose != null) {
-                            val tz = TimeZone.currentSystemDefault()
-                            val lastLocal = Instant.fromEpochMilliseconds(lastDose.timestamp).toLocalDateTime(tz)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Last dose:", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${lastLocal.year}-${(lastLocal.month.ordinal + 1).toString().padStart(2,'0')}-${lastLocal.day.toString().padStart(2,'0')}",
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
+                        DoseTimelineChart(
+                            doses = allDosesForSubstance,
+                            substanceName = substance.name,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -739,6 +787,27 @@ private fun routeColor(route: String): Color {
     }
 }
 
+private fun substanceClassColor(cls: String): Color {
+    val c = cls.lowercase().trim()
+    return when {
+        c.contains("psychedelic") || c.contains("hallucinogen") -> Color(0xFFAB47BC)
+        c.contains("stimulant") -> Color(0xFFFF7043)
+        c.contains("depressant") || c.contains("sedative") -> Color(0xFF42A5F5)
+        c.contains("dissociative") -> Color(0xFF26C6DA)
+        c.contains("empathogen") || c.contains("entactogen") -> Color(0xFFEC407A)
+        c.contains("opioid") || c.contains("opiate") -> Color(0xFFEF5350)
+        c.contains("benzodiazepine") || c.contains("z-drug") -> Color(0xFFFFA726)
+        c.contains("maoi") -> Color(0xFFFF6D00)
+        c.contains("ssri") || c.contains("antidepressant") -> Color(0xFF66BB6A)
+        c.contains("antipsychotic") -> Color(0xFF78909C)
+        c.contains("anesthetic") || c.contains("nootropic") -> Color(0xFF5C6BC0)
+        c.contains("deliriant") -> Color(0xFF8D6E63)
+        c.contains("cannabinoid") -> Color(0xFF9CCC65)
+        c.contains("alcohol") -> Color(0xFFBDBDBD)
+        else -> Color(0xFF78909C)
+    }
+}
+
 @Composable
 private fun RouteChip(route: String) {
     val color = routeColor(route)
@@ -768,17 +837,18 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
 
     if (phases.isEmpty()) return
 
-    // Bar phases (onset/comeup/peak/offset) vs afterglow
     val barPhases = phases.filter { it.label != "Afterglow" }
     val afterglow = phases.find { it.label == "Afterglow" }
 
     val phaseColors = mapOf(
-        "Onset" to listOf(Color(0xFF66BB6A), Color(0xFF81C784)),
-        "Comeup" to listOf(Color(0xFF42A5F5), Color(0xFF64B5F6)),
-        "Peak" to listOf(Color(0xFFEF5350), Color(0xFFE57373)),
-        "Offset" to listOf(Color(0xFFFFA726), Color(0xFFFFB74D)),
-        "Afterglow" to listOf(Color(0xFFAB47BC), Color(0xFFCE93D8))
+        "Onset" to Color(0xFF66BB6A),
+        "Comeup" to Color(0xFF42A5F5),
+        "Peak" to Color(0xFFEF5350),
+        "Offset" to Color(0xFFFFA726),
+        "Afterglow" to Color(0xFFAB47BC)
     )
+
+    val sumOfMax = barPhases.sumOf { it.maxMinutes }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -789,87 +859,173 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
 
-            // Main timeline bar
-            val sumOfMax = barPhases.sumOf { it.maxMinutes }
-            Canvas(modifier = Modifier.fillMaxWidth().height(32.dp)) {
-                val barTop = 4f
-                val barHeight = 16f
-                val w = size.width
+            // 2D intensity-over-time curve (ggplot2 style)
+            val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f)
+            val axisLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
 
-                var xOff = 0f
+            // Build curve data points
+            data class CurvePt(val x: Float, val y: Float, val label: String, val timeLabel: String, val color: Color)
+            val curvePoints = remember(barPhases, sumOfMax) {
+                val pts = mutableListOf<CurvePt>()
+                var acc = 0f
                 barPhases.forEach { phase ->
-                    val fraction = (phase.maxMinutes / sumOfMax).toFloat().coerceAtLeast(0.02f)
-                    val segWidth = w * fraction
-                    val colors = phaseColors[phase.label] ?: listOf(Color.Gray)
-                    drawRoundRect(
-                        color = colors[0],
-                        topLeft = Offset(xOff, barTop),
-                        size = Size(segWidth, barHeight),
-                        cornerRadius = CornerRadius(4f, 4f)
-                    )
-                    xOff += segWidth
+                    val frac = (phase.maxMinutes / sumOfMax).toFloat().coerceAtLeast(0.04f)
+                    val x = acc + frac / 2f
+                    val y = when (phase.label) {
+                        "Onset" -> 0.25f; "Comeup" -> 0.75f; "Peak" -> 1f; "Offset" -> 0.15f; else -> 0.5f
+                    }
+                    val time = phase.display.split("–", "-", "—").firstOrNull()?.trim() ?: ""
+                    pts.add(CurvePt(x, y, phase.label, time, phaseColors[phase.label] ?: Color.Gray))
+                    acc += frac
+                }
+                pts.toList()
+            }
+
+            Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+                // Canvas: grid, curve, points
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val lPad = 14f
+                    val rPad = 4f
+                    val tPad = 4f
+                    val bPad = 4f
+                    val plotW = w - lPad - rPad
+                    val plotH = h - tPad - bPad
+
+                    // Horizontal grid lines
+                    for (i in 0..4) {
+                        val y = tPad + plotH * (1f - i / 4f)
+                        drawLine(gridColor, Offset(lPad, y), Offset(w - rPad, y), strokeWidth = 0.5f)
+                    }
+
+                    if (curvePoints.size >= 2) {
+                        val path = androidx.compose.ui.graphics.Path()
+                        val firstX = lPad + curvePoints[0].x * plotW
+                        val firstY = tPad + plotH * (1f - curvePoints[0].y)
+                        path.moveTo(firstX, firstY)
+
+                        for (i in 0 until curvePoints.size - 1) {
+                            val p0 = curvePoints[i]; val p1 = curvePoints[i + 1]
+                            val x0 = lPad + p0.x * plotW; val y0 = tPad + plotH * (1f - p0.y)
+                            val x1 = lPad + p1.x * plotW; val y1 = tPad + plotH * (1f - p1.y)
+                            path.cubicTo((x0 + x1) / 2f, y0, (x0 + x1) / 2f, y1, x1, y1)
+                        }
+
+                        // Fill
+                        val fill = androidx.compose.ui.graphics.Path().apply {
+                            addPath(path)
+                            val last = curvePoints.last()
+                            lineTo(lPad + last.x * plotW, tPad + plotH)
+                            lineTo(firstX, tPad + plotH)
+                            close()
+                        }
+                        drawPath(fill, curvePoints.last().color.copy(alpha = 0.10f))
+                        // Curve line (thick, emulated by drawing 3 overlapping lines)
+                        drawPath(path, curvePoints.last().color.copy(alpha = 0.3f), style = Stroke(width = 4f))
+                        drawPath(path, curvePoints.last().color, style = Stroke(width = 2.5f))
+                    }
+
+                    // Points + drop lines
+                    curvePoints.forEach { pt ->
+                        val cx = lPad + pt.x * plotW
+                        val cy = tPad + plotH * (1f - pt.y)
+                        drawLine(gridColor.copy(alpha = 0.15f), Offset(cx, cy), Offset(cx, tPad + plotH), strokeWidth = 0.5f)
+                        drawCircle(Color.White, radius = 5f, center = Offset(cx, cy))
+                        drawCircle(pt.color, radius = 3.5f, center = Offset(cx, cy))
+                    }
+
+                    // X-axis line
+                    drawLine(axisLineColor,
+                        Offset(lPad, tPad + plotH), Offset(w - rPad, tPad + plotH), strokeWidth = 1f)
+                }
+
+                // Y-axis labels (overlaid on the left)
+                Column(
+                    modifier = Modifier.fillMaxHeight().padding(start = 2.dp, top = 2.dp, bottom = 2.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("100%", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    Text("75%", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    Text("50%", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    Text("25%", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    Text("0%", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                }
+
+                // Y-axis title
+                Text("↑ Intensity",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.align(Alignment.TopEnd))
+
+                // X-axis labels (overlaid at bottom)
+                Row(
+                    modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(start = 14.dp, end = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    curvePoints.forEach { pt ->
+                        Text(pt.label, style = MaterialTheme.typography.labelSmall,
+                            color = pt.color, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
-            // Phase tiles
+            // Phase tiles with exact time ranges
             Spacer(Modifier.height(8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                for (phase in barPhases) {
-                    val colors = phaseColors[phase.label] ?: listOf(Color.Gray)
+                barPhases.forEach { phase ->
+                    val color = phaseColors[phase.label] ?: Color.Gray
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = colors[0].copy(alpha = 0.15f),
-                        tonalElevation = 2.dp,
+                        color = color.copy(alpha = 0.10f),
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 5.dp)
                         ) {
-                            Text(
-                                phase.display,
+                            Text(phase.label,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = colors[0],
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Text(
-                                phase.label,
+                                color = color, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(phase.display,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                         }
                     }
                 }
             }
 
-            // Afterglow shown separately
+            // Afterglow
             if (afterglow != null) {
-                val agColors = phaseColors["Afterglow"] ?: listOf(Color.Gray)
-                Spacer(Modifier.height(6.dp))
+                val agColor = phaseColors["Afterglow"] ?: Color.Gray
+                Spacer(Modifier.height(4.dp))
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = agColors[0].copy(alpha = 0.12f),
+                    color = agColor.copy(alpha = 0.08f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text("Afterglow", style = MaterialTheme.typography.labelMedium,
-                            color = agColors[0], fontWeight = FontWeight.SemiBold)
+                        Text("Afterglow", style = MaterialTheme.typography.labelSmall,
+                            color = agColor, fontWeight = FontWeight.SemiBold)
                         Text(afterglow.display, style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
 
-            // Total bar
+            // Total — visual bar
             if (totalRaw != null) {
                 Spacer(Modifier.height(8.dp))
                 val totalMin = totalParsed?.first?.let {
@@ -881,22 +1037,46 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                     if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
                 } ?: ""
 
-                val totalColor = MaterialTheme.colorScheme.primary
-                Canvas(modifier = Modifier.fillMaxWidth().height(20.dp)) {
-                    val w = size.width
-                    drawRoundRect(
-                        color = totalColor.copy(alpha = 0.3f),
-                        topLeft = Offset(0f, 2f),
-                        size = Size(w, 12f),
-                        cornerRadius = CornerRadius(6f, 6f)
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary)
-                    Text(if (totalMin == totalMaxStr) totalMaxStr else "${totalMin}\u2013${totalMaxStr}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text("Total duration", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                        // Visual bar
+                        Box(modifier = Modifier.weight(1f).height(8.dp)) {
+                            val totalColor = MaterialTheme.colorScheme.primary
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = totalColor.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {}
+                            Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
+                                val frac = if (totalParsed != null && totalParsed.second > 0)
+                                    (totalParsed.first / totalParsed.second).toFloat().coerceIn(0.1f, 1f)
+                                else 0.3f
+                                drawRoundRect(
+                                    totalColor.copy(alpha = 0.5f),
+                                    size = Size(size.width * frac, size.height),
+                                    cornerRadius = CornerRadius(4f, 4f)
+                                )
+                            }
+                        }
+
+                        Text(
+                            if (totalMin == totalMaxStr) totalMaxStr else "$totalMin - $totalMaxStr",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
         }
@@ -1057,5 +1237,349 @@ private fun ToleranceTimelineSection(doses: List<Dose>, substanceName: String, i
         Text("Each vertical line is a dose. Height = relative amount.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// ── Pharmacology section ─────────────────────────────────────────────────
+
+private val AFFINITY_LOG_MIN = -2.0  // 0.01 nM
+private val AFFINITY_LOG_MAX = 4.0   // 10000 nM
+
+private enum class AffinityStrength(
+    val label: String,
+    val min: Double,
+    val max: Double,
+) {
+    VERY_STRONG("v.strong", Double.NEGATIVE_INFINITY, 1.0),
+    STRONG("strong", 1.0, 10.0),
+    MODERATE("moderate", 10.0, 100.0),
+    WEAK("weak", 100.0, 1000.0),
+    VERY_WEAK("v.weak", 1000.0, Double.POSITIVE_INFINITY);
+
+    companion object {
+        fun fromNanoMolar(nm: Double?): AffinityStrength? {
+            if (nm == null || nm.isNaN()) return null
+            return entries.firstOrNull { nm >= it.min && nm < it.max }
+        }
+    }
+}
+
+private fun affinityStrengthColor(strength: AffinityStrength): Color = when (strength) {
+    AffinityStrength.VERY_STRONG -> Color(0xFFE53935)
+    AffinityStrength.STRONG -> Color(0xFFFB8C00)
+    AffinityStrength.MODERATE -> Color(0xFF7CB342)
+    AffinityStrength.WEAK -> Color(0xFF42A5F5)
+    AffinityStrength.VERY_WEAK -> Color(0xFF78909C)
+}
+
+@Composable
+private fun PharmacologySection(substance: Substance) {
+    val bindingdbRecords = substance.bindingdbData?.records.orEmpty()
+    val pdspRecords = substance.pdspData?.records.orEmpty()
+    val totalRecords = bindingdbRecords.size + pdspRecords.size
+    if (totalRecords == 0) return
+
+    var expanded by remember { mutableStateOf(false) }
+
+    data class RawEntry(
+        val targetName: String,
+        val species: String?,
+        val affinityType: String,
+        val affinityNM: Double?,
+        val source: String,
+    )
+
+    val groups = remember(substance) {
+        val raw = mutableListOf<RawEntry>()
+        bindingdbRecords.forEach { r ->
+            raw.add(
+                RawEntry(
+                    targetName = r.targetName ?: "Unknown target",
+                    species = r.species,
+                    affinityType = r.affinityType ?: "?",
+                    affinityNM = r.affinityNM,
+                    source = "BDB",
+                )
+            )
+        }
+        pdspRecords.forEach { r ->
+            raw.add(
+                RawEntry(
+                    targetName = r.targetName ?: "Unknown target",
+                    species = r.species ?: "Human",
+                    affinityType = "Ki",
+                    affinityNM = r.kiNanoMolar,
+                    source = "PDSP",
+                )
+            )
+        }
+        val byTargetType = raw.groupBy { Pair(it.targetName, it.affinityType) }
+        val aggByTarget = mutableMapOf<String, MutableList<Pair<String, AggEntry>>>()
+        byTargetType.forEach { (key, entries) ->
+            val (target, type) = key
+            val values = entries.mapNotNull { it.affinityNM }.sorted()
+            val medianNM = if (values.isEmpty()) null
+                else if (values.size % 2 == 1) values[values.size / 2]
+                else (values[values.size / 2 - 1] + values[values.size / 2]) / 2.0
+            aggByTarget.getOrPut(target) { mutableListOf() }.add(
+                target to AggEntry(
+                    affinityType = type,
+                    minNM = values.minOrNull(),
+                    medianNM = medianNM,
+                    maxNM = values.maxOrNull(),
+                    count = entries.size,
+                    sources = entries.map { it.source }.toSet(),
+                    species = entries.mapNotNull { it.species }.toSet(),
+                )
+            )
+        }
+        aggByTarget.mapValues { (_, es) -> es.sortedBy { (_, a) -> a.medianNM ?: Double.MAX_VALUE } }
+            .toList().sortedBy { (_, es) -> es.firstOrNull()?.second?.medianNM ?: Double.MAX_VALUE }
+    }
+
+    val totalGroups = groups.sumOf { (_, es) -> es.size }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Clickable header
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable(enabled = true) { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Pharmacology",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (!expanded) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Text(
+                                "$totalRecords",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            if (expanded) {
+                Spacer(Modifier.height(6.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    "$totalRecords measures in $totalGroups groups across ${groups.size} targets",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+
+                groups.forEach { (target, entries) ->
+                    val allSpecies = entries.flatMap { (_, a) -> a.species }.toSet()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) {
+                        Text(target, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        allSpecies.forEach { sp ->
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                            ) {
+                                Text(
+                                    sp,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize * 0.8f),
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    entries.forEach { (_, a) ->
+                        AffinityBar(
+                            affinityType = a.affinityType,
+                            minNM = a.minNM,
+                            medianNM = a.medianNM,
+                            maxNM = a.maxNM,
+                            count = a.count,
+                            sources = a.sources,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                AffinityLegend()
+            }
+        }
+    }
+}
+
+private data class AggEntry(
+    val affinityType: String,
+    val minNM: Double?,
+    val medianNM: Double?,
+    val maxNM: Double?,
+    val count: Int,
+    val sources: Set<String>,
+    val species: Set<String>,
+)
+
+@Composable
+private fun AffinityBar(
+    affinityType: String,
+    minNM: Double?,
+    medianNM: Double?,
+    maxNM: Double?,
+    count: Int,
+    sources: Set<String>,
+) {
+    val medianStrength = medianNM?.let { AffinityStrength.fromNanoMolar(it) }
+    val color = medianStrength?.let { affinityStrengthColor(it) }
+        ?: MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+    val dimColor = color.copy(alpha = 0.3f)
+
+    val isRange = count > 1 && minNM != null && maxNM != null && minNM != maxNM
+
+    val lStyle = MaterialTheme.typography.labelSmall
+    val tinySize = lStyle.fontSize * 0.75f
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Type label
+        Text(
+            affinityType,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.width(32.dp),
+        )
+
+        // Visual log-scale affinity bar
+        Box(modifier = Modifier.width(100.dp).height(18.dp)) {
+            if (isRange) {
+                val mn = minNM; val mx = maxNM; val md = medianNM
+                fun lpos(nm: Double): Float = ((kotlin.math.log10(nm.coerceIn(0.001, 99999.0)) - AFFINITY_LOG_MIN) / (AFFINITY_LOG_MAX - AFFINITY_LOG_MIN)).toFloat().coerceIn(0f, 1f)
+                val minP = lpos(mn); val maxP = lpos(mx); val medP = if (md != null) lpos(md) else minP
+
+                Canvas(Modifier.fillMaxSize()) {
+                    val by = size.height / 2; val bh = 7.dp.toPx()
+                    val bx = minP * size.width; val bw = (maxP - minP) * size.width
+                    drawRoundRect(dimColor, Offset(bx, by - bh / 2), Size(bw, bh), CornerRadius(bh / 2))
+                    if (medP > minP) {
+                        drawRoundRect(color, Offset(bx, by - bh / 2), Size((medP - minP) * size.width, bh), CornerRadius(bh / 2))
+                    }
+                    drawCircle(color, 4.dp.toPx(), Offset(medP * size.width, by))
+                    drawCircle(Color.White.copy(alpha = 0.5f), 2.5f.dp.toPx(), Offset(medP * size.width, by))
+                }
+            } else if (minNM != null) {
+                val pos = ((kotlin.math.log10(minNM.coerceIn(0.001, 99999.0)) - AFFINITY_LOG_MIN) / (AFFINITY_LOG_MAX - AFFINITY_LOG_MIN)).toFloat().coerceIn(0f, 1f)
+                Canvas(Modifier.fillMaxSize()) {
+                    val by = size.height / 2
+                    drawCircle(color, 4.dp.toPx(), Offset(pos * size.width, by))
+                    drawCircle(Color.White.copy(alpha = 0.5f), 2.5f.dp.toPx(), Offset(pos * size.width, by))
+                }
+            }
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // Value + metadata
+        Column(horizontalAlignment = Alignment.End) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    if (isRange) "${formatAffinity(minNM)} - ${formatAffinity(maxNM)} nM"
+                    else if (minNM != null) "${formatAffinity(minNM)} nM" else "? nM",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (medianStrength != null) {
+                    Text(
+                        medianStrength.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (isRange && medianNM != null) {
+                    Text(
+                        "median ${formatAffinity(medianNM)} nM",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = tinySize),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (count > 1) {
+                    Surface(shape = RoundedCornerShape(3.dp), color = MaterialTheme.colorScheme.surface) {
+                        Text(
+                            "x$count",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = tinySize),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+                sources.forEach { src ->
+                    Surface(shape = RoundedCornerShape(3.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                        Text(
+                            src,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = tinySize),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatAffinity(nm: Double): String = when {
+    nm < 0.01 -> "%.2e".format(nm)
+    nm < 1.0 -> "%.2f".format(nm)
+    nm < 100.0 -> "%.1f".format(nm)
+    nm < 10000.0 -> "%.0f".format(nm)
+    else -> "%.0f".format(nm)
+}
+
+@Composable
+private fun AffinityLegend() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("◀", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("stronger", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AffinityStrength.entries.forEach { s ->
+            val c = affinityStrengthColor(s)
+            Surface(shape = RoundedCornerShape(3.dp), color = c.copy(alpha = 0.2f)) {
+                Text(
+                    s.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = c,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                )
+            }
+        }
+        Text("weaker", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("▶", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

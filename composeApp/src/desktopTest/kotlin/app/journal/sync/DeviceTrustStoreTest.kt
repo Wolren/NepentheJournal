@@ -8,6 +8,11 @@ class DeviceTrustStoreTest {
     private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-trust-${System.nanoTime()}")
     private val store = DeviceTrustStore(testDir.absolutePath)
 
+    init {
+        // Use fast PBKDF2 for tests (1k instead of 100k iterations)
+        DeviceTrustStore.pbkdf2Iterations = 1000
+    }
+
     @AfterTest
     fun cleanup() {
         store.clearAll()
@@ -195,11 +200,88 @@ class DeviceTrustStoreTest {
         assertTrue(store.isTrusted("fp-5"))
     }
 
-    // ==================== Concurrent access safety ====================
+    // ==================== Encryption ====================
 
     @Test
-    fun rapidAddAndRemoveDoesNotCorrupt() {
-        // Simulate rapid pairing/unpairing
+    fun encryptionRoundtripPreservesSecret() {
+        val secret = "super-secret-hmac-key-12345"
+        val peer = samplePeer("dev-enc", "fp-enc").copy(sharedSecret = secret)
+        store.addPeer(peer)
+
+        // File on disk must not contain plaintext
+        val fileContent = File(testDir, "trusted-devices.json").readText()
+        assertFalse(fileContent.contains(secret), "plaintext should NOT appear on disk")
+
+        // Re-read from a fresh store — secret must decrypt correctly
+        val store2 = DeviceTrustStore(testDir.absolutePath)
+        assertEquals(secret, store2.getSharedSecret("dev-enc"))
+    }
+
+    @Test
+    fun encryptionUsesRandomIvPerSave() {
+        // Same peer, same secret, added twice sequentially
+        val peer = samplePeer("dev-iv", "fp-iv").copy(sharedSecret = "fixed-secret")
+        store.addPeer(peer)
+        val fileAfterFirst = File(testDir, "trusted-devices.json").readText()
+
+        // Overwrite with the same peer (same secrets, same everything)
+        store.addPeer(peer)
+        val fileAfterSecond = File(testDir, "trusted-devices.json").readText()
+
+        // Every save must produce different ciphertext (GCM random IV)
+        assertNotEquals(fileAfterFirst, fileAfterSecond,
+            "same plaintext peer saved twice must produce different ciphertext (random IV)")
+    }
+
+    @Test
+    fun pbkdf2SaltPersistsAcrossRestarts() {
+        store.addPeer(samplePeer("dev-salt", "fp-salt").copy(sharedSecret = "test-secret"))
+
+        // Reload from disk — should use the same salt
+        val store2 = DeviceTrustStore(testDir.absolutePath)
+        assertEquals("test-secret", store2.getSharedSecret("dev-salt"))
+
+        // Verify the salt is now stored permanently
+        val fileContent = File(testDir, "trusted-devices.json").readText()
+        assertTrue(fileContent.contains("\"salt\""), "store JSON should contain salt field")
+        assertTrue(fileContent.contains("\"version\":2"), "store should be version 2")
+
+        // Another reload — still works
+        val store3 = DeviceTrustStore(testDir.absolutePath)
+        assertEquals("test-secret", store3.getSharedSecret("dev-salt"))
+    }
+
+    @Test
+    fun plaintextMigrationSurvives() {
+        // Simulate a pre-encryption file: write plaintext secret directly
+        testDir.mkdirs()
+        val oldJson = """{"version":1,"peers":[{"deviceId":"legacy-dev","displayName":"Old Peer","fingerprint":"fp-old","sharedSecret":"old-plaintext-secret","pairedAt":1000}]}"""
+        File(testDir, "trusted-devices.json").writeText(oldJson)
+
+        val store2 = DeviceTrustStore(testDir.absolutePath)
+        assertEquals("old-plaintext-secret", store2.getSharedSecret("legacy-dev"),
+            "plaintext secrets from before encryption should still load")
+        assertEquals(1, store2.count())
+    }
+
+    @Test
+    fun encryptionHandlesEmptySecret() {
+        val peer = samplePeer("dev-empty", "fp-empty").copy(sharedSecret = "")
+        store.addPeer(peer)
+
+        // File must not contain raw empty string in secret position
+        val fileContent = File(testDir, "trusted-devices.json").readText()
+        assertFalse(fileContent.contains(":\"\",") && fileContent.contains("sharedSecret"),
+            "empty secret should also be encrypted on disk")
+
+        val store2 = DeviceTrustStore(testDir.absolutePath)
+        assertEquals("", store2.getSharedSecret("dev-empty"))
+    }
+
+    // ==================== Sequential stress ====================
+
+    @Test
+    fun rapidAddAndRemoveProducesCorrectCount() {
         for (i in 1..100) {
             store.addPeer(samplePeer("dev-$i", "fp-$i"))
         }

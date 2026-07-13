@@ -21,6 +21,8 @@ import app.journal.model.ToleranceInfo
 import app.journal.model.ToleranceLevel
 import app.journal.util.currentTimeMillis
 import app.journal.ui.dashboard.ActivityHeatmap
+import app.journal.ui.dashboard.SessionsTrendChart
+import app.journal.ui.dashboard.TopSubstancesChart
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -36,12 +38,14 @@ fun DashboardScreen() {
     val sessions by repo.sessions.collectAsState()
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
+    val showTrendChart by repo.showSessionsTrendChart.collectAsState()
 
     // Tolerance derived from dose data. Keys on toleranceVersion so the
     // calculation only re-runs when doses mutate, not on every recomposition.
     // ToleranceCalculator internally caches by version for further safety.
     val toleranceVersion by repo.toleranceVersion.collectAsState()
-    val toleranceAll = remember(toleranceVersion) { ToleranceCalculator.calculate(repo) }
+    val calculator = remember { ToleranceCalculator(repo) }
+    val toleranceAll = remember(toleranceVersion) { calculator.calculate() }
     val toleranceList = remember(toleranceAll) {
         // Cap NONE-level items to 5 to avoid endless scrolling
         val nonNone = toleranceAll.filter { it.level != ToleranceLevel.NONE }
@@ -50,6 +54,14 @@ fun DashboardScreen() {
     }
     val totalSessions = sessions.size
     val totalSubstances = substances.size
+
+    // Top substances chart (computed in composable scope before LazyColumn)
+    val substanceSessionPairs = remember(doses, substances) {
+        doses.mapNotNull { dose ->
+            val sub = repo.getSubstance(dose.substanceId)
+            if (sub != null) sub.name to dose.sessionId else null
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -107,6 +119,25 @@ fun DashboardScreen() {
                         )
                     }
                 }
+            }
+        }
+
+        // Sessions trend chart (off by default — toggle in Preferences)
+        if (sessions.isNotEmpty() && showTrendChart) {
+            item {
+                SessionsTrendChart(
+                    sessions = sessions,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        // Top substances chart
+        if (substanceSessionPairs.isNotEmpty()) {
+            item {
+                TopSubstancesChart(
+                    substanceSessionPairs = substanceSessionPairs
+                )
             }
         }
 

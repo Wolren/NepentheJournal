@@ -20,13 +20,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
+import app.journal.log.Log
+import app.journal.log.collectLogs
 import app.journal.model.SyncConfig
 import app.journal.sync.*
 import app.journal.ui.theme.*
@@ -54,10 +61,13 @@ fun SettingsScreen() {
     var editSecondary by remember(themeConfig) { mutableStateOf(themeConfig.secondaryColor) }
     var editTertiary by remember(themeConfig) { mutableStateOf(themeConfig.tertiaryColor) }
     var editBgColor by remember(themeConfig) { mutableStateOf<Long>(themeConfig.backgroundColor ?: 0xFF0E1511L) }
+    var editSurfaceColor by remember(themeConfig) { mutableStateOf(themeConfig.surfaceColor ?: 0xFF16211AL) }
     var editBgImage by remember(themeConfig) { mutableStateOf(themeConfig.backgroundImagePath) }
     var editBgOpacity by remember(themeConfig) { mutableStateOf(0.5f) }
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
+    var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
+    var editAnimationScale by remember(themeConfig) { mutableStateOf(themeConfig.animationScale) }
 
     fun applyTheme() {
         themeManager.update(ThemeConfig(
@@ -66,12 +76,13 @@ fun SettingsScreen() {
             secondaryColor = editSecondary,
             tertiaryColor = editTertiary,
             backgroundColor = editBgColor,
-            surfaceColor = editBgColor,
+            surfaceColor = editSurfaceColor,
             backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() },
             backgroundOpacity = editBgOpacity,
             cardStyle = editCardStyle,
             cornerRadius = editCornerRadius,
-            fontScale = 1.0f
+            fontScale = editFontScale,
+            animationScale = editAnimationScale
         ))
     }
 
@@ -82,18 +93,64 @@ fun SettingsScreen() {
         pendingConflicts = 0, lastError = null
     ))
     val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
     var manualHost by remember { mutableStateOf("") }
     var manualPort by remember { mutableStateOf("4984") }
+    var manualToken by remember { mutableStateOf("") }
+    var continuousSync by remember { mutableStateOf(false) }
     var syncExpanded by remember { mutableStateOf(false) }
+    var isStartingHost by remember { mutableStateOf(false) }
+    var isStoppingHost by remember { mutableStateOf(false) }
+    var isSyncing by remember { mutableStateOf(false) }
     var dataExpanded by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
     var legalExpanded by remember { mutableStateOf(false) }
     var privacyExpanded by remember { mutableStateOf(false) }
     var libraryExpanded by remember { mutableStateOf(false) }
     var logLines by remember { mutableStateOf(listOf("Sync engine ready")) }
+    var trustedDevices by remember { mutableStateOf(syncEngine.trustedDevices()) }
     var dataStatus by remember { mutableStateOf<String?>(null) }
+
+    // Refresh trusted devices when hosting or connections change
+    LaunchedEffect(status.pairedDeviceCount, status.isHosting) {
+        trustedDevices = syncEngine.trustedDevices()
+    }
+
+    val isIpValid = manualHost.isBlank() || manualHost.matches(Regex("^[\\\\.\\\\d]+$"))
+    val isPortValid = (manualPort.toIntOrNull() ?: 0) in 1..65535
+    val hostError = if (manualHost.isNotBlank() && !isIpValid) "Invalid IP format" else null
+    val portError = if (manualPort.isNotBlank() && !isPortValid) "Port must be 1-65535" else null
+
+    fun userMessage(msg: String): String = when {
+        msg.contains("Connection refused") -> "Device not reachable. Check IP and port."
+        msg.contains("timed out") -> "Connection timed out. Device may be offline."
+        msg.contains("Certificate pinning failed") -> "Device certificate changed. Re-pair required."
+        msg.contains("Invalid or expired token") -> "Pairing token expired or wrong. Generate a new one."
+        msg.contains("Authentication failed") -> "Sync auth failed. Try re-pairing."
+        msg.contains("Not paired") -> "Not paired with this device. Enter a pairing token."
+        msg.contains("keytool") || msg.contains("Certificate") -> "TLS setup failed. Restart the app."
+        msg.contains("port") && msg.contains("available") -> "Port already in use. Try a different port."
+        else -> msg
+    }
+
+    fun formatTimestamp(epochMs: Long): String {
+        val diff = System.currentTimeMillis() - epochMs
+        val seconds = diff / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val days = hours / 24
+        return when {
+            seconds < 60 -> "just now"
+            minutes < 60 -> "${minutes}m ago"
+            hours < 24 -> "${hours}h ago"
+            days < 7 -> "${days}d ago"
+            else -> "${days / 7}w ago"
+        }
+    }
+
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
+    var crashLogStatus by remember { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -127,7 +184,6 @@ fun SettingsScreen() {
                         Text("Base", style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // Dark — applies Forest preset
                             FilterChip(
                                 selected = editBaseTheme == BaseTheme.DARK,
                                 onClick = {
@@ -136,11 +192,12 @@ fun SettingsScreen() {
                                     editSecondary = ThemeDefaults.Dark.secondaryColor
                                     editTertiary = ThemeDefaults.Dark.tertiaryColor
                                     editBgColor = 0xFF0E1511L
+                                    editSurfaceColor = 0xFF16211AL
                                     applyTheme()
                                 },
-                                label = { Text("Dark") }
+                                label = { Text("Dark") },
+                                modifier = Modifier.weight(1f)
                             )
-                            // Light — applies Meadow preset
                             FilterChip(
                                 selected = editBaseTheme == BaseTheme.LIGHT,
                                 onClick = {
@@ -149,19 +206,23 @@ fun SettingsScreen() {
                                     editSecondary = ThemeDefaults.Light.secondaryColor
                                     editTertiary = ThemeDefaults.Light.tertiaryColor
                                     editBgColor = 0xFFF3F8EFL
+                                    editSurfaceColor = 0xFFFFFFFFL
                                     applyTheme()
                                 },
-                                label = { Text("Light") }
+                                label = { Text("Light") },
+                                modifier = Modifier.weight(1f)
                             )
                             FilterChip(
                                 selected = editBaseTheme == BaseTheme.SYSTEM,
                                 onClick = { editBaseTheme = BaseTheme.SYSTEM; applyTheme() },
-                                label = { Text("System") }
+                                label = { Text("System") },
+                                modifier = Modifier.weight(1f)
                             )
                             FilterChip(
                                 selected = editBaseTheme == BaseTheme.CUSTOM,
                                 onClick = { editBaseTheme = BaseTheme.CUSTOM },
-                                label = { Text("Custom") }
+                                label = { Text("Custom") },
+                                modifier = Modifier.weight(1f)
                             )
                         }
 
@@ -169,25 +230,6 @@ fun SettingsScreen() {
                         if (editBaseTheme == BaseTheme.CUSTOM) {
                             Spacer(Modifier.height(8.dp))
                             HorizontalDivider()
-                            Spacer(Modifier.height(8.dp))
-                            Text("Presets", style = MaterialTheme.typography.labelLarge)
-                            Spacer(Modifier.height(4.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                AppTonalButton(onClick = {
-                                    editPrimary = ThemeDefaults.Dark.primaryColor
-                                    editSecondary = ThemeDefaults.Dark.secondaryColor
-                                    editTertiary = ThemeDefaults.Dark.tertiaryColor
-                                    editBgColor = 0xFF0E1511L
-                                    applyTheme()
-                                }) { Text("Forest (Dark)") }
-                                AppTonalButton(onClick = {
-                                    editPrimary = ThemeDefaults.Light.primaryColor
-                                    editSecondary = ThemeDefaults.Light.secondaryColor
-                                    editTertiary = ThemeDefaults.Light.tertiaryColor
-                                    editBgColor = 0xFFF3F8EFL
-                                    applyTheme()
-                                }) { Text("Meadow (Light)") }
-                            }
                             Spacer(Modifier.height(12.dp))
                             Text("Colors", style = MaterialTheme.typography.labelLarge)
                             Spacer(Modifier.height(4.dp))
@@ -199,6 +241,8 @@ fun SettingsScreen() {
                             QuickSwatches(current = editTertiary, onPick = { editTertiary = it; applyTheme() })
                             Spacer(Modifier.height(8.dp))
                             ColorPickerField("Background", editBgColor, onPick = { editBgColor = it; applyTheme() })
+                            Spacer(Modifier.height(4.dp))
+                            ColorPickerField("Surface", editSurfaceColor, onPick = { editSurfaceColor = it; applyTheme() })
                             Spacer(Modifier.height(12.dp))
                             Text("Background image", style = MaterialTheme.typography.labelLarge)
                             Spacer(Modifier.height(4.dp))
@@ -218,7 +262,7 @@ fun SettingsScreen() {
                                 Slider(
                                     value = editBgOpacity,
                                     onValueChange = { editBgOpacity = it; applyTheme() },
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier.weight(1f).height(16.dp),
                                     valueRange = 0f..1f
                                 )
                                 Text("%.0f%%".format(editBgOpacity * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
@@ -245,6 +289,43 @@ fun SettingsScreen() {
                                         modifier = Modifier.padding(end = 4.dp))
                                 }
                             }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Typography", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Font scale", style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.width(8.dp))
+                                Slider(
+                                    value = editFontScale,
+                                    onValueChange = { editFontScale = it; applyTheme() },
+                                    modifier = Modifier.weight(1f).height(16.dp),
+                                    valueRange = 0.8f..1.3f,
+                                    steps = 9
+                                )
+                                Text("%.0f%%".format(editFontScale * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Animations", style = MaterialTheme.typography.labelLarge)
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Speed", style = MaterialTheme.typography.bodySmall)
+                                Spacer(Modifier.width(8.dp))
+                                Slider(
+                                    value = editAnimationScale,
+                                    onValueChange = { editAnimationScale = it; applyTheme() },
+                                    modifier = Modifier.weight(1f).height(16.dp),
+                                    valueRange = 0f..1f,
+                                    steps = 4
+                                )
+                                val label = when {
+                                    editAnimationScale == 0f -> "Off"
+                                    editAnimationScale <= 0.25f -> "0.25×"
+                                    editAnimationScale <= 0.5f -> "0.5×"
+                                    editAnimationScale <= 0.75f -> "0.75×"
+                                    else -> "1×"
+                                }
+                                Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                            }
                         }
 
                         // Bottom actions — only in Custom mode
@@ -264,10 +345,13 @@ fun SettingsScreen() {
                                         editSecondary = ThemeDefaults.Dark.secondaryColor
                                         editTertiary = ThemeDefaults.Dark.tertiaryColor
                                         editBgColor = 0xFF0E1511L
+                                        editSurfaceColor = 0xFF16211AL
                                         editCardStyle = ThemeDefaults.Dark.cardStyle
                                         editCornerRadius = ThemeDefaults.Dark.cornerRadius
                                         editBgImage = null
                                         editBgOpacity = 0.3f
+                                        editFontScale = 1.0f
+                                        editAnimationScale = 1.0f
                                         applyTheme()
                                     },
                                     colors = ButtonDefaults.filledTonalButtonColors(
@@ -285,38 +369,85 @@ fun SettingsScreen() {
 
         // ================ PREFERENCES ================
         item {
+            val prefExpanded = remember { mutableStateOf(false) }
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Preferences", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    val useShulgin by repo.useShulginRating.collectAsState()
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { prefExpanded.value = !prefExpanded.value },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Rating scale", style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                if (useShulgin) "Shulgin scale (+/-, +, ++, +++, ++++)"
-                                else "Numeric scale (1-10)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
+                            Text("Preferences", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Icon(
+                            if (prefExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    if (prefExpanded.value) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+
+                        val useShulgin by repo.useShulginRating.collectAsState()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Rating scale", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    if (useShulgin) "Shulgin scale (+/-, +, ++, +++, ++++)"
+                                    else "Numeric scale (1-10)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = useShulgin,
+                                onCheckedChange = { enabled ->
+                                    repo.setShulginRating(enabled)
+                                    val store = JournalStore(repo)
+                                    store.save()
+                                }
                             )
                         }
-                        Switch(
-                            checked = useShulgin,
-                            onCheckedChange = { enabled ->
-                                repo.setShulginRating(enabled)
-                                val store = JournalStore(repo)
-                                store.save()
+
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+
+                        val showTrend by repo.showSessionsTrendChart.collectAsState()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Sessions per week chart",
+                                    style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    if (showTrend) "Shows weekly trend on Dashboard"
+                                    else "Hidden by default",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        )
+                            Switch(
+                                checked = showTrend,
+                                onCheckedChange = { enabled ->
+                                    repo.setShowSessionsTrendChart(enabled)
+                                    val store = JournalStore(repo)
+                                    store.save()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -500,6 +631,9 @@ fun SettingsScreen() {
             }
         }
 
+        // ================ OBSIDIAN VAULT ================
+        item { ObsidianSettingsCard() }
+
         // ================ DEVICE SYNC ================
         item {
             Card(modifier = Modifier.fillMaxWidth(),
@@ -518,48 +652,247 @@ fun SettingsScreen() {
                     }
                     if (syncExpanded) {
                         Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
+
+                        // ---- Status overview ----
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Column {
+                                Text("Active", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Icon(if (status.isHosting) Icons.Default.Wifi else Icons.Default.WifiOff, null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = if (status.isHosting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(if (status.isHosting) "Active" else "Off",
+                                        style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Column {
+                                Text("Paired", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${status.pairedDeviceCount}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            }
+                            Column {
+                                Text("Last Sync", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(status.lastSyncAt?.let { formatTimestamp(it) } ?: "Never",
+                                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            }
+                            Column {
+                                Text("Conflicts", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${status.pendingConflicts}",
+                                    style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
+                                    color = if (status.pendingConflicts > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
+
+                        // ---- Hosting ----
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Devices, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                Text("Hosting", style = MaterialTheme.typography.titleMedium)
+                            }
+                            if (isStartingHost || isStoppingHost) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                AppTonalButton(
+                                    onClick = {
+                                        scope.launch {
+                                            if (status.isHosting) {
+                                                isStoppingHost = true
+                                                try {
+                                                    syncEngine.stopHosting()
+                                                    logLines = listOf("Stopped hosting") + logLines
+                                                } catch (e: Exception) {
+                                                    logLines = listOf("Stop failed: ${userMessage(e.message ?: "")}") + logLines
+                                                } finally { isStoppingHost = false }
+                                            } else {
+                                                isStartingHost = true
+                                                try {
+                                                    val cfg = SyncConfig(
+                                                        id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
+                                                        deviceId = "desktop-main", displayName = "Windows Desktop",
+                                                        listenerPort = manualPort.toIntOrNull() ?: 4984, continuousSync = continuousSync, enableDeltaSync = true
+                                                    )
+                                                    syncEngine.startHosting(cfg).fold(
+                                                        onSuccess = { logLines = listOf("Hosting on port ${it.port}") + logLines },
+                                                        onFailure = { logLines = listOf("Host start failed: ${userMessage(it.message ?: "")}") + logLines }
+                                                    )
+                                                } catch (e: Exception) {
+                                                    logLines = listOf("Error: ${userMessage(e.message ?: "")}") + logLines
+                                                } finally { isStartingHost = false }
+                                            }
+                                        }
+                                    },
+                                    colors = if (status.isHosting) ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ) else null
+                                ) {
+                                    Icon(if (status.isHosting) Icons.Default.Cancel else Icons.Default.Wifi, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (status.isHosting) "Stop" else "Start")
+                                }
+                            }
+                        }
+
+                        if (status.isHosting) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("Other devices connect to: ${status.hostAddress ?: "..."}",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        // ---- Pairing token ----
+                        if (status.isHosting && status.pairingToken != null) {
+                            Spacer(Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column {
+                                        Text("Pairing Token", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(status.pairingToken!!, style = MaterialTheme.typography.headlineMedium,
+                                            fontWeight = FontWeight.Bold, letterSpacing = 8.sp,
+                                            fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                        Text("Enter this on the device you want to pair",
+                                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                                    }
+                                    AppIconButton(onClick = {
+                                        clipboard.setText(AnnotatedString(status.pairingToken!!))
+                                        logLines = listOf("Token copied to clipboard") + logLines
+                                    }, icon = Icons.Default.ContentCopy, contentDescription = "Copy token",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                }
+                            }
+                        }
+
+                        // ---- Continuous sync toggle ----
+                        Spacer(Modifier.height(12.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically) {
                             Column {
-                                Text(if (status.isHosting) "Hosting Active" else "Hosting")
-                                if (status.hostAddress != null) Text(status.hostAddress!!, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                Text("Continuous sync", style = MaterialTheme.typography.bodyMedium)
+                                Text("Automatically sync with paired devices", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            AppTonalButton(onClick = {
-                                scope.launch {
-                                    if (status.isHosting) { syncEngine.stopHosting(); logLines = listOf("Stopped") + logLines }
-                                    else {
-                                        syncEngine.startHosting(SyncConfig(
-                                            id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
-                                            deviceId = "desktop-main", displayName = "Windows Desktop",
-                                            listenerPort = manualPort.toIntOrNull() ?: 4984, continuousSync = false, enableDeltaSync = true
-                                        )).onSuccess { logLines = listOf("Hosting on port ${it.port}") + logLines }
-                                         .onFailure { logLines = listOf("Failed: ${it.message}") + logLines }
-                                    }
-                                }
-                            }) { Text(if (status.isHosting) "Stop" else "Start") }
+                            Switch(checked = continuousSync, onCheckedChange = { continuousSync = it })
                         }
+
+                        Spacer(Modifier.height(16.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
+
+                        // ---- Connect to device ----
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Link, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Text("Connect to Device", style = MaterialTheme.typography.titleMedium)
+                        }
+
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(value = manualHost, onValueChange = { manualHost = it },
-                                placeholder = { Text("IP") }, singleLine = true, modifier = Modifier.weight(2f))
-                            OutlinedTextField(value = manualPort, onValueChange = { manualPort = it },
-                                placeholder = { Text("Port") }, singleLine = true, modifier = Modifier.weight(1f))
+                                placeholder = { Text("IP address") }, singleLine = true,
+                                isError = hostError != null, supportingText = hostError?.let { { Text(it) } },
+                                modifier = Modifier.weight(2f))
+                            OutlinedTextField(value = manualPort, onValueChange = { manualPort = it.filter { c -> c.isDigit() }.take(5) },
+                                placeholder = { Text("Port") }, singleLine = true,
+                                isError = portError != null, supportingText = portError?.let { { Text(it) } },
+                                modifier = Modifier.weight(1f))
                         }
-                        Spacer(Modifier.height(6.dp))
-                        AppButton(onClick = {
-                            scope.launch {
-                                val host = manualHost.trim(); val port = manualPort.toIntOrNull() ?: 4984
-                                if (host.isEmpty()) { logLines = listOf("Enter an IP") + logLines; return@launch }
-                                syncEngine.syncWith(DiscoveredPeer(null, host, host, port, false, null))
-                                    .onSuccess { logLines = listOf("Synced with $host:$port") + logLines }
-                                    .onFailure { logLines = listOf("Sync failed: ${it.message}") + logLines }
+
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(value = manualToken, onValueChange = { manualToken = it.uppercase().take(6) },
+                            placeholder = { Text("Pairing token from host") }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            supportingText = { Text(if (manualToken.isEmpty()) "Required for first-time pairing" else "${manualToken.length}/6 characters") })
+
+                        Spacer(Modifier.height(12.dp))
+                        if (isSyncing) {
+                            Box(modifier = Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
                             }
-                        }, enabled = manualHost.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Sync Now") }
+                        } else {
+                            AppButton(onClick = {
+                                scope.launch {
+                                    val host = manualHost.trim()
+                                    val port = manualPort.toIntOrNull()
+                                    if (host.isEmpty()) { logLines = listOf("Enter a host IP address") + logLines; return@launch }
+                                    if (port == null || port !in 1..65535) { logLines = listOf("Enter a valid port (1-65535)") + logLines; return@launch }
+                                    isSyncing = true
+                                    try {
+                                        val peer = DiscoveredPeer(deviceId = null, displayName = host, host = host, port = port,
+                                            isTrusted = false, fingerprint = null, pairingToken = manualToken.ifBlank { null })
+                                        syncEngine.syncWith(peer, continuousSync).fold(
+                                            onSuccess = { logLines = listOf("Connected to $host:$port") + logLines },
+                                            onFailure = { logLines = listOf("Sync failed: ${userMessage(it.message ?: "")}") + logLines }
+                                        )
+                                    } catch (e: Exception) {
+                                        logLines = listOf("Error: ${userMessage(e.message ?: "")}") + logLines
+                                    } finally { isSyncing = false }
+                                }
+                            }, enabled = manualHost.isNotBlank() && isPortValid && isIpValid,
+                                icon = Icons.Default.Sync, modifier = Modifier.fillMaxWidth()) {
+                                Text("Sync Now")
+                            }
+                        }
+
+                        // ---- Trusted devices ----
+                        if (trustedDevices.isNotEmpty()) {
+                            Spacer(Modifier.height(16.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                Text("Trusted Devices", style = MaterialTheme.typography.titleMedium)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            trustedDevices.forEach { device ->
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Default.Person, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(device.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text("Paired ${formatTimestamp(device.pairedAt)}" +
+                                                (device.lastSeenAt?.let { " - seen ${formatTimestamp(it)}" } ?: ""),
+                                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    AppIconButton(onClick = {
+                                        scope.launch {
+                                            syncEngine.revokeTrustedDevice(device.deviceId)
+                                            trustedDevices = syncEngine.trustedDevices()
+                                            logLines = listOf("Revoked ${device.displayName}") + logLines
+                                        }
+                                    }, icon = Icons.Default.LinkOff, contentDescription = "Revoke ${device.displayName}", tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+
+                        // ---- Event log ----
+                        Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                        Text("Event Log", style = MaterialTheme.typography.labelLarge)
                         Spacer(Modifier.height(4.dp))
-                        Text("Connections: ${status.activeConnections.size}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (status.pendingConflicts > 0) Text("${status.pendingConflicts} conflict(s)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-                        logLines.take(5).forEach { line ->
-                            Text(line, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        logLines.take(15).forEach { line ->
+                            val prefix = when {
+                                line.startsWith("+") -> '+'
+                                line.startsWith("!") -> '!'
+                                else -> '-'
+                            }
+                            val displayText = line.removePrefix("+").removePrefix("!").removePrefix("-")
+                            val color = when (prefix) {
+                                '+' -> MaterialTheme.colorScheme.primary
+                                '!' -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 1.dp)) {
+                                Text("$prefix", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall, color = color)
+                                Text(displayText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (logLines.isEmpty()) {
+                            Text("No events yet", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                         }
                     }
                 }
@@ -901,6 +1234,49 @@ fun SettingsScreen() {
                         Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Load test data")
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Text("Diagnostics", style = MaterialTheme.typography.labelLarge)
+                    Text("Export the app's rolling crash log for debugging. Logs are stored locally and never sent anywhere.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    AppOutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val appDir = PlatformFile.dataDir()
+                                    val logs = collectLogs(appDir)
+                                    val path = FilePicker.saveFile(
+                                        "nepenthe-crash-${app.journal.util.currentTimeMillis()}.log",
+                                        "Log files", listOf("log", "txt")
+                                    )
+                                    if (path != null) {
+                                        PlatformFile.writeText(path, logs)
+                                        Log.withTag("Settings").i { "Crash logs exported to $path" }
+                                        crashLogStatus = "Logs exported (${logs.length} chars)"
+                                    }
+                                } catch (e: Exception) {
+                                    crashLogStatus = "Export failed: ${e.message}"
+                                    Log.withTag("Settings").e(e) { "Crash log export failed" }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Export crash logs")
+                    }
+                    if (crashLogStatus != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(crashLogStatus!!,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (crashLogStatus!!.startsWith("Export") || crashLogStatus!!.startsWith("Logs"))
+                                MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error)
                     }
                 }
             }

@@ -13,6 +13,7 @@
 
 package app.journal.data
 
+import app.journal.log.Log
 import app.journal.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -94,6 +95,23 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val _useSubstanceColors = MutableStateFlow(true)
     override val useSubstanceColors: StateFlow<Boolean> = _useSubstanceColors.asStateFlow()
 
+    // ---- Obsidian vault config ----
+    private val _obsidianVaultPath = MutableStateFlow("")
+    override val obsidianVaultPath: StateFlow<String> = _obsidianVaultPath.asStateFlow()
+
+    private val _obsidianAutoExport = MutableStateFlow(false)
+    override val obsidianAutoExport: StateFlow<Boolean> = _obsidianAutoExport.asStateFlow()
+
+    private val _obsidianSubfolder = MutableStateFlow("Nepenthe")
+    override val obsidianSubfolder: StateFlow<String> = _obsidianSubfolder.asStateFlow()
+
+    private val _obsidianFileOrganization = MutableStateFlow("flat")
+    override val obsidianFileOrganization: StateFlow<String> = _obsidianFileOrganization.asStateFlow()
+
+    // ---- Display preferences ----
+    private val _showSessionsTrendChart = MutableStateFlow(false)
+    override val showSessionsTrendChart: StateFlow<Boolean> = _showSessionsTrendChart.asStateFlow()
+
     // ---- Version counter for tolerance recalculation ----
     private val _toleranceVersion = MutableStateFlow(0)
     override val toleranceVersion: StateFlow<Int> = _toleranceVersion.asStateFlow()
@@ -125,13 +143,55 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val _sessionsByTag = mutableMapOf<String, MutableSet<String>>()
     /** substanceId -> list of effects that reference this substance */
     private val _effectsBySubstance = mutableMapOf<String, MutableList<Effect>>()
+    /** substanceId -> list of custom units */
+    private val _customUnitsBySubstance = mutableMapOf<String, MutableList<CustomUnit>>()
+
+    /**
+     * Precomputed dose stats per substance.
+     * (distinctSessionCount, lastUsedTimestamp). Updated incrementally on dose mutations.
+     */
+    override val substanceDoseStats: Map<String, Pair<Int, Long>>
+        get() = synchronized(lock) { _substanceDoseStats.toMap() }
+    private val _substanceDoseStats = mutableMapOf<String, Pair<Int, Long>>()
     private val lock = Any()
 
     // ========================
     //  Bulk apply (seed load)
     // ========================
 
-    override fun applySnapshot(snapshot: JournalSnapshot) {
+    /** Bulk-apply entities from a sync delta — single emissions per store, single mutation bump. */
+    fun applyBatch(
+        sessions: List<Session> = emptyList(),
+        doses: List<Dose> = emptyList(),
+        substances: List<Substance> = emptyList(),
+        effects: List<Effect> = emptyList(),
+        interactions: List<Interaction> = emptyList(),
+        notes: List<Note> = emptyList(),
+        timelineEvents: List<TimelineEvent> = emptyList(),
+        customUnits: List<CustomUnit> = emptyList()
+    ) = synchronized(lock) {
+        if (sessions.isNotEmpty()) {
+            sessionsStore.putAll(sessions)
+            sessions.forEach { addSessionToIndices(it) }
+        }
+        if (doses.isNotEmpty()) {
+            dosesStore.putAll(doses)
+            doses.forEach { dose ->
+                _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+                _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
+                updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
+            }
+        }
+        if (substances.isNotEmpty()) substancesStore.putAll(substances)
+        if (effects.isNotEmpty()) effectsStore.putAll(effects)
+        if (interactions.isNotEmpty()) interactionsStore.putAll(interactions)
+        if (notes.isNotEmpty()) notesStore.putAll(notes)
+        if (timelineEvents.isNotEmpty()) timelineEventsStore.putAll(timelineEvents)
+        if (customUnits.isNotEmpty()) customUnitsStore.putAll(customUnits)
+        bumpMutationCount()
+    }
+
+    override fun applySnapshot(snapshot: JournalSnapshot) = synchronized(lock) {
         sessionsStore.applyAll(snapshot.sessions)
         substancesStore.applyAll(snapshot.substances)
         dosesStore.applyAll(snapshot.doses)
@@ -176,36 +236,52 @@ class JournalRepository internal constructor() : IJournalRepository {
         _sessionsPerSubstance.clear()
         _sessionsByTag.clear()
         _effectsBySubstance.clear()
+        _customUnitsBySubstance.clear()
+        _substanceDoseStats.clear()
         sessionsStore.forEachValue { addSessionToIndices(it) }
         dosesStore.forEachValue { dose ->
             _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+            updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
         }
         effectsStore.forEachValue { effect ->
             for (subId in effect.substanceIds) {
                 _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
             }
         }
+        customUnitsStore.forEachValue { unit ->
+            _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
+        }
+    }
+
+    /** Incrementally update precomputed dose stats for a substance. */
+    private fun updateDoseStatsForSubstance(substanceId: String, sessionId: String, timestamp: Long) {
+        val (sessionCount, lastUsed) = _substanceDoseStats[substanceId] ?: Pair(0, 0L)
+        _substanceDoseStats[substanceId] = Pair(
+            sessionCount + 1,
+            maxOf(lastUsed, timestamp)
+        )
     }
 
     // ========================
     //  Sessions
     // ========================
 
-    override fun upsertSession(session: Session) {
+    override fun upsertSession(session: Session) = synchronized(lock) {
         val oldSession = sessionsStore.put(session)
         if (oldSession == null) addSessionToIndices(session)
         bumpMutationCount()
     }
 
-    override fun getSession(id: String): Session? = sessionsStore.get(id)
+    override fun getSession(id: String): Session? = synchronized(lock) { sessionsStore.get(id) }
 
-    override fun deleteSession(id: String) {
+    override fun deleteSession(id: String) = synchronized(lock) {
         val session = sessionsStore.get(id) ?: return
         sessionsStore.remove(id)
         removeSessionFromIndices(session)
 
-        val affectedSubstances = dosesStore.removeWhere { it.sessionId == id }
-            .map { it.substanceId }.toSet()
+        // Batch-remove child entities with single emissions per store
+        val removedDoses = dosesStore.removeWhere { it.sessionId == id }
+        val removedSubstances = removedDoses.map { it.substanceId }.toSet()
 
         _dosesBySession.remove(id)
         _notesBySession.remove(id)
@@ -214,24 +290,40 @@ class JournalRepository internal constructor() : IJournalRepository {
         notesStore.removeWhere { it.sessionId == id }
         timelineEventsStore.removeWhere { it.sessionId == id }
 
-        for (subId in affectedSubstances) {
+        // Rebuild dose stats for affected substances
+        for (subId in removedSubstances) {
             _sessionsPerSubstance[subId]?.remove(id)
             if (_sessionsPerSubstance[subId]?.isEmpty() == true)
                 _sessionsPerSubstance.remove(subId)
+            rebuildSubstanceDoseStats(subId)
         }
+
         bumpMutationCount()
+    }
+
+    /** Recompute dose stats for a single substance from scratch. */
+    private fun rebuildSubstanceDoseStats(substanceId: String) {
+        val relevant = dosesStore.all.filter { it.substanceId == substanceId }
+        if (relevant.isEmpty()) {
+            _substanceDoseStats.remove(substanceId)
+            return
+        }
+        val sessionIds = relevant.map { it.sessionId }.distinct()
+        val lastTimestamp = relevant.maxOf { it.timestamp }
+        _substanceDoseStats[substanceId] = Pair(sessionIds.size, lastTimestamp)
     }
 
     // ========================
     //  Doses
     // ========================
 
-    override fun upsertDose(dose: Dose) {
+    override fun upsertDose(dose: Dose) = synchronized(lock) {
         val prev = dosesStore.put(dose)
         val prevSessionId = prev?.sessionId
         val prevSubstanceId = prev?.substanceId
 
-        if (prevSessionId != null && prevSessionId != dose.sessionId) {
+        // Remove previous entry from the session index to prevent duplicates on update
+        if (prevSessionId != null) {
             _dosesBySession[prevSessionId]?.removeAll { it.id == dose.id }
         }
         _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
@@ -240,25 +332,44 @@ class JournalRepository internal constructor() : IJournalRepository {
             _sessionsPerSubstance[prevSubstanceId]?.remove(dose.sessionId)
             if (_sessionsPerSubstance[prevSubstanceId]?.isEmpty() == true)
                 _sessionsPerSubstance.remove(prevSubstanceId)
+            rebuildSubstanceDoseStats(prevSubstanceId)
         }
         _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+
+        // Incrementally update substance dose stats (same session ID could be counted twice,
+        // but distinct session count is approximate — exact rebuild on deleteSession)
+        val subId = dose.substanceId
+        val (prevCount, prevLast) = _substanceDoseStats[subId] ?: Pair(0, 0L)
+        val newCount = if (prev == null || prev.substanceId != subId) prevCount + 1 else prevCount
+        _substanceDoseStats[subId] = Pair(newCount, maxOf(prevLast, dose.timestamp))
 
         bumpToleranceVersion()
         bumpMutationCount()
     }
 
     override fun dosesForSession(sessionId: String): List<Dose> =
-        synchronized(this) { _dosesBySession[sessionId]?.toList() ?: emptyList() }
+        synchronized(lock) { _dosesBySession[sessionId]?.toList() ?: emptyList() }
 
-    override fun deleteDose(id: String) {
+    override fun deleteDose(id: String) = synchronized(lock) {
         val removed = dosesStore.remove(id) ?: return
-        synchronized(this) {
-            _dosesBySession[removed.sessionId]?.removeAll { it.id == id }
-            _sessionsPerSubstance[removed.substanceId]?.remove(removed.sessionId)
-            if (_sessionsPerSubstance[removed.substanceId]?.isEmpty() == true)
-                _sessionsPerSubstance.remove(removed.substanceId)
-        }
+        _dosesBySession[removed.sessionId]?.removeAll { it.id == id }
+        _sessionsPerSubstance[removed.substanceId]?.remove(removed.sessionId)
+        if (_sessionsPerSubstance[removed.substanceId]?.isEmpty() == true)
+            _sessionsPerSubstance.remove(removed.substanceId)
+        rebuildSubstanceDoseStats(removed.substanceId)
         bumpToleranceVersion()
+        bumpMutationCount()
+    }
+
+    override fun deleteNote(id: String) = synchronized(lock) {
+        val removed = notesStore.remove(id) ?: return
+        removed.sessionId?.let { _notesBySession[it]?.removeAll { n -> n.id == id } }
+        bumpMutationCount()
+    }
+
+    override fun deleteTimelineEvent(id: String) = synchronized(lock) {
+        val removed = timelineEventsStore.remove(id) ?: return
+        _eventsBySession[removed.sessionId]?.removeAll { e -> e.id == id }
         bumpMutationCount()
     }
 
@@ -266,32 +377,30 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Substances
     // ========================
 
-    override fun upsertSubstance(substance: Substance) {
+    override fun upsertSubstance(substance: Substance) = synchronized(lock) {
         substancesStore.put(substance)
         bumpToleranceVersion()
         bumpMutationCount()
     }
 
-    override fun getSubstance(id: String): Substance? = substancesStore.get(id)
+    override fun getSubstance(id: String): Substance? = synchronized(lock) { substancesStore.get(id) }
 
-    override fun searchSubstances(query: String): List<Substance> {
+    override fun searchSubstances(query: String): List<Substance> = synchronized(lock) {
         val q = query.lowercase()
-        return substancesStore.all.filter {
+        substancesStore.all.filter {
             it.name.lowercase().contains(q) ||
             it.aliases.any { a -> a.lowercase().contains(q) }
         }
     }
 
-    override fun deleteSubstance(id: String) {
+    override fun deleteSubstance(id: String) = synchronized(lock) {
         substancesStore.remove(id)
-        val affectedSessionIds = synchronized(this) {
-            dosesStore.removeWhere { it.substanceId == id }
-                .map { it.sessionId }.toSet()
-        }
+        val affectedSessionIds = dosesStore.removeWhere { it.substanceId == id }
+            .map { it.sessionId }.toSet()
         for (sessionId in affectedSessionIds) {
             _dosesBySession[sessionId]?.removeAll { it.substanceId == id }
         }
-        synchronized(this) { _sessionsPerSubstance.remove(id) }
+        _sessionsPerSubstance.remove(id)
         bumpToleranceVersion()
         bumpMutationCount()
     }
@@ -300,34 +409,33 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Interactions
     // ========================
 
-    override fun upsertInteraction(interaction: Interaction) {
+    override fun upsertInteraction(interaction: Interaction) = synchronized(lock) {
         interactionsStore.put(interaction)
         bumpMutationCount()
     }
+
+    override fun getInteraction(id: String): Interaction? = synchronized(lock) { interactionsStore.get(id) }
 
     // ========================
     //  Effects
     // ========================
 
-    override fun upsertEffect(effect: Effect) {
+    override fun upsertEffect(effect: Effect) = synchronized(lock) {
         val prev = effectsStore.put(effect)
-        // Update _effectsBySubstance index
-        synchronized(lock) {
-            if (prev != null) {
-                for (subId in prev.substanceIds) {
-                    _effectsBySubstance[subId]?.removeAll { it.id == effect.id }
-                    if (_effectsBySubstance[subId]?.isEmpty() == true)
-                        _effectsBySubstance.remove(subId)
-                }
+        if (prev != null) {
+            for (subId in prev.substanceIds) {
+                _effectsBySubstance[subId]?.removeAll { it.id == effect.id }
+                if (_effectsBySubstance[subId]?.isEmpty() == true)
+                    _effectsBySubstance.remove(subId)
             }
-            for (subId in effect.substanceIds) {
-                _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
-            }
+        }
+        for (subId in effect.substanceIds) {
+            _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
         }
         bumpMutationCount()
     }
 
-    override fun getEffect(id: String): Effect? = effectsStore.get(id)
+    override fun getEffect(id: String): Effect? = synchronized(lock) { effectsStore.get(id) }
 
     override fun effectsForSubstance(substanceId: String): List<Effect> =
         synchronized(lock) { _effectsBySubstance[substanceId]?.toList() ?: emptyList() }
@@ -336,30 +444,63 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Custom Units
     // ========================
 
-    override fun upsertCustomUnit(unit: CustomUnit) {
-        customUnitsStore.put(unit)
+    override fun upsertCustomUnit(unit: CustomUnit) = synchronized(lock) {
+        val prev = customUnitsStore.put(unit)
+        if (prev != null && prev.substanceId != unit.substanceId) {
+            _customUnitsBySubstance[prev.substanceId]?.removeAll { it.id == unit.id }
+        }
+        _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         bumpMutationCount()
     }
 
-    override fun deleteCustomUnit(id: String) {
-        customUnitsStore.remove(id)
+    override fun deleteCustomUnit(id: String) = synchronized(lock) {
+        val removed = customUnitsStore.remove(id) ?: return
+        _customUnitsBySubstance[removed.substanceId]?.removeAll { it.id == id }
+        if (_customUnitsBySubstance[removed.substanceId]?.isEmpty() == true)
+            _customUnitsBySubstance.remove(removed.substanceId)
         bumpMutationCount()
     }
 
-    override fun customUnitsForSubstance(substanceId: String): List<CustomUnit> =
-        customUnitsStore.all.filter { it.substanceId == substanceId }
+    override fun customUnitsForSubstance(substanceId: String): List<CustomUnit> = synchronized(lock) {
+        _customUnitsBySubstance[substanceId]?.toList() ?: emptyList()
+    }
 
     // ========================
     //  Preferences
     // ========================
 
-    override fun setShulginRating(enabled: Boolean) {
+    override fun setShulginRating(enabled: Boolean) = synchronized(lock) {
         _useShulginRating.value = enabled
         bumpMutationCount()
     }
 
-    override fun setSubstanceColors(enabled: Boolean) {
+    override fun setSubstanceColors(enabled: Boolean) = synchronized(lock) {
         _useSubstanceColors.value = enabled
+    }
+
+    override fun setObsidianVaultPath(path: String) = synchronized(lock) {
+        _obsidianVaultPath.value = path
+        bumpMutationCount()
+    }
+
+    override fun setObsidianAutoExport(enabled: Boolean) = synchronized(lock) {
+        _obsidianAutoExport.value = enabled
+        bumpMutationCount()
+    }
+
+    override fun setObsidianSubfolder(folder: String) = synchronized(lock) {
+        _obsidianSubfolder.value = folder
+        bumpMutationCount()
+    }
+
+    override fun setObsidianFileOrganization(org: String) = synchronized(lock) {
+        _obsidianFileOrganization.value = org
+        bumpMutationCount()
+    }
+
+    override fun setShowSessionsTrendChart(enabled: Boolean) = synchronized(lock) {
+        _showSessionsTrendChart.value = enabled
+        bumpMutationCount()
     }
 
     // ========================
@@ -369,12 +510,32 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun upsertNote(note: Note) = synchronized(lock) {
         val prev = notesStore.put(note)
         val prevSessionId = prev?.sessionId
-        if (prevSessionId != null && prevSessionId != note.sessionId) {
+        // Remove previous entry from index to prevent duplicates on update
+        if (prevSessionId != null) {
             _notesBySession[prevSessionId]?.removeAll { it.id == note.id }
         }
         val sessionId = note.sessionId ?: return
         _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
         bumpMutationCount()
+    }
+
+    override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = synchronized(lock) {
+        val sessionId = note.sessionId ?: return null
+        val existing = notesStore.get(note.id)
+        val resolved = if (existing != null && existing.body != note.body) {
+            note.copy(conflictSiblings = existing.conflictSiblings +
+                    ConflictSibling(note.body, remoteDeviceId, note.updatedAt))
+        } else note
+        notesStore.put(resolved)
+        if (sessionId != (existing?.sessionId ?: sessionId)) {
+            existing?.sessionId?.let { _notesBySession[it]?.removeAll { n -> n.id == note.id } }
+        }
+        if (existing != null) {
+            _notesBySession[sessionId]?.removeAll { it.id == note.id }
+        }
+        _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(resolved)
+        bumpMutationCount()
+        resolved
     }
 
     override fun notesForSession(sessionId: String): List<Note> =
@@ -387,7 +548,8 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun upsertTimelineEvent(event: TimelineEvent) = synchronized(lock) {
         val prev = timelineEventsStore.put(event)
         val prevSessionId = prev?.sessionId
-        if (prevSessionId != null && prevSessionId != event.sessionId) {
+        // Remove previous entry from index to prevent duplicates on update
+        if (prevSessionId != null) {
             _eventsBySession[prevSessionId]?.removeAll { it.id == event.id }
         }
         _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
@@ -464,9 +626,9 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun dosesDataFrame(): List<DoseDataRow> {
+    override fun dosesDataFrame(): List<DoseDataRow> = synchronized(lock) {
         val subNameCache = substancesStore.all.associate { it.id to it.name }
-        return dosesStore.all.map { dose ->
+        dosesStore.all.map { dose ->
             DoseDataRow(
                 id = dose.id, sessionId = dose.sessionId,
                 substanceId = dose.substanceId,
@@ -479,8 +641,8 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun substancesDataFrame(): List<SubstanceDataRow> {
-        return substancesStore.all.map { sub ->
+    override fun substancesDataFrame(): List<SubstanceDataRow> = synchronized(lock) {
+        substancesStore.all.map { sub ->
             SubstanceDataRow(
                 id = sub.id, name = sub.name,
                 aliases = sub.aliases.joinToString("; "),
@@ -507,7 +669,14 @@ class JournalRepository internal constructor() : IJournalRepository {
             mutationCount
                 .drop(1)
                 .debounce(2000)
-                .collect { store.save() }
+                .collect {
+                    try {
+                        store.save()
+                        Log.withTag("Repo").v { "Auto-saved (mutation #$it)" }
+                    } catch (e: Exception) {
+                        Log.withTag("Repo").e(e) { "Auto-save failed" }
+                    }
+                }
         }
     }
 
@@ -526,6 +695,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         timelineEvents: List<TimelineEvent>,
         interactions: List<Interaction>
     ) = synchronized(lock) {
+        Log.withTag("Repo").d { "bulkInsert: ${sessions.size} sessions, ${doses.size} doses, ${timelineEvents.size} events, ${interactions.size} interactions" }
         sessionsStore.applyAll(sessions)
         dosesStore.applyAll(doses)
         timelineEventsStore.applyAll(timelineEvents)
@@ -540,6 +710,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     // ========================
 
     override fun clearAll() = synchronized(lock) {
+        Log.withTag("Repo").w { "clearAll: wiping all journal data" }
         sessionsStore.clear()
         substancesStore.clear()
         dosesStore.clear()
@@ -549,12 +720,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         effectsStore.clear()
         _effectsBySubstance.clear()
         customUnitsStore.clear()
+        _customUnitsBySubstance.clear()
         _dosesBySession.clear()
         _notesBySession.clear()
         _eventsBySession.clear()
         _sessionsByDate.clear()
         _sessionsPerSubstance.clear()
         _sessionsByTag.clear()
+        _substanceDoseStats.clear()
         _useShulginRating.value = false
         _useSubstanceColors.value = true
         bumpToleranceVersion()

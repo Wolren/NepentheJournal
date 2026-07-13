@@ -7,6 +7,9 @@ import app.journal.util.currentTimeMillis
 /**
  * Simple tolerance estimate based on recency and frequency of ingestion.
  * Per-substance tolerance levels help gauge current sensitivity.
+ *
+ * Instance-based so callers (Composables) can hold a `remember`-ed instance
+ * and get proper caching without static state leaking across tests.
  */
 @Immutable
 data class ToleranceInfo(
@@ -27,10 +30,8 @@ enum class ToleranceLevel {
     HIGH, MEDIUM, LOW, NONE
 }
 
-object ToleranceCalculator {
+class ToleranceCalculator(private val repo: IJournalRepository) {
 
-    // Cache keyed by repo identity + version to avoid stale cross-test hits
-    private var cacheKeyRepo: IJournalRepository? = null
     private var cachedVersion: Int = -1
     private var cachedResult: List<ToleranceInfo> = emptyList()
 
@@ -40,15 +41,18 @@ object ToleranceCalculator {
      * @param now Reference "now" timestamp. Defaults to the live clock so callers
      *            (UI) don't change; tests pass a fixed value for determinism.
      */
-    fun calculate(repo: IJournalRepository, now: Long = currentTimeMillis()): List<ToleranceInfo> {
+    fun calculate(now: Long = currentTimeMillis()): List<ToleranceInfo> {
         val currentVersion = repo.toleranceVersion.value
-        if (repo === cacheKeyRepo && currentVersion == cachedVersion && cachedResult.isNotEmpty()) {
+        if (currentVersion == cachedVersion && cachedResult.isNotEmpty()) {
             return cachedResult
         }
 
         val dayMs = 86400000L
 
-        val dosesBySubstance = repo.doses.value.groupBy { it.substanceId }
+        val cutoff = now - 45L * dayMs
+        val recentDoses = repo.doses.value.filter { it.timestamp > cutoff }
+
+        val dosesBySubstance = recentDoses.groupBy { it.substanceId }
 
         val result = dosesBySubstance.mapNotNull { (substanceId, doses) ->
             val substance = repo.getSubstance(substanceId) ?: return@mapNotNull null
@@ -84,8 +88,17 @@ object ToleranceCalculator {
         }.sortedBy { it.daysSinceLastDose }
 
         cachedVersion = currentVersion
-        cacheKeyRepo = repo
         cachedResult = result
         return result
+    }
+
+    companion object {
+        /**
+         * Convenience for one-shot calculations (tests, quick lookups).
+         * Prefer creating an instance and keeping it alive when caching matters.
+         */
+        fun calculate(repo: IJournalRepository, now: Long = currentTimeMillis()): List<ToleranceInfo> {
+            return ToleranceCalculator(repo).calculate(now)
+        }
     }
 }

@@ -10,4 +10,9 @@ actual object PlatformFile {
     actual fun readText(path: String): String {
         return File(path).readText()
     }
+
+    actual fun dataDir(): String {
+        return System.getProperty("user.home")?.let { "$it/.psychonautica" }
+            ?: throw IllegalStateException("Cannot determine home directory")
+    }
 }

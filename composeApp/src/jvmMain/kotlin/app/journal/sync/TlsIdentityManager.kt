@@ -5,26 +5,26 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.*
 import java.security.cert.X509Certificate
-import java.util.concurrent.TimeUnit
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /**
  * Generates and manages a self-signed TLS identity for the sync server.
  *
  * On first run, generates an RSA 2048-bit key pair + self-signed X.509 cert
- * stored in a PKCS12 keystore at ~/.psychonautica/identity.p12.
+ * stored in a PKCS12 keystore at [dataDir]/identity.p12.
  *
- * The keystore password is derived from the device's user.home + a fixed salt
+ * Uses BouncyCastle for cross-platform cert generation (no keytool.exe).
+ *
+ * The keystore password is derived from device identity + a fixed salt
  * to avoid hardcoding credentials in the binary. Override via env var
  * NEPENTHE_TLS_PASSWORD for testing/debugging.
  *
  * The fingerprint (SHA-256 of the DER-encoded cert) is used as the device ID
  * and for certificate pinning during pairing.
  */
-class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
+class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
 
     private val storeFile: File get() = File(dataDir, "identity.p12")
     val alias: String = "nepenthe"
@@ -59,7 +59,11 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
     fun ensureIdentity(): String {
         if (!storeFile.exists()) {
             storeFile.parentFile.mkdirs()
-            generateKeyStore()
+            generateSelfSignedP12(
+                storePath = storeFile.absolutePath,
+                alias = alias,
+                password = password
+            )
         }
         return loadFingerprint()
     }
@@ -136,53 +140,7 @@ class TlsIdentityManager(private val dataDir: String = defaultDataDir()) {
 
     private fun loadFingerprint(): String = fingerprint(loadCertificate())
 
-    private fun generateKeyStore() {
-        val userHome = System.getProperty("user.home") ?: "."
-        val dname = "CN=Nepenthe Journal, OU=Self-Hosted, O=User, L=Home, ST=Local, C=XX"
-        val cmd = listOfNotNull(
-            findKeytool(),
-            "-genkeypair",
-            "-alias", alias,
-            "-keyalg", "RSA",
-            "-keysize", "2048",
-            "-validity", "3650",
-            "-storetype", "PKCS12",
-            "-keystore", storeFile.absolutePath,
-            "-storepass", String(password),
-            "-keypass", String(password),
-            "-dname", dname,
-            "-ext", "SAN=dns:localhost,ip:127.0.0.1",
-            "-J\"-Duser.home=$userHome\""
-        )
-
-        val proc = ProcessBuilder(cmd)
-            .directory(File(dataDir))
-            .redirectErrorStream(true)
-            .start()
-
-        val output = proc.inputStream.bufferedReader().readText()
-        val exited = proc.waitFor(30, TimeUnit.SECONDS)
-
-        if (!exited || proc.exitValue() != 0) {
-            throw RuntimeException("keytool failed (exit=${proc.exitValue()}): $output")
-        }
-    }
-
-    private fun findKeytool(): String {
-        val javaHome = System.getProperty("java.home") ?: throw RuntimeException("java.home not set")
-        val bin = File(javaHome, "bin")
-        val name = if (System.getProperty("os.name").lowercase().contains("win")) "keytool.exe" else "keytool"
-        return File(bin, name).absolutePath.also {
-            if (!File(it).exists()) throw RuntimeException("keytool not found at $it")
-        }
-    }
-
     companion object {
-        fun defaultDataDir(): String {
-            val home = System.getProperty("user.home") ?: "."
-            return "$home${File.separator}.psychonautica"
-        }
-
         fun fingerprint(cert: X509Certificate): String {
             val md = MessageDigest.getInstance("SHA-256")
             md.update(cert.encoded)

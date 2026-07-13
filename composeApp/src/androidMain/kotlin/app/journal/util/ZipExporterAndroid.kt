@@ -3,6 +3,7 @@ package app.journal.util
 import android.net.Uri
 import app.journal.NepentheApp
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry

@@ -3,6 +3,8 @@ package app.journal.ui.session
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,6 +20,10 @@ import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.*
 import app.journal.ui.components.TagChip
 import app.journal.util.currentTimeMillis
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +37,6 @@ fun SessionEditorScreen(
     val isEditing = sessionToEdit != null
 
     // Snapshot interactions once — doesn't cause recomposition on every
-    // interaction change. Interactions are loaded from seed and rarely
     // change at runtime. The InteractionChecker caches its index by
     // content hash, so rebuild is skipped even on sessionDoses change.
     val allInteractions = remember { repo.interactions.value }
@@ -63,6 +68,10 @@ fun SessionEditorScreen(
             if (sessionToEdit != null) repo.dosesForSession(sessionToEdit.id) else emptyList()
         )
     }
+
+    // End time validation
+    val endTimeValue = endTime
+    val endTimeError = endTimeValue != null && endTimeValue <= startTime
 
     // Discard confirmation
     var showDiscardDialog by remember { mutableStateOf(false) }
@@ -112,6 +121,21 @@ fun SessionEditorScreen(
         )
         repo.upsertSession(session)
 
+        // Auto-export to Obsidian if enabled
+        if (repo.obsidianAutoExport.value && repo.obsidianVaultPath.value.isNotBlank()) {
+            try {
+                val config = app.journal.export.obsidian.ObsidianExportConfig(
+                    vaultPath = repo.obsidianVaultPath.value,
+                    subfolder = repo.obsidianSubfolder.value
+                )
+                app.journal.export.obsidian.ObsidianExportManager.exportSession(
+                    repo, sessionId, config
+                )
+            } catch (_: Exception) {
+                // Silent — auto-export failures are non-critical
+            }
+        }
+
         val existingIds = if (sessionToEdit != null)
             repo.dosesForSession(sessionToEdit.id).map { it.id }.toSet() else emptySet()
         val keptIds = mutableSetOf<String>()
@@ -159,6 +183,7 @@ fun SessionEditorScreen(
             sessionStartTime = startTime,
             initialDose = editingDose,
             onDismiss = { showDoseDialog = false; editingDose = null },
+            customUnits = repo.customUnits.value,
             onSave = { dose ->
                 sessionDoses = if (sessionDoses.any { it.id == dose.id })
                     sessionDoses.map { if (it.id == dose.id) dose else it }
@@ -169,11 +194,40 @@ fun SessionEditorScreen(
         )
     }
 
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Delete confirmation dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete session?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                AppTextButton(onClick = {
+                    sessionToEdit?.let { repo.deleteSession(it.id) }
+                    showDeleteConfirm = false
+                    onBack()
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                AppTextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     // Main layout
     ScreenScaffold(
         title = if (isEditing) "Edit Session" else "New Session",
         onBack = ::handleBack,
         actions = {
+            if (isEditing) {
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.error)
+                }
+            }
             AppTextButton(onClick = ::saveSession) { Text("Save") }
         }
     ) {
@@ -208,6 +262,30 @@ fun SessionEditorScreen(
                     modifier = Modifier.weight(1f),
                     clearable = endTime != null
                 )
+            }
+            if (endTimeError) {
+                Text("End time must be after start time",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 4.dp, top = 2.dp))
+            }
+            // Duration display
+            val durationMs = if (endTimeValue != null && !endTimeError) endTimeValue - startTime else null
+            if (durationMs != null && durationMs > 0) {
+                val hours = durationMs / 3600000
+                val minutes = (durationMs % 3600000) / 60000
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                ) {
+                    Icon(Icons.Default.Schedule, null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp))
+                    Text("Duration: ${hours}h ${minutes}m",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
 
@@ -272,6 +350,34 @@ fun SessionEditorScreen(
                     },
                     enabled = tagInput.isNotBlank()
                 ) { Text("Add") }
+            }
+            // Previous tags from other sessions — tap to reuse
+            val allSessions by repo.sessions.collectAsState()
+            val existingTags = remember(allSessions) {
+                allSessions.flatMap { it.tags }.distinct().filter { it !in tags }.take(15)
+            }
+            if (existingTags.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("Previous tags",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                Spacer(Modifier.height(2.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    existingTags.forEach { tag ->
+                        SuggestionChip(
+                            onClick = {
+                                if (tag !in tags) {
+                                    tags = (tags + tag).toMutableList()
+                                }
+                            },
+                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                            border = null
+                        )
+                    }
+                }
             }
             if (tags.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
@@ -365,6 +471,12 @@ fun SessionEditorScreen(
         // Dose list — clickable to edit, delete button inline
         items(sessionDoses, key = { it.id }) { dose ->
             val substance = repo.getSubstance(dose.substanceId)
+            val roaColor = routeColor(dose.routeOfAdministration)
+            val doseLocal = remember(dose.timestamp) {
+                try {
+                    Instant.fromEpochMilliseconds(dose.timestamp).toLocalDateTime(TimeZone.currentSystemDefault())
+                } catch (_: Exception) { null }
+            }
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -377,23 +489,54 @@ fun SessionEditorScreen(
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Route color indicator
+                    Surface(
+                        modifier = Modifier.size(4.dp, 40.dp),
+                        shape = RoundedCornerShape(2.dp),
+                        color = roaColor
+                    ) {}
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = substance?.name ?: dose.substanceId,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = buildString {
-                                append("${dose.amount} ${dose.unit} - ${dose.routeOfAdministration}")
-                                if (dose.redosing) append(" (redose)")
-                                if (dose.stomachFullness != null) append(" - ${dose.stomachFullness.label}")
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = substance?.name ?: stripPrefix(dose.substanceId),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Surface(
+                                modifier = Modifier.size(6.dp),
+                                shape = CircleShape,
+                                color = roaColor
+                            ) {}
+                            Text(dose.routeOfAdministration,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = roaColor)
+                        }
+                        Spacer(Modifier.height(2.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = buildString {
+                                    append("${dose.amount} ${dose.unit}")
+                                    if (dose.redosing) append(" · redose")
+                                    if (dose.isDoseEstimate) append(" · est. ±${dose.estimatedDoseStandardDeviation}")
+                                    if (dose.stomachFullness != null) append(" · ${dose.stomachFullness.label}")
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (doseLocal != null) {
+                            Text(
+                                text = "${doseLocal.year}-${(doseLocal.month.ordinal + 1).toString().padStart(2,'0')}-${doseLocal.day.toString().padStart(2,'0')} " +
+                                       "${doseLocal.hour.toString().padStart(2,'0')}:${doseLocal.minute.toString().padStart(2,'0')}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                     IconButton(onClick = {
                         sessionDoses = sessionDoses.filter { it.id != dose.id }

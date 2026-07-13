@@ -55,14 +55,33 @@ internal class EntityStore<T>(
         return toRemove
     }
 
-    /** Bulk-insert from a list, replacing existing entries by ID. */
+    /** Bulk-insert from a list, replacing existing entries by ID. Single emit. */
     fun applyAll(items: List<T>) {
+        if (items.isEmpty()) return
         items.forEach { map[idOf(it)] = it }
         emit()
     }
 
+    /** Insert or replace multiple entities by ID. Single emit. */
+    fun putAll(items: List<T>) {
+        if (items.isEmpty()) return
+        items.forEach { map[idOf(it)] = it }
+        emit()
+    }
+
+    /** Remove multiple entities by ID. Single emit. Returns count removed. */
+    fun removeAll(ids: Collection<String>): Int {
+        var count = 0
+        for (id in ids) {
+            if (map.remove(id) != null) count++
+        }
+        if (count > 0) emit()
+        return count
+    }
+
     /** Remove all entities. */
     fun clear() {
+        if (map.isEmpty()) return
         map.clear()
         emit()
     }

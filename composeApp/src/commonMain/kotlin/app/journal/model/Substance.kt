@@ -78,6 +78,84 @@ data class ChemblData(
  */
 @Immutable
 @Serializable
+data class IupharInteraction(
+    val targetId: Long? = null,
+    val targetName: String? = null,
+    val targetSpecies: String? = null,
+    val type: String? = null,
+    val action: String? = null,
+    val affinity: String? = null,
+    val affinityParameter: String? = null,
+    val endogenous: Boolean? = null,
+    val primaryTarget: Boolean? = null,
+)
+
+/**
+ * IUPHAR/BPS Guide to PHARMACOLOGY pharmacology data.
+ * Quantitative binding affinities at molecular targets.
+ */
+@Immutable
+@Serializable
+data class IupharData(
+    val ligandId: Int? = null,
+    val interactions: List<IupharInteraction> = emptyList(),
+)
+
+/**
+ * Single binding affinity measurement from the PDSP Ki database.
+ * Ki values are in nanomolar (nM). Lower values = stronger binding.
+ */
+@Immutable
+@Serializable
+data class PdspKiRecord(
+    val targetName: String? = null,
+    val gene: String? = null,
+    val species: String? = null,
+    val kiNanoMolar: Double? = null,
+    val reference: String? = null,
+    val source: String? = null,
+)
+
+/**
+ * PDSP Ki database pharmacology data.
+ * Contains Ki binding affinity measurements at CNS molecular targets.
+ * The official PDSP Ki database is maintained by NIMH.
+ */
+@Immutable
+@Serializable
+data class PdspData(
+    val records: List<PdspKiRecord> = emptyList(),
+)
+
+/**
+ * Single binding affinity measurement from BindingDB.
+ * Affinity values are in nanomolar (nM). Lower values = stronger binding.
+ */
+@Immutable
+@Serializable
+data class BindingdbRecord(
+    val targetName: String? = null,
+    val uniprotId: String? = null,
+    val geneSymbol: String? = null,
+    val species: String? = null,
+    val affinityType: String? = null,
+    val affinityNM: Double? = null,
+    val pmid: String? = null,
+)
+
+/**
+ * BindingDB pharmacology data.
+ * Experimentally measured binding affinities (Ki, Kd, IC50, EC50)
+ * at protein targets. Curated by the BindingDB project.
+ */
+@Immutable
+@Serializable
+data class BindingdbData(
+    val records: List<BindingdbRecord> = emptyList(),
+)
+
+@Immutable
+@Serializable
 data class Substance(
     override val id: String,
     /** Previous ID (e.g. "pwiki:lsd") - kept for migration of session references. */
@@ -112,8 +190,14 @@ data class Substance(
     val atcCode: String? = null,
     // --- ChEMBL bioactivity data ---
     val chemblData: ChemblData? = null,
+    // --- IUPHAR/BPS pharmacology data ---
+    val iupharData: IupharData? = null,
+    // --- PDSP Ki database pharmacology data ---
+    val pdspData: PdspData? = null,
+    // --- BindingDB pharmacology data ---
+    val bindingdbData: BindingdbData? = null,
     val erowidUrl: String = "",
-    /** Source attributions: "psychonautwiki", "pubchem", "tripsit", "wikidata", "chembl" */
+    /** Source attributions: "psychonautwiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
     val sources: List<String> = emptyList(),
     val cachedAt: Long,
     val sourceVersion: String,

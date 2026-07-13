@@ -48,11 +48,13 @@ import app.journal.ui.safer.SaferScreen
 import app.journal.ui.session.CalendarScreen
 import app.journal.ui.session.SessionEditorScreen
 import app.journal.ui.session.SessionListScreen
+import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.session.SessionTimelineScreen
 import app.journal.ui.session.LiveSessionScreen
 import app.journal.ui.settings.SettingsScreen
-import app.journal.ui.substances.SubstanceEditorScreen
 import app.journal.ui.substances.SubstanceDetailScreen
+import app.journal.ui.substances.SubstanceEditorScreen
+import app.journal.ui.substances.SubstanceCompanionScreen
 import app.journal.ui.substances.SubstanceScreen
 import app.journal.ui.theme.BackgroundImage
 import app.journal.ui.theme.LocalThemeConfig
@@ -84,10 +86,12 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     var showCalendar by remember { mutableStateOf(false) }
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
-    var showFavoritesOnly by remember { mutableStateOf(false) }
-    var showArchived by remember { mutableStateOf(false) }
     var useRelativeTime by remember { mutableStateOf(true) }
+    val sessionListViewModel = remember { SessionListViewModel.create() }
+    val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
+    val showArch by sessionListViewModel.showArchived.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
+    var companionSubstanceId by remember { mutableStateOf<String?>(null) }
 
     CompositionLocalProvider(LocalThemeConfig provides themeConfig) {
         CompositionLocalProvider(LocalRepo provides repo) {
@@ -127,6 +131,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                     SystemBackHandler {
                         when {
                             liveSessionId != null -> liveSessionId = null
+                            companionSubstanceId != null -> companionSubstanceId = null
                             editingSessionId != null -> editingSessionId = null
                             selectedTimelineSessionId != null -> selectedTimelineSessionId = null
                             editingSubstanceId != null -> editingSubstanceId = null
@@ -150,6 +155,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
 
                     AnimatedContent(
                         targetState = when {
+                            companionSubstanceId != null -> "companion_substance"
                             liveSessionId != null -> "live_session"
                             editingSessionId != null -> "editor_session"
                             selectedTimelineSessionId != null -> "timeline"
@@ -226,7 +232,21 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     SubstanceDetailScreen(
                                         substanceId = id,
                                         onBack = { selectedSubstanceId = null },
-                                        onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null }
+                                        onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null },
+                                        onCompanion = { companionSubstanceId = id }
+                                    )
+                                }
+                            }
+                            "companion_substance" -> {
+                                val id = companionSubstanceId
+                                if (id != null) {
+                                    SubstanceCompanionScreen(
+                                        substanceId = id,
+                                        onBack = { companionSubstanceId = null },
+                                        onSessionClick = { sessionId: String ->
+                                            selectedTimelineSessionId = sessionId
+                                            companionSubstanceId = null
+                                        }
                                     )
                                 }
                             }
@@ -251,10 +271,10 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                                 actions = {
                                                     when (selectedScreen) {
                                                         Screen.SESSIONS -> SessionListScreen.TopActions(
-                                                            showFavoritesOnly = showFavoritesOnly,
-                                                            showArchived = showArchived,
-                                                            onToggleFavorites = { showFavoritesOnly = !showFavoritesOnly },
-                                                            onToggleArchived = { showArchived = !showArchived },
+                                                            showFavoritesOnly = showFavs,
+                                                            showArchived = showArch,
+                                                            onToggleFavorites = { sessionListViewModel.showFavoritesOnly.value = !showFavs },
+                                                            onToggleArchived = { sessionListViewModel.showArchived.value = !showArch },
                                                             onCalendarClick = { showCalendar = true },
                                                             useRelativeTime = useRelativeTime,
                                                             onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
@@ -295,12 +315,11 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                         when (selectedScreen) {
                                             Screen.DASHBOARD -> DashboardScreen()
                                             Screen.SESSIONS -> SessionListScreen(
+                                                viewModel = sessionListViewModel,
                                                 onNewSession = { editingSessionId = "__new__" },
                                                 onEditSession = { id -> editingSessionId = id },
                                                 onSessionClick = { id -> selectedTimelineSessionId = id },
                                                 onLiveSession = { liveSessionId = "__new__" },
-                                                showFavoritesOnly = showFavoritesOnly,
-                                                showArchived = showArchived,
                                                 useRelativeTime = useRelativeTime,
                                                 onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
                                             )

@@ -4,7 +4,9 @@ import kotlin.test.*
 
 class SyncAuthenticatorTest {
 
-    private val trustStore = DeviceTrustStore(System.getProperty("java.io.tmpdir"))
+    private val trustStore = DeviceTrustStore(System.getProperty("java.io.tmpdir") + "/sync-auth-${System.nanoTime()}").also {
+        DeviceTrustStore.pbkdf2Iterations = 1000
+    }
     private val authenticator = SyncAuthenticator(trustStore)
 
     @AfterTest

@@ -1,6 +1,7 @@
 package app.journal.ingest
 
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
 import app.journal.util.readBundledResource
@@ -32,13 +33,13 @@ object DoseWikiIngestor {
 
         val text = readBundledResource(RESOURCE_PATH)
             ?: run {
-                println("DoseWiki: resource $RESOURCE_PATH not found")
+                Log.withTag("DoseWiki").w { "Resource $RESOURCE_PATH not found" }
                 return
             }
         val substances: List<DoseWikiSubstance> = try {
             json.decodeFromString(text)
         } catch (e: Exception) {
-            System.err.println("DoseWiki: failed to parse slim data: ${e.message}")
+            Log.withTag("DoseWiki").e { "Failed to parse slim data: ${e.message}" }
             return
         }
 
@@ -106,10 +107,10 @@ object DoseWikiIngestor {
         }
 
         ingested = true
-        println(
+        Log.withTag("DoseWiki").i {
             "DoseWiki: ingested $totalEffectCount effects for $substanceUpdateCount substances " +
             "($RESOURCE_PATH)"
-        )
+        }
     }
 
     /**

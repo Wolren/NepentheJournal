@@ -21,11 +21,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
+import app.journal.ui.theme.AdaptiveColors
+import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -71,7 +78,31 @@ fun SessionTimelineScreen(
 
     ScreenScaffold(
         title = session.title,
-        onBack = onBack
+        onBack = onBack,
+        actions = {
+            // Export to Obsidian
+            val vaultPath by repo.obsidianVaultPath.collectAsState()
+            val subfolder by repo.obsidianSubfolder.collectAsState()
+            if (vaultPath.isNotBlank()) {
+                var exportStatus by remember { mutableStateOf<String?>(null) }
+                IconButton(onClick = {
+                    val config = app.journal.export.obsidian.ObsidianExportConfig(
+                        vaultPath = vaultPath,
+                        subfolder = subfolder
+                    )
+                    val path = app.journal.export.obsidian.ObsidianExportManager.exportSession(
+                        repo, sessionId, config
+                    )
+                    exportStatus = if (path != null) "Exported" else "Export failed"
+                }) {
+                    Icon(
+                        Icons.Default.MenuBook,
+                        contentDescription = "Export to Obsidian",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     ) {
         // Session header with rating
         item {
@@ -279,11 +310,36 @@ private fun TimelineBar(
     checkins: List<CheckIn>,
     doses: List<Dose>
 ) {
+    val repo = remember { JournalRepository.instance }
+    val isDark = ThemeManager.instance.isDarkTheme()
     val totalDuration = (endTime ?: currentTimeMillis()) - startTime
     val now = currentTimeMillis()
-    val progress = if (totalDuration > 0) {
-        ((now - startTime).toFloat() / totalDuration).coerceIn(0f, 1f)
-    } else 1f
+    val rangeMs = totalDuration.coerceAtLeast(1L)
+    val textMeasurer = rememberTextMeasurer()
+
+    // Build substance rows from dose data
+    val substanceNames = doses.map { d -> repo.getSubstance(d.substanceId)?.name ?: d.substanceId }.distinct()
+    val displayNames = if (substanceNames.isNotEmpty()) substanceNames else listOf("Session")
+    val phaseEvents = events.filter { it.eventType in phaseColors }.sortedBy { it.timestamp }
+    val rowH = 22.dp
+    val labelW = 72.dp
+    val rowGap = 4.dp
+    val topPad = 4.dp
+
+    // Pre-compute row data (composable-safe, outside Canvas)
+    val rows = displayNames.map { name ->
+        val isFall = name == "Session"
+        val col = if (isFall) MaterialTheme.colorScheme.primary
+            else AdaptiveColors.colorFor(name).getComposeColor(isDark)
+        val d = if (isFall) emptyList() else doses.filter { dose ->
+            repo.getSubstance(dose.substanceId)?.name == name || dose.substanceId == name
+        }
+        val matched = if (isFall) phaseEvents
+            else phaseEvents.filter { pe ->
+                d.any { dose -> kotlin.math.abs(dose.timestamp - pe.timestamp) < 3600000 }
+            }
+        TimelineRowData(name, col, d, matched)
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -291,121 +347,131 @@ private fun TimelineBar(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text("Timeline", style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-
-            // Check-in intensity chart
-            if (checkins.isNotEmpty()) {
-                val intensityColor = MaterialTheme.colorScheme.tertiary
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val width = size.width
-                        val height = size.height
-                        val range = totalDuration.coerceAtLeast(1L)
-
-                        if (checkins.size >= 2) {
-                            val sorted = checkins.sortedBy { it.timestamp }
-                            val path = Path()
-                            sorted.forEachIndexed { i, checkin ->
-                                val x = ((checkin.timestamp - startTime).toFloat() / range * width).coerceIn(0f, width)
-                                val y = height - (checkin.overallIntensity / 10f * height).coerceIn(0f, height)
-                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                            }
-                            val lastX = ((sorted.last().timestamp - startTime).toFloat() / range * width).coerceIn(0f, width)
-                            path.lineTo(lastX, height)
-                            path.lineTo(0f, height)
-                            path.close()
-                            drawPath(path, color = intensityColor.copy(alpha = 0.2f))
-
-                            val linePath = Path()
-                            sorted.forEachIndexed { i, checkin ->
-                                val x = ((checkin.timestamp - startTime).toFloat() / range * width).coerceIn(0f, width)
-                                val y = height - (checkin.overallIntensity / 10f * height).coerceIn(0f, height)
-                                if (i == 0) linePath.moveTo(x, y) else linePath.lineTo(x, y)
-                            }
-                            drawPath(linePath, color = intensityColor, style = Stroke(width = 2f))
-
-                            sorted.forEach { checkin ->
-                                val x = ((checkin.timestamp - startTime).toFloat() / range * width).coerceIn(0f, width)
-                                val y = height - (checkin.overallIntensity / 10f * height).coerceIn(0f, height)
-                                drawCircle(color = intensityColor, radius = 3f, center = Offset(x, y))
-                            }
-                        } else if (checkins.size == 1) {
-                            val c = checkins.first()
-                            val x = ((c.timestamp - startTime).toFloat() / range * width).coerceIn(0f, width)
-                            val y = height - (c.overallIntensity / 10f * height).coerceIn(0f, height)
-                            drawCircle(color = intensityColor, radius = 4f, center = Offset(x, y))
+            // Substance chips
+            if (substanceNames.isNotEmpty()) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    substanceNames.forEach { name ->
+                        val c = AdaptiveColors.colorFor(name).getComposeColor(isDark)
+                        Surface(shape = RoundedCornerShape(6.dp), color = c.copy(alpha = 0.15f)) {
+                            Text(name, style = MaterialTheme.typography.labelSmall,
+                                color = c, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                         }
                     }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("0", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Intensity", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
-                    Text("10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Track bar
-            val primaryColor = MaterialTheme.colorScheme.primary
-            Box(modifier = Modifier.fillMaxWidth().height(32.dp)) {
+            // Timeline Canvas
+            val canvasH = (displayNames.size * 26 + 4).dp
+            Box(modifier = Modifier.fillMaxWidth().height(canvasH)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val barY = size.height / 2 - 4
-                    val barW = size.width
-                    drawRoundRect(
-                        color = Color.Gray.copy(alpha = 0.2f),
-                        topLeft = Offset(0f, barY),
-                        size = Size(barW, 8f),
-                        cornerRadius = CornerRadius(4f)
-                    )
-                    val phaseEvents = events.filter { it.eventType in phaseColors }
-                    if (phaseEvents.isNotEmpty()) {
-                        val sorted = phaseEvents.sortedBy { it.timestamp }
-                        val range = (sorted.last().timestamp - sorted.first().timestamp).coerceAtLeast(1L)
-                        sorted.forEach { event ->
-                            val color = phaseColors[event.eventType] ?: Color.Gray
-                            val x = ((event.timestamp - sorted.first().timestamp).toFloat() / range * barW).coerceIn(0f, barW - 4f)
-                            drawCircle(color = color, radius = 6f, center = Offset(x, barY + 4f))
+                    val w = size.width
+                    val labelPx = labelW.toPx()
+                    val barX = labelPx + 6.dp.toPx()
+                    val barW = (w - barX).coerceAtLeast(1f)
+                    val rowPx = rowH.toPx()
+                    val gapPx = rowGap.toPx()
+                    val padPx = topPad.toPx()
+
+                    // Draw each row
+                    rows.forEachIndexed { idx, row ->
+                        val y = padPx + idx * (rowPx + gapPx)
+
+                        // Label background
+                        drawRoundRect(row.color, Offset(0f, y), Size(labelPx, rowPx), CornerRadius(4f, 4f))
+
+                        // Bar background
+                        drawRoundRect(row.color.copy(alpha = 0.12f), Offset(barX, y), Size(barW, rowPx), CornerRadius(4f, 4f))
+
+                        // Dose start marker
+                        val firstDose = row.doses.minByOrNull { it.timestamp }
+                        if (firstDose != null) {
+                            val pct = ((firstDose.timestamp - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                            drawRoundRect(row.color, Offset(barX + pct * barW, y + 2.dp.toPx()),
+                                Size(4.dp.toPx(), rowPx - 4.dp.toPx()), CornerRadius(2f, 2f))
+                        }
+
+                        // Phase segments (proportional within their own range)
+                        if (row.matched.size >= 2) {
+                            val firstT = row.matched.first().timestamp
+                            val lastT = row.matched.last().timestamp
+                            val segR = (lastT - firstT).coerceAtLeast(1L)
+                            for (i in 0 until row.matched.size - 1) {
+                                val cur = row.matched[i]
+                                val nxt = row.matched[i + 1]
+                                val p1 = ((cur.timestamp - firstT).toFloat() / segR).coerceIn(0f, 1f)
+                                val p2 = ((nxt.timestamp - firstT).toFloat() / segR).coerceIn(0f, 1f)
+                                val sc = phaseColors[cur.eventType] ?: row.color
+                                drawRect(sc.copy(alpha = 0.5f), Offset(barX + p1 * barW, y + 2.dp.toPx()),
+                                    Size(((p2 - p1) * barW).coerceAtLeast(1f), rowPx - 4.dp.toPx()))
+                            }
+                        }
+
+                        // Current time marker
+                        if (endTime == null || now < endTime) {
+                            val p = ((now - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                            drawLine(Color.White, Offset(barX + p * barW, y), Offset(barX + p * barW, y + rowPx), strokeWidth = 2.dp.toPx())
                         }
                     }
-                    if (endTime == null || now < endTime) {
-                        val px = (barW * progress).coerceIn(0f, barW)
-                        drawCircle(color = primaryColor, radius = 8f, center = Offset(px, barY + 4f))
-                        drawCircle(color = primaryColor.copy(alpha = 0.3f), radius = 14f, center = Offset(px, barY + 4f))
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                phases.forEach { (type, label) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(modifier = Modifier.size(8.dp).padding(bottom = 2.dp).background(
-                            color = phaseColors[type] ?: MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(2.dp)))
-                        Text(label, style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    // Draw text labels using Compose TextMeasurer
+                    val labelStyle = TextStyle(
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                    rows.forEachIndexed { idx, row ->
+                        val y = padPx + idx * (rowPx + gapPx)
+                        val text = row.name.take(10)
+                        val measured = textMeasurer.measure(text, style = labelStyle)
+                        drawText(
+                            textLayoutResult = measured,
+                            topLeft = Offset(
+                                x = (labelPx - measured.size.width) / 2f,
+                                y = y + (rowPx - measured.size.height) / 2f
+                            )
+                        )
                     }
                 }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatDuration(now - startTime), style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary)
-                if (endTime != null) {
-                    Text("Total: ${formatDuration(endTime - startTime)}",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Text("In progress", style = MaterialTheme.typography.labelSmall,
+
+            // Time axis
+            Spacer(Modifier.height(2.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(start = labelW + 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                for (i in 0..5) {
+                    val h = rangeMs * i / 5 / 3600000
+                    Text("${h}h", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // Phase legend
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                phases.forEach { (type, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Box(Modifier.size(6.dp).background(
+                            phaseColors[type] ?: MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp)))
+                        Text(label, style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
     }
 }
+
+private data class TimelineRowData(
+    val name: String,
+    val color: Color,
+    val doses: List<Dose>,
+    val matched: List<TimelineEvent>
+)
 
 @Composable
 private fun EventCard(event: TimelineEvent, sessionStart: Long) {
