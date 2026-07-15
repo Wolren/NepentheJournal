@@ -153,6 +153,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     override val substanceDoseStats: Map<String, Pair<Int, Long>>
         get() = synchronized(lock) { _substanceDoseStats.toMap() }
     private val _substanceDoseStats = mutableMapOf<String, Pair<Int, Long>>()
+    private val _doseStatsSessionIds = mutableMapOf<String, MutableSet<String>>()
     private val lock = Any()
 
     // ========================
@@ -170,24 +171,21 @@ class JournalRepository internal constructor() : IJournalRepository {
         timelineEvents: List<TimelineEvent> = emptyList(),
         customUnits: List<CustomUnit> = emptyList()
     ) = synchronized(lock) {
-        if (sessions.isNotEmpty()) {
-            sessionsStore.putAll(sessions)
-            sessions.forEach { addSessionToIndices(it) }
-        }
-        if (doses.isNotEmpty()) {
-            dosesStore.putAll(doses)
-            doses.forEach { dose ->
-                _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
-                _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
-                updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
-            }
-        }
+        if (sessions.isNotEmpty()) sessionsStore.putAll(sessions)
+        if (doses.isNotEmpty()) dosesStore.putAll(doses)
         if (substances.isNotEmpty()) substancesStore.putAll(substances)
         if (effects.isNotEmpty()) effectsStore.putAll(effects)
         if (interactions.isNotEmpty()) interactionsStore.putAll(interactions)
         if (notes.isNotEmpty()) notesStore.putAll(notes)
         if (timelineEvents.isNotEmpty()) timelineEventsStore.putAll(timelineEvents)
         if (customUnits.isNotEmpty()) customUnitsStore.putAll(customUnits)
+        // Rebuild all indices after bulk upsert to handle updates to existing entities
+        // where old index entries (tags, dates, per-session children) need to be replaced.
+        if (sessions.isNotEmpty() || doses.isNotEmpty() || effects.isNotEmpty() ||
+            notes.isNotEmpty() || timelineEvents.isNotEmpty() || customUnits.isNotEmpty()
+        ) {
+            rebuildAllIndices()
+        }
         bumpMutationCount()
     }
 
@@ -238,10 +236,25 @@ class JournalRepository internal constructor() : IJournalRepository {
         _effectsBySubstance.clear()
         _customUnitsBySubstance.clear()
         _substanceDoseStats.clear()
+        _doseStatsSessionIds.clear()
+        _dosesBySession.clear()
+        _notesBySession.clear()
+        _eventsBySession.clear()
         sessionsStore.forEachValue { addSessionToIndices(it) }
         dosesStore.forEachValue { dose ->
             _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+            _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
             updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
+        }
+        notesStore.forEachValue { note ->
+            if (note.sessionId != null) {
+                _notesBySession.getOrPut(note.sessionId!!) { mutableListOf() }.add(note)
+            }
+        }
+        timelineEventsStore.forEachValue { event ->
+            if (event.sessionId != null) {
+                _eventsBySession.getOrPut(event.sessionId!!) { mutableListOf() }.add(event)
+            }
         }
         effectsStore.forEachValue { effect ->
             for (subId in effect.substanceIds) {
@@ -253,13 +266,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    /** Incrementally update precomputed dose stats for a substance. */
+    /** Incrementally update precomputed dose stats for a substance — counts distinct sessions only. */
     private fun updateDoseStatsForSubstance(substanceId: String, sessionId: String, timestamp: Long) {
-        val (sessionCount, lastUsed) = _substanceDoseStats[substanceId] ?: Pair(0, 0L)
-        _substanceDoseStats[substanceId] = Pair(
-            sessionCount + 1,
-            maxOf(lastUsed, timestamp)
-        )
+        val ids = _doseStatsSessionIds.getOrPut(substanceId) { mutableSetOf() }
+        val isNew = ids.add(sessionId)
+        val prev = _substanceDoseStats[substanceId]?.first ?: 0
+        val count = if (isNew) prev + 1 else prev
+        val lastUsed = maxOf(_substanceDoseStats[substanceId]?.second ?: 0L, timestamp)
+        _substanceDoseStats[substanceId] = Pair(count, lastUsed)
     }
 
     // ========================
@@ -268,7 +282,8 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun upsertSession(session: Session) = synchronized(lock) {
         val oldSession = sessionsStore.put(session)
-        if (oldSession == null) addSessionToIndices(session)
+        if (oldSession != null) removeSessionFromIndices(oldSession)
+        addSessionToIndices(session)
         bumpMutationCount()
     }
 
@@ -299,6 +314,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
 
         bumpMutationCount()
+        bumpToleranceVersion()
     }
 
     /** Recompute dose stats for a single substance from scratch. */
@@ -306,11 +322,13 @@ class JournalRepository internal constructor() : IJournalRepository {
         val relevant = dosesStore.all.filter { it.substanceId == substanceId }
         if (relevant.isEmpty()) {
             _substanceDoseStats.remove(substanceId)
+            _doseStatsSessionIds.remove(substanceId)
             return
         }
         val sessionIds = relevant.map { it.sessionId }.distinct()
         val lastTimestamp = relevant.maxOf { it.timestamp }
         _substanceDoseStats[substanceId] = Pair(sessionIds.size, lastTimestamp)
+        _doseStatsSessionIds[substanceId] = sessionIds.toMutableSet()
     }
 
     // ========================
@@ -336,12 +354,19 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
 
-        // Incrementally update substance dose stats (same session ID could be counted twice,
-        // but distinct session count is approximate — exact rebuild on deleteSession)
+        // Update substance dose stats (count of distinct sessions containing this substance).
         val subId = dose.substanceId
-        val (prevCount, prevLast) = _substanceDoseStats[subId] ?: Pair(0, 0L)
-        val newCount = if (prev == null || prev.substanceId != subId) prevCount + 1 else prevCount
-        _substanceDoseStats[subId] = Pair(newCount, maxOf(prevLast, dose.timestamp))
+        val sessionCount = dosesStore.all
+            .filter { it.substanceId == subId }
+            .map { it.sessionId }
+            .distinct()
+            .count()
+        val prevLast = _substanceDoseStats[subId]?.second ?: 0L
+        _substanceDoseStats[subId] = Pair(
+            sessionCount,
+            maxOf(prevLast, dose.timestamp)
+        )
+        _doseStatsSessionIds.getOrPut(subId) { mutableSetOf() }.add(dose.sessionId)
 
         bumpToleranceVersion()
         bumpMutationCount()
@@ -395,12 +420,32 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deleteSubstance(id: String) = synchronized(lock) {
         substancesStore.remove(id)
+
+        // Cascade: remove all child entities for this substance
+        customUnitsStore.removeWhere { it.substanceId == id }
+        _customUnitsBySubstance.remove(id)
+
+        // Clean up effect index entries referencing this substance
+        effectsStore.forEachValue { effect ->
+            if (id in effect.substanceIds) {
+                _effectsBySubstance[id]?.removeAll { it.id == effect.id }
+            }
+        }
+        _effectsBySubstance.remove(id)
+
+        // Clean up interactions referencing this substance
+        interactionsStore.removeWhere {
+            id in listOf(it.substanceAId, it.substanceBId)
+        }
+
         val affectedSessionIds = dosesStore.removeWhere { it.substanceId == id }
             .map { it.sessionId }.toSet()
         for (sessionId in affectedSessionIds) {
             _dosesBySession[sessionId]?.removeAll { it.substanceId == id }
         }
         _sessionsPerSubstance.remove(id)
+        _substanceDoseStats.remove(id)
+        _doseStatsSessionIds.remove(id)
         bumpToleranceVersion()
         bumpMutationCount()
     }
@@ -446,8 +491,11 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun upsertCustomUnit(unit: CustomUnit) = synchronized(lock) {
         val prev = customUnitsStore.put(unit)
-        if (prev != null && prev.substanceId != unit.substanceId) {
+        if (prev != null) {
             _customUnitsBySubstance[prev.substanceId]?.removeAll { it.id == unit.id }
+            if (_customUnitsBySubstance[prev.substanceId]?.isEmpty() == true &&
+                prev.substanceId != unit.substanceId)
+                _customUnitsBySubstance.remove(prev.substanceId)
         }
         _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         bumpMutationCount()
@@ -660,6 +708,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
+    override fun exportSessionBundles(): List<Pair<Session, List<Dose>>> = synchronized(lock) {
+        sessionsStore.all.map { session ->
+            session to (_dosesBySession[session.id]?.toList() ?: emptyList())
+        }
+    }
+
     // ========================
     //  Auto-save
     // ========================
@@ -728,6 +782,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         _sessionsPerSubstance.clear()
         _sessionsByTag.clear()
         _substanceDoseStats.clear()
+        _doseStatsSessionIds.clear()
         _useShulginRating.value = false
         _useSubstanceColors.value = true
         bumpToleranceVersion()

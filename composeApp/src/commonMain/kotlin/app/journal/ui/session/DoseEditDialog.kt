@@ -231,11 +231,20 @@ fun TimeField(
             }
         }
         if (clearable) {
-            AppTextButton(
-                onClick = { onChanged(0L) },
-                modifier = Modifier.height(24.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("Clear end time", style = MaterialTheme.typography.labelSmall)
+                TextButton(
+                    onClick = { onChanged(0L) },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null,
+                        modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text("Clear end time", style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
     }

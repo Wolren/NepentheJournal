@@ -1,5 +1,6 @@
 package app.journal.export.obsidian
 
+import app.journal.data.AppJson
 import app.journal.data.JournalRepository
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
@@ -16,19 +17,36 @@ import app.journal.util.currentTimeMillis
  */
 object ObsidianNoteImporter {
 
-    private val json = kotlinx.serialization.json.Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    private val json = AppJson.json
+
+    /** Maximum number of child entities allowed per session in an import. */
+    private const val MAX_DOSES_PER_SESSION = 500
+    private const val MAX_NOTES_PER_SESSION = 200
+    private const val MAX_TIMELINE_EVENTS_PER_SESSION = 500
+
+    /** Earliest valid timestamp: 2000-01-01T00:00:00Z */
+    private const val MIN_VALID_TIMESTAMP = 946684800000L
+
+    /** Maximum allowed margin into the future (10 years from import time). */
+    private const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 10
 
     /**
      * Import all Obsidian notes from [vaultDir] into [repo].
      * Only processes files containing the ```nepenthe canonical block.
+     *
+     * @throws SecurityException if [vaultDir] contains path traversal components
      */
     fun importFromVault(
         repo: JournalRepository,
         vaultDir: String
     ): ObsidianImportResult {
+        // H1: Reject ".." in vault directory path to prevent path traversal
+        if (vaultDir.contains("..")) {
+            return ObsidianImportResult(errors = listOf(
+                "Vault directory path contains '..' — rejecting for security: $vaultDir"
+            ))
+        }
+
         val mdFiles = ObsidianVaultOps.listMdFiles(vaultDir)
         var created = 0
         var updated = 0
@@ -53,6 +71,13 @@ object ObsidianNoteImporter {
                 json.decodeFromString(canonicalJson)
             } catch (e: Exception) {
                 skipped++
+                continue
+            }
+
+            // C5: Validate parsed block data before processing
+            val validationErrors = validateBlock(block)
+            if (validationErrors.isNotEmpty()) {
+                errors.add("Import failed for $filePath: ${validationErrors.joinToString("; ")}")
                 continue
             }
 
@@ -177,5 +202,54 @@ object ObsidianNoteImporter {
         val endIdx = afterNewline.indexOf("\n$BLOCK_CLOSE")
         if (endIdx < 0) return null
         return afterNewline.substring(0, endIdx)
+    }
+
+    // ---- Data validation ----
+
+    /** Validate a parsed [ObsidianCanonicalBlock] before importing it. */
+    private fun validateBlock(block: ObsidianCanonicalBlock): List<String> {
+        val errors = mutableListOf<String>()
+        val now = currentTimeMillis()
+        val maxTimestamp = now + TIMESTAMP_FUTURE_MARGIN_MS
+        val session = block.session
+
+        // ID format
+        if (!isValidId(session.id)) {
+            errors.add("invalid session ID '${session.id}'")
+        }
+
+        // Timestamp bounds
+        if (session.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("createdAt ${session.createdAt} out of valid range")
+        }
+        if (session.updatedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("updatedAt ${session.updatedAt} out of valid range")
+        }
+        if (session.startTime !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("startTime ${session.startTime} out of valid range")
+        }
+        if (session.endTime != null && session.endTime !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("endTime ${session.endTime} out of valid range")
+        }
+
+        // Entity count limits
+        if (block.doses.size > MAX_DOSES_PER_SESSION) {
+            errors.add("too many doses: ${block.doses.size} > $MAX_DOSES_PER_SESSION")
+        }
+        if (block.notes.size > MAX_NOTES_PER_SESSION) {
+            errors.add("too many notes: ${block.notes.size} > $MAX_NOTES_PER_SESSION")
+        }
+        if (block.timelineEvents.size > MAX_TIMELINE_EVENTS_PER_SESSION) {
+            errors.add("too many timeline events: ${block.timelineEvents.size} > $MAX_TIMELINE_EVENTS_PER_SESSION")
+        }
+
+        return errors
+    }
+
+    /** Check that an ID is non-blank and contains no path-traversal characters. */
+    private fun isValidId(id: String): Boolean {
+        return id.isNotBlank() && id.none { c ->
+            c == '/' || c == '\\' || c == '.' || c == '\n' || c == '\r' || c == '\t'
+        }
     }
 }

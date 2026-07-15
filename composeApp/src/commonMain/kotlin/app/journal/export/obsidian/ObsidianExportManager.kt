@@ -69,6 +69,16 @@ object ObsidianExportManager {
         if (!ObsidianVaultOps.validateVaultPath(config.vaultPath)) {
             return ObsidianImportResult(errors = listOf("Vault path is not valid: ${config.vaultPath}"))
         }
+
+        // H1: Verify resolved directory stays within vault after normalization
+        val vaultNorm = ObsidianVaultOps.normalizePath(config.vaultPath)
+        val dirNorm = ObsidianVaultOps.normalizePath(dir)
+        if (!dirNorm.startsWith(vaultNorm.trimEnd('/').trimEnd('\\'))) {
+            return ObsidianImportResult(errors = listOf(
+                "Resolved import directory is outside the vault: $dirNorm not under $vaultNorm"
+            ))
+        }
+
         ObsidianVaultOps.ensureDir(dir)
         return ObsidianNoteImporter.importFromVault(repo, dir)
     }
@@ -108,6 +118,15 @@ object ObsidianExportManager {
             val monthDir = "${dt.monthNumber}".padStart(2, '0')
             "$baseDir/$yearDir/$monthDir"
         } else baseDir
+
+        // H1: Normalize and verify resolved path stays within vault directory
+        val vaultNorm = ObsidianVaultOps.normalizePath(config.vaultPath)
+        val dirNorm = ObsidianVaultOps.normalizePath(dir)
+        if (!dirNorm.startsWith(vaultNorm.trimEnd('/').trimEnd('\\'))) {
+            throw SecurityException(
+                "Resolved export directory is outside vault: $dirNorm not under $vaultNorm"
+            )
+        }
 
         ObsidianVaultOps.ensureDir(dir)
         val filePath = "$dir/${note.fileName}"

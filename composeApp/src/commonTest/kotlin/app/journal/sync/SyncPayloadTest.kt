@@ -38,7 +38,8 @@ class SyncPayloadTest {
         val batch = SyncBatch(deviceId = "d", deviceName = "n", since = 0L)
         val encoded = json.encodeToString(batch)
         assertTrue(encoded.contains("\"deviceId\""))
-        assertTrue(encoded.contains("\"sessions\"") || encoded.contains("\"doses\""))
+        assertTrue(encoded.contains("\"sessions\""), "should contain sessions key in any batch")
+        assertTrue(encoded.contains("\"doses\""), "should contain doses key in any batch")
     }
 
     @Test

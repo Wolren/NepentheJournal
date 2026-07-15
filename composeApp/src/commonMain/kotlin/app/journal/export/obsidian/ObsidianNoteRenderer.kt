@@ -1,5 +1,6 @@
 package app.journal.export.obsidian
 
+import app.journal.data.AppJson
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
@@ -36,11 +37,7 @@ data class ObsidianCanonicalBlock(
 internal const val BLOCK_OPEN = "```nepenthe"
 internal const val BLOCK_CLOSE = "```"
 
-private val canonicalJson = Json {
-    prettyPrint = true
-    encodeDefaults = true
-    ignoreUnknownKeys = true
-}
+private val canonicalJson = AppJson.pretty
 
 /**
  * Pure function that renders a session + its children into an Obsidian markdown note.
@@ -231,6 +228,15 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
+        // ---- Session Notes ----
+        if (!session.notes.isNullOrBlank()) {
+            appendLine("## Session Notes")
+            appendLine()
+            append(session.notes)
+            appendLine()
+            appendLine()
+        }
+
         // ---- Canonical data block (lossless round-trip) ----
         val canonical = ObsidianCanonicalBlock(
             version = 1,
@@ -244,7 +250,7 @@ fun renderSessionToObsidianNote(
         appendLine("---")
         appendLine()
         appendLine("> [!INFO] Nepenthe Journal Data")
-        appendLine("> Machine-readable block \u2014 edit the sections above and re-import to sync.")
+        appendLine("> Machine-readable block — edit the sections above and re-import to sync.")
         appendLine()
         appendLine(BLOCK_OPEN)
         append(json)

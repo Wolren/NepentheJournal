@@ -51,6 +51,7 @@ fun SessionEditorScreen(
     var setting by remember { mutableStateOf(sessionToEdit?.setting ?: "") }
     var intention by remember { mutableStateOf(sessionToEdit?.intention ?: "") }
     var outcome by remember { mutableStateOf(sessionToEdit?.outcome ?: "") }
+    var notes by remember { mutableStateOf(sessionToEdit?.notes ?: "") }
     var rating by remember { mutableStateOf(sessionToEdit?.rating?.toString() ?: "") }
     var shulginRating by remember {
         mutableStateOf(sessionToEdit?.shulginRating ?: "")
@@ -66,6 +67,14 @@ fun SessionEditorScreen(
     var sessionDoses by remember {
         mutableStateOf(
             if (sessionToEdit != null) repo.dosesForSession(sessionToEdit.id) else emptyList()
+        )
+    }
+
+    // Timeline events
+    var sessionEvents by remember {
+        mutableStateOf(
+            if (sessionToEdit != null) repo.eventsForSession(sessionToEdit.id)
+            else emptyList()
         )
     }
 
@@ -86,6 +95,7 @@ fun SessionEditorScreen(
             setting != (s?.setting ?: "") ||
             intention != (s?.intention ?: "") ||
             outcome != (s?.outcome ?: "") ||
+            notes != (s?.notes ?: "") ||
             rating != (s?.rating?.toString() ?: "") ||
             shulginRating != (s?.shulginRating ?: "") ||
             tags.toList() != (s?.tags ?: emptyList<String>()) ||
@@ -104,12 +114,13 @@ fun SessionEditorScreen(
             id = sessionId,
             title = title.ifBlank { "Untitled Session" },
             startTime = startTime,
-            endTime = if (endTime != null && endTime != startTime) endTime else null,
+            endTime = if (endTimeValue != null && endTimeValue > 1000L && endTimeValue != startTime) endTimeValue else null,
             tags = tags.toList(),
             set = set.ifBlank { null },
             setting = setting.ifBlank { null },
             intention = intention.ifBlank { null },
             outcome = outcome.ifBlank { null },
+            notes = notes.ifBlank { null },
             rating = if (useShulgin) {
                 shulginRating.let { s -> ShulginRating.entries.find { it.name == s }?.numericValue }
             } else rating.toIntOrNull(),
@@ -245,23 +256,25 @@ fun SessionEditorScreen(
 
         // Start / End time
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TimeField(
-                    label = "Start",
-                    epochMs = startTime,
-                    onChanged = { startTime = it },
-                    modifier = Modifier.weight(1f)
-                )
-                TimeField(
-                    label = "End",
-                    epochMs = endTime,
-                    onChanged = { endTime = it },
-                    modifier = Modifier.weight(1f),
-                    clearable = endTime != null
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TimeField(
+                        label = "Start",
+                        epochMs = startTime,
+                        onChanged = { startTime = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TimeField(
+                        label = "End",
+                        epochMs = endTime,
+                        onChanged = { endTime = it },
+                        modifier = Modifier.weight(1f),
+                        clearable = endTime != null
+                    )
+                }
             }
             if (endTimeError) {
                 Text("End time must be after start time",
@@ -308,7 +321,11 @@ fun SessionEditorScreen(
                     }
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     (1..10).forEach { n ->
                         FilterChip(
                             selected = rating == n.toString(),
@@ -362,8 +379,9 @@ fun SessionEditorScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                 Spacer(Modifier.height(2.dp))
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     existingTags.forEach { tag ->
@@ -381,8 +399,9 @@ fun SessionEditorScreen(
             }
             if (tags.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     tags.forEach { tag ->
@@ -442,6 +461,18 @@ fun SessionEditorScreen(
                 label = { Text("Outcome") },
                 placeholder = { Text("What happened? Insights, reflections...") },
                 minLines = 3, maxLines = 6,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Notes
+        item {
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notes") },
+                placeholder = { Text("Freeform notes, observations...") },
+                minLines = 3, maxLines = 8,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -557,6 +588,197 @@ fun SessionEditorScreen(
                     substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: stripPrefix(id) },
                     modifier = Modifier.padding(top = 4.dp)
                 )
+            }
+        }
+
+        // ── Timeline Events section ──
+        item {
+            HorizontalDivider()
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Timeline Events",
+                    style = MaterialTheme.typography.titleMedium)
+                AppTonalButton(onClick = {
+                    val now = currentTimeMillis()
+                    val newEvent = TimelineEvent(
+                        id = "evt:${now}",
+                        sessionId = sessionToEdit?.id ?: "session:${now}",
+                        eventType = TimelineEventType.OBSERVATION,
+                        label = "Check-in",
+                        timestamp = now,
+                        body = "Quick event",
+                        createdAt = now, updatedAt = now,
+                        deviceOrigin = "desktop"
+                    )
+                    // Persist immediately so it appears with a real id
+                    repo.upsertTimelineEvent(newEvent)
+                    sessionEvents = sessionEvents + newEvent
+                }) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add Event")
+                }
+            }
+        }
+
+        // Inline-editable event cards
+        items(sessionEvents.sortedBy { it.timestamp }, key = { it.id }) { event ->
+            EditorInlineEventCard(
+                event = event,
+                repo = repo,
+                onDelete = {
+                    repo.deleteTimelineEvent(event.id)
+                    sessionEvents = sessionEvents.filter { it.id != event.id }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorInlineEventCard(
+    event: TimelineEvent,
+    repo: JournalRepository,
+    onDelete: () -> Unit
+) {
+    var editing by remember { mutableStateOf(false) }
+    var editLabel by remember { mutableStateOf(event.label) }
+    var editBody by remember { mutableStateOf(event.body ?: "") }
+    var editIntensity by remember { mutableFloatStateOf(event.intensity ?: 5f) }
+    var editType by remember { mutableStateOf(event.eventType) }
+    var useIntensity by remember { mutableStateOf(event.intensity != null) }
+
+    if (editing) {
+        // INLINE EDIT MODE
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Event type chips
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    val quickTypes = listOf(
+                        TimelineEventType.OBSERVATION to "Obs",
+                        TimelineEventType.NOTE to "Note",
+                        TimelineEventType.ONSET to "On",
+                        TimelineEventType.COMEUP to "Up",
+                        TimelineEventType.PEAK to "Peak",
+                        TimelineEventType.OFFSET to "Off",
+                        TimelineEventType.AFTERGLOW to "Glow",
+                        TimelineEventType.SIDE_EFFECT to "SE",
+                        TimelineEventType.EMERGENCY to "!"
+                    )
+                    quickTypes.forEach { (type, lbl) ->
+                        FilterChip(
+                            selected = editType == type,
+                            onClick = { editType = type },
+                            label = { Text(lbl, style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(26.dp)
+                        )
+                    }
+                }
+                OutlinedTextField(value = editLabel, onValueChange = { editLabel = it },
+                    label = { Text("Label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = editBody, onValueChange = { editBody = it },
+                    label = { Text("Notes") }, minLines = 2, maxLines = 4,
+                    modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = useIntensity, onClick = { useIntensity = !useIntensity },
+                        label = { Text("Intensity", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.height(26.dp))
+                    if (useIntensity) {
+                        Text("${editIntensity.toInt()}/10", style = MaterialTheme.typography.labelSmall)
+                        Slider(value = editIntensity, onValueChange = { editIntensity = it },
+                            valueRange = 1f..10f, steps = 8, modifier = Modifier.weight(1f))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextButton(onClick = { editing = false }) { Text("Cancel") }
+                    AppTextButton(onClick = {
+                        repo.upsertTimelineEvent(event.copy(
+                            eventType = editType,
+                            label = editLabel.ifBlank { event.label },
+                            body = editBody.ifBlank { null },
+                            intensity = if (useIntensity) editIntensity else null,
+                            updatedAt = currentTimeMillis()
+                        ))
+                        editing = false
+                    }) { Text("Save") }
+                }
+            }
+        }
+    } else {
+        // VIEW MODE
+        val icon = when (event.eventType) {
+            TimelineEventType.ONSET -> Icons.Default.ArrowForward
+            TimelineEventType.COMEUP -> Icons.Default.TrendingUp
+            TimelineEventType.PEAK -> Icons.Default.Star
+            TimelineEventType.OFFSET -> Icons.Default.TrendingDown
+            TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
+            TimelineEventType.END -> Icons.Default.Stop
+            TimelineEventType.OBSERVATION -> Icons.Default.Visibility
+            TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
+            TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
+            TimelineEventType.EMERGENCY -> Icons.Default.Error
+            TimelineEventType.NOTE -> Icons.Default.Notes
+            TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
+        }
+        val accent = when (event.eventType) {
+            TimelineEventType.EMERGENCY, TimelineEventType.SIDE_EFFECT -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.primary
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(event.label, style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium)
+                        }
+                        if (!event.body.isNullOrBlank()) {
+                            Text(event.body, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (event.intensity != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Intensity:", style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Surface(shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer) {
+                                    Text("${event.intensity.toInt()}/10",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.error)
+                    }
+                }
             }
         }
     }

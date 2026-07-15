@@ -848,7 +848,8 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
         "Afterglow" to Color(0xFFAB47BC)
     )
 
-    val sumOfMax = barPhases.sumOf { it.maxMinutes }
+    // Use totalMax as the timeline span — phases within it fill the full chart width
+    val timelineSpan = maxOf(totalMax, barPhases.maxOfOrNull { it.maxMinutes } ?: 1.0)
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -865,11 +866,15 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
 
             // Build curve data points
             data class CurvePt(val x: Float, val y: Float, val label: String, val timeLabel: String, val color: Color)
-            val curvePoints = remember(barPhases, sumOfMax) {
+            val curvePoints = remember(barPhases, timelineSpan) {
                 val pts = mutableListOf<CurvePt>()
                 var acc = 0f
-                barPhases.forEach { phase ->
-                    val frac = (phase.maxMinutes / sumOfMax).toFloat().coerceAtLeast(0.04f)
+                val rawFracs = barPhases.map {
+                    (it.maxMinutes / timelineSpan).toFloat().coerceAtLeast(0.01f)
+                }
+                val scale = 1f / rawFracs.sum()
+                barPhases.forEachIndexed { idx, phase ->
+                    val frac = rawFracs[idx] * scale
                     val x = acc + frac / 2f
                     val y = when (phase.label) {
                         "Onset" -> 0.25f; "Comeup" -> 0.75f; "Peak" -> 1f; "Offset" -> 0.15f; else -> 0.5f
@@ -878,7 +883,16 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                     pts.add(CurvePt(x, y, phase.label, time, phaseColors[phase.label] ?: Color.Gray))
                     acc += frac
                 }
+                // Return to baseline after Offset
+                if (pts.any { it.label == "Offset" }) {
+                    pts.add(CurvePt(acc, 0f, "", "", Color.Transparent))
+                }
                 pts.toList()
+            }
+
+            // Color for the curve line and fill — use the last non-baseline point
+            val curveColor = remember(curvePoints) {
+                curvePoints.findLast { it.label.isNotEmpty() }?.color ?: Color.Gray
             }
 
             Box(modifier = Modifier.fillMaxWidth().height(140.dp)) {
@@ -886,10 +900,10 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
                     val h = size.height
-                    val lPad = 14f
-                    val rPad = 4f
-                    val tPad = 4f
-                    val bPad = 4f
+                    val lPad = 28.dp.toPx()
+                    val rPad = 4.dp.toPx()
+                    val tPad = 4.dp.toPx()
+                    val bPad = 4.dp.toPx()
                     val plotW = w - lPad - rPad
                     val plotH = h - tPad - bPad
 
@@ -909,7 +923,13 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                             val p0 = curvePoints[i]; val p1 = curvePoints[i + 1]
                             val x0 = lPad + p0.x * plotW; val y0 = tPad + plotH * (1f - p0.y)
                             val x1 = lPad + p1.x * plotW; val y1 = tPad + plotH * (1f - p1.y)
-                            path.cubicTo((x0 + x1) / 2f, y0, (x0 + x1) / 2f, y1, x1, y1)
+                            val midX = (x0 + x1) / 2f
+                            // For steep descents (y drop >50%), keep cp2 near the start height
+                            // so the curve plateaus before descending, not drops immediately
+                            val cp2y = if ((p0.y - p1.y) > 0.5f) {
+                                y0 - (y0 - y1) * 0.4f
+                            } else y1
+                            path.cubicTo(midX, y0, midX, cp2y, x1, y1)
                         }
 
                         // Fill
@@ -920,14 +940,15 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                             lineTo(firstX, tPad + plotH)
                             close()
                         }
-                        drawPath(fill, curvePoints.last().color.copy(alpha = 0.10f))
+                        drawPath(fill, curveColor.copy(alpha = 0.10f))
                         // Curve line (thick, emulated by drawing 3 overlapping lines)
-                        drawPath(path, curvePoints.last().color.copy(alpha = 0.3f), style = Stroke(width = 4f))
-                        drawPath(path, curvePoints.last().color, style = Stroke(width = 2.5f))
+                        drawPath(path, curveColor.copy(alpha = 0.3f), style = Stroke(width = 4f))
+                        drawPath(path, curveColor, style = Stroke(width = 2.5f))
                     }
 
-                    // Points + drop lines
+                    // Points + drop lines (skip the implicit baseline return point)
                     curvePoints.forEach { pt ->
+                        if (pt.label.isEmpty()) return@forEach
                         val cx = lPad + pt.x * plotW
                         val cy = tPad + plotH * (1f - pt.y)
                         drawLine(gridColor.copy(alpha = 0.15f), Offset(cx, cy), Offset(cx, tPad + plotH), strokeWidth = 0.5f)
@@ -962,23 +983,12 @@ private fun DurationTimelineSection(profile: Map<String, String>) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.align(Alignment.TopEnd))
-
-                // X-axis labels (overlaid at bottom)
-                Row(
-                    modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(start = 14.dp, end = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    curvePoints.forEach { pt ->
-                        Text(pt.label, style = MaterialTheme.typography.labelSmall,
-                            color = pt.color, fontWeight = FontWeight.Bold)
-                    }
-                }
             }
 
             // Phase tiles with exact time ranges
             Spacer(Modifier.height(8.dp))
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 barPhases.forEach { phase ->

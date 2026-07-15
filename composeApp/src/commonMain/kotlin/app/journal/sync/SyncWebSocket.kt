@@ -60,6 +60,7 @@ val wsModule = SerializersModule {
 /** The JSON serialization instance used for WebSocket frames. */
 val wsJson = Json {
     ignoreUnknownKeys = true
+    encodeDefaults = true
     classDiscriminator = "#type"
     serializersModule = wsModule
 }

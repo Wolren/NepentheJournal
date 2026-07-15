@@ -1,0 +1,407 @@
+substance_id,cid,substance_name,substance_class,source,target_id,target_name,target_species,interaction_type,action,affinity_display,affinity_parameter,endogenous,primary_target
+cid:10251906,10251906,25I-NBOMe,Substituted_phenethylamines,iuphar,6,5-HT<sub>2A</sub> receptor,Rat,Agonist,Agonist,8.7,pKi,False,False
+cid:98527,98527,2C-B,Substituted_phenethylamines,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Agonist,9.2,pKi,False,False
+cid:1832,1832,5-MeO-DMT,Substituted_tryptamines,iuphar,4,5-ht<sub>1e</sub> receptor,Human,Agonist,Full agonist,6.1 - 6.3,pKi,False,False
+cid:1832,1832,5-MeO-DMT,Substituted_tryptamines,iuphar,5,5-HT<sub>1F</sub> receptor,Human,Agonist,Full agonist,7.4,pKi,False,False
+cid:1832,1832,5-MeO-DMT,Substituted_tryptamines,iuphar,8,5-HT<sub>2C</sub> receptor,Human,Agonist,Full agonist,6.2 - 7.0,pKi,False,False
+cid:1832,1832,5-MeO-DMT,Substituted_tryptamines,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Agonist,Full agonist,6.9,pKi,False,False
+cid:1832,1832,5-MeO-DMT,Substituted_tryptamines,iuphar,12,5-HT<sub>7</sub> receptor,Rat,Agonist,Full agonist,7.4 - 7.7,pKi,False,False
+cid:187,187,Acetylcholine,,iuphar,13,M<sub>1</sub> receptor,Human,Agonist,Agonist,,,False,False
+cid:187,187,Acetylcholine,,iuphar,14,M<sub>2</sub> receptor,Human,Agonist,Agonist,8.8,pKd,False,False
+cid:187,187,Acetylcholine,,iuphar,15,M<sub>3</sub> receptor,Human,Agonist,Agonist,,,False,False
+cid:187,187,Acetylcholine,,iuphar,16,M<sub>4</sub> receptor,Human,Agonist,Agonist,8.2,pKd,False,False
+cid:187,187,Acetylcholine,,iuphar,17,M<sub>5</sub> receptor,Human,Agonist,Agonist,,,False,False
+cid:5816,5816,Adrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Rat,Agonist,Full agonist,6.3,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,22,&alpha;<sub>1A</sub>-adrenoceptor,Human,Agonist,Full agonist,5.1 - 6.5,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Human,Agonist,Full agonist,5.3 - 7.2,pKi,True,True
+cid:5816,5816,Adrenaline,,iuphar,29,&beta;<sub>2</sub>-adrenoceptor,Human,Agonist,Full agonist,6.0 - 6.2,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,3.6 - 5.2,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,4.9 - 5.8,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,28,&beta;<sub>1</sub>-adrenoceptor,Human,Agonist,Agonist,5.2 - 6.0,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Human,Agonist,Full agonist,3.9 - 4.7,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,2597,carbonic anhydrase 1,Human,Activator,Activation,,,False,False
+cid:5816,5816,Adrenaline,,iuphar,22,&alpha;<sub>1A</sub>-adrenoceptor,Human,Agonist,Full agonist,9.1,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Human,Agonist,Full agonist,3.9 - 6.5,pKi,True,False
+cid:5816,5816,Adrenaline,,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Human,Agonist,Full agonist,9.4,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,6.5,pIC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,5.5,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,8.0,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,6.8,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,3.7 - 7.4,pKi,True,True
+cid:5816,5816,Adrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,7.6,pIC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,6.3,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,7.5,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,6.7,pIC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,7.6,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,28,&beta;<sub>1</sub>-adrenoceptor,Human,Agonist,Agonist,7.6,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,29,&beta;<sub>2</sub>-adrenoceptor,Human,Agonist,Full agonist,7.9,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Human,Agonist,Full agonist,6.5,pEC50,False,False
+cid:5816,5816,Adrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Human,Agonist,Full agonist,7.7,pEC50,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,434,K<sub>ir</sub>3.1,Mouse,Activator,Agonist,,,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,435,K<sub>ir</sub>3.2,None,Activator,Agonist,,,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,379,5-HT<sub>3</sub>A,Mouse,Allosteric modulator,Positive,,,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,428,Glycine Receptor (All subtypes),Human,Allosteric modulator,Potentiation,,,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,437,K<sub>ir</sub>3.4,Mouse,Activator,None,,,False,False
+cid:702,702,Alcohol,Alcohol,iuphar,512,TRPV6,Human,Activator,Activation,0.8,pEC50,False,False
+cid:2118,2118,Alprazolam,Benzodiazepines,iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Allosteric modulator,Positive,7.2,pEC50,False,False
+cid:2118,2118,Alprazolam,Benzodiazepines,iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Allosteric modulator,Positive,7.4,pEC50,False,False
+cid:2118,2118,Alprazolam,Benzodiazepines,iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Allosteric modulator,Positive,7.9,pEC50,False,False
+cid:2118,2118,Alprazolam,Benzodiazepines,iuphar,408,GABA<sub>A</sub> receptor &alpha;5 subunit,Human,Allosteric modulator,Positive,8.0,pEC50,False,False
+cid:3007,3007,Amphetamine,Substituted_phenethylamines,iuphar,2749,carbonic anhydrase 7,Human,Activator,Activation,,,False,False
+cid:3007,3007,Amphetamine,Substituted_phenethylamines,iuphar,3093,carbonic anhydrase 5A,Human,Activator,Activation,,,False,False
+cid:2196,2196,Aniracetam,Racetams,iuphar,444,GluA1,Human,Allosteric modulator,Positive,,,False,False
+cid:2196,2196,Aniracetam,Racetams,iuphar,445,GluA2,Human,Allosteric modulator,Positive,,,False,False
+cid:2196,2196,Aniracetam,Racetams,iuphar,446,GluA3,Human,Allosteric modulator,Positive,,,False,False
+cid:2196,2196,Aniracetam,Racetams,iuphar,447,GluA4,Human,Allosteric modulator,Positive,,,False,False
+cid:2284,2284,Baclofen,"Butyric_acid, Gabapentinoids",iuphar,242,GABA<sub>B</sub> receptor,Human,Agonist,Full agonist,4.3 - 6.2,pKi,False,True
+cid:10257,10257,Bufotenin,Substituted_tryptamines,iuphar,3,5-HT<sub>1D</sub> receptor,Human,Antagonist,Antagonist,7.7 - 8.0,pKi,False,False
+cid:10257,10257,Bufotenin,Substituted_tryptamines,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Antagonist,Antagonist,6.8,pKi,False,False
+cid:10257,10257,Bufotenin,Substituted_tryptamines,iuphar,10,5-HT<sub>5A</sub> receptor,Mouse,Antagonist,Antagonist,5.3 - 6.0,pKi,False,False
+cid:10257,10257,Bufotenin,Substituted_tryptamines,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Antagonist,Antagonist,7.0 - 8.4,pKi,False,False
+cid:10257,10257,Bufotenin,Substituted_tryptamines,iuphar,12,5-HT<sub>7</sub> receptor,Mouse,Agonist,Full agonist,7.0,pKi,False,False
+cid:644073,644073,Buprenorphine,Substituted_morphinans,iuphar,319,&mu; receptor,Human,Agonist,Partial agonist,8.8,pKi,False,True
+cid:644073,644073,Buprenorphine,Substituted_morphinans,iuphar,318,&kappa; receptor,Human,Antagonist,Antagonist,9.1 - 10.2,pKi,False,True
+cid:2477,2477,Buspirone,,iuphar,1,5-HT<sub>1A</sub> receptor,Human,Agonist,Partial agonist,7.7 - 8.0,pKi,False,True
+cid:2477,2477,Buspirone,,iuphar,12,5-HT<sub>7</sub> receptor,Rat,Agonist,Partial agonist,6.4,pKi,False,False
+cid:2477,2477,Buspirone,,iuphar,12,5-HT<sub>7</sub> receptor,Mouse,Antagonist,Antagonist,6.4,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,18,A<sub>1</sub> receptor,Rat,Antagonist,Antagonist,4.4 - 4.4,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,19,A<sub>2A</sub> receptor,Rat,Antagonist,Antagonist,4.3 - 4.5,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,18,A<sub>1</sub> receptor,Human,Antagonist,Antagonist,4.3 - 5.0,pKi,False,True
+cid:2519,2519,Caffeine,Xanthines,iuphar,19,A<sub>2A</sub> receptor,Human,Antagonist,Antagonist,4.6 - 5.6,pKi,False,True
+cid:2519,2519,Caffeine,Xanthines,iuphar,20,A<sub>2B</sub> receptor,Rat,Antagonist,Antagonist,4.5,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,21,A<sub>3</sub> receptor,Rat,Antagonist,Antagonist,4.0,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,20,A<sub>2B</sub> receptor,Mouse,Antagonist,Antagonist,4.9,pKi,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,749,RyR3,Human,Activator,None,,,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,743,IP<sub>3</sub>R1,Human,Antagonist,Antagonist,,,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,748,RyR2,Human,Activator,None,,,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,747,RyR1,Human,Activator,None,,,False,False
+cid:2519,2519,Caffeine,Xanthines,iuphar,20,A<sub>2B</sub> receptor,Human,Antagonist,Antagonist,4.5 - 5.0,pKi,False,True
+cid:2519,2519,Caffeine,Xanthines,iuphar,21,A<sub>3</sub> receptor,Human,Antagonist,Antagonist,4.9,pKi,False,True
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,508,TRPV2,Rat,Activator,Activation,5.4,pEC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,508,TRPV2,Human,Activator,Activation,4.5,pEC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,89,<i>GPR18</i>,Human,Agonist,Partial agonist,4.3,pEC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,109,<i>GPR55</i>,Human,Antagonist,Antagonist,6.3 - 6.5,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,56,CB<sub>1</sub> receptor,Human,Allosteric modulator,Negative,,,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,509,TRPV3,Rat,Activator,Activation,5.4,pEC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,500,TRPM8,Rat,Channel blocker,Antagonist,5.6,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,485,TRPA1,Rat,Activator,Agonist,6.3,pEC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,578,Na<sub>v</sub>1.1,Human,Channel blocker,None,4.9,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,578,Na<sub>v</sub>1.1,Human,Channel blocker,None,5.5,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,579,Na<sub>v</sub>1.2,Human,Channel blocker,None,5.5,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,580,Na<sub>v</sub>1.3,Human,Channel blocker,None,5.5,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,582,Na<sub>v</sub>1.5,Human,Channel blocker,None,5.4,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,583,Na<sub>v</sub>1.6,Human,Channel blocker,None,5.5,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,584,Na<sub>v</sub>1.7,Human,Channel blocker,None,5.5 - 6.7,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,585,Na<sub>v</sub>1.8,Mouse,Channel blocker,None,5.7,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,581,Na<sub>v</sub>1.4,Human,Channel blocker,None,5.7,pIC50,False,False
+cid:644019,644019,Cannabidiol,Cannabinoid,iuphar,581,Na<sub>v</sub>1.4,Human,Channel blocker,None,5.0,pIC50,False,False
+cid:5281515,5281515,Cannabinoid,,iuphar,57,CB<sub>2</sub> receptor,Human,Agonist,Agonist,5.7,pEC50,False,False
+cid:5281515,5281515,Cannabinoid,,iuphar,57,CB<sub>2</sub> receptor,Human,Agonist,Agonist,6.8,pKi,False,False
+cid:2802,2802,Clonazepam,Benzodiazepines,iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Allosteric modulator,Positive,8.7,pKi,False,True
+cid:2802,2802,Clonazepam,Benzodiazepines,iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Allosteric modulator,Positive,8.8,pKi,False,True
+cid:2802,2802,Clonazepam,Benzodiazepines,iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Allosteric modulator,Positive,8.9,pKi,False,True
+cid:2803,2803,Clonidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Partial agonist,7.6,pKd,False,False
+cid:2803,2803,Clonidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Rat,Agonist,Partial agonist,8.8,pKd,False,False
+cid:446220,446220,Cocaine,Substituted_tropanes,iuphar,379,5-HT<sub>3</sub>A,Human,Antagonist,Antagonist,5.1 - 5.4,pKi,False,False
+cid:446220,446220,Cocaine,Substituted_tropanes,iuphar,378,5-HT<sub>3</sub>AB,Human,Antagonist,Antagonist,4.8,pKi,False,False
+cid:446220,446220,Cocaine,Substituted_tropanes,iuphar,927,DAT,Rat,Inhibitor,Inhibition,7.1,pIC50,False,True
+cid:5284371,5284371,Codeine,Substituted_morphinans,iuphar,319,&mu; receptor,Human,Agonist,Full agonist,6.9,pKi,False,True
+cid:5754,5754,Cortisol,,iuphar,625,Glucocorticoid receptor,Human,Agonist,Agonist,7.3 - 8.0,pIC50,True,True
+cid:5754,5754,Cortisol,,iuphar,626,Mineralocorticoid receptor,Human,Agonist,Agonist,9.8 - 9.9,pIC50,True,False
+cid:5754,5754,Cortisol,,iuphar,100,<i>GPR33</i>,Human,None,Binding,7.9,pKd,False,False
+cid:6089,6089,DMT,Substituted_tryptamines,iuphar,3,5-HT<sub>1D</sub> receptor,Human,Agonist,Full agonist,7.0 - 7.3,pKi,False,False
+cid:6089,6089,DMT,Substituted_tryptamines,iuphar,11,5-HT<sub>6</sub> receptor,Human,Agonist,Full agonist,7.2,pKi,False,False
+cid:62065,62065,DOB,Substituted_amphetamines,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Full agonist,9.1,pKd,False,False
+cid:31703,31703,DOx,,iuphar,2637,DNA topoisomerase II alpha,Human,Inhibitor,Inhibition,6.0,pIC50,False,False
+cid:5826,5826,Dextroamphetamine,Substituted_phenethylamines,iuphar,364,TA<sub>1</sub> receptor,Human,Agonist,Full agonist,6.0 - 6.9,pEC50,False,False
+cid:5826,5826,Dextroamphetamine,Substituted_phenethylamines,iuphar,364,TA<sub>1</sub> receptor,Rat,Agonist,Full agonist,6.1 - 6.4,pEC50,False,False
+cid:5826,5826,Dextroamphetamine,Substituted_phenethylamines,iuphar,364,TA<sub>1</sub> receptor,Mouse,Agonist,Full agonist,6.7 - 8.7,pEC50,False,False
+cid:5826,5826,Dextroamphetamine,Substituted_phenethylamines,iuphar,926,NET,Human,Inhibitor,Inhibition,7.0,pKi,False,True
+cid:5826,5826,Dextroamphetamine,Substituted_phenethylamines,iuphar,927,DAT,Human,Inhibitor,Inhibition,7.0,pKi,False,True
+cid:5360696,5360696,Dextromethorphan,Substituted_morphinans,iuphar,2552,sigma non-opioid intracellular receptor 1,Human,Agonist,Agonist,6.3,pKi,False,False
+cid:5360696,5360696,Dextromethorphan,Substituted_morphinans,iuphar,458,GluN2C,Human,Channel blocker,None,6.3,pIC50,False,False
+cid:5360696,5360696,Dextromethorphan,Substituted_morphinans,iuphar,659,<i>TAS2R1</i>,Human,Agonist,Agonist,,,False,False
+cid:3016,3016,Diazepam,Benzodiazepines,iuphar,363,TRH<sub>1</sub> receptor,Rat,Antagonist,Antagonist,5.2,pKi,False,False
+cid:3016,3016,Diazepam,Benzodiazepines,iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Allosteric modulator,Positive,7.8,pKi,False,True
+cid:3016,3016,Diazepam,Benzodiazepines,iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Allosteric modulator,Positive,7.8,pKi,False,True
+cid:3016,3016,Diazepam,Benzodiazepines,iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Allosteric modulator,Positive,7.8,pKi,False,True
+cid:3100,3100,Diphenhydramine,Ethanolamine,iuphar,262,H<sub>1</sub> receptor,Human,Antagonist,Antagonist,7.9,pKi,False,True
+cid:681,681,Dopamine,,iuphar,214,D<sub>1</sub> receptor,Human,Agonist,Full agonist,4.3 - 5.6,pKi,True,True
+cid:681,681,Dopamine,,iuphar,215,D<sub>2</sub> receptor,Human,Agonist,Full agonist,4.7 - 7.2,pKi,True,True
+cid:681,681,Dopamine,,iuphar,216,D<sub>3</sub> receptor,Human,Agonist,Full agonist,6.4 - 7.3,pKi,True,True
+cid:681,681,Dopamine,,iuphar,218,D<sub>5</sub> receptor,Human,Agonist,Full agonist,6.6,pKi,True,True
+cid:681,681,Dopamine,,iuphar,217,D<sub>4</sub> receptor,Human,Agonist,Full agonist,7.6,pKi,True,True
+cid:681,681,Dopamine,,iuphar,217,D<sub>4</sub> receptor,Rat,Agonist,Full agonist,7.4,pKi,True,False
+cid:681,681,Dopamine,,iuphar,215,D<sub>2</sub> receptor,Rat,Agonist,Full agonist,5.3 - 6.4,pKi,True,False
+cid:64139,64139,Efavirenz,Benzoxazine,iuphar,1337,CYP3A4,Human,Inhibitor,Inhibition,4.8,pIC50,False,False
+cid:9294,9294,Ephedrine,Amphetamine,iuphar,29,&beta;<sub>2</sub>-adrenoceptor,Human,Agonist,Partial agonist,5.6,pKi,False,True
+cid:3345,3345,Fentanyl,"Anilidopiperidine, Substituted_piperidines",iuphar,319,&mu; receptor,Human,Agonist,Full agonist,9.2,pKi,False,True
+cid:3345,3345,Fentanyl,"Anilidopiperidine, Substituted_piperidines",iuphar,317,&delta; receptor,Human,Agonist,Full agonist,6.8,pKi,False,False
+cid:3345,3345,Fentanyl,"Anilidopiperidine, Substituted_piperidines",iuphar,318,&kappa; receptor,Human,Agonist,Partial agonist,7.1,pKi,False,False
+cid:3345,3345,Fentanyl,"Anilidopiperidine, Substituted_piperidines",iuphar,319,&mu; receptor,Rat,Agonist,Full agonist,9.4,pKi,False,False
+cid:3380,3380,Flunitrazepam,Benzodiazepines,iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Allosteric modulator,Full agonist,,,False,False
+cid:3380,3380,Flunitrazepam,Benzodiazepines,iuphar,408,GABA<sub>A</sub> receptor &alpha;5 subunit,Human,Allosteric modulator,Full agonist,,,False,False
+cid:3380,3380,Flunitrazepam,Benzodiazepines,iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Allosteric modulator,Full agonist,,,False,False
+cid:3380,3380,Flunitrazepam,Benzodiazepines,iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Allosteric modulator,Positive,,,False,False
+cid:10413,10413,GHB,Γ-Hydroxy_acid,iuphar,311,HCA<sub>1</sub> receptor,Human,Agonist,Full agonist,1.8,pEC50,False,False
+cid:10413,10413,GHB,Γ-Hydroxy_acid,iuphar,242,GABA<sub>B</sub> receptor,Human,Agonist,Partial agonist,,,False,False
+cid:3446,3446,Gabapentin,Gabapentinoids,iuphar,562,K<SUB>v</SUB>7.3,Human,Activator,Activation,8.3,pEC50,False,False
+cid:3446,3446,Gabapentin,Gabapentinoids,iuphar,564,K<SUB>v</SUB>7.5,Human,Activator,Activation,8.7,pEC50,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,407,GABA<sub>A</sub> receptor &alpha;4 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,408,GABA<sub>A</sub> receptor &alpha;5 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,416,GABA<sub>A</sub> receptor &delta; subunit,Human,Agonist,Full agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,420,GABA<sub>A</sub> receptor &rho;1 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,409,GABA<sub>A</sub> receptor &alpha;6 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Agonist,Agonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,421,GABA<sub>A</sub> receptor &rho;2 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:3448,3448,Gaboxadol,"3-hydroxyisoxazole, 3-Hydroxyisoxazole",iuphar,422,GABA<sub>A</sub> receptor &rho;3 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:9651,9651,Galantamine,Benzazepine,iuphar,2465,acetylcholinesterase (Yt blood group),Human,Inhibitor,Inhibition,6.3,pIC50,False,False
+cid:33032,33032,Glutamate,,iuphar,291,mGlu<sub>3</sub> receptor,Rat,Agonist,Full agonist,6.4,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,293,mGlu<sub>5</sub> receptor,Human,Agonist,Agonist,5.0 - 5.5,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,294,mGlu<sub>6</sub> receptor,Human,Agonist,Agonist,4.8,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,295,mGlu<sub>7</sub> receptor,Human,Agonist,Agonist,3.0,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,296,mGlu<sub>8</sub> receptor,Human,Agonist,Agonist,4.9 - 5.6,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,289,mGlu<sub>1</sub> receptor,Human,Agonist,Agonist,4.8 - 5.0,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,290,mGlu<sub>2</sub> receptor,Human,Agonist,Agonist,4.7 - 5.4,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,291,mGlu<sub>3</sub> receptor,Human,Agonist,Agonist,5.3 - 5.4,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,292,mGlu<sub>4</sub> receptor,Human,Agonist,Agonist,4.7 - 5.5,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,289,mGlu<sub>1</sub> receptor,Rat,Agonist,Full agonist,6.4 - 6.5,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,290,mGlu<sub>2</sub> receptor,Human,Agonist,Full agonist,4.9,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,290,mGlu<sub>2</sub> receptor,Rat,Agonist,Full agonist,5.4 - 5.9,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,291,mGlu<sub>3</sub> receptor,Human,Agonist,Full agonist,7.4,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,292,mGlu<sub>4</sub> receptor,Rat,Agonist,Full agonist,4.9 - 5.5,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,294,mGlu<sub>6</sub> receptor,Human,Agonist,Full agonist,5.2,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,294,mGlu<sub>6</sub> receptor,Rat,Agonist,Full agonist,4.4,pEC50,True,False
+cid:33032,33032,Glutamate,,iuphar,295,mGlu<sub>7</sub> receptor,Human,Agonist,Full agonist,3.1,pKi,True,False
+cid:33032,33032,Glutamate,,iuphar,296,mGlu<sub>8</sub> receptor,Human,Agonist,Full agonist,5.0 - 5.7,pIC50,True,False
+cid:33032,33032,Glutamate,,iuphar,293,mGlu<sub>5</sub> receptor,Rat,Agonist,Full agonist,6.1,pIC50,True,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,215,D<sub>2</sub> receptor,Human,Antagonist,Antagonist,7.4 - 8.8,pKi,False,True
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,6,5-HT<sub>2A</sub> receptor,Human,Antagonist,Antagonist,6.7 - 7.3,pKi,False,True
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,214,D<sub>1</sub> receptor,Human,Antagonist,Antagonist,7.6 - 8.2,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,1,5-HT<sub>1A</sub> receptor,Human,Antagonist,Antagonist,5.7 - 5.8,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,3,5-HT<sub>1D</sub> receptor,Human,Antagonist,Antagonist,6.6,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,6,5-HT<sub>2A</sub> receptor,Rat,Antagonist,Antagonist,7.4,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,7,5-HT<sub>2B</sub> receptor,Human,Antagonist,Antagonist,5.8 - 6.4,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,12,5-HT<sub>7</sub> receptor,Mouse,Antagonist,Antagonist,6.3,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,12,5-HT<sub>7</sub> receptor,Rat,Antagonist,Antagonist,6.3 - 6.6,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,12,5-HT<sub>7</sub> receptor,Human,Antagonist,Antagonist,6.3 - 6.6,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,215,D<sub>2</sub> receptor,Rat,Antagonist,Antagonist,8.3,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,216,D<sub>3</sub> receptor,Rat,Antagonist,Antagonist,7.0,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,216,D<sub>3</sub> receptor,Human,Antagonist,Antagonist,7.5 - 8.6,pKi,False,True
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,218,D<sub>5</sub> receptor,Human,Antagonist,Antagonist,6.3,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,262,H<sub>1</sub> receptor,Human,Antagonist,Antagonist,5.7 - 6.1,pKi,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,435,K<sub>ir</sub>3.2,Mouse,Gating inhibitor,Antagonist,4.1,pEC50,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,217,D<sub>4</sub> receptor,Human,Antagonist,Antagonist,8.7 - 8.8,pKi,False,True
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,570,K<SUB>v</SUB>10.1,Human,Channel blocker,None,6.2,pIC50,False,False
+cid:3559,3559,Haloperidol,"Substituted_piperidines, Butyrophenone",iuphar,666,<i>TAS2R10</i>,Human,Agonist,Agonist,,,False,False
+cid:774,774,Histamine,,iuphar,264,H<sub>3</sub> receptor,Human,Agonist,Full agonist,8.0,pKd,False,False
+cid:774,774,Histamine,,iuphar,265,H<sub>4</sub> receptor,Human,Agonist,Full agonist,7.4 - 8.4,pKd,False,False
+cid:774,774,Histamine,,iuphar,265,H<sub>4</sub> receptor,Rat,Agonist,Full agonist,6.9,pKd,False,False
+cid:774,774,Histamine,,iuphar,265,H<sub>4</sub> receptor,Mouse,Agonist,Full agonist,7.4,pKd,False,False
+cid:5284569,5284569,Hydrocodone,Substituted_morphinans,iuphar,319,&mu; receptor,Human,Agonist,Agonist,8.7,pKi,False,True
+cid:5284569,5284569,Hydrocodone,Substituted_morphinans,iuphar,318,&kappa; receptor,Human,Agonist,Agonist,6.6,pKi,False,False
+cid:5284570,5284570,Hydromorphone,Substituted_morphinans,iuphar,317,&delta; receptor,Human,Agonist,Agonist,7.4,pKi,False,False
+cid:5284570,5284570,Hydromorphone,Substituted_morphinans,iuphar,319,&mu; receptor,Human,Agonist,Agonist,9.6,pKi,False,True
+cid:5284570,5284570,Hydromorphone,Substituted_morphinans,iuphar,318,&kappa; receptor,Human,Agonist,Agonist,8.6,pKi,False,False
+cid:197060,197060,Ibogaine,Substituted_tryptamines,iuphar,928,SERT,Human,Inhibitor,Inhibition,6.3,pIC50,False,False
+cid:1233,1233,Ibotenic acid,"3-Hydroxyisoxazole, Α-Amino_acid",iuphar,289,mGlu<sub>1</sub> receptor,Rat,Agonist,Full agonist,5.9 - 6.4,pKi,False,False
+cid:1233,1233,Ibotenic acid,"3-Hydroxyisoxazole, Α-Amino_acid",iuphar,293,mGlu<sub>5</sub> receptor,Rat,Agonist,Full agonist,5.7,pIC50,False,False
+cid:10382701,10382701,JWH-018,Naphthoylindole,iuphar,56,CB<sub>1</sub> receptor,Human,Agonist,Full agonist,8.0,pKi,False,False
+cid:10382701,10382701,JWH-018,Naphthoylindole,iuphar,57,CB<sub>2</sub> receptor,Human,Agonist,Full agonist,8.5,pKi,False,False
+cid:3821,3821,Ketamine,Arylcyclohexylamines,iuphar,458,GluN2C,Human,Channel blocker,None,6.2,pIC50,False,True
+cid:3821,3821,Ketamine,Arylcyclohexylamines,iuphar,457,GluN2B,Human,Channel blocker,None,,,False,True
+cid:3821,3821,Ketamine,Arylcyclohexylamines,iuphar,459,GluN2D,Human,Channel blocker,None,,,False,True
+cid:3821,3821,Ketamine,Arylcyclohexylamines,iuphar,456,GluN2A,Human,Channel blocker,None,,,False,True
+cid:5761,5761,LSD,Lysergamides,iuphar,7,5-HT<sub>2B</sub> receptor,Human,Agonist,Biased agonist,8.4,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,1,5-HT<sub>1A</sub> receptor,Human,Agonist,Full agonist,9.0,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,6,5-HT<sub>2A</sub> receptor,Rat,Agonist,Full agonist,8.5,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Full agonist,9.4,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,7,5-HT<sub>2B</sub> receptor,Rat,Agonist,Full agonist,8.3,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,8,5-HT<sub>2C</sub> receptor,Human,Agonist,Full agonist,8.2 - 8.6,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Agonist,Full agonist,7.8 - 8.7,pKi,False,False
+cid:5761,5761,LSD,Lysergamides,iuphar,11,5-HT<sub>6</sub> receptor,Human,Agonist,Full agonist,8.4,pKi,False,False
+cid:3958,3958,Lorazepam,Benzodiazepines,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Rat,Allosteric modulator,Positive,3.8,pKi,False,False
+cid:3958,3958,Lorazepam,Benzodiazepines,iuphar,114,<i>GPR68</i>,Human,Allosteric modulator,Positive,,,False,False
+cid:896,896,Melatonin,Substituted_tryptamines,iuphar,287,MT<sub>1</sub> receptor,Human,Agonist,Full agonist,9.4 - 9.9,pKd,False,False
+cid:896,896,Melatonin,Substituted_tryptamines,iuphar,288,MT<sub>2</sub> receptor,Human,Agonist,Full agonist,9.0 - 9.6,pKd,False,False
+cid:4054,4054,Memantine,Adamantanes,iuphar,458,GluN2C,Rat,Antagonist,Antagonist,6.2,pKi,False,False
+cid:4076,4076,Mescaline,Substituted_phenethylamines,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Agonist,5.6,pEC50,False,False
+cid:4095,4095,Methadone,Diphenylpropylamine,iuphar,319,&mu; receptor,Human,Agonist,Agonist,8.4,pIC50,False,True
+cid:4158,4158,Methylphenidate,Substituted_phenidates,iuphar,927,DAT,Human,Inhibitor,Inhibition,7.1,pIC50,False,True
+cid:4158,4158,Methylphenidate,Substituted_phenidates,iuphar,926,NET,Human,Inhibitor,Inhibition,7.2,pIC50,False,True
+cid:4192,4192,Midazolam,Benzodiazepines,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Rat,Allosteric modulator,Positive,3.7,pKi,False,False
+cid:4192,4192,Midazolam,Benzodiazepines,iuphar,363,TRH<sub>1</sub> receptor,Rat,Antagonist,Antagonist,5.5,pKi,False,False
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,8,5-HT<sub>2C</sub> receptor,Human,Antagonist,Antagonist,7.4,pKi,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Antagonist,Antagonist,7.1,pIC50,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Antagonist,Antagonist,6.8 - 7.1,pKi,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Antagonist,Antagonist,6.1 - 6.7,pKi,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Antagonist,Antagonist,6.7,pIC50,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Antagonist,Antagonist,7.2,pKi,False,True
+cid:4205,4205,Mirtazapine,Piperazinoazepine,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Antagonist,Antagonist,7.0 - 7.7,pKi,False,True
+cid:4236,4236,Modafinil,Benzhydryl,iuphar,927,DAT,Rat,Inhibitor,Inhibition,5.4,pKi,False,False
+cid:5288826,5288826,Morphine,Substituted_morphinans,iuphar,317,&delta; receptor,Human,Agonist,Full agonist,6.9,pKi,False,False
+cid:5288826,5288826,Morphine,Substituted_morphinans,iuphar,318,&kappa; receptor,Rat,Agonist,Partial agonist,6.7 - 7.0,pKi,False,False
+cid:5288826,5288826,Morphine,Substituted_morphinans,iuphar,318,&kappa; receptor,Human,Agonist,Partial agonist,7.3,pKi,False,False
+cid:5288826,5288826,Morphine,Substituted_morphinans,iuphar,319,&mu; receptor,Rat,Agonist,Partial agonist,7.9,pKi,False,False
+cid:5288826,5288826,Morphine,Substituted_morphinans,iuphar,319,&mu; receptor,Human,Agonist,Full agonist,9.0,pKi,False,True
+cid:5284596,5284596,Naloxone,Substituted_morphinans,iuphar,319,&mu; receptor,Rat,Antagonist,Antagonist,8.6 - 9.0,pKd,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,465,nicotinic acetylcholine receptor &alpha;4 subunit,Human,Agonist,Agonist,8.7,pKi,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,464,nicotinic acetylcholine receptor &alpha;3 subunit,Human,Agonist,Agonist,5.8,pKi,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,469,nicotinic acetylcholine receptor &alpha;9 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,469,nicotinic acetylcholine receptor &alpha;9 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,470,nicotinic acetylcholine receptor &alpha;10 subunit,Human,Antagonist,Antagonist,,,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,554,K<SUB>v</SUB>4.3,Rat,Channel blocker,None,7.4,pIC50,False,False
+cid:89594,89594,Nicotine,"Pyridine, Substituted_pyrrolidines",iuphar,485,TRPA1,Human,Activator,Activation,4.8,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Mouse,Agonist,Full agonist,3.8,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Rat,Agonist,Full agonist,6.3,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,4.5 - 6.8,pKi,True,True
+cid:439260,439260,Noradrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Human,Agonist,Full agonist,5.5 - 7.4,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Human,Agonist,Full agonist,4.7 - 6.3,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Rat,Agonist,Full agonist,4.2,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,28,&beta;<sub>1</sub>-adrenoceptor,Human,Agonist,Agonist,5.5 - 6.0,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,29,&beta;<sub>2</sub>-adrenoceptor,Human,Agonist,Agonist,4.6 - 5.4,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,3.6 - 7.4,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Human,Agonist,Full agonist,3.8 - 6.2,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,3.5 - 6.0,pKi,True,True
+cid:439260,439260,Noradrenaline,,iuphar,22,&alpha;<sub>1A</sub>-adrenoceptor,Human,Agonist,Full agonist,4.8 - 6.4,pKi,True,False
+cid:439260,439260,Noradrenaline,,iuphar,22,&alpha;<sub>1A</sub>-adrenoceptor,Human,Agonist,Full agonist,7.7 - 8.6,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Human,Agonist,Full agonist,9.2,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Human,Agonist,Full agonist,7.8,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,6.6,pIC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,5.3,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,7.7,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Full agonist,6.7,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,7.8,pIC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,6.9,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Full agonist,7.8,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,6.5 - 8.6,pIC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,7.7,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,27,&alpha;<sub>2C</sub>-adrenoceptor,Human,Agonist,Full agonist,6.0 - 6.6,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,28,&beta;<sub>1</sub>-adrenoceptor,Human,Agonist,Agonist,7.9,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,29,&beta;<sub>2</sub>-adrenoceptor,Human,Agonist,Agonist,6.4,pEC50,False,False
+cid:439260,439260,Noradrenaline,,iuphar,30,&beta;<sub>3</sub>-adrenoceptor,Human,Agonist,Full agonist,7.2,pEC50,False,False
+cid:4058,4058,Pethidine,Substituted_piperidines,iuphar,319,&mu; receptor,Human,Agonist,Agonist,6.5,pIC50,False,True
+cid:4058,4058,Pethidine,Substituted_piperidines,iuphar,318,&kappa; receptor,Human,Agonist,Agonist,5.6,pIC50,False,False
+cid:4058,4058,Pethidine,Substituted_piperidines,iuphar,317,&delta; receptor,Human,Agonist,Agonist,5.0,pIC50,False,False
+cid:1001,1001,Phenethylamine (compound),supplement,iuphar,169,<i>TAAR4P </i>,Mouse,Agonist,Agonist,6.0,pEC50,False,False
+cid:1001,1001,Phenethylamine (compound),supplement,iuphar,169,<i>TAAR4P </i>,Rat,Agonist,Partial agonist,,,False,False
+cid:1001,1001,Phenethylamine (compound),supplement,iuphar,364,TA<sub>1</sub> receptor,Human,Agonist,Full agonist,6.2 - 7.0,pEC50,True,False
+cid:1001,1001,Phenethylamine (compound),supplement,iuphar,364,TA<sub>1</sub> receptor,Mouse,Agonist,Full agonist,6.3 - 7.4,pEC50,True,False
+cid:1001,1001,Phenethylamine (compound),supplement,iuphar,364,TA<sub>1</sub> receptor,Rat,Agonist,Full agonist,6.4 - 6.6,pEC50,True,False
+cid:4763,4763,Phenobarbital,Barbiturates,iuphar,606,Pregnane X receptor,Human,Agonist,Agonist,,,False,False
+cid:4843,4843,Piracetam,Racetams,iuphar,444,GluA1,Human,Allosteric modulator,Positive,,,False,False
+cid:4843,4843,Piracetam,Racetams,iuphar,445,GluA2,Human,Allosteric modulator,Positive,,,False,False
+cid:4843,4843,Piracetam,Racetams,iuphar,446,GluA3,Human,Allosteric modulator,Positive,,,False,False
+cid:4843,4843,Piracetam,Racetams,iuphar,447,GluA4,Human,Allosteric modulator,Positive,,,False,False
+cid:4917,4917,Prochlorperazine,Phenothiazine,iuphar,214,D<sub>1</sub> receptor,Human,Antagonist,Antagonist,7.1,pKi,False,False
+cid:4917,4917,Prochlorperazine,Phenothiazine,iuphar,216,D<sub>3</sub> receptor,Human,Antagonist,Antagonist,8.4,pKi,False,True
+cid:4917,4917,Prochlorperazine,Phenothiazine,iuphar,217,D<sub>4</sub> receptor,Human,Antagonist,Antagonist,6.1,pKi,False,False
+cid:4917,4917,Prochlorperazine,Phenothiazine,iuphar,215,D<sub>2</sub> receptor,Human,Antagonist,Antagonist,8.4,pKi,False,True
+cid:5994,5994,Progesterone,Steroid,iuphar,627,Progesterone receptor,Human,Agonist,Agonist,8.5,pKi,False,True
+cid:5994,5994,Progesterone,Steroid,iuphar,490,TRPC5,Human,Channel blocker,Inhibition,5.3,pIC50,False,False
+cid:5994,5994,Progesterone,Steroid,iuphar,389,CatSper2,Human,Activator,Full agonist,8.1,pEC50,True,False
+cid:5994,5994,Progesterone,Steroid,iuphar,390,CatSper3,Human,Activator,Full agonist,8.1,pEC50,True,False
+cid:5994,5994,Progesterone,Steroid,iuphar,428,Glycine Receptor (All subtypes),None,Subunit-specific,Inhibition,,,False,False
+cid:5994,5994,Progesterone,Steroid,iuphar,626,Mineralocorticoid receptor,Human,Antagonist,Antagonist,11.0,pIC50,True,False
+cid:5994,5994,Progesterone,Steroid,iuphar,627,Progesterone receptor,Human,Agonist,Agonist,8.8,pEC50,True,True
+cid:5994,5994,Progesterone,Steroid,iuphar,391,CatSper4,Human,Activator,Full agonist,8.1,pEC50,True,False
+cid:5994,5994,Progesterone,Steroid,iuphar,388,CatSper1,Human,Activator,Full agonist,8.0 - 8.1,pEC50,True,False
+cid:4927,4927,Promethazine,Phenothiazine,iuphar,262,H<sub>1</sub> receptor,Human,Antagonist,Antagonist,9.6,pKi,False,True
+cid:4980,4980,Psilocin,Substituted_tryptamines,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Agonist,7.6,pEC50,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,215,D<sub>2</sub> receptor,Human,Antagonist,Antagonist,7.2,pKi,False,True
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,926,NET,Human,Inhibitor,Inhibition,6.0,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Full agonist,7.0,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Antagonist,Antagonist,6.4 - 7.0,pKi,False,True
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,1,5-HT<sub>1A</sub> receptor,Human,Agonist,Full agonist,6.5 - 6.6,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,3,5-HT<sub>1D</sub> receptor,Human,Agonist,Full agonist,5.7,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,4,5-ht<sub>1e</sub> receptor,Human,Agonist,Full agonist,5.9,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,5,5-HT<sub>1F</sub> receptor,Human,Agonist,Full agonist,5.6,pKi,False,False
+cid:5002,5002,Quetiapine,Dibenzothiazepine,iuphar,262,H<sub>1</sub> receptor,Human,Antagonist,Antagonist,8.0 - 8.7,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,2,5-HT<sub>1B</sub> receptor,Human,Antagonist,Antagonist,6.6 - 7.3,pKi,False,True
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,3,5-HT<sub>1D</sub> receptor,Human,Antagonist,Antagonist,7.8 - 8.0,pKi,False,True
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Antagonist,Inverse agonist,9.3 - 10.0,pKi,False,True
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,215,D<sub>2</sub> receptor,Human,Antagonist,Antagonist,9.4,pKi,False,True
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,6,5-HT<sub>2A</sub> receptor,Rat,Antagonist,Antagonist,8.5,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,1,5-HT<sub>1A</sub> receptor,Human,Antagonist,Antagonist,6.4 - 6.5,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,1,5-HT<sub>1A</sub> receptor,Rat,Antagonist,Antagonist,6.2,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,4,5-ht<sub>1e</sub> receptor,Human,Antagonist,Antagonist,5.9,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,5,5-HT<sub>1F</sub> receptor,Human,Antagonist,Antagonist,5.9,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,8,5-HT<sub>2C</sub> receptor,Human,Antagonist,Inverse agonist,7.5 - 7.6,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Antagonist,Inverse agonist,6.0 - 6.4,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,11,5-HT<sub>6</sub> receptor,Human,Antagonist,Antagonist,5.6,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,12,5-HT<sub>7</sub> receptor,Human,Antagonist,Inverse agonist,8.3 - 8.7,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,12,5-HT<sub>7</sub> receptor,Rat,Antagonist,Inverse agonist,8.9 - 9.0,pKd,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,22,&alpha;<sub>1A</sub>-adrenoceptor,Human,Antagonist,Antagonist,8.4 - 8.7,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,23,&alpha;<sub>1B</sub>-adrenoceptor,Human,Antagonist,Antagonist,7.8 - 8.0,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,24,&alpha;<sub>1D</sub>-adrenoceptor,Human,Antagonist,Antagonist,7.4,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,262,H<sub>1</sub> receptor,Human,Antagonist,Antagonist,7.6 - 7.8,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,216,D<sub>3</sub> receptor,Human,Antagonist,Antagonist,7.0,pKi,False,False
+cid:5073,5073,Risperidone,Benzisoxazole,iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Antagonist,Antagonist,7.3,pKi,False,False
+cid:128563,128563,Salvinorin A,"Salvinorin, Terpenoid",iuphar,318,&kappa; receptor,Human,Agonist,Full agonist,7.8 - 8.7,pKi,False,False
+cid:5202,5202,Serotonin,,iuphar,378,5-HT<sub>3</sub>AB,Human,Agonist,Agonist,6.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,2,5-HT<sub>1B</sub> receptor,Mouse,Agonist,Full agonist,8.1,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,2,5-HT<sub>1B</sub> receptor,Human,Agonist,Full agonist,7.4 - 9.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,5,5-HT<sub>1F</sub> receptor,Human,Agonist,Full agonist,8.0,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,9,5-HT<sub>4</sub> receptor,Human,Agonist,Full agonist,8.4 - 8.8,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,9,5-HT<sub>4</sub> receptor,Rat,Agonist,Full agonist,7.7,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Agonist,Full agonist,7.9,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,214,D<sub>1</sub> receptor,Human,Agonist,Partial agonist,5.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,379,5-HT<sub>3</sub>A,Human,Agonist,Agonist,6.5 - 6.9,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,2,5-HT<sub>1B</sub> receptor,Human,Agonist,Full agonist,7.5 - 8.4,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,12,5-HT<sub>7</sub> receptor,Rat,Agonist,Full agonist,8.7 - 9.2,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,379,5-HT<sub>3</sub>A,Human,Agonist,Agonist,5.5 - 6.4,pEC50,True,False
+cid:5202,5202,Serotonin,,iuphar,378,5-HT<sub>3</sub>AB,Human,Agonist,Agonist,4.8 - 5.8,pEC50,True,False
+cid:5202,5202,Serotonin,,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Full agonist,8.9,pKd,True,False
+cid:5202,5202,Serotonin,,iuphar,1,5-HT<sub>1A</sub> receptor,Human,Agonist,Full agonist,9.1 - 9.7,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,3,5-HT<sub>1D</sub> receptor,Human,Agonist,Full agonist,8.0 - 9.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,4,5-ht<sub>1e</sub> receptor,Human,Agonist,Full agonist,8.0 - 8.2,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,5,5-HT<sub>1F</sub> receptor,Human,Agonist,Full agonist,7.7 - 8.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,5,5-HT<sub>1F</sub> receptor,Rat,Agonist,Full agonist,7.2,pIC50,True,False
+cid:5202,5202,Serotonin,,iuphar,6,5-HT<sub>2A</sub> receptor,Human,Agonist,Full agonist,6.0 - 8.4,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,7,5-HT<sub>2B</sub> receptor,Human,Agonist,Full agonist,7.9 - 8.4,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,7,5-HT<sub>2B</sub> receptor,Rat,Agonist,Full agonist,8.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,9,5-HT<sub>4</sub> receptor,Mouse,Agonist,Full agonist,7.2,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,10,5-HT<sub>5A</sub> receptor,Mouse,Agonist,Full agonist,6.0 - 6.6,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,10,5-HT<sub>5A</sub> receptor,Human,Agonist,Full agonist,6.7 - 6.9,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,10,5-HT<sub>5A</sub> receptor,Rat,Agonist,Full agonist,6.6,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,11,5-HT<sub>6</sub> receptor,Rat,Agonist,Full agonist,6.6 - 7.9,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,11,5-HT<sub>6</sub> receptor,Human,Agonist,Full agonist,6.8 - 7.5,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,12,5-HT<sub>7</sub> receptor,Mouse,Agonist,Full agonist,8.3,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,12,5-HT<sub>7</sub> receptor,Human,Agonist,Full agonist,8.1 - 9.6,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,9,5-HT<sub>4</sub> receptor,Human,Agonist,Full agonist,5.9 - 7.0,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,9,5-HT<sub>4</sub> receptor,Rat,Agonist,Full agonist,6.7 - 8.2,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,8,5-HT<sub>2C</sub> receptor,Human,Agonist,Full agonist,6.8 - 8.6,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,8,5-HT<sub>2C</sub> receptor,Rat,Agonist,Full agonist,6.7 - 7.9,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,218,D<sub>5</sub> receptor,Human,Agonist,Full agonist,5.5,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,6,5-HT<sub>2A</sub> receptor,Rat,Agonist,Full agonist,6.0 - 6.5,pKi,True,False
+cid:5202,5202,Serotonin,,iuphar,1161,Proton-coupled Amino acid Transporter 1,Human,Inhibitor,Inhibition,2.2,pKi,False,False
+cid:36511,36511,Substance P,,iuphar,360,NK<sub>1</sub> receptor,Human,Agonist,Full agonist,8.6,pKd,False,False
+cid:41693,41693,Sufentanil,Anilidopiperidine,iuphar,319,&mu; receptor,Rat,Agonist,Full agonist,9.1,pKi,False,False
+cid:41693,41693,Sufentanil,Anilidopiperidine,iuphar,319,&mu; receptor,Human,Agonist,Full agonist,9.9,pKi,False,True
+cid:9838022,9838022,Tapentadol,Phenylpropylamine,iuphar,319,&mu; receptor,Human,Agonist,Agonist,6.8,pKi,False,True
+cid:9838022,9838022,Tapentadol,Phenylpropylamine,iuphar,926,NET,Human,Inhibitor,Inhibition,5.1,pKi,False,True
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,109,<i>GPR55</i>,Human,Agonist,Agonist,8.1,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,89,<i>GPR18</i>,Human,Agonist,Full agonist,6.0,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,500,TRPM8,Human,Channel blocker,None,,,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,56,CB<sub>1</sub> receptor,Human,Agonist,Partial agonist,7.3 - 7.4,pKi,False,True
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,57,CB<sub>2</sub> receptor,Human,Agonist,Partial agonist,7.1 - 7.5,pKi,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,485,TRPA1,Human,Activator,Agonist,4.9,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,508,TRPV2,Rat,Activator,Activation,4.8,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,425,glycine receptor &alpha;3 subunit,Human,Allosteric modulator,Potentiation,5.3,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,423,glycine receptor &alpha;1 subunit,Human,Allosteric modulator,Potentiation,5.5,pEC50,False,False
+cid:16078,16078,Tetrahydrocannabinol,,iuphar,424,glycine receptor &alpha;2 subunit,Human,Allosteric modulator,Potentiation,6.0,pEC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Agonist,5.8,pKi,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Agonist,7.6,pIC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Agonist,5.8,pEC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Agonist,8.4,pEC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Agonist,7.8,pIC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Agonist,6.3,pEC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,26,&alpha;<sub>2B</sub>-adrenoceptor,Human,Agonist,Agonist,7.0,pEC50,False,False
+cid:5487,5487,Tizanidine,"Imidazoline, Arylaminoimidazoline",iuphar,25,&alpha;<sub>2A</sub>-adrenoceptor,Human,Agonist,Agonist,6.0,pKi,False,False
+cid:5572,5572,Trihexyphenidyl,,iuphar,13,M<sub>1</sub> receptor,Human,Antagonist,Antagonist,8.9,pKi,False,True
+cid:5732,5732,Zolpidem,Imidazopyridine,iuphar,406,GABA<sub>A</sub> receptor &alpha;3 subunit,Human,Allosteric modulator,Positive,5.7,pKi,False,False
+cid:5732,5732,Zolpidem,Imidazopyridine,iuphar,405,GABA<sub>A</sub> receptor &alpha;2 subunit,Human,Allosteric modulator,Positive,6.1,pKi,False,False
+cid:5732,5732,Zolpidem,Imidazopyridine,iuphar,404,GABA<sub>A</sub> receptor &alpha;1 subunit,Human,Allosteric modulator,Positive,7.4 - 7.7,pKi,False,True
+cid:64961,64961,Beta-Carboline,,iuphar,2829,"indoleamine 2,3-dioxygenase 1",Human,Inhibitor,Inhibition,0.9,pKi,False,False

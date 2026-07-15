@@ -23,13 +23,7 @@ import app.journal.util.currentTimeMillis
 import app.journal.ui.dashboard.ActivityHeatmap
 import app.journal.ui.dashboard.SessionsTrendChart
 import app.journal.ui.dashboard.TopSubstancesChart
-import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.Month
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import app.journal.ui.components.*
 
 @Composable
@@ -62,6 +56,21 @@ fun DashboardScreen() {
             if (sub != null) sub.name to dose.sessionId else null
         }
     }
+
+    // Substance names by date — for click action on heatmap cells
+    val substancesByDate = remember(doses, repo) {
+        val map = mutableMapOf<LocalDate, MutableSet<String>>()
+        val tz = TimeZone.currentSystemDefault()
+        for (dose in doses) {
+            val date = Instant.fromEpochMilliseconds(dose.timestamp)
+                .toLocalDateTime(tz).date
+            val name = repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId
+            map.getOrPut(date) { mutableSetOf() }.add(name)
+        }
+        map.mapValues { (_, names) -> names.sorted() }
+    }
+
+    var clickedDayInfo by remember { mutableStateOf<DaySubstanceInfo?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -115,7 +124,23 @@ fun DashboardScreen() {
                         }
                         ActivityHeatmap(
                             sessionDates = sessionDates,
-                            nowMillis = currentTimeMillis()
+                            nowMillis = currentTimeMillis(),
+                            onCellClick = { date, count ->
+                                val names = substancesByDate[date]
+                                clickedDayInfo = if (names != null) {
+                                    DaySubstanceInfo(
+                                        date = date,
+                                        count = names.size,
+                                        substances = names
+                                    )
+                                } else {
+                                    DaySubstanceInfo(
+                                        date = date,
+                                        count = 0,
+                                        substances = emptyList()
+                                    )
+                                }
+                            }
                         )
                     }
                 }
@@ -185,7 +210,52 @@ fun DashboardScreen() {
 
         item { Spacer(Modifier.height(8.dp)) }
     }
+
+    // Day details dialog
+    clickedDayInfo?.let { info ->
+        AlertDialog(
+            onDismissRequest = { clickedDayInfo = null },
+            title = {
+                Text(
+                    formatDateShort(info.date),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "${info.count} substance${if (info.count != 1) "s" else ""} taken",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (info.substances.isNotEmpty()) {
+                        Divider()
+                        info.substances.forEach { name ->
+                            Text(
+                                name,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { clickedDayInfo = null }) {
+                    Text("OK")
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
 }
+
+private data class DaySubstanceInfo(
+    val date: LocalDate,
+    val count: Int,
+    val substances: List<String>
+)
 
 @Composable
 private fun StatCard(
@@ -333,4 +403,17 @@ private fun formatDate(local: LocalDateTime): String {
         else -> "Unknown"
     }
     return "$dow, $month ${local.day}, ${local.year}"
+}
+
+private fun formatDateShort(date: LocalDate): String {
+    val monthAbbr = when (date.month) {
+        Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"
+        Month.MARCH -> "Mar"; Month.APRIL -> "Apr"
+        Month.MAY -> "May"; Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"; Month.AUGUST -> "Aug"
+        Month.SEPTEMBER -> "Sep"; Month.OCTOBER -> "Oct"
+        Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+        else -> "???"
+    }
+    return "${date.day} $monthAbbr ${date.year}"
 }

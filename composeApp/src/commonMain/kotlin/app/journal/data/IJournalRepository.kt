@@ -131,6 +131,12 @@ interface IJournalRepository : IngestRepository {
     fun dosesDataFrame(): List<DoseDataRow>
     fun substancesDataFrame(): List<SubstanceDataRow>
 
+    /**
+     * Returns a consistent snapshot of all sessions with their doses.
+     * Reads everything under the repo lock so the data is self-consistent.
+     */
+    fun exportSessionBundles(): List<Pair<Session, List<Dose>>>
+
     // ---- Bulk insert (batch ops) ----
     fun bulkInsert(
         sessions: List<Session> = emptyList(),

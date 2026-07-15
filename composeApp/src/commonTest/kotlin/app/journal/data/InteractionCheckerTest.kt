@@ -111,15 +111,19 @@ class InteractionCheckerTest {
     }
 
     @Test
-    fun indexCacheCachesAcrossCalls() {
+    fun indexCacheProducesCorrectResult() {
         val interactions = listOf(
             interaction("i:1", "cid:1", "cid:2", InteractionRisk.DANGEROUS)
         )
         // First call builds cache
-        InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
-        // Second call should use cached index
-        val result = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
-        assertEquals(1, result.dangerous.size)
+        val r1 = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
+        assertEquals(1, r1.dangerous.size)
+        // Second call uses cached index — same result
+        val r2 = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
+        assertEquals(1, r2.dangerous.size)
+        // Same interactions but different IDs still works (cache rebuilt)
+        val r3 = InteractionChecker.checkPairwise(listOf("cid:3", "cid:4"), interactions)
+        assertEquals(0, r3.dangerous.size)
     }
 
     @Test

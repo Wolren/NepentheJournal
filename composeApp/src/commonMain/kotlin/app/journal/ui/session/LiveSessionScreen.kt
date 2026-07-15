@@ -2,6 +2,7 @@ package app.journal.ui.session
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -75,6 +76,7 @@ fun LiveSessionScreen(
     var showCrisisDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showEndConfirm by remember { mutableStateOf(false) }
+    var deletingLiveEvent by remember { mutableStateOf<TimelineEvent?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
     var editTitle by remember { mutableStateOf(session.title.ifBlank { "Live Session" }) }
     var editTags by remember { mutableStateOf(session.tags.joinToString(", ")) }
@@ -156,6 +158,36 @@ fun LiveSessionScreen(
             }
         )
     }
+    if (deletingLiveEvent != null) {
+        AlertDialog(
+            onDismissRequest = { deletingLiveEvent = null },
+            title = { Text("Delete event?") },
+            text = { Text("Delete \"${deletingLiveEvent?.label}\"? This cannot be undone.") },
+            confirmButton = {
+                AppTextButton(onClick = {
+                    deletingLiveEvent?.let { repo.deleteTimelineEvent(it.id) }
+                    deletingLiveEvent = null
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                AppTextButton(onClick = { deletingLiveEvent = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Unified timeline: merge events + doses sorted by timestamp (newest first)
+    val mergedTimeline = remember(sessionEvents, sessionDoses, allSubstances) {
+        val eventItems = sessionEvents.map { LiveTimelineItem.Event(it) as LiveTimelineItem }
+        val doseItems = sessionDoses.map { d ->
+            LiveTimelineItem.Dosage(d, allSubstances.find { s -> s.id == d.substanceId }) as LiveTimelineItem
+        }
+        (eventItems + doseItems).sortedBy {
+            when (it) {
+                is LiveTimelineItem.Event -> it.event.timestamp
+                is LiveTimelineItem.Dosage -> it.dose.timestamp
+            }
+        }.reversed()
+    }
 
     ScreenScaffold(
         title = session.title.ifBlank { "Live Session" },
@@ -211,40 +243,68 @@ fun LiveSessionScreen(
 
         // Quick action buttons
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AppTonalButton(
-                    onClick = { showDoseDialog = true },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Log Dose")
+                    AppTonalButton(
+                        onClick = { showDoseDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Log Dose")
+                    }
+                    AppTonalButton(
+                        onClick = { showMoodDialog = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("How I Feel")
+                    }
                 }
-                AppTonalButton(
-                    onClick = { showMoodDialog = true },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
+                // Phase marker buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("How I Feel")
+                    Box(Modifier.weight(1f)) {
+                        PhaseChip("Onset", TimelineEventType.ONSET, session, repo)
+                    }
+                    Box(Modifier.weight(1f)) {
+                        PhaseChip("Comeup", TimelineEventType.COMEUP, session, repo)
+                    }
+                    Box(Modifier.weight(1f)) {
+                        PhaseChip("Peak", TimelineEventType.PEAK, session, repo)
+                    }
+                    Box(Modifier.weight(1f)) {
+                        PhaseChip("Offset", TimelineEventType.OFFSET, session, repo)
+                    }
                 }
             }
         }
 
-        // Timeline events
-        if (sessionEvents.isNotEmpty()) {
+        if (mergedTimeline.isNotEmpty()) {
             item {
                 Text("Timeline", style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
             }
-            items(sessionEvents.reversed(), key = { it.id }) { event ->
-                LiveEventCard(event, session.startTime)
+            items(mergedTimeline, key = {
+                when (it) {
+                    is LiveTimelineItem.Event -> "evt:${it.event.id}"
+                    is LiveTimelineItem.Dosage -> "dose:${it.dose.id}"
+                }
+            }) { item ->
+                when (item) {
+                    is LiveTimelineItem.Event -> LiveEventCard(item.event, session.startTime,
+                        repo = repo, onDelete = { deletingLiveEvent = it })
+                    is LiveTimelineItem.Dosage -> LiveDoseCard(item.dose, item.substance, session.startTime)
+                }
             }
         } else {
             item {
@@ -263,19 +323,6 @@ fun LiveSessionScreen(
                             style = MaterialTheme.typography.bodySmall)
                     }
                 }
-            }
-        }
-
-        // Doses summary
-        if (sessionDoses.isNotEmpty()) {
-            item {
-                Text("Doses", style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-            }
-            items(sessionDoses.reversed(), key = { it.id }) { dose ->
-                val sub = allSubstances.find { it.id == dose.substanceId }
-                LiveDoseCard(dose, sub, session.startTime)
             }
         }
 
@@ -422,72 +469,193 @@ private fun InteractionWarningsBanner(warnings: List<ClassBasedWarning>) {
     }
 }
 
+// ── Unified timeline item for merging events + doses ──
+private sealed class LiveTimelineItem {
+    data class Event(val event: TimelineEvent) : LiveTimelineItem()
+    data class Dosage(val dose: Dose, val substance: Substance?) : LiveTimelineItem()
+}
+
 @Composable
-private fun LiveEventCard(event: TimelineEvent, sessionStart: Long) {
+private fun LiveEventCard(
+    event: TimelineEvent,
+    sessionStart: Long,
+    repo: JournalRepository,
+    onDelete: ((TimelineEvent) -> Unit)? = null
+) {
+    var editing by remember { mutableStateOf(false) }
+    var editLabel by remember { mutableStateOf(event.label) }
+    var editBody by remember { mutableStateOf(event.body ?: "") }
+    var editIntensity by remember { mutableFloatStateOf(event.intensity ?: 5f) }
+    var editType by remember { mutableStateOf(event.eventType) }
+    var useIntensity by remember { mutableStateOf(event.intensity != null) }
+
     val elapsed = event.timestamp - sessionStart
     val mins = elapsed / 60000
     val secs = (elapsed % 60000) / 1000
     val timeStr = "+${mins}m${secs}s"
 
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
-            Surface(
-                modifier = Modifier.size(36.dp),
-                shape = CircleShape,
-                color = when (event.eventType) {
-                    TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> Color(0xFFD32F2F).copy(alpha = 0.15f)
-                    TimelineEventType.OBSERVATION, TimelineEventType.NOTE -> MaterialTheme.colorScheme.primaryContainer
-                    else -> MaterialTheme.colorScheme.secondaryContainer
-                }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    val icon = when (event.eventType) {
-                        TimelineEventType.ONSET -> Icons.Default.ArrowForward
-                        TimelineEventType.COMEUP -> Icons.Default.TrendingUp
-                        TimelineEventType.PEAK -> Icons.Default.Star
-                        TimelineEventType.OFFSET -> Icons.Default.TrendingDown
-                        TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
-                        TimelineEventType.END -> Icons.Default.Stop
-                        TimelineEventType.OBSERVATION -> Icons.Default.Visibility
-                        TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
-                        TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
-                        TimelineEventType.EMERGENCY -> Icons.Default.Error
-                        TimelineEventType.NOTE -> Icons.Default.Notes
-                        TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
+    if (editing) {
+        // --- INLINE EDIT MODE ---
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+            ),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Event type selector (compact chips row)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    val quickTypes = listOf(
+                        TimelineEventType.OBSERVATION to "Obs",
+                        TimelineEventType.NOTE to "Note",
+                        TimelineEventType.PEAK to "Peak",
+                        TimelineEventType.OFFSET to "Off",
+                        TimelineEventType.SIDE_EFFECT to "SE",
+                        TimelineEventType.EMERGENCY to "!"
+                    )
+                    quickTypes.forEach { (type, label) ->
+                        FilterChip(
+                            selected = editType == type,
+                            onClick = { editType = type },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(26.dp)
+                        )
                     }
-                    Icon(icon, null, modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // Label
+                OutlinedTextField(
+                    value = editLabel,
+                    onValueChange = { editLabel = it },
+                    label = { Text("Label") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Body
+                OutlinedTextField(
+                    value = editBody,
+                    onValueChange = { editBody = it },
+                    label = { Text("Notes") },
+                    minLines = 2, maxLines = 4,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Intensity checkbox + slider
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = useIntensity,
+                        onClick = { useIntensity = !useIntensity },
+                        label = { Text("Intensity", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.height(26.dp)
+                    )
+                    if (useIntensity) {
+                        Text("${editIntensity.toInt()}/10",
+                            style = MaterialTheme.typography.labelSmall)
+                        Slider(
+                            value = editIntensity,
+                            onValueChange = { editIntensity = it },
+                            valueRange = 1f..10f, steps = 8,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Save / Cancel buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextButton(onClick = { editing = false }) {
+                        Text("Cancel")
+                    }
+                    AppTextButton(onClick = {
+                        repo.upsertTimelineEvent(event.copy(
+                            eventType = editType,
+                            label = editLabel.ifBlank { event.label },
+                            body = editBody.ifBlank { null },
+                            intensity = if (useIntensity) editIntensity else null,
+                            updatedAt = currentTimeMillis()
+                        ))
+                        editing = false
+                    }) { Text("Save") }
                 }
             }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(event.label, style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium)
-                    Text(timeStr, style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    } else {
+        // --- VIEW MODE ---
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+        ) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                Surface(
+                    modifier = Modifier.size(36.dp),
+                    shape = CircleShape,
+                    color = when (event.eventType) {
+                        TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> Color(0xFFD32F2F).copy(alpha = 0.15f)
+                        TimelineEventType.OBSERVATION, TimelineEventType.NOTE -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        val icon = when (event.eventType) {
+                            TimelineEventType.ONSET -> Icons.Default.ArrowForward
+                            TimelineEventType.COMEUP -> Icons.Default.TrendingUp
+                            TimelineEventType.PEAK -> Icons.Default.Star
+                            TimelineEventType.OFFSET -> Icons.Default.TrendingDown
+                            TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
+                            TimelineEventType.END -> Icons.Default.Stop
+                            TimelineEventType.OBSERVATION -> Icons.Default.Visibility
+                            TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
+                            TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
+                            TimelineEventType.EMERGENCY -> Icons.Default.Error
+                            TimelineEventType.NOTE -> Icons.Default.Notes
+                            TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
+                        }
+                        Icon(icon, null, modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                if (!event.body.isNullOrBlank()) {
-                    Text(event.body, style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (event.intensity != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Intensity:", style = MaterialTheme.typography.labelSmall,
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(event.label, style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium)
+                        Text(timeStr, style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Surface(shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text("${event.intensity.toInt()}/10",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                    }
+                    if (!event.body.isNullOrBlank()) {
+                        Text(event.body, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (event.intensity != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Intensity:", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Surface(shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer) {
+                                Text("${event.intensity.toInt()}/10",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                            }
+                        }
+                    }
+                }
+                // Action icons
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (onDelete != null) {
+                        IconButton(onClick = { onDelete(event) }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, "Delete", modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -550,6 +718,7 @@ private fun QuickDoseDialog(
     var unit by remember { mutableStateOf("mg") }
     var route by remember { mutableStateOf("Oral") }
     var note by remember { mutableStateOf("") }
+    var doseMinutesAgo by remember { mutableStateOf("") }  // empty = now
 
     val roaOptions = listOf("Oral", "Sublingual", "Insufflated", "Inhaled",
         "Vaporized", "Intranasal", "Intramuscular", "Intravenous", "Rectal")
@@ -648,6 +817,22 @@ private fun QuickDoseDialog(
                 OutlinedTextField(value = note, onValueChange = { note = it },
                     label = { Text("Note (optional)") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth())
+
+                // Time offset for backdating
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = doseMinutesAgo,
+                        onValueChange = { doseMinutesAgo = it.filter { c -> c.isDigit() } },
+                        label = { Text("Min ago") },
+                        singleLine = true,
+                        modifier = Modifier.width(100.dp),
+                        placeholder = { Text("0") }
+                    )
+                    Text("min ago (0 = now)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         confirmButton = {
@@ -674,7 +859,7 @@ private fun QuickDoseDialog(
                             routeOfAdministration = route,
                             amount = amount.toDoubleOrNull() ?: 0.0,
                             unit = unit,
-                            timestamp = now,
+                            timestamp = now - (doseMinutesAgo.toLongOrNull() ?: 0L) * 60000L,
                             createdAt = now, updatedAt = now,
                             deviceOrigin = "desktop",
                         )
@@ -712,6 +897,7 @@ private fun QuickDoseDialog(
 private fun QuickMoodDialog(
     session: Session,
     repo: JournalRepository,
+    substances: List<Substance> = emptyList(),
     onDismiss: () -> Unit,
 ) {
     val now = currentTimeMillis()
@@ -721,6 +907,12 @@ private fun QuickMoodDialog(
 
     val moodOptions = listOf("Calm", "Euphoric", "Anxious", "Focused",
         "Tired", "Awestruck", "Introspective", "Happy", "Overwhelmed", "Peaceful")
+    val effectOptions = listOf(
+        "Euphoria" to "😊", "Stimulation" to "⚡", "Sedation" to "😌",
+        "Introspection" to "🧠", "Anxiety" to "😰", "Nausea" to "🤢",
+        "Body high" to "🔥", "Clarity" to "💡"
+    )
+    val activeEffects = remember { mutableStateListOf<String>() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -766,6 +958,28 @@ private fun QuickMoodDialog(
                     steps = 8,
                 )
 
+                // Effect toggles
+                Text("Effects present", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    effectOptions.forEach { (name, emoji) ->
+                        FilterChip(
+                            selected = name in activeEffects,
+                            onClick = {
+                                if (name in activeEffects) activeEffects.remove(name)
+                                else activeEffects.add(name)
+                            },
+                            label = {
+                                Text("$emoji $name", style = MaterialTheme.typography.labelSmall)
+                            },
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                }
+
                 // Note
                 OutlinedTextField(value = note, onValueChange = { note = it },
                     label = { Text("Notes (optional)") },
@@ -777,13 +991,18 @@ private fun QuickMoodDialog(
             AppTextButton(
                 onClick = {
                     val label = if (mood.isNotBlank()) mood else "Check-in"
+                    val effectsBody = if (activeEffects.isNotEmpty()) {
+                        "Effects: ${activeEffects.joinToString(", ")}"
+                    } else null
+                    val combinedNote = listOfNotNull(note.ifBlank { null }, effectsBody)
+                        .joinToString("\n")
                     repo.upsertTimelineEvent(TimelineEvent(
                         id = "event:mood:${now}_${session.id}",
                         sessionId = session.id,
                         timestamp = now,
                         eventType = TimelineEventType.OBSERVATION,
                         label = label,
-                        body = note.ifBlank { null },
+                        body = note.ifBlank { effectsBody } ?: null,
                         intensity = intensity,
                         createdAt = now, updatedAt = now,
                         deviceOrigin = "desktop",
@@ -906,6 +1125,47 @@ private fun CrisisResourceCard(label: String, contact: String, detail: String) {
                 fontWeight = FontWeight.Medium)
             Text(detail, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun PhaseChip(label: String, eventType: TimelineEventType, session: Session, repo: JournalRepository) {
+    val phaseColor = when (eventType) {
+        TimelineEventType.ONSET -> Color(0xFF80CBC4)
+        TimelineEventType.COMEUP -> Color(0xFFA5D6A7)
+        TimelineEventType.PEAK -> Color(0xFFFFAB91)
+        TimelineEventType.OFFSET -> Color(0xFFFFF59D)
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val chipColor = phaseColor.copy(alpha = 0.15f)
+    val textColor = phaseColor.copy(alpha = 0.9f)
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = chipColor,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().clickable {
+                val now = currentTimeMillis()
+                repo.upsertTimelineEvent(TimelineEvent(
+                    id = "event:phase:${now}_${session.id}",
+                    sessionId = session.id,
+                    timestamp = now,
+                    eventType = eventType,
+                    label = label,
+                    createdAt = now, updatedAt = now,
+                    deviceOrigin = "desktop",
+                ))
+            },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                color = textColor,
+                modifier = Modifier.padding(vertical = 6.dp))
         }
     }
 }

@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.data.AppJson
 import app.journal.log.Log
 import app.journal.model.*
 import kotlinx.serialization.json.Json
@@ -13,7 +14,7 @@ import kotlinx.serialization.json.Json
  * (or compromised) peers.
  */
 
-private val json = Json { ignoreUnknownKeys = true }
+private val json = AppJson.json
 
 private const val MAX_ITEMS_DEFAULT = 500
 private const val MAX_SUBSTANCES = 100

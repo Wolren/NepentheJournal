@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.data.AppJson
 import app.journal.log.Log
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -54,7 +55,9 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     )
 
     private val file: File get() = File(dataDir, "trusted-devices.json")
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val tmpFile: File get() = File(dataDir, "trusted-devices.json.tmp")
+    private val json get() = AppJson.json
+    override fun toString(): String = json.encodeToString(this)
 
     /** In-memory cache of the DECRYPTED store — loaded once, invalidated on writes. */
     @Volatile
@@ -127,6 +130,13 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
      */
     private fun loadStore(): TrustStore {
         cachedStore?.let { return it }
+
+        // Clean up orphaned temp file from prior crash
+        if (tmpFile.exists()) {
+            Log.withTag("DeviceTrustStore").w { "Cleaning orphaned temp file from prior save" }
+            tmpFile.delete()
+        }
+
         if (!file.exists()) {
             val salt = generateSalt()
             currentSalt = salt
@@ -170,13 +180,17 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     }
 
     private fun saveStore(store: TrustStore) {
-        // Cache the DECRYPTED store so subsequent reads don't re-decrypt
         cachedStore = store
         currentSalt = store.salt.ifBlank { generateSalt() }
         file.parentFile.mkdirs()
-        // Encrypt and write
         val encrypted = encryptStore(store.copy(salt = currentSalt!!))
-        file.writeText(json.encodeToString(encrypted))
+        // Atomic write: write to .tmp, then rename
+        val text = json.encodeToString(encrypted)
+        tmpFile.writeText(text)
+        if (!tmpFile.renameTo(file)) {
+            // renameTo can fail on Windows if target exists and is locked
+            file.writeText(text)
+        }
     }
 
     /** Encrypt every peer's sharedSecret using the store's salt. */

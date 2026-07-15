@@ -4,6 +4,7 @@ import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.util.platformTestDataEnabled
 import app.journal.util.readBundledResource
 import kotlinx.coroutines.*
 
@@ -29,10 +30,7 @@ object DataInitializer {
     private const val SEED_RESOURCE = "/psychonautwiki_seed.json"
 
     fun isTestDataEnabled(): Boolean {
-        return try {
-            java.lang.Boolean.getBoolean("nepenthe.test-data") ||
-            System.getenv("NEPENTHE_TEST_DATA") == "1"
-        } catch (_: Exception) { false }
+        return platformTestDataEnabled()
     }
 
     /**
@@ -168,6 +166,37 @@ object DataInitializer {
         } catch (e: Exception) {
             Log.withTag("DataInit").e { "Failed to load seed resource: ${e.message}" }
             false
+        }
+    }
+
+    /**
+     * Reload the default substance database from the bundled seed, discarding
+     * any user modifications to preloaded substances and restoring factory
+     * substance data. User-created substances (deviceOrigin != "system")
+     * are preserved. Sessions, doses, notes, and timeline events are untouched.
+     *
+     * Call this when the user wants to reset the substance library to defaults.
+     */
+    fun reloadDefaultSubstances(repo: JournalRepository) {
+        try {
+            val text = readBundledResource(SEED_RESOURCE) ?: return
+            val snapshot = JournalJson.json.decodeFromString<JournalSnapshot>(text)
+            val normalized = snapshot.copy(
+                substances = snapshot.substances.map { sub ->
+                    sub.copy(substanceClass = SubstanceClassNormalizer.normalize(sub.substanceClass))
+                }
+            )
+
+            // Only touch substances — preserve sessions, doses, settings, etc.
+            // Seed substances (deviceOrigin == "system") get overwritten by ID.
+            // User-created substances are also overwritten if they share an ID;
+            // substances with IDs not in the seed survive untouched.
+            repo.applyBatch(substances = normalized.substances)
+
+            JournalStore(repo).save()
+            Log.withTag("DataInit").i { "Reloaded ${normalized.substances.size} substances from bundled seed" }
+        } catch (e: Exception) {
+            Log.withTag("DataInit").e(e) { "Failed to reload default substances" }
         }
     }
 

@@ -22,4 +22,11 @@ expect object ObsidianVaultOps {
 
     /** Ensure [dirPath] exists (create if needed). Returns true if ready. */
     fun ensureDir(dirPath: String): Boolean
+
+    /**
+     * Normalize a file path, resolving relative segments ("..", ".").
+     * On JVM this uses [java.io.File.normalize]; on other platforms it
+     * provides equivalent string-based normalization.
+     */
+    fun normalizePath(path: String): String
 }

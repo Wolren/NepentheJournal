@@ -9,7 +9,6 @@ class DataMigrationTest {
     fun oldPwikiDoseReferencesAreMigrated() {
         val repo = JournalRepository()
 
-        // Substance with old pwiki ID and new cid ID
         repo.upsertSubstance(Substance(
             id = "cid:5761", oldId = "pwiki:lsd", name = "LSD",
             createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
@@ -17,17 +16,14 @@ class DataMigrationTest {
             cachedAt = 0L, sourceVersion = "test"
         ))
 
-        // Dose referencing the OLD pwiki ID
         repo.upsertDose(Dose(
             id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:1", substanceId = "pwiki:lsd",
-            routeOfAdministration = "Oral", amount = 100.0, unit = "µg", timestamp = 1000L
+            routeOfAdministration = "Oral", amount = 100.0, unit = "\u00B5g", timestamp = 1000L
         ))
 
-        // Run migration
         DataInitializer.migrateOldIds(repo)
 
-        // Dose should now reference the cid
         val dose = repo.doses.value.first()
         assertEquals("cid:5761", dose.substanceId)
     }
@@ -49,7 +45,6 @@ class DataMigrationTest {
             cachedAt = 0L, sourceVersion = "test"
         ))
 
-        // Interaction referencing old pwiki IDs
         repo.upsertInteraction(Interaction(
             id = "interaction:pwiki:lsd:pwiki:psilocybin",
             substanceAId = "pwiki:lsd", substanceBId = "pwiki:psilocybin",
@@ -62,10 +57,36 @@ class DataMigrationTest {
         DataInitializer.migrateOldIds(repo)
 
         val interaction = repo.interactions.value.first()
-        // IDs are alphabetically sorted after migration
         assertEquals("cid:1615", interaction.substanceAId)
         assertEquals("cid:5761", interaction.substanceBId)
-        // ID preserved as-is (just a unique key, the fields hold the canonical relationship)
+    }
+
+    @Test
+    fun migrationDoesNotTouchEffectsOrNotes() {
+        val repo = JournalRepository()
+
+        repo.upsertSubstance(Substance(
+            id = "cid:5761", oldId = "pwiki:lsd", name = "LSD",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
+            substanceClass = listOf("Classical Psychedelic"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+
+        repo.upsertEffect(Effect(
+            id = "ef:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            name = "Euphoria", substanceIds = listOf("pwiki:lsd")
+        ))
+        repo.upsertNote(Note(
+            id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", body = "Test note"
+        ))
+
+        DataInitializer.migrateOldIds(repo)
+
+        val effect = repo.effects.value.first()
+        assertEquals("pwiki:lsd", effect.substanceIds.first(),
+            "effects should not be migrated (only doses and interactions)")
+        assertEquals(1, repo.notes.value.size)
     }
 
     @Test
@@ -81,13 +102,12 @@ class DataMigrationTest {
         repo.upsertDose(Dose(
             id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:1", substanceId = "pwiki:lsd",
-            routeOfAdministration = "Oral", amount = 100.0, unit = "µg", timestamp = 1000L
+            routeOfAdministration = "Oral", amount = 100.0, unit = "\u00B5g", timestamp = 1000L
         ))
 
         DataInitializer.migrateOldIds(repo)
         assertEquals("cid:5761", repo.doses.value.first().substanceId)
 
-        // Run again
         DataInitializer.migrateOldIds(repo)
         assertEquals("cid:5761", repo.doses.value.first().substanceId)
         assertEquals(1, repo.doses.value.size)
@@ -106,10 +126,21 @@ class DataMigrationTest {
         repo.upsertDose(Dose(
             id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:1", substanceId = "cid:5761",
-            routeOfAdministration = "Oral", amount = 100.0, unit = "µg", timestamp = 1000L
+            routeOfAdministration = "Oral", amount = 100.0, unit = "\u00B5g", timestamp = 1000L
         ))
 
-        // No oldId set — migration should be a no-op
+        DataInitializer.migrateOldIds(repo)
+        assertEquals("cid:5761", repo.doses.value.first().substanceId)
+    }
+
+    @Test
+    fun migrationSkipsEmptyIdMap() {
+        val repo = JournalRepository()
+        repo.upsertDose(Dose(
+            id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", substanceId = "cid:5761",
+            routeOfAdministration = "Oral", amount = 100.0, unit = "\u00B5g", timestamp = 1000L
+        ))
         DataInitializer.migrateOldIds(repo)
         assertEquals("cid:5761", repo.doses.value.first().substanceId)
     }

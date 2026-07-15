@@ -46,6 +46,46 @@ class ExportImportTest {
     }
 
     @Test
+    fun exportImportMultipleSessionsWithDoses() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(Substance(
+            id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+        repo.upsertSubstance(Substance(
+            id = "sub:2", name = "MDMA", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Empathogen"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertSession(sampleSession("s:2"))
+        repo.upsertDose(sampleDose("d:1", "s:1").copy(substanceId = "sub:1", amount = 100.0))
+        repo.upsertDose(sampleDose("d:2", "s:1").copy(substanceId = "sub:2", amount = 120.0))
+        repo.upsertDose(sampleDose("d:3", "s:2").copy(substanceId = "sub:1", amount = 50.0))
+
+        val json = ExportImport.exportSessions(repo)
+        val repo2 = JournalRepository()
+        repo2.upsertSubstance(Substance(
+            id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+        repo2.upsertSubstance(Substance(
+            id = "sub:2", name = "MDMA", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Empathogen"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+        val count = ExportImport.importSessions(repo2, json)
+
+        assertEquals(2, count)
+        assertEquals(2, repo2.sessions.value.size)
+        assertEquals(3, repo2.doses.value.size)
+        assertEquals(2, repo2.dosesForSession("s:1").size)
+        assertEquals(1, repo2.dosesForSession("s:2").size)
+    }
+
+    @Test
     fun exportEmptyReturnsValidJson() {
         val repo = JournalRepository()
         val json = ExportImport.exportSessions(repo)

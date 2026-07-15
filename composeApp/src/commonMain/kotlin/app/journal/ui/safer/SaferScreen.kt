@@ -157,8 +157,8 @@ fun SaferScreen() {
                         )
                     )
                     Spacer(Modifier.height(10.dp))
-                    ResourceLink("DoseWiki", "psychonautwiki.org", "Substance-specific dosage information and duration data from PsychonautWiki") {
-                        uriHandler.openUri("https://psychonautwiki.org/wiki/Category:Dosage")
+                    ResourceLink("DoseWiki", "dosewiki-admin.vercel.app", "In-app dosage and duration reference data") {
+                        uriHandler.openUri("https://dosewiki-admin.vercel.app/")
                     }
                     Spacer(Modifier.height(8.dp))
                     ResourceLink("PsychonautWiki", "psychonautwiki.org", "Comprehensive substance information, effects, and interaction database") {

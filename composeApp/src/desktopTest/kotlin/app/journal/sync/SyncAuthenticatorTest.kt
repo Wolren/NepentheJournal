@@ -67,7 +67,11 @@ class SyncAuthenticatorTest {
 
         val body = """{"test":"data","number":42}"""
         val authHeader = authenticator.signRequest(deviceId, body, secret)
-        assertTrue(authHeader.contains(":"))
+        val parts = authHeader.split(":")
+        assertEquals(3, parts.size, "auth header should be timestamp:nonce:signature")
+        assertTrue(parts[0].toLongOrNull() != null, "timestamp should be a number")
+        assertEquals(32, parts[1].length, "nonce should be 32 hex chars (16 bytes)")
+        assertEquals(64, parts[2].length, "signature should be 64 hex chars (SHA-256)")
         assertTrue(authenticator.verifyRequest(deviceId, body, authHeader))
     }
 
@@ -186,9 +190,8 @@ class SyncAuthenticatorTest {
     // ==================== Constants ====================
 
     @Test
-    fun constantsAreSane() {
-        assertTrue(SyncAuthenticator.MAX_SYNC_BODY_BYTES > 0)
-        assertTrue(SyncAuthenticator.AUTH_HEADER.isNotEmpty())
-        assertTrue(SyncAuthenticator.DEVICE_ID_HEADER.isNotEmpty())
+    fun maxSyncBodyBytesIsReasonable() {
+        assertTrue(SyncAuthenticator.MAX_SYNC_BODY_BYTES >= 1_000_000, "should allow at least 1MB payloads")
+        assertTrue(SyncAuthenticator.MAX_SYNC_BODY_BYTES <= 100_000_000, "should not exceed 100MB")
     }
 }

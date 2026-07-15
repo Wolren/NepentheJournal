@@ -298,21 +298,23 @@ fun ObsidianSettingsCard() {
                 }
 
                 // Status message
-                if (statusText != null) {
+                val statusMsg = statusText
+                if (statusMsg != null) {
                     Spacer(Modifier.height(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.padding(vertical = 2.dp)
                     ) {
                         Icon(
-                            if (statusIsError) Icons.Default.Error else Icons.Default.Info,
+                            imageVector = if (statusIsError) Icons.Default.Warning else Icons.Default.CheckCircle,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                             tint = if (statusIsError) MaterialTheme.colorScheme.error
                                 else MaterialTheme.colorScheme.primary
                         )
+                        Spacer(Modifier.width(4.dp))
                         Text(
-                            statusText!!,
+                            statusMsg,
                             style = MaterialTheme.typography.labelSmall,
                             color = if (statusIsError) MaterialTheme.colorScheme.error
                                 else MaterialTheme.colorScheme.primary

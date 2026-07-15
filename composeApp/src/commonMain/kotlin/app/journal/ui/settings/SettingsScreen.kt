@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
+import app.journal.data.DataInitializer
 import app.journal.log.Log
 import app.journal.log.collectLogs
 import app.journal.model.SyncConfig
@@ -47,7 +48,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(syncEngine: SyncEngine) {
     val repo = remember { JournalRepository.instance }
     val sessionCount by repo.totalSessionCount.collectAsState(initial = 0)
     val substanceCount by repo.totalSubstanceCount.collectAsState(initial = 0)
@@ -86,7 +87,6 @@ fun SettingsScreen() {
         ))
     }
 
-    val syncEngine = remember { createSyncEngine(repo) }
     val status by syncEngine.observeStatus().collectAsState(initial = SyncStatusSnapshot(
         isHosting = false, hostAddress = null,
         activeConnections = emptyList(), lastSyncAt = null,
@@ -161,7 +161,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { themeExpanded = !themeExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -458,7 +458,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { dataExpanded = !dataExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -530,10 +530,11 @@ fun SettingsScreen() {
                                 Text("Import", maxLines = 1)
                             }
                         }
-                        if (dataStatus != null) {
+                        val statusMsg = dataStatus
+                        if (statusMsg != null) {
                             Spacer(Modifier.height(4.dp))
-                            Text(dataStatus!!, style = MaterialTheme.typography.labelSmall,
-                                color = if (dataStatus!!.startsWith("Import") || dataStatus!!.startsWith("Export"))
+                            Text(statusMsg, style = MaterialTheme.typography.labelSmall,
+                                color = if (statusMsg.startsWith("Import") || statusMsg.startsWith("Export"))
                                     MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.error)
                         }
@@ -639,7 +640,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -711,7 +712,7 @@ fun SettingsScreen() {
                                                     val cfg = SyncConfig(
                                                         id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
                                                         deviceId = "desktop-main", displayName = "Windows Desktop",
-                                                        listenerPort = manualPort.toIntOrNull() ?: 4984, continuousSync = continuousSync, enableDeltaSync = true
+                                                        listenerPort = manualPort.toIntOrNull() ?: 4985, continuousSync = continuousSync, enableDeltaSync = true
                                                     )
                                                     syncEngine.startHosting(cfg).fold(
                                                         onSuccess = { logLines = listOf("Hosting on port ${it.port}") + logLines },
@@ -741,7 +742,8 @@ fun SettingsScreen() {
                         }
 
                         // ---- Pairing token ----
-                        if (status.isHosting && status.pairingToken != null) {
+                        val pairingToken = status.pairingToken
+                        if (status.isHosting && pairingToken != null) {
                             Spacer(Modifier.height(12.dp))
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -755,14 +757,14 @@ fun SettingsScreen() {
                                     Column {
                                         Text("Pairing Token", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                         Spacer(Modifier.height(4.dp))
-                                        Text(status.pairingToken!!, style = MaterialTheme.typography.headlineMedium,
+                                        Text(pairingToken, style = MaterialTheme.typography.headlineMedium,
                                             fontWeight = FontWeight.Bold, letterSpacing = 8.sp,
                                             fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onPrimaryContainer)
                                         Text("Enter this on the device you want to pair",
                                             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
                                     }
                                     AppIconButton(onClick = {
-                                        clipboard.setText(AnnotatedString(status.pairingToken!!))
+                                        clipboard.setText(AnnotatedString(pairingToken))
                                         logLines = listOf("Token copied to clipboard") + logLines
                                     }, icon = Icons.Default.ContentCopy, contentDescription = "Copy token",
                                         tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -904,7 +906,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { libraryExpanded = !libraryExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -924,10 +926,10 @@ fun SettingsScreen() {
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
-                        Text("PsychonautWiki substance dataset (effects + interactions). Runs once; you only add your own on top.",
+                        Text("Reloads the default PsychonautWiki substance database from the bundled seed resource, overwriting any changes made to built-in substances. User-created substances and all journal entries (sessions, doses, notes) are preserved.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
-                        Text("Substance database loaded from bundled seed resource. Run scripts/smw_dump.py to refresh.",
+                        Text("Substance data sourced from PsychonautWiki + PubChem + TripSit + Wikidata. Run scripts/matrix_build.py to refresh the seed.",
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(8.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -935,14 +937,12 @@ fun SettingsScreen() {
                                 onClick = {
                                     scope.launch {
                                         isFetching = true
-                                        fetchStatus = "Reimporting from seed..."
+                                        fetchStatus = "Reloading seed data..."
                                         try {
-                                            val store = JournalStore(repo)
-                                            repo.clearAll()
-                                            store.load()
-                                            fetchStatus = "Reloaded from disk / seed"
+                                            DataInitializer.reloadDefaultSubstances(repo)
+                                            fetchStatus = "Reloaded ${repo.substances.value.size} substances from seed"
                                         } catch (e: Exception) {
-                                            fetchStatus = "Reimport failed: ${e.message}"
+                                            fetchStatus = "Reload failed: ${e.message}"
                                         }
                                         isFetching = false
                                     }
@@ -950,16 +950,17 @@ fun SettingsScreen() {
                                 enabled = !isFetching,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Reimport seed data")
+                                Text("Reset to defaults")
                             }
                         }
-                        if (fetchStatus != null) {
+                        val fetchMsg = fetchStatus
+                        if (fetchMsg != null) {
                             Spacer(Modifier.height(4.dp))
-                            Text(fetchStatus!!, style = MaterialTheme.typography.labelSmall,
-                                color = if (fetchStatus!!.startsWith("Loaded")) MaterialTheme.colorScheme.primary
-                                else if (fetchStatus!!.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
+                            Text(fetchMsg, style = MaterialTheme.typography.labelSmall,
+                                color = if (fetchMsg.startsWith("Loaded")) MaterialTheme.colorScheme.primary
+                                else if (fetchMsg.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
                                 else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -972,7 +973,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { aboutExpanded = !aboutExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1066,7 +1067,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { legalExpanded = !legalExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1138,7 +1139,7 @@ fun SettingsScreen() {
             Card(modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = 260f))) {
+                Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { privacyExpanded = !privacyExpanded },
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1270,11 +1271,12 @@ fun SettingsScreen() {
                         Spacer(Modifier.width(4.dp))
                         Text("Export crash logs")
                     }
-                    if (crashLogStatus != null) {
+                    val crashMsg = crashLogStatus
+                    if (crashMsg != null) {
                         Spacer(Modifier.height(4.dp))
-                        Text(crashLogStatus!!,
+                        Text(crashMsg,
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (crashLogStatus!!.startsWith("Export") || crashLogStatus!!.startsWith("Logs"))
+                            color = if (crashMsg.startsWith("Export") || crashMsg.startsWith("Logs"))
                                 MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.error)
                     }

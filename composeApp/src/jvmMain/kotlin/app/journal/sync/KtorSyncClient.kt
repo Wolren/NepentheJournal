@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.data.AppJson
 import app.journal.data.JournalRepository
 import app.journal.model.*
 import io.ktor.client.*
@@ -20,13 +21,17 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * TLS-enabled sync client with HMAC request signing and certificate pinning.
+ * LAN sync client with HMAC-SHA256 request signing over plain HTTP.
+ *
+ * NOTE: This client communicates over plain HTTP + HMAC auth, not TLS.
+ * The `tlsIdentity` parameter is accepted for API compatibility but is NOT used
+ * for transport encryption — all requests go to http:// URLs.
  *
  * Modes:
- *   - PAIRING mode (trustedFingerprint = null): uses TOFU SSL (accepts any cert)
- *   - AUTHENTICATED mode (trustedFingerprint != null): pins to the paired cert
+ *   - PAIRING mode (sharedSecret = null): no auth, used to exchange pairing tokens
+ *   - AUTHENTICATED mode (sharedSecret != null): HMAC-SHA256 signs every request
  *
- * All sync requests include HMAC-SHA256 signatures.
+ * WebSocket continuous sync uses the same HMAC scheme for connection auth.
  */
 class KtorSyncClient(
     private val repo: JournalRepository,
@@ -37,7 +42,7 @@ class KtorSyncClient(
     private val sharedSecret: String? = null,
     trustedFingerprint: String? = null
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.json
     private val canSign: Boolean get() = sharedSecret != null
 
     // Plain HTTP client — no TLS. HMAC auth secures requests on LAN.
@@ -70,14 +75,14 @@ class KtorSyncClient(
         try {
             val response = client.post("http://$host:$port/pairing/verify") {
                 contentType(ContentType.Application.Json)
-                setBody(PairingVerifyRequestRaw(
+                setBody(PairingVerifyRequest(
                     token = token,
                     clientDeviceId = clientDeviceId,
                     clientDeviceName = clientDeviceName,
                     clientFingerprint = clientFingerprint
                 ))
             }
-            val result = response.body<PairingResultResponseRaw>()
+            val result = response.body<PairingResultResponse>()
             if (result.success) {
                 Result.success(DevicePairingResult(
                     deviceId = result.deviceId ?: "",
@@ -244,37 +249,10 @@ class KtorSyncClient(
 @kotlinx.serialization.Serializable
 private data class PairingStartResponseRaw(
     val token: String,
-    val hostFingerprint: String,
-    val hostDeviceId: String,
-    val hostDeviceName: String,
-    val hostAddress: String,
-    val listenerPort: Int,
-    val protocolVersion: Int = 2
-)
-
-@kotlinx.serialization.Serializable
-private data class PairingVerifyRequestRaw(
-    val token: String,
-    val clientDeviceId: String,
-    val clientDeviceName: String,
-    val clientFingerprint: String
-)
-
-@kotlinx.serialization.Serializable
-private data class PairingResultResponseRaw(
-    val success: Boolean,
-    val error: String? = null,
-    val deviceId: String? = null,
-    val sharedSecret: String? = null,
-    val hostDeviceId: String? = null,
-    val hostDeviceName: String? = null,
-    val hostFingerprint: String? = null
-)
-
-data class DevicePairingResult(
-    val deviceId: String,
-    val sharedSecret: String,
-    val hostDeviceId: String,
-    val hostDeviceName: String,
-    val hostFingerprint: String
+    val hostFingerprint: String?,
+    val hostDeviceId: String?,
+    val hostDeviceName: String?,
+    val hostAddress: String?,
+    val listenerPort: Int?,
+    val protocolVersion: Int?
 )

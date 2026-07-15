@@ -151,7 +151,7 @@ object FuzzSeed {
                     consumerName = consumer,
                     createdAt = sessionStart - dayMs,
                     updatedAt = sessionStart,
-                    deviceOrigin = if (rng.nextFloat() < 0.5f) "desktop" else "mobile"
+                    deviceOrigin = "fuzz"
                 )
                 sessions.add(session)
 

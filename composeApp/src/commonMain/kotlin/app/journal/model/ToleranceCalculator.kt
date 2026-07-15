@@ -34,6 +34,7 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
 
     private var cachedVersion: Int = -1
     private var cachedResult: List<ToleranceInfo> = emptyList()
+    private var hasCached: Boolean = false
 
     /**
      * Returns tolerance info for all substances that have been ingested.
@@ -43,7 +44,7 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
      */
     fun calculate(now: Long = currentTimeMillis()): List<ToleranceInfo> {
         val currentVersion = repo.toleranceVersion.value
-        if (currentVersion == cachedVersion && cachedResult.isNotEmpty()) {
+        if (currentVersion == cachedVersion && hasCached) {
             return cachedResult
         }
 
@@ -89,6 +90,7 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
 
         cachedVersion = currentVersion
         cachedResult = result
+        hasCached = true
         return result
     }
 

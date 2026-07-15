@@ -5,7 +5,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import app.journal.data.AppJson
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -22,7 +22,7 @@ import kotlinx.serialization.json.jsonPrimitive
 object OpenFdaClient {
 
     private const val BASE = "https://api.fda.gov/drug/label.json"
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.json
 
     /**
      * Simplified drug interaction info from an FDA label.

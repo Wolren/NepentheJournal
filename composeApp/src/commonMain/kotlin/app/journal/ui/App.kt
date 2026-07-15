@@ -16,6 +16,7 @@ package app.journal.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,8 @@ import androidx.compose.ui.unit.IntOffset
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.model.Session
+import app.journal.sync.SyncEngine
+import app.journal.sync.createSyncEngine
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 import app.journal.ui.dashboard.DashboardScreen
@@ -88,13 +91,13 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     var useRelativeTime by remember { mutableStateOf(true) }
     val sessionListViewModel = remember { SessionListViewModel.create() }
+    val syncEngine = remember { createSyncEngine(JournalRepository.instance) }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     val showArch by sessionListViewModel.showArchived.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
 
     CompositionLocalProvider(LocalThemeConfig provides themeConfig) {
-        CompositionLocalProvider(LocalRepo provides repo) {
         val isDark = themeManager.isDarkTheme()
         val colorScheme = themeManager.colorScheme(isDark)
 
@@ -145,12 +148,12 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                         System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE_FAST"
                     }
                     val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember {
-                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 10000f)
-                        else spring(dampingRatio = 0.8f, stiffness = 260f)
+                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
+                        else spring(dampingRatio = 1f, stiffness = 4000f)
                     }
                     val fadeSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = remember {
-                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 10000f)
-                        else spring(dampingRatio = 0.8f, stiffness = 260f)
+                        if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
+                        else spring(dampingRatio = 1f, stiffness = 4000f)
                     }
 
                     AnimatedContent(
@@ -166,16 +169,21 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                         },
                         transitionSpec = {
                             if (targetState == "main") {
-                                slideInVertically(animationSpec = slideSpec) { it / 4 } togetherWith
-                                slideOutVertically(animationSpec = slideSpec) { it / 4 }
+                                slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
+                                slideOutVertically(animationSpec = slideSpec) { it / 8 }
                             } else {
-                                slideInVertically(animationSpec = slideSpec) { it / 4 } togetherWith
+                                slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
                                 fadeOut(animationSpec = fadeSpec)
                             }
                         },
                         label = "navOverlay"
                     ) { state ->
-                        when (state) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                        ) {
+                            when (state) {
                             "live_session" -> {
                                 val session = stableLiveId?.let { id ->
                                     if (id == "__new__") null
@@ -328,16 +336,16 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                                 onNewSubstance = { editingSubstanceId = "__new__" }
                                             )
                                             Screen.SAFER -> SaferScreen()
-                                            Screen.SETTINGS -> SettingsScreen()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-}
+                                            Screen.SETTINGS -> SettingsScreen(syncEngine = syncEngine)
+                                        }  // closes when(selectedScreen)
+                                    }  // closes inner Box(padding)
+                                }  // closes Scaffold innerPadding
+                            }  // closes "main" block
+                            }  // closes when(state)
+                        }  // closes Box wrapper (background flash fix)
+                    }  // closes AnimatedContent transitionSpec
+                }  // closes outer Box(fillMaxSize)
+            }  // closes Surface
+        }  // closes MaterialTheme
+    }  // closes CompositionLocalProvider
+}  // closes App

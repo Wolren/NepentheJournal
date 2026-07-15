@@ -106,12 +106,23 @@ class JournalRepositoryTest {
     }
 
     @Test
-    fun deleteIsIdempotent() {
+    fun deleteIsIdempotentWithStateUnchanged() {
         val repo = JournalRepository()
-        repo.deleteSession("nonexistent") // should not throw
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        val sessionsBefore = repo.sessions.value.size
+        val dosesBefore = repo.doses.value.size
+        val substancesBefore = repo.substances.value.size
+
+        repo.deleteSession("nonexistent")
         repo.deleteDose("nonexistent")
         repo.deleteSubstance("nonexistent")
         repo.deleteCustomUnit("nonexistent")
+
+        assertEquals(sessionsBefore, repo.sessions.value.size)
+        assertEquals(dosesBefore, repo.doses.value.size)
+        assertEquals(substancesBefore, repo.substances.value.size)
     }
 
     // ==================== Index consistency ====================
@@ -448,7 +459,21 @@ class JournalRepositoryTest {
         repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
         val stats = repo.substanceDoseStats
         val (count, lastUsed) = stats["sub:1"]!!
-        assertEquals(2, count)  // each dose counted separately
+        assertEquals(1, count)  // distinct sessions, not total doses
+        assertEquals(2000L, lastUsed)
+    }
+
+    @Test
+    fun substanceDoseStatsDistinctSessionsAcrossMultipleSessions() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertSession(sampleSession("s:2"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:2", 2000L))
+        val stats = repo.substanceDoseStats
+        val (count, lastUsed) = stats["sub:1"]!!
+        assertEquals(2, count)  // two distinct sessions
         assertEquals(2000L, lastUsed)
     }
 

@@ -3,19 +3,9 @@ package app.journal.data
 import app.journal.log.Log
 import app.journal.model.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
+import kotlinx.serialization.json.*
 import java.io.File
 
-/**
- * Desktop JVM actual: stores journal data as a JSON file at
- * ~/.psychonautica/journal-data.json
- *
- * Uses atomic write pattern to prevent data loss on crash:
- * 1. Write to journal-data.json.tmp (temp file, same filesystem)
- * 2. Rename tmp -> target (atomic on the same filesystem)
- * 3. Keep journal-data.json.bak as the last successful save
- * 4. On load, clean up orphaned .tmp files from prior crashes
- */
 actual class JournalStore actual constructor(private val repo: JournalRepository) {
 
     actual fun dataPath(): String {
@@ -30,56 +20,40 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         val target = File(dataPath())
         val tmp = File(tempPath())
 
-        // Clean up orphaned temp file from a prior crash
         if (tmp.exists()) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             tmp.delete()
         }
 
         if (!target.exists()) return
+        if (target.length() > 50_000_000) {
+            Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
+            return
+        }
         try {
             val text = target.readText()
-            // Decode each entity list independently. A corrupt field in one list
-            // must not wipe the entire journal — recover what we can.
-            val snapshot = runCatching { JournalJson.json.decodeFromString<JournalSnapshot>(text) }
+            val snapshot = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }
                 .getOrElse { e ->
                     Log.withTag("JournalStore").w { "Journal data failed full parse, attempting per-list recovery: ${e.message}" }
                     recoverSnapshot(text)
                 }
-            JournalJson.apply(repo, snapshot)
+            AppJson.apply(repo, snapshot)
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
         }
     }
 
-    /**
-     * Best-effort recovery when the whole-file parse fails: decode each top-level
-     * list field on its own so a single malformed record only drops that record,
-     * not the entire category. Falls back to an empty list per field rather than
-     * losing everything.
-     */
     private fun recoverSnapshot(text: String): JournalSnapshot {
-        fun <T : Any> decodeList(path: String, serializer: KSerializer<T>): List<T> {
-            val marker = "\"$path\""
-            val start = text.indexOf(marker)
-            if (start < 0) return emptyList()
-            val arrStart = text.indexOf('[', start)
-            if (arrStart < 0) return emptyList()
-            val arrEnd = text.indexOf(']', arrStart)
-            if (arrEnd < 0) return emptyList()
-            val arrText = text.substring(arrStart, arrEnd + 1)
-            // Split flat array of objects on "},{" boundaries. Objects here are
-            // flat (no nested arrays), so this is safe.
-            val inner = arrText.removeSurrounding("[", "]").trim()
-            if (inner.isEmpty()) return emptyList()
-            val rawItems = inner.split("},{")
-            val items = rawItems.mapNotNull { chunk ->
-                val trimmed = chunk.trim().removePrefix("{").removeSuffix("}").trim()
-                if (trimmed.isEmpty()) return@mapNotNull null
-                val obj = "{$trimmed}"
-                runCatching { JournalJson.json.decodeFromString(serializer, obj) }.getOrNull()
-            }
-            return items
+        fun <T : Any> decodeList(key: String, serializer: KSerializer<T>): List<T> {
+            return try {
+                val root = Json.parseToJsonElement(text).jsonObject
+                val arr = root[key]?.jsonArray ?: return emptyList()
+                arr.mapNotNull { element ->
+                    runCatching {
+                        AppJson.json.decodeFromJsonElement(serializer, element)
+                    }.getOrNull()
+                }
+            } catch (_: Exception) { emptyList() }
         }
         val sessions = decodeList("sessions", Session.serializer())
         val substances = decodeList("substances", Substance.serializer())
@@ -113,31 +87,28 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         val backup = File(backupPath())
 
         try {
-            // Ensure directory exists
             target.parentFile.mkdirs()
 
-            // Build snapshot
-            val snapshot = JournalJson.snapshot(repo)
-            val text = JournalJson.json.encodeToString(snapshot)
+            val snapshot = AppJson.snapshot(repo)
+            val text = AppJson.json.encodeToString(snapshot)
 
-            // Atomic write: write to temp, then rename
+            if (text.length > 50_000_000) {
+                Log.withTag("JournalStore").e { "Serialized journal too large (${text.length} chars), refusing to save" }
+                return
+            }
+
             tmp.writeText(text)
             if (!tmp.exists()) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tmp.absolutePath}" }
                 return
             }
 
-            // Rotate backup: keep previous good save
             if (target.exists()) {
                 target.copyTo(backup, overwrite = true)
             }
 
-            // Atomic rename (same filesystem)
-            tmp.renameTo(target)
-            if (!target.exists()) {
-                // renameTo can fail on Windows if target exists and is locked
-                // Fall back to direct write
-                Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
+            if (!tmp.renameTo(target)) {
+                Log.withTag("JournalStore").w { "Atomic rename failed (target may be locked), falling back to direct write" }
                 target.writeText(text)
             }
         } catch (e: Exception) {

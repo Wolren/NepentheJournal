@@ -31,7 +31,6 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization)
                 implementation(libs.kotlinx.datetime)
-                implementation(libs.kotbase.couchbase.lite)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.client.content)
                 implementation(libs.ktor.serialization)
@@ -50,7 +49,7 @@ kotlin {
         }
         val androidMain = getByName("androidMain") {
             dependencies {
-                implementation(libs.androidx.activity)
+                implementation(libs.androidx.activity.compose)
                 implementation(libs.ktor.client.cio)
             }
         }
@@ -74,6 +73,10 @@ kotlin {
         iosMain {
             dependencies {
                 implementation(libs.ktor.client.darwin)
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.serialization)
+                implementation(libs.kermit.core)
             }
         }
 

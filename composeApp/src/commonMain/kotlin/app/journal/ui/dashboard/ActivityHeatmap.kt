@@ -2,6 +2,7 @@ package app.journal.ui.dashboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,7 @@ import kotlinx.datetime.*
 fun ActivityHeatmap(
     sessionDates: List<Long>,
     nowMillis: Long,
+    onCellClick: (LocalDate, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val cellSize = 13.dp
@@ -102,6 +104,11 @@ fun ActivityHeatmap(
                                             1.5.dp, Color.White.copy(alpha = 0.7f),
                                             RoundedCornerShape(2.dp)
                                         ) else Modifier
+                                    )
+                                    .then(
+                                        if (!isFuture) Modifier.clickable {
+                                            onCellClick(date, count)
+                                        } else Modifier
                                     )
 
                                 Box(mod)

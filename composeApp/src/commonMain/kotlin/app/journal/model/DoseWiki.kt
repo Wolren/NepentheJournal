@@ -2,6 +2,8 @@ package app.journal.model
 
 import kotlinx.serialization.Serializable
 
+import app.journal.data.AppJson
+
 /**
  * Slimmed DoseWiki substance data, deserialized directly from the bundled
  * dosewiki_slim.json. This is the PRIMARY source for subjective effect

@@ -54,8 +54,10 @@ import time
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
-
 import httpx
+
+# All cache files live under scripts/cache/ so the repo root stays clean.
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1111,7 +1113,7 @@ def bindingdb_collect(
 def main():
     parser = argparse.ArgumentParser(description="Build unified substance matrix")
     parser.add_argument("--input", "-i", default="", help="Input SMW seed JSON")
-    parser.add_argument("--output", "-o", default="unified_seed.json", help="Output path")
+    parser.add_argument("--output", "-o", default=os.path.join(CACHE_DIR, "unified_seed.json"), help="Output path")
     parser.add_argument("--refresh", "-r", action="store_true", help="Delete caches and re-download all data")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
@@ -1119,8 +1121,9 @@ def main():
     # Refresh: delete all cache files
     if args.refresh:
         for fname in ["pubchem_cid_cache.json", "wikidata_cache.json", "chembl_cache.json"]:
-            if os.path.exists(fname):
-                os.remove(fname)
+            p = os.path.join(CACHE_DIR, fname)
+            if os.path.exists(p):
+                os.remove(p)
                 if args.verbose:
                     print(f"[*] Deleted cache: {fname}", file=sys.stderr)
 
@@ -1164,7 +1167,7 @@ def main():
         print("[*] Resolving PubChem CIDs...", file=sys.stderr)
 
     # Try loading cached CID map
-    pubchem_cid_cache = "pubchem_cid_cache.json"
+    pubchem_cid_cache = os.path.join(CACHE_DIR, "pubchem_cid_cache.json")
     name_to_cid: dict[str, int | None] = {}
     cid_to_name: dict[int, str] = {}
     if os.path.exists(pubchem_cid_cache):
@@ -1307,7 +1310,7 @@ def main():
     wd_map: dict[int, dict[str, Any]] = {}
 
     # Try loading cached Wikidata results
-    wikidata_cache_file = "wikidata_cache.json"
+    wikidata_cache_file = os.path.join(CACHE_DIR, "wikidata_cache.json")
     if os.path.exists(wikidata_cache_file):
         try:
             with open(wikidata_cache_file) as f:
@@ -1335,7 +1338,7 @@ def main():
         print(f"[+] Wikidata: {len(wd_map)}/{len(cids_with_chembl)}", file=sys.stderr)
 
     # Fetch ChEMBL for those with ChEMBL IDs
-    chembl_cache_file = "chembl_cache.json"
+    chembl_cache_file = os.path.join(CACHE_DIR, "chembl_cache.json")
     chembl_cache: dict[str, dict[str, Any]] = {}
     if os.path.exists(chembl_cache_file):
         try:
@@ -1408,7 +1411,7 @@ def main():
     if args.verbose:
         print("[*] Fetching IUPHAR/BPS GtoPdb ligand interactions...", file=sys.stderr)
 
-    iuphar_cache_file = "iuphar_cache.json"
+    iuphar_cache_file = os.path.join(CACHE_DIR, "iuphar_cache.json")
     if args.refresh and os.path.exists(iuphar_cache_file):
         os.remove(iuphar_cache_file)
 
@@ -1479,7 +1482,7 @@ def main():
     if args.verbose:
         print("[*] Fetching PDSP Ki database ligand binding affinities...", file=sys.stderr)
 
-    pdsp_cache_file = "pdsp_cache.json"
+    pdsp_cache_file = os.path.join(CACHE_DIR, "pdsp_cache.json")
     if args.refresh and os.path.exists(pdsp_cache_file):
         os.remove(pdsp_cache_file)
 
@@ -1514,7 +1517,7 @@ def main():
     if args.verbose:
         print("[*] Fetching BindingDB affinity data...", file=sys.stderr)
 
-    bindingdb_cache_file = "bindingdb_cache.json"
+    bindingdb_cache_file = os.path.join(CACHE_DIR, "bindingdb_cache.json")
     if args.refresh and os.path.exists(bindingdb_cache_file):
         os.remove(bindingdb_cache_file)
 

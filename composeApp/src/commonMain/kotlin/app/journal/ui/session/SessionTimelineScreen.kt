@@ -58,6 +58,11 @@ private val phases = listOf(
     TimelineEventType.AFTERGLOW to "Afterglow"
 )
 
+private sealed class TimelineItem {
+    data class Event(val event: TimelineEvent) : TimelineItem()
+    data class PhaseHeader(val label: String) : TimelineItem()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionTimelineScreen(
@@ -68,6 +73,28 @@ fun SessionTimelineScreen(
     val session = remember(sessionId) { repo.getSession(sessionId) }
     val events = remember(sessionId) { repo.eventsForSession(sessionId) }
     val doses = remember(sessionId) { repo.dosesForSession(sessionId) }
+
+    // Pre-compute sorted events and phase-grouped items (outside LazyColumn scope)
+    val sortedEvents = remember(events) { events.sortedBy { it.timestamp } }
+    val sessionDuration = remember(session) { (session?.endTime ?: currentTimeMillis()) - (session?.startTime ?: 0L) }
+    val combinedItems = remember(sortedEvents, sessionDuration, session) {
+        val items = mutableListOf<TimelineItem>()
+        var currentPhase: String? = null
+        val startTime = session?.startTime ?: 0L
+        for (event in sortedEvents) {
+            val elapsedMs = event.timestamp - startTime
+            val phase = phaseLabel(elapsedMs, sessionDuration)
+            if (phase != null && phase != currentPhase) {
+                currentPhase = phase
+                items.add(TimelineItem.PhaseHeader(phase))
+            }
+            items.add(TimelineItem.Event(event))
+        }
+        items
+    }
+
+    var showAddEventDialog by remember { mutableStateOf(false) }
+    var deletingEvent by remember { mutableStateOf<TimelineEvent?>(null) }
 
     if (session == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -116,7 +143,7 @@ fun SessionTimelineScreen(
                     val tz = TimeZone.currentSystemDefault()
                     val local = Instant.fromEpochMilliseconds(session.startTime).toLocalDateTime(tz)
                     Text(
-                        "${local.year}-${(local.month.ordinal + 1).toString().padStart(2,'0')}-${local.day.toString().padStart(2,'0')}",
+                                                "${local.day.toString().padStart(2,'0')} ${local.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${local.year}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -190,15 +217,43 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Timeline events list
-        if (events.isNotEmpty()) {
+        // Timeline events list with phase headers
+        if (combinedItems.isNotEmpty()) {
             item {
-                Text("Timeline Events", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text("Timeline Events", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    FilledTonalIconButton(onClick = { showAddEventDialog = true }) {
+                        Icon(Icons.Default.Add, "Add event", tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
-            itemsIndexed(events, key = { _, e -> e.id }) { _, event ->
-                AnimatedListItem {
-                    EventCard(event, session.startTime)
+            items(combinedItems, key = {
+                when (it) {
+                    is TimelineItem.Event -> it.event.id
+                    is TimelineItem.PhaseHeader -> "phase_${it.label}"
+                }
+            }) { item ->
+                when (item) {
+                    is TimelineItem.Event -> EventCard(item.event, session.startTime, repo = repo,
+                        onDelete = { deletingEvent = it })
+                    is TimelineItem.PhaseHeader -> {
+                        Spacer(Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(item.label, style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                            }
+                        }
+                    }
                 }
             }
         } else {
@@ -219,17 +274,29 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Substances / Doses
+        // Intensity curve
+        item {
+            IntensityCurveOverlay(
+                events = sortedEvents,
+                startTime = session.startTime
+            )
+        }
+
+        // Substances / Dosage Table
         if (doses.isNotEmpty()) {
             item {
                 Text("Substances", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
             }
-            itemsIndexed(doses, key = { _, d -> d.id }) { _, dose ->
-                AnimatedListItem {
-                    val substance = repo.getSubstance(dose.substanceId)
-                    DoseTimelineCard(dose, substance)
-                }
+            item {
+                DosageSummaryTable(doses = doses, repo = repo, sessionStart = session.startTime)
+            }
+        }
+
+        // Check-in effect tags
+        if (session.checkins.any { it.effectScores.isNotEmpty() }) {
+            item {
+                EffectTagCloud(session = session, repo = repo)
             }
         }
 
@@ -243,6 +310,30 @@ fun SessionTimelineScreen(
                 }
             }
         }
+    }
+
+    if (showAddEventDialog) {
+        AddEventDialog(
+            session = session,
+            repo = repo,
+            onDismiss = { showAddEventDialog = false }
+        )
+    }
+    if (deletingEvent != null) {
+        AlertDialog(
+            onDismissRequest = { deletingEvent = null },
+            title = { Text("Delete event?") },
+            text = { Text("Delete \"${deletingEvent?.label}\"? This cannot be undone.") },
+            confirmButton = {
+                AppTextButton(onClick = {
+                    deletingEvent?.let { repo.deleteTimelineEvent(it.id) }
+                    deletingEvent = null
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                AppTextButton(onClick = { deletingEvent = null }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -474,7 +565,19 @@ private data class TimelineRowData(
 )
 
 @Composable
-private fun EventCard(event: TimelineEvent, sessionStart: Long) {
+private fun EventCard(
+    event: TimelineEvent,
+    sessionStart: Long,
+    repo: JournalRepository,
+    onDelete: ((TimelineEvent) -> Unit)? = null
+) {
+    var editing by remember { mutableStateOf(false) }
+    var editLabel by remember { mutableStateOf(event.label) }
+    var editBody by remember { mutableStateOf(event.body ?: "") }
+    var editIntensity by remember { mutableFloatStateOf(event.intensity ?: 5f) }
+    var editType by remember { mutableStateOf(event.eventType) }
+    var useIntensity by remember { mutableStateOf(event.intensity != null) }
+
     val elapsed = event.timestamp - sessionStart
     val mins = elapsed / 60000
 
@@ -500,33 +603,110 @@ private fun EventCard(event: TimelineEvent, sessionStart: Long) {
         else -> phaseColors[event.eventType] ?: MaterialTheme.colorScheme.primary
     }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(Modifier.fillMaxWidth()) {
-            Surface(modifier = Modifier.fillMaxHeight().width(4.dp), color = accent) {}
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
-                Column(Modifier.weight(1f)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(event.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                        Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent)
+    if (editing) {
+        // --- INLINE EDIT MODE ---
+        Card(
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Event type chips
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    val quickTypes = listOf(
+                        TimelineEventType.OBSERVATION to "Obs",
+                        TimelineEventType.NOTE to "Note",
+                        TimelineEventType.ONSET to "On",
+                        TimelineEventType.COMEUP to "Up",
+                        TimelineEventType.PEAK to "Peak",
+                        TimelineEventType.OFFSET to "Off",
+                        TimelineEventType.AFTERGLOW to "Glow",
+                        TimelineEventType.SIDE_EFFECT to "SE",
+                        TimelineEventType.EMERGENCY to "!"
+                    )
+                    quickTypes.forEach { (type, lbl) ->
+                        FilterChip(
+                            selected = editType == type,
+                            onClick = { editType = type },
+                            label = { Text(lbl, style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.height(26.dp)
+                        )
                     }
-                    if (!event.body.isNullOrBlank()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(event.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedTextField(value = editLabel, onValueChange = { editLabel = it },
+                    label = { Text("Label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = editBody, onValueChange = { editBody = it },
+                    label = { Text("Notes") }, minLines = 2, maxLines = 4,
+                    modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = useIntensity, onClick = { useIntensity = !useIntensity },
+                        label = { Text("Intensity", style = MaterialTheme.typography.labelSmall) },
+                        modifier = Modifier.height(26.dp))
+                    if (useIntensity) {
+                        Text("${editIntensity.toInt()}/10", style = MaterialTheme.typography.labelSmall)
+                        Slider(value = editIntensity, onValueChange = { editIntensity = it },
+                            valueRange = 1f..10f, steps = 8, modifier = Modifier.weight(1f))
                     }
-                    if (event.intensity != null) {
-                        Spacer(Modifier.height(2.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Intensity:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                                Text("${event.intensity}/10", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextButton(onClick = { editing = false }) { Text("Cancel") }
+                    AppTextButton(onClick = {
+                        repo.upsertTimelineEvent(event.copy(
+                            eventType = editType,
+                            label = editLabel.ifBlank { event.label },
+                            body = editBody.ifBlank { null },
+                            intensity = if (useIntensity) editIntensity else null,
+                            updatedAt = currentTimeMillis()
+                        ))
+                        editing = false
+                    }) { Text("Save") }
+                }
+            }
+        }
+    } else {
+        // --- VIEW MODE ---
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(Modifier.fillMaxWidth()) {
+                Surface(modifier = Modifier.fillMaxHeight().width(4.dp), color = accent) {}
+                Row(Modifier.padding(12.dp).weight(1f), verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(event.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent)
+                        }
+                        if (!event.body.isNullOrBlank()) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(event.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (event.intensity != null) {
+                            Spacer(Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Intensity:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                                    Text("${event.intensity}/10", style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+                                }
+                            }
+                        }
+                    }
+                    // Action buttons
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (onDelete != null) {
+                            IconButton(onClick = { onDelete(event) }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
@@ -541,4 +721,323 @@ private fun formatDuration(millis: Long): String {
     val hours = totalSec / 3600
     val mins = (totalSec % 3600) / 60
     return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+}
+
+@Composable
+private fun DosageSummaryTable(doses: List<Dose>, repo: JournalRepository, sessionStart: Long) {
+    val isDark = ThemeManager.instance.isDarkTheme()
+    val grouped = doses.groupBy { it.substanceId }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            grouped.entries.forEachIndexed { idx, (substanceId, substanceDoses) ->
+                val substance = repo.getSubstance(substanceId)
+                val color = AdaptiveColors.colorFor(substance?.name ?: substanceId).getComposeColor(isDark)
+                if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(4.dp, 40.dp),
+                        shape = RoundedCornerShape(2.dp),
+                        color = color
+                    ) {}
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(substance?.name ?: substanceId,
+                            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        substanceDoses.forEach { dose ->
+                            val offsetMin = ((dose.timestamp - sessionStart) / 60000).toInt()
+                            Text(
+                                "${dose.amount} ${dose.unit} ${dose.routeOfAdministration} @ +${offsetMin}m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EffectTagCloud(session: Session, repo: JournalRepository) {
+    val allScores = session.checkins
+        .flatMap { c -> c.effectScores.entries.map { it.key to it.value } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, scores) -> scores.average().toFloat() }
+        .entries
+        .sortedByDescending { it.value }
+    if (allScores.isEmpty()) return
+
+    val isDark = ThemeManager.instance.isDarkTheme()
+    Column {
+        Spacer(Modifier.height(8.dp))
+        Text("Effects Experienced", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            allScores.forEach { (effect, avgScore) ->
+                val label = effect.replace("_", " ").replaceFirstChar { it.uppercase() }
+                val chipColor = when {
+                    avgScore >= 7f -> MaterialTheme.colorScheme.tertiary
+                    avgScore >= 4f -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.secondary
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = chipColor.copy(alpha = 0.12f)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = chipColor,
+                            fontWeight = FontWeight.Medium)
+                        Text("${avgScore.toInt()}/10", style = MaterialTheme.typography.labelSmall,
+                            color = chipColor.copy(alpha = 0.7f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IntensityCurveOverlay(
+    events: List<TimelineEvent>,
+    startTime: Long
+) {
+    val now = currentTimeMillis()
+    val rangeMs = now - startTime
+    val intensityEvents = events.filter { it.intensity != null }.sortedBy { it.timestamp }
+    if (intensityEvents.size < 2) return
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()) {
+                Text("Intensity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text("Intensity \u2191", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(8.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(80.dp)) {
+                val primaryColor = MaterialTheme.colorScheme.primary
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val padL = 24.dp.toPx()
+                    val padB = 16.dp.toPx()
+                    val drawW = w - padL
+                    val drawH = h - padB
+
+                    // Grid lines
+                    val gridColor = Color.Gray.copy(alpha = 0.15f)
+                    for (i in 0..4) {
+                        val y = drawH * i / 4
+                        drawLine(gridColor,
+                            Offset(padL, y), Offset(w, y), strokeWidth = 0.5.dp.toPx())
+                    }
+
+                    // Build path
+                    if (intensityEvents.size >= 2) {
+                        val path = Path()
+                        val firstT = intensityEvents.first().timestamp
+                        val lastT = intensityEvents.last().timestamp
+                        val eventRange = (lastT - firstT).coerceAtLeast(1L)
+                        var firstPoint = true
+                        path.moveTo(padL, drawH)
+                        for (event in intensityEvents) {
+                            val x = padL + ((event.timestamp - firstT).toFloat() / eventRange * drawW).coerceIn(0f, drawW)
+                            val y = drawH - (event.intensity!! / 10f * drawH).coerceIn(0f, drawH)
+                            if (firstPoint) {
+                                path.lineTo(x, y)
+                                firstPoint = false
+                            } else {
+                                path.lineTo(x, y)
+                            }
+                        }
+                        path.lineTo(w, drawH)
+                        path.close()
+                        drawPath(path, primaryColor.copy(alpha = 0.15f))
+                        // Stroke the top edge
+                        var first = true
+                        for (event in intensityEvents) {
+                            val x = padL + ((event.timestamp - firstT).toFloat() / eventRange * drawW).coerceIn(0f, drawW)
+                            val y = drawH - (event.intensity!! / 10f * drawH).coerceIn(0f, drawH)
+                            if (first) {
+                                path.rewind(); path.moveTo(x, y); first = false
+                            } else {
+                                path.lineTo(x, y)
+                            }
+                        }
+                        drawPath(path, primaryColor, style = Stroke(width = 2.dp.toPx()))
+                    }
+                }
+            }
+            // Time axis for curve
+            Spacer(Modifier.height(2.dp))
+            Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                val durHours = rangeMs / 3600000f
+                for (i in 0..4) {
+                    Text("${(durHours * i / 4).toInt()}h",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                }
+            }
+        }
+    }
+}
+
+private fun phaseLabel(elapsedMs: Long, totalMs: Long): String? {
+    if (totalMs <= 0) return null
+    val fraction = elapsedMs.toFloat() / totalMs
+    return when {
+        fraction < 0.25f -> "Onset"
+        fraction < 0.50f -> "Comeup"
+        fraction < 0.75f -> "Peak"
+        else -> "Offset"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddEventDialog(
+    session: Session,
+    repo: JournalRepository,
+    editEvent: TimelineEvent? = null,
+    onDismiss: () -> Unit
+) {
+    val now = currentTimeMillis()
+    val eventTypes = listOf(
+        TimelineEventType.OBSERVATION to "Observation",
+        TimelineEventType.NOTE to "Note",
+        TimelineEventType.ONSET to "Onset",
+        TimelineEventType.COMEUP to "Comeup",
+        TimelineEventType.PEAK to "Peak",
+        TimelineEventType.OFFSET to "Offset",
+        TimelineEventType.AFTERGLOW to "Afterglow",
+        TimelineEventType.SAFETY_CHECK to "Safety check",
+        TimelineEventType.SIDE_EFFECT to "Side effect",
+        TimelineEventType.EMERGENCY to "Emergency"
+    )
+    val initialTypeIdx = eventTypes.indexOfFirst { it.first == editEvent?.eventType }.coerceAtLeast(0)
+    var selectedIndex by remember { mutableIntStateOf(initialTypeIdx) }
+    var label by remember { mutableStateOf(editEvent?.label ?: "") }
+    var notes by remember { mutableStateOf(editEvent?.body ?: "") }
+    var intensity by remember { mutableFloatStateOf(editEvent?.intensity ?: 5f) }
+    var useIntensity by remember { mutableStateOf(editEvent?.intensity != null) }
+    var timestamp by remember { mutableStateOf(editEvent?.timestamp ?: (session.startTime + ((now - session.startTime) / 2).coerceAtLeast(60000L))) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (editEvent != null) "Edit Event" else "Add Timeline Event", fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Event type dropdown
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(
+                        value = eventTypes[selectedIndex].second,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Event type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        eventTypes.forEachIndexed { i, (_, name) ->
+                            DropdownMenuItem(
+                                text = { Text(name) },
+                                onClick = { selectedIndex = i; expanded = false }
+                            )
+                        }
+                    }
+                }
+
+                // Label
+                OutlinedTextField(
+                    value = label, onValueChange = { label = it },
+                    label = { Text("Label") },
+                    placeholder = { Text("e.g., Strong visuals") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Notes
+                OutlinedTextField(
+                    value = notes, onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    minLines = 2, maxLines = 4,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Intensity toggle + slider
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(checked = useIntensity, onCheckedChange = { useIntensity = it })
+                    Column {
+                        Text("Intensity", style = MaterialTheme.typography.bodyMedium)
+                        if (useIntensity) {
+                            Row(verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Slider(value = intensity, onValueChange = { intensity = it },
+                                    valueRange = 1f..10f, steps = 8,
+                                    modifier = Modifier.weight(1f))
+                                Text("${intensity.toInt()}/10",
+                                    style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+
+                // Time offset
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val offsetMin = ((timestamp - session.startTime) / 60000).toInt()
+                    Text("Time: +${offsetMin}m",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = {
+                        timestamp = session.startTime + (offsetMin + 15) * 60000L
+                    }) { Text("+15m") }
+                    OutlinedButton(onClick = {
+                        timestamp = session.startTime + ((offsetMin - 15).coerceAtLeast(0)) * 60000L
+                    }) { Text("-15m") }
+                }
+            }
+        },
+        confirmButton = {
+            AppTextButton(onClick = {
+                val eventType = eventTypes[selectedIndex].first
+                val eventLabel = label.ifBlank { eventTypes[selectedIndex].second }
+                val eventId = editEvent?.id ?: "event:manual:${now}_${session.id}"
+                val existing = editEvent
+                repo.upsertTimelineEvent(TimelineEvent(
+                    id = eventId,
+                    sessionId = session.id,
+                    timestamp = timestamp,
+                    eventType = eventType,
+                    label = eventLabel,
+                    body = notes.ifBlank { null },
+                    intensity = if (useIntensity) intensity else null,
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                    deviceOrigin = existing?.deviceOrigin ?: "desktop",
+                ))
+                onDismiss()
+            }) { Text("Save") }
+        },
+        dismissButton = {
+            AppTextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

@@ -44,3 +44,40 @@ data class HostInfo(
     val fingerprint: String,
     val protocolVersion: Int = 1
 )
+
+/**
+ * Pairing request sent by a client to verify a pairing token with the host.
+ */
+@Serializable
+data class PairingVerifyRequest(
+    val token: String,
+    val clientDeviceId: String,
+    val clientDeviceName: String,
+    val clientFingerprint: String
+)
+
+/**
+ * Response to a pairing verification request.
+ * On success, contains the shared secret for HMAC auth.
+ */
+@Serializable
+data class PairingResultResponse(
+    val success: Boolean,
+    val error: String? = null,
+    val deviceId: String? = null,
+    val sharedSecret: String? = null,
+    val hostDeviceId: String? = null,
+    val hostDeviceName: String? = null,
+    val hostFingerprint: String? = null
+)
+
+/**
+ * Result of a completed pairing, stored by the client.
+ */
+data class DevicePairingResult(
+    val deviceId: String,
+    val sharedSecret: String,
+    val hostDeviceId: String,
+    val hostDeviceName: String,
+    val hostFingerprint: String
+)

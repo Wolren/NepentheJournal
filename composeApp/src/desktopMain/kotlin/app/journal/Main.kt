@@ -53,7 +53,7 @@ fun main() {
 
         val icon = remember { loadAppIcon() }
         val windowState = rememberWindowState(
-            size = DpSize(1280.dp, 820.dp),
+            size = DpSize(1100.dp, 820.dp),
             position = WindowPosition(100.dp, 60.dp)
         )
 

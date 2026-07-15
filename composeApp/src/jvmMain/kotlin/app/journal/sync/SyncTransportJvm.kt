@@ -71,8 +71,7 @@ class SyncTransport(
         withContext(Dispatchers.IO) {
             try {
                 server?.stop()
-                val fp = deviceFingerprint // force identity generation
-
+                val fp = deviceFingerprint
                 val srv = KtorSyncServer(
                     repo = repo,
                     port = config.listenerPort,
@@ -85,33 +84,30 @@ class SyncTransport(
                     }
                 )
 
-                val result = srv.start()
-                result.onSuccess { info ->
-                    server = srv
-                    authenticator.generatePairingToken()
-                    val token = authenticator.currentPairingToken()
-                    _status.value = _status.value.copy(
-                        isHosting = true,
-                        hostAddress = "${info.address}:${info.port}",
-                        pairingToken = token,
-                        pairedDeviceCount = trustStore.count()
-                    )
-                    // Refresh token every 60s
-                    tokenRefreshJob?.cancel()
-                    tokenRefreshJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
-                        while (isActive) {
-                            delay(60_000L)
-                            authenticator.generatePairingToken()
-                            _status.value = _status.value.copy(
-                                pairingToken = authenticator.currentPairingToken()
-                            )
-                        }
+                val info = srv.start() // throws on failure
+                server = srv
+                authenticator.generatePairingToken()
+                val token = authenticator.currentPairingToken()
+                _status.value = _status.value.copy(
+                    isHosting = true,
+                    hostAddress = "${info.address}:${info.port}",
+                    pairingToken = token,
+                    pairedDeviceCount = trustStore.count()
+                )
+                tokenRefreshJob?.cancel()
+                tokenRefreshJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+                    while (isActive) {
+                        delay(60_000L)
+                        authenticator.generatePairingToken()
+                        _status.value = _status.value.copy(
+                            pairingToken = authenticator.currentPairingToken()
+                        )
                     }
-                    // Register mDNS service
-                    lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
                 }
-                result
+                lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
+                Result.success(info)
             } catch (e: Exception) {
+                Log.withTag("SyncTransport").e(e) { "startHosting: failed" }
                 _status.value = _status.value.copy(lastError = e.message)
                 Result.failure(e)
             }

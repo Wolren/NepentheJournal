@@ -1,5 +1,6 @@
 package app.journal.ingest
 
+import app.journal.data.AppJson
 import app.journal.data.JournalRepository
 import app.journal.log.Log
 import app.journal.model.*
@@ -20,7 +21,7 @@ object DoseWikiIngestor {
 
     private const val RESOURCE_PATH = "/dosewiki_slim.json"
 
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+    private val json = AppJson.json
 
     private var ingested = false
 

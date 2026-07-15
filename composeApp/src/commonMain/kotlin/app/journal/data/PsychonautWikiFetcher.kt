@@ -1,5 +1,6 @@
 package app.journal.data
 
+import app.journal.data.AppJson
 import app.journal.ingest.*
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
@@ -19,7 +20,7 @@ class PsychonautWikiFetcher(
     private val repo: IngestRepository,
     private val endpoint: String = ENDPOINT
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = AppJson.json
     private val client = HttpClient {
         install(ContentNegotiation) { json(json) }
         expectSuccess = false

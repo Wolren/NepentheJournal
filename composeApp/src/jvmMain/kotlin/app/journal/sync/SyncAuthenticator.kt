@@ -38,7 +38,11 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         if (seenNonces.size > MAX_SEEN_NONCES) {
             val cutoff = now - TIMESTAMP_WINDOW_MS
             seenNonces.entries.removeIf { it.value < cutoff }
-            if (seenNonces.size > MAX_SEEN_NONCES) seenNonces.clear()
+            // If still over limit, drop the oldest entries instead of killing the entire set
+            while (seenNonces.size > MAX_SEEN_NONCES) {
+                val oldest = seenNonces.minByOrNull { it.value }?.key ?: break
+                seenNonces.remove(oldest)
+            }
         }
         // putIfAbsent returns null only when the nonce was not already present.
         return seenNonces.putIfAbsent(nonce, timestamp) == null

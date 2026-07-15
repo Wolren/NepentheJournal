@@ -75,9 +75,7 @@ private fun formatTimestamp(epochMs: Long): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SyncScreen() {
-    val repo = remember { JournalRepository.instance }
-    val syncEngine = remember { createSyncEngine(repo) }
+fun SyncScreen(syncEngine: SyncEngine) {
     val status by syncEngine.observeStatus().collectAsState(initial = SyncStatusSnapshot(
         isHosting = false, hostAddress = null,
         activeConnections = emptyList(), lastSyncAt = null,
@@ -298,7 +296,8 @@ fun SyncScreen() {
                     }
 
                     // Pairing token display
-                    if (status.isHosting && status.pairingToken != null) {
+                    val pairingToken = status.pairingToken
+                    if (status.isHosting && pairingToken != null) {
                         Spacer(Modifier.height(12.dp))
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -317,7 +316,7 @@ fun SyncScreen() {
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = status.pairingToken!!,
+                                        text = pairingToken,
                                         style = MaterialTheme.typography.headlineLarge,
                                         fontWeight = FontWeight.Bold,
                                         letterSpacing = 8.sp,
@@ -333,7 +332,7 @@ fun SyncScreen() {
                                 }
                                 AppIconButton(
                                     onClick = {
-                                        clipboard.setText(AnnotatedString(status.pairingToken!!))
+                                        clipboard.setText(AnnotatedString(pairingToken))
                                         logLines = listOf(LogEntry("Token copied to clipboard", LogType.SUCCESS)) + logLines
                                     },
                                     icon = Icons.Default.ContentCopy,
@@ -610,10 +609,11 @@ fun SyncScreen() {
         }
 
         // ---- Error display ----
-        if (status.lastError != null && status.pendingConflicts == 0) {
+        val lastError = status.lastError
+        if (lastError != null && status.pendingConflicts == 0) {
             item {
                 Text(
-                    text = status.lastError!!,
+                    text = lastError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 4.dp)

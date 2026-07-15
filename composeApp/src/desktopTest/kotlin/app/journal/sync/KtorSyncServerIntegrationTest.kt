@@ -1,354 +1,170 @@
 package app.journal.sync
 
 import app.journal.data.JournalRepository
-import app.journal.model.*
+import app.journal.sync.DeviceTrustStore.TrustedPeer
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import io.ktor.server.websocket.*
-import io.ktor.websocket.*
-import kotlinx.coroutines.*
-import kotlinx.serialization.json.Json
 import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 import java.io.File
 
 /**
- * Integration tests for Sync server routing logic using Ktor's testApplication.
- * Tests all endpoints: /info, /pairing/verify, /sync/push, /sync/pull, /sync/ws
- * including authentication, validation, and rate limiting.
- * No real server or TLS needed — testApplication routes requests in-process.
+ * In-process integration tests using Ktor's testApplication (no real port binding).
+ * All endpoints are exercised through the production SyncServerRouter.
  */
 class KtorSyncServerIntegrationTest {
 
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-routes-${System.nanoTime()}")
-    private val trustStore = DeviceTrustStore(testDir.absolutePath).also {
-        DeviceTrustStore.pbkdf2Iterations = 1000
-    }
+    private val testDir = File(
+        System.getProperty("java.io.tmpdir"),
+        "nepenthe-test-sync-${System.nanoTime()}"
+    )
+    private val repo = JournalRepository()
+    private val trustStore = DeviceTrustStore(testDir.absolutePath)
     private val authenticator = SyncAuthenticator(trustStore)
 
     @BeforeTest
-    fun before() {
-        authenticator.clearPendingPairing()
-        authenticator.clearSeenNonces()
-    }
+    fun setUp() { testDir.mkdirs() }
 
     @AfterTest
-    fun cleanup() {
-        trustStore.clearAll()
-        authenticator.clearPendingPairing()
-        authenticator.clearSeenNonces()
-        File(testDir, "trusted-devices.json").delete()
-        testDir.delete()
+    fun tearDown() { testDir.deleteRecursively() }
+
+    @Test
+    fun `info returns host info`() {
+        testApplication {
+            application { installRouter() }
+            val resp = client.get("/info")
+            assertEquals(HttpStatusCode.OK, resp.status)
+            val body = resp.bodyAsText()
+            assertTrue(body.contains("Test Device"))
+            assertTrue(body.contains("abc123def456"))
+            assertTrue(body.contains("test-device-abc123"))
+        }
     }
 
-    /**
-     * Build the routing module used by all tests.
-     * Mirrors KtorSyncServer's routing including the WebSocket endpoint.
-     */
-    private fun Application.testRouting() {
-        install(WebSockets) {
-            pingPeriod = 15.seconds
-            timeout = 15.seconds
-            maxFrameSize = Long.MAX_VALUE
-        }
-
-        routing {
-            get("/info") {
-                call.respondText(
-                    json.encodeToString(HostInfo("test-server", "Test", "abcd1234", 2)),
-                    ContentType.Application.Json
-                )
+    @Test
+    fun `pairing verify returns shared secret`() {
+        testApplication {
+            application { installRouter() }
+            val token = authenticator.generatePairingToken()
+            val resp = client.post("/pairing/verify") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"token":"$token","clientDeviceId":"test-client","clientDeviceName":"Client","clientFingerprint":"client789xyz"}""")
             }
+            assertEquals(HttpStatusCode.OK, resp.status)
+            val body = resp.bodyAsText()
+            assertTrue(body.contains("\"success\":true"))
+            val secret = extractField(body, "sharedSecret")
+            assertNotNull(secret)
+            assertEquals(secret, trustStore.getSharedSecret("test-client"))
+        }
+    }
 
-            get("/pairing/start") {
-                call.respondText(
-                    json.encodeToString(HostInfo("test-server", "Test", "abcd1234", 2)),
-                    ContentType.Application.Json
-                )
+    @Test
+    fun `pairing verify rejects invalid token`() {
+        testApplication {
+            application { installRouter() }
+            val resp = client.post("/pairing/verify") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"token":"bogus","clientDeviceId":"c","clientDeviceName":"","clientFingerprint":""}""")
             }
+            assertEquals(HttpStatusCode.Forbidden, resp.status)
+        }
+    }
 
-            post("/pairing/verify") {
-                val bodyText = call.receiveText()
-                if (bodyText.length > 4096) {
-                    call.respondText("""{"success":false,"error":"Body too large"}""", ContentType.Application.Json, status = HttpStatusCode.BadRequest)
-                    return@post
+    @Test
+    fun `pairing verify rate limits after 5 attempts`() {
+        testApplication {
+            application { installRouter() }
+            for (i in 1..5) {
+                val r = client.post("/pairing/verify") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"token":"bad-$i","clientDeviceId":"c$i","clientDeviceName":"","clientFingerprint":""}""")
                 }
-                val verifyReq = try {
-                    json.decodeFromString<Map<String, String>>(bodyText)
-                } catch (_: Exception) {
-                    call.respondText("""{"success":false,"error":"Invalid request"}""", ContentType.Application.Json, status = HttpStatusCode.BadRequest)
-                    return@post
-                }
-                if (!authenticator.verifyPairingToken(verifyReq["token"] ?: "")) {
-                    call.respondText("""{"success":false,"error":"Invalid or expired token"}""", ContentType.Application.Json, status = HttpStatusCode.Forbidden)
-                    return@post
-                }
-                val sharedSecret = authenticator.generateSharedSecret()
-                trustStore.addPeer(DeviceTrustStore.TrustedPeer(
-                    deviceId = verifyReq["clientDeviceId"] ?: "unknown",
-                    displayName = verifyReq["clientDeviceName"] ?: "Unknown",
-                    fingerprint = verifyReq["clientFingerprint"] ?: "unknown",
-                    sharedSecret = sharedSecret,
-                    pairedAt = System.currentTimeMillis()
-                ))
-                call.respondText(
-                    """{"success":true,"deviceId":"${verifyReq["clientDeviceId"]}","sharedSecret":"$sharedSecret"}""",
-                    ContentType.Application.Json
-                )
+                assertNotEquals(HttpStatusCode.TooManyRequests, r.status)
             }
-
-            post("/sync/push") {
-                val deviceId = call.request.headers["X-Sync-Device"]
-                val authHeader = call.request.headers["X-Sync-Auth"]
-                if (deviceId == null || authHeader == null) {
-                    call.respondText("""{"success":false,"error":"Authentication failed"}""", ContentType.Application.Json, status = HttpStatusCode.Unauthorized)
-                    return@post
-                }
-                val rawBody = call.receiveText()
-                if (!authenticator.verifyRequest(deviceId, rawBody, authHeader)) {
-                    call.respondText("""{"success":false,"error":"Authentication failed"}""", ContentType.Application.Json, status = HttpStatusCode.Unauthorized)
-                    return@post
-                }
-                if (rawBody.length > 10_000_000) {
-                    call.respondText("""{"success":false,"error":"Payload too large"}""", ContentType.Application.Json, status = HttpStatusCode.fromValue(413))
-                    return@post
-                }
-                call.respondText("""{"success":true}""", ContentType.Application.Json)
+            val r = client.post("/pairing/verify") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"token":"bad-6","clientDeviceId":"c6","clientDeviceName":"","clientFingerprint":""}""")
             }
+            assertEquals(HttpStatusCode.TooManyRequests, r.status)
+        }
+    }
 
-            get("/sync/pull") {
-                val deviceId = call.request.headers["X-Sync-Device"]
-                val authHeader = call.request.headers["X-Sync-Auth"]
-                if (deviceId == null || authHeader == null) {
-                    call.respondText("""{"success":false,"error":"Authentication failed"}""", ContentType.Application.Json, status = HttpStatusCode.Unauthorized)
-                    return@get
-                }
-                if (!authenticator.verifyRequest(deviceId, call.request.uri, authHeader)) {
-                    call.respondText("""{"success":false,"error":"Authentication failed"}""", ContentType.Application.Json, status = HttpStatusCode.Unauthorized)
-                    return@get
-                }
-                call.respondText("""{"success":true,"sessions":[],"doses":[]}""", ContentType.Application.Json)
+    @Test
+    fun `sync push with paired secret succeeds`() {
+        testApplication {
+            application { installRouter() }
+            val token = authenticator.generatePairingToken()
+            val pair = client.post("/pairing/verify") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"token":"$token","clientDeviceId":"paired-client","clientDeviceName":"Client","clientFingerprint":"client789xyz"}""")
             }
+            val sharedSecret = extractField(pair.bodyAsText(), "sharedSecret")!!
 
-            // ---- WebSocket: continuous sync endpoint ----
-            webSocket("/sync/ws") {
-                val callerDeviceId = call.request.queryParameters["deviceId"] ?: run {
-                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing deviceId"))
-                    return@webSocket
-                }
-                val authHeader = call.request.queryParameters["auth"] ?: run {
-                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing auth"))
-                    return@webSocket
-                }
-                if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
-                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Untrusted device"))
-                    return@webSocket
-                }
-                if (!authenticator.verifyRequest(callerDeviceId, "ws", authHeader)) {
-                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Authentication failed"))
-                    return@webSocket
-                }
+            val pushBody = """{"deviceId":"paired-client","deviceName":"Client","since":0,"substances":[],"doses":[],"sessions":[],"interactions":[],"notes":[],"timelineEvents":[],"effects":[],"customUnits":[]}"""
+            val authValue = authenticator.signRequest("paired-client", pushBody, sharedSecret)
 
-                for (frame in incoming) {
-                    if (frame is Frame.Text) {
-                        val text = frame.readText()
-                        val msg = try {
-                            wsJson.decodeFromString<WsMessage>(text)
-                        } catch (_: Exception) {
-                            outgoing.send(Frame.Text(
-                                wsJson.encodeToString(WsAck(0, error = "Malformed"))
-                            ))
-                            continue
-                        }
-                        when (msg) {
-                            is WsDelta -> {
-                                outgoing.send(Frame.Text(
-                                    wsJson.encodeToString(WsAck(seq = msg.seq))
-                                ))
-                            }
-                            is WsPing -> {
-                                outgoing.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
-                            }
-                            is WsPong -> { /* ignore */ }
-                            is WsAck -> { /* ignore */ }
-                        }
-                    }
-                }
+            val push = client.post("/sync/push") {
+                header("X-Sync-Device", "paired-client")
+                header("X-Sync-Auth", authValue)
+                contentType(ContentType.Application.Json)
+                setBody(pushBody)
             }
+            assertEquals(HttpStatusCode.OK, push.status, "Push with paired secret: ${push.bodyAsText()}")
         }
     }
 
-    // ==================== /info ====================
-
     @Test
-    fun `info endpoint returns device info`() = testApplication {
-        application { testRouting() }
-        val response = client.get("/info")
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText()
-        assertTrue(body.contains("abcd1234"))
-    }
-
-    // ==================== /pairing/verify ====================
-
-    @Test
-    fun `pairing verify succeeds with valid token`() = testApplication {
-        application { testRouting() }
-        val token = authenticator.generatePairingToken(60L)
-        val response = client.post("/pairing/verify") {
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(mapOf("token" to token, "clientDeviceId" to "c1", "clientDeviceName" to "C1", "clientFingerprint" to "fp1")))
+    fun `sync push rejects unauthenticated`() {
+        testApplication {
+            application { installRouter() }
+            val resp = client.post("/sync/push") {
+                contentType(ContentType.Application.Json)
+                setBody("{}")
+            }
+            assertEquals(HttpStatusCode.Unauthorized, resp.status)
         }
-        assertEquals(HttpStatusCode.OK, response.status)
     }
 
     @Test
-    fun `pairing verify rejects wrong token`() = testApplication {
-        application { testRouting() }
-        authenticator.generatePairingToken(60L)
-        val response = client.post("/pairing/verify") {
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(mapOf("token" to "WRONG1", "clientDeviceId" to "c1", "clientDeviceName" to "C1", "clientFingerprint" to "fp1")))
+    fun `sync push rejects wrong secret`() {
+        testApplication {
+            application { installRouter() }
+            trustStore.addPeer(TrustedPeer("evil", "Evil", "evil", "real-secret", System.currentTimeMillis()))
+            val body = """{"deviceId":"evil","deviceName":"Evil","since":0}"""
+            val authValue = authenticator.signRequest("evil", body, "wrong-secret")
+            val resp = client.post("/sync/push") {
+                header("X-Sync-Device", "evil")
+                header("X-Sync-Auth", authValue)
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.Unauthorized, resp.status)
         }
-        assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 
     @Test
-    fun `pairing verify rejects oversized body`() = testApplication {
-        application { testRouting() }
-        val response = client.post("/pairing/verify") {
-            contentType(ContentType.Application.Json)
-            setBody("x".repeat(5000))
+    fun `sync pull rejects unauthenticated`() {
+        testApplication {
+            application { installRouter() }
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/sync/pull").status)
         }
-        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 
-    @Test
-    fun `pairing verify rejects malformed json`() = testApplication {
-        application { testRouting() }
-        val response = client.post("/pairing/verify") {
-            contentType(ContentType.Application.Json)
-            setBody("not-json{")
+    private fun Application.installRouter() {
+        SyncServerRouter(
+            repo = repo, trustStore = trustStore, authenticator = authenticator,
+            onConnection = {}, deviceId = "test-device-abc123",
+            deviceName = "Test Device", fingerprint = "abc123def456"
+        ).installRouting(this)
+    }
+
+    companion object {
+        fun extractField(json: String, field: String): String? {
+            val pattern = "\"$field\"\\s*:\\s*\"([^\"]+)\"".toRegex()
+            return pattern.find(json)?.groupValues?.get(1)
         }
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-
-    // ==================== /sync/push ====================
-
-    @Test
-    fun `sync push rejects unauthenticated requests`() = testApplication {
-        application { testRouting() }
-        val response = client.post("/sync/push") {
-            contentType(ContentType.Application.Json)
-            setBody("{}")
-        }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    @Test
-    fun `authenticated sync push succeeds`() = testApplication {
-        application { testRouting() }
-        val (deviceId, secret) = pairTestDevice()
-        val body = """{"deviceId":"$deviceId","deviceName":"Test","since":0}"""
-        val authHeader = signBody(deviceId, body, secret)
-
-        val response = client.post("/sync/push") {
-            contentType(ContentType.Application.Json)
-            header("X-Sync-Device", deviceId)
-            header("X-Sync-Auth", authHeader)
-            setBody(body)
-        }
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-
-    @Test
-    fun `tampered sync push is rejected`() = testApplication {
-        application { testRouting() }
-        val (deviceId, secret) = pairTestDevice()
-        val body = """{"deviceId":"$deviceId","deviceName":"Test","since":0}"""
-        val authHeader = signBody(deviceId, body, secret)
-        val tampered = """{"deviceId":"$deviceId","deviceName":"HACKED","since":0}"""
-
-        val response = client.post("/sync/push") {
-            contentType(ContentType.Application.Json)
-            header("X-Sync-Device", deviceId)
-            header("X-Sync-Auth", authHeader)
-            setBody(tampered)
-        }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    // ==================== /sync/pull ====================
-
-    @Test
-    fun `sync pull rejects unauthenticated`() = testApplication {
-        application { testRouting() }
-        val response = client.get("/sync/pull?since=0")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    @Test
-    fun `authenticated sync pull succeeds`() = testApplication {
-        application { testRouting() }
-        val (deviceId, secret) = pairTestDevice()
-        val uri = "/sync/pull?since=0"
-        val authHeader = signBody(deviceId, uri, secret)
-
-        val response = client.get(uri) {
-            header("X-Sync-Device", deviceId)
-            header("X-Sync-Auth", authHeader)
-        }
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-
-    // ==================== /sync/ws (WebSocket) ====================
-
-    @Test
-    fun `ws rejects unauthenticated connections`() = testApplication {
-        application { testRouting() }
-        // WS without auth should not upgrade successfully
-        val response = client.get("/sync/ws?deviceId=unknown&auth=bad")
-        assertNotEquals(HttpStatusCode.OK, response.status,
-            "unauthenticated WS should not succeed (upgrade fails)")
-    }
-
-    @Test
-    fun `ws endpoint returns non-200 for missing auth`() = testApplication {
-        application { testRouting() }
-        val response = client.get("/sync/ws")
-        assertNotEquals(HttpStatusCode.OK, response.status,
-            "WS without query params should not succeed")
-    }
-
-    // ==================== Helpers ====================
-
-    /** Pairs a test device and returns (deviceId, sharedSecret). */
-    private fun pairTestDevice(): Pair<String, String> {
-        val secret = authenticator.generateSharedSecret()
-        trustStore.addPeer(DeviceTrustStore.TrustedPeer(
-            deviceId = "test-client-auth", displayName = "Auth Test",
-            fingerprint = "test-fp-auth", sharedSecret = secret,
-            pairedAt = System.currentTimeMillis()
-        ))
-        return "test-client-auth" to secret
-    }
-
-    private fun signBody(deviceId: String, body: String, secret: String): String {
-        val ts = System.currentTimeMillis()
-        val nonceBytes = ByteArray(16)
-        java.security.SecureRandom().nextBytes(nonceBytes)
-        val nonce = nonceBytes.joinToString("") { "%02x".format(it) }
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        val sig = mac.doFinal("$deviceId:$ts:$nonce:$body".toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
-        return "$ts:$nonce:$sig"
     }
 }

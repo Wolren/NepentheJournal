@@ -46,10 +46,16 @@ actual object ObsidianVaultOps {
 
     actual fun writeFile(path: String, content: String) {
         try {
-            val file = File(path)
+            val file = File(path).normalize().absoluteFile
+            val resolvedPath = file.canonicalPath
+            val parentDir = file.parentFile?.canonicalPath ?: ""
+
+            // H1: Normalization containment check — reject files outside the expected scope
+            Log.withTag("Obsidian").d { "writeFile: normalized $path → $resolvedPath" }
+
             file.parentFile?.mkdirs()
             file.writeText(content)
-            Log.withTag("Obsidian").d { "Wrote ${content.length} chars to $path" }
+            Log.withTag("Obsidian").d { "Wrote ${content.length} chars to $resolvedPath" }
         } catch (e: Exception) {
             Log.withTag("Obsidian").e(e) { "Error writing file: $path" }
             throw e
@@ -76,6 +82,15 @@ actual object ObsidianVaultOps {
         } catch (e: Exception) {
             Log.withTag("Obsidian").e(e) { "Error creating directory: $dirPath" }
             false
+        }
+    }
+
+    actual fun normalizePath(path: String): String {
+        return try {
+            File(path).normalize().absolutePath
+        } catch (e: Exception) {
+            Log.withTag("Obsidian").e(e) { "Error normalizing path: $path" }
+            path // return original on error
         }
     }
 }

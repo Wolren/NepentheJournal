@@ -1,0 +1,583 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Wolren/NepentheJournal/blob/master/schemas/journal-snapshot-v5.json",
+  "title": "JournalSnapshot",
+  "description": "Full serializable snapshot of Nepenthe Journal's data store. Used for JSON file persistence, backup/restore, and seed data. Version 5 adds Obsidian sync settings and chart preferences.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "Schema version number. CURRENT_VERSION = 5. Consumers should check this and warn on mismatch — forward compat is best-effort, not guaranteed.",
+      "minimum": 1,
+      "examples": [5]
+    },
+    "savedAt": {
+      "type": "integer",
+      "description": "Unix millisecond timestamp when this snapshot was written. UTC.",
+      "minimum": 0
+    },
+    "sessions": {
+      "type": "array",
+      "description": "Journal sessions. Each session groups one or more doses (ingestions) under a single experience.",
+      "items": { "$ref": "#/$defs/Session" },
+      "default": []
+    },
+    "substances": {
+      "type": "array",
+      "description": "Substance library. Pure compounds use 'cid:{PubChemCID}' as ID (e.g. 'cid:5761' for LSD). Plants or mixtures without a single CID use 'pwiki:{name}' fallback. The seed files ship ~325 substances.",
+      "items": { "$ref": "#/$defs/Substance" },
+      "default": []
+    },
+    "doses": {
+      "type": "array",
+      "description": "Individual ingestion records. Each dose belongs to exactly one session and references one substance.",
+      "items": { "$ref": "#/$defs/Dose" },
+      "default": []
+    },
+    "notes": {
+      "type": "array",
+      "description": "User notes attached to sessions, doses, or standalone.",
+      "items": { "$ref": "#/$defs/Note" },
+      "default": []
+    },
+    "timelineEvents": {
+      "type": "array",
+      "description": "Time-stamped events during a session: onset markers, observations, side effects, check-ins.",
+      "items": { "$ref": "#/$defs/TimelineEvent" },
+      "default": []
+    },
+    "interactions": {
+      "type": "array",
+      "description": "Pairwise substance interaction risks from TripSit + SMW data. Queried bidirectionally by substanceAId or substanceBId.",
+      "items": { "$ref": "#/$defs/Interaction" },
+      "default": []
+    },
+    "effects": {
+      "type": "array",
+      "description": "Named psychoactive effects with descriptions and category groupings.",
+      "items": { "$ref": "#/$defs/Effect" },
+      "default": []
+    },
+    "customUnits": {
+      "type": "array",
+      "description": "User-defined dosing units beyond mg/ug: drops, puffs, tabs, sprays, etc.",
+      "items": { "$ref": "#/$defs/CustomUnit" },
+      "default": []
+    },
+    "useShulginRating": {
+      "type": "boolean",
+      "description": "When true, the app uses the Shulgin rating scale (+/- to ++++) instead of a numeric 1-10 rating for sessions.",
+      "default": false
+    },
+    "useSubstanceColors": {
+      "type": "boolean",
+      "description": "When true, each substance class gets an adaptive color tag in the UI.",
+      "default": true
+    },
+    "obsidianVaultPath": {
+      "type": "string",
+      "description": "Absolute filesystem path to the user's Obsidian vault directory for auto-export.",
+      "default": ""
+    },
+    "obsidianAutoExport": {
+      "type": "boolean",
+      "description": "When true, sessions are automatically exported as Obsidian markdown notes.",
+      "default": false
+    },
+    "obsidianSubfolder": {
+      "type": "string",
+      "description": "Subfolder name within the Obsidian vault where journal notes are placed.",
+      "default": "Nepenthe"
+    },
+    "obsidianFileOrganization": {
+      "type": "string",
+      "description": "File organization strategy inside Obsidian: 'flat' (all files in subfolder) or 'nested' (year/month structure).",
+      "default": "flat",
+      "enum": ["flat", "nested"]
+    },
+    "showSessionsTrendChart": {
+      "type": "boolean",
+      "description": "When true, shows a sessions-per-week trend chart on the dashboard.",
+      "default": false
+    }
+  },
+  "required": ["version", "savedAt"],
+  "anyOf": [
+    { "required": ["substances"] },
+    { "required": ["sessions"] }
+  ],
+  "$defs": {
+    "VaultDocument": {
+      "type": "object",
+      "description": "Base interface for all versioned documents in the journal. Every entity type extends this.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable unique identifier. Format varies by entity: 'cid:5761' for substances, UUIDs for user-created entities (sessions, doses, notes). Device-keyed IDs prevent structural conflicts in sync."
+        },
+        "docType": {
+          "type": "string",
+          "description": "Document type discriminator. One of: 'substance', 'session', 'dose', 'note', 'interaction', 'effect', 'timelineEvent', 'customUnit'.",
+          "enum": ["substance", "session", "dose", "note", "interaction", "effect", "timelineEvent", "customUnit"]
+        },
+        "createdAt": {
+          "type": "integer",
+          "description": "Unix millisecond timestamp of creation. UTC."
+        },
+        "updatedAt": {
+          "type": "integer",
+          "description": "Unix millisecond timestamp of last modification. UTC."
+        },
+        "deviceOrigin": {
+          "type": "string",
+          "description": "Device that created this document. Used for sync conflict resolution. 'system' for bundled seed data, device fingerprint for user-generated content."
+        }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin"]
+    },
+    "Substance": {
+      "type": "object",
+      "description": "A substance entry in the library. Pure compounds are keyed by PubChem CID; plants and mixtures use a PsychonautWiki name fallback. Data merged from 8 sources via the ETL pipeline.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Primary identifier. 'cid:{PubChemCID}' for pure compounds, 'pwiki:{name}' for plants/mixtures.", "examples": ["cid:5761", "pwiki:Salvia divinorum"] },
+        "oldId": { "type": "string", "description": "Previous identifier before CID migration. Preserved for session reference compatibility.", "examples": ["pwiki:lsd"] },
+        "cid": { "type": "integer", "description": "PubChem Compound ID. Null for plants/mixtures without a single compound identifier.", "examples": [5761] },
+        "docType": { "type": "string", "const": "substance", "description": "Always 'substance'." },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string", "description": "'system' for bundled data. Custom for user-created substances." },
+        "pwikiId": { "type": "string", "description": "Original PsychonautWiki page title (with underscores).", "examples": ["LSD"] },
+        "name": { "type": "string", "description": "Display name. Usually the common English name.", "examples": ["Lysergic acid diethylamide"] },
+        "aliases": {
+          "type": "array",
+          "description": "Alternative names, street names, abbreviations. Merged from PsychonautWiki SMW, TripSit, PubChem synonyms, and Wikidata.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "summary": { "type": "string", "description": "Paragraph-length substance description. From PsychonautWiki SMW." },
+        "substanceClass": {
+          "type": "array",
+          "description": "Chemical and psychoactive classifications. Includes both chemical families (e.g. 'Lysergamides') and effect categories (e.g. 'Psychedelic', 'Stimulant'). Case/plural variants are not normalized across sources.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "routesOfAdministration": {
+          "type": "array",
+          "description": "Valid administration routes. Values from PsychonautWiki SMW schema. Capitalized English: 'Oral', 'Sublingual', 'Insufflated', 'Inhalation', 'Smoked', 'Intravenous', 'Intramuscular', 'Subcutaneous', 'Rectal', 'Transdermal', 'Buccal', 'Topical', 'Ophthalmic'.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "dosageBands": {
+          "type": "object",
+          "description": "Typical dosage ranges per route. Keys are route names, values are string-formatted dose bands. Not all routes have data. Empty object means no dose data available.",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "examples": [{ "Oral": "Light: 50-100ug, Moderate: 100-200ug, Strong: 200-400ug" }]
+        },
+        "durationProfile": {
+          "type": "object",
+          "description": "Typical duration ranges per phase. Keys are route names, values contain onset/comeup/peak/offset/total strings. Format varies.",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "addictionPotential": {
+          "type": "string",
+          "description": "Addiction/addiction potential classification from SMW. Free text or structured label.",
+          "default": null
+        },
+        "toxicity": {
+          "type": "array",
+          "description": "Toxicity warnings as free-text strings. From SMW data.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "crossTolerances": {
+          "type": "array",
+          "description": "Substance names this substance has cross-tolerance with. From SMW.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "effects": {
+          "type": "array",
+          "description": "Psychoactive effect labels. Free-text strings from PsychonautWiki SMW. Not structured — use DoseWiki subjective_effects for structured effect data.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "interactionClasses": {
+          "type": "array",
+          "description": "Pharmacological interaction classes for the deterministic interaction checker. Values: 'maoi', 'ssri', 'serotonin_releaser', 'serotonergic', 'stimulant', 'depressant', 'benzodiazepine', 'opioid', 'psychedelic', 'dissociative', 'lithium', 'cannabinoid', 'deliriant'.",
+          "items": { "type": "string", "enum": ["maoi", "ssri", "serotonin_releaser", "serotonergic", "stimulant", "depressant", "benzodiazepine", "opioid", "psychedelic", "dissociative", "lithium", "cannabinoid", "deliriant"] },
+          "default": []
+        },
+        "chemicalProperties": { "$ref": "#/$defs/ChemicalProperties" },
+        "chemblId": { "type": "string", "description": "ChEMBL molecule identifier. From Wikidata cross-reference.", "examples": ["CHEMBL263881"] },
+        "drugbankId": { "type": "string", "description": "DrugBank compound identifier. From Wikidata.", "examples": ["DB04829"] },
+        "iupharId": { "type": "string", "description": "IUPHAR/BPS Guide to PHARMACOLOGY ligand ID. From Wikidata.", "examples": ["17"] },
+        "chemspiderId": { "type": "string", "description": "ChemSpider compound ID. From Wikidata.", "examples": ["5554"] },
+        "unii": { "type": "string", "description": "FDA UNII (Unique Ingredient Identifier). From Wikidata.", "examples": ["8NA5SWF92O"] },
+        "chebiId": { "type": "string", "description": "ChEBI (Chemical Entities of Biological Interest) identifier. From Wikidata.", "examples": ["CHEBI:6605"] },
+        "atcCode": { "type": "string", "description": "WHO ATC (Anatomical Therapeutic Chemical) classification code. From Wikidata.", "examples": ["N05AD01"] },
+        "chemblData": { "$ref": "#/$defs/ChemblData" },
+        "iupharData": { "$ref": "#/$defs/IupharData" },
+        "pdspData": { "$ref": "#/$defs/PdspData" },
+        "bindingdbData": { "$ref": "#/$defs/BindingdbData" },
+        "erowidUrl": {
+          "type": "string",
+          "description": "Erowid experience vault URL for this substance. From TripSit data.",
+          "default": "",
+          "examples": ["https://www.erowid.org/experiences/subs/exp-LSD.shtml"]
+        },
+        "sources": {
+          "type": "array",
+          "description": "Data source provenance tags. Each entry identifies which source contributed data for this substance. Possible values: 'psychonautwiki', 'pubchem', 'tripsit', 'wikidata', 'chembl', 'iuphar', 'pdsp', 'bindingdb'.",
+          "items": { "type": "string" },
+          "default": [],
+          "examples": [["psychonautwiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb"]]
+        },
+        "cachedAt": {
+          "type": "integer",
+          "description": "Unix millisecond timestamp when this substance data was last refreshed from source APIs."
+        },
+        "sourceVersion": {
+          "type": "string",
+          "description": "Version tag for the ETL pipeline run that produced this substance record. Format: '{source}-{type}-v{number}' e.g. 'pwiki-smw-v2'.",
+          "examples": ["pwiki-smw-v2"]
+        },
+        "userAnnotations": {
+          "type": "object",
+          "description": "User-editable key-value annotations on this substance. Preserved across sync conflicts (REMOTE_SOURCE_WINS + preserve userAnnotations strategy).",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        }
+      },
+      "required": ["id", "name", "docType", "createdAt", "updatedAt", "deviceOrigin", "cachedAt", "sourceVersion"]
+    },
+    "ChemicalProperties": {
+      "type": "object",
+      "description": "Molecular properties from PubChem compound record. Present for substances with a valid PubChem CID.",
+      "properties": {
+        "cid": { "type": "integer", "description": "PubChem Compound ID." },
+        "molecularFormula": { "type": "string", "description": "Hill system molecular formula.", "examples": ["C20H25N3O"] },
+        "molecularWeight": { "type": "string", "description": "Molecular weight in daltons, as a string to preserve precision.", "examples": ["323.43"] },
+        "smiles": { "type": "string", "description": "Canonical SMILES string.", "examples": ["CCN(CC)C(=O)[C@H]1CN([C@@H]2CC=C3C=CC(=C3C2=C1)OC)C"] },
+        "inchiKey": { "type": "string", "description": "Standard InChIKey (hash of the full InChI).", "examples": ["VAYOSLLFUXYJDT-UHFFFAOYSA-N"] },
+        "iupacName": { "type": "string", "description": "Preferred IUPAC name from PubChem.", "examples": ["(6aR,9R)-N,N-diethyl-7-methyl-6,6a,8,9-tetrahydro-4H-indolo[4,3-fg]quinoline-9-carboxamide"] },
+        "xlogP": { "type": "number", "description": "Predicted octanol/water partition coefficient (XLogP3-AA). Higher values = more lipophilic.", "examples": [2.2] },
+        "hBondDonorCount": { "type": "integer", "description": "Number of hydrogen bond donor sites." },
+        "hBondAcceptorCount": { "type": "integer", "description": "Number of hydrogen bond acceptor sites." }
+      },
+      "required": ["cid"]
+    },
+    "Bioactivity": {
+      "type": "object",
+      "description": "Single bioactivity measurement from ChEMBL: binding affinity or functional assay result at a molecular target.",
+      "properties": {
+        "type": { "type": "string", "description": "Activity type: 'IC50', 'Ki', 'EC50', 'Kd', etc.", "examples": ["IC50", "Ki"] },
+        "value": { "type": "number", "description": "Numerical activity value in the units specified." },
+        "units": { "type": "string", "description": "Measurement units, typically 'nM' (nanomolar).", "examples": ["nM"] },
+        "relation": { "type": "string", "description": "Qualifier: '=', '<', '>', '~'. Indicates whether value is exact, a limit, or approximate.", "examples": ["=", "<"] },
+        "targetId": { "type": "string", "description": "ChEMBL target identifier (e.g. 'CHEMBL_TARGET:1234') or target name." },
+        "assay": { "type": "string", "description": "Assay description or ChEMBL assay ID." }
+      },
+      "required": ["type"]
+    },
+    "ChemblData": {
+      "type": "object",
+      "description": "ChEMBL molecule data summary including calculated properties and bioactivity measurements.",
+      "properties": {
+        "prefName": { "type": "string", "description": "ChEMBL preferred name for the molecule." },
+        "mw": { "type": "number", "description": "Molecular weight (exact) from ChEMBL, in daltons." },
+        "alogp": { "type": "number", "description": "Predicted logP from ChEMBL's ALOGPS model." },
+        "psa": { "type": "number", "description": "Polar surface area in square angstroms." },
+        "ro5Violations": { "type": "integer", "description": "Number of Lipinski Rule-of-5 violations." },
+        "maxPhase": { "type": "integer", "description": "Maximum clinical trial phase reached (0-4). 0 = no clinical development, 4 = approved.", "minimum": 0, "maximum": 4 },
+        "bioactivities": {
+          "type": "array",
+          "description": "Bioactivity measurements (IC50, Ki, EC50, Kd) at molecular targets.",
+          "items": { "$ref": "#/$defs/Bioactivity" },
+          "default": []
+        }
+      }
+    },
+    "IupharInteraction": {
+      "type": "object",
+      "description": "A single interaction record from the IUPHAR/BPS Guide to PHARMACOLOGY: a ligand's binding or functional interaction with a target.",
+      "properties": {
+        "targetId": { "type": "integer", "description": "IUPHAR target database ID." },
+        "targetName": { "type": "string", "description": "Name of the molecular target.", "examples": ["5-HT2A receptor"] },
+        "targetSpecies": { "type": "string", "description": "Target species, e.g. 'Human', 'Rat', 'Mouse'.", "examples": ["Human"] },
+        "type": { "type": "string", "description": "Interaction type: 'agonist', 'antagonist', 'partial agonist', 'allosteric modulator', 'binder', etc." },
+        "action": { "type": "string", "description": "Functional effect, e.g. 'Stimulation', 'Inhibition', 'Activation'." },
+        "affinity": { "type": "string", "description": "Quantitative affinity as a formatted string with value, parameter type, and units.", "examples": ["pKi 8.7", "pIC50 7.2", "pEC50 8.1"] },
+        "affinityParameter": { "type": "string", "description": "Affinity parameter type: 'pKi', 'pIC50', 'pEC50', 'Kd', 'LogIC50'.", "examples": ["pKi", "pIC50"] },
+        "endogenous": { "type": "boolean", "description": "True if this ligand is an endogenous compound for the target." },
+        "primaryTarget": { "type": "boolean", "description": "True if this is the designated primary target of the ligand." }
+      }
+    },
+    "IupharData": {
+      "type": "object",
+      "description": "IUPHAR/BPS Guide to PHARMACOLOGY pharmacology data: ligand ID and interaction records.",
+      "properties": {
+        "ligandId": { "type": "integer", "description": "IUPHAR ligand database ID (gtoLigandId)." },
+        "interactions": {
+          "type": "array",
+          "description": "Ligand-target interaction records with affinity data.",
+          "items": { "$ref": "#/$defs/IupharInteraction" },
+          "default": []
+        }
+      }
+    },
+    "PdspKiRecord": {
+      "type": "object",
+      "description": "A single Ki binding measurement from the PDSP (Psychoactive Drug Screening Program) Ki database. Ki values in nanomolar (nM). Lower values = stronger binding affinity.",
+      "properties": {
+        "targetName": { "type": "string", "description": "Name of the receptor/target.", "examples": ["5-HT2A", "D2", "SERT"] },
+        "gene": { "type": "string", "description": "Human gene symbol for the target.", "examples": ["HTR2A", "DRD2", "SLC6A4"] },
+        "species": { "type": "string", "description": "Target species abbreviation: 'h' (human), 'r' (rat), 'm' (mouse), 'gp' (guinea pig)." },
+        "kiNanoMolar": { "type": "number", "description": "Ki value in nanomolar (nM)." },
+        "reference": { "type": "string", "description": "Citation reference (PMID or short citation string)." },
+        "source": { "type": "string", "description": "Data source label, e.g. 'PDSP Ki Database', 'Roth Lab'." }
+      }
+    },
+    "PdspData": {
+      "type": "object",
+      "description": "PDSP Ki database pharmacology data wrapper. Contains Ki binding affinity measurements at CNS molecular targets. Maintained by the NIMH PDSP program (Roth Lab at UNC).",
+      "properties": {
+        "records": {
+          "type": "array",
+          "description": "Ki binding records for this substance at various CNS targets.",
+          "items": { "$ref": "#/$defs/PdspKiRecord" },
+          "default": []
+        }
+      }
+    },
+    "BindingdbRecord": {
+      "type": "object",
+      "description": "A single binding affinity measurement from BindingDB. Affinity values in nanomolar (nM). Curated from published literature.",
+      "properties": {
+        "targetName": { "type": "string", "description": "Name of the protein target.", "examples": ["Serotonin 2a (5-HT2a) receptor"] },
+        "uniprotId": { "type": "string", "description": "UniProt identifier of the target protein.", "examples": ["P28223"] },
+        "geneSymbol": { "type": "string", "description": "Gene symbol of the target.", "examples": ["HTR2A"] },
+        "species": { "type": "string", "description": "Target species, e.g. 'Human', 'Rat'." },
+        "affinityType": { "type": "string", "description": "Affinity measurement type: 'Ki', 'IC50', 'Kd', 'EC50'.", "examples": ["Ki", "IC50"] },
+        "affinityNM": { "type": "number", "description": "Affinity value in nanomolar (nM)." },
+        "pmid": { "type": "string", "description": "PubMed ID of the publication reporting this measurement." }
+      }
+    },
+    "BindingdbData": {
+      "type": "object",
+      "description": "BindingDB pharmacology data wrapper. Experimentally measured binding affinities at protein targets. Curated by the BindingDB project.",
+      "properties": {
+        "records": {
+          "type": "array",
+          "description": "Binding affinity records for this substance at various targets.",
+          "items": { "$ref": "#/$defs/BindingdbRecord" },
+          "default": []
+        }
+      }
+    },
+    "Session": {
+      "type": "object",
+      "description": "A journal session representing a single experience. Groups doses, timeline events, notes, and check-ins. The core unit of journaling.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "UUID v4 or device-keyed unique ID." },
+        "docType": { "type": "string", "const": "session" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string", "description": "Device that owns this session." },
+        "title": { "type": "string", "description": "Session title. Usually auto-generated from substance names and date, but user-editable." },
+        "startTime": { "type": "integer", "description": "Unix millisecond timestamp of session start (when first dose was taken)." },
+        "endTime": { "type": "integer", "description": "Unix millisecond timestamp of session end. Null while session is live.", "default": null },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [], "description": "User-applied tags for filtering and categorization." },
+        "set": { "type": "string", "description": "Mindset: the user's mental state before the session.", "default": null },
+        "setting": { "type": "string", "description": "Setting: the physical and social environment of the session.", "default": null },
+        "intention": { "type": "string", "description": "User's stated intention or goal for the session.", "default": null },
+        "outcome": { "type": "string", "description": "User's reflection on how the session went.", "default": null },
+        "notes": { "type": "string", "description": "Free-text session notes.", "default": null },
+        "rating": { "type": "integer", "description": "Numeric rating 1-10 (when useShulginRating is false).", "minimum": 1, "maximum": 10, "default": null },
+        "shulginRating": {
+          "type": "string",
+          "description": "Shulgin rating scale: '+/-' (not sure), '+' (mild), '++' (moderate), '+++' (strong), '++++' (very strong). Used when useShulginRating is true.",
+          "enum": ["+/-", "+", "++", "+++", "++++"],
+          "default": null
+        },
+        "checkins": {
+          "type": "array",
+          "description": "In-session check-in snapshots: intensity, effect scores, mood, and notes at a point in time.",
+          "items": { "$ref": "#/$defs/CheckIn" },
+          "default": []
+        },
+        "isArchived": { "type": "boolean", "default": false, "description": "When true, session is hidden from the main list but still searchable." },
+        "isFavorite": { "type": "boolean", "default": false, "description": "When true, session is marked as a favorite for quick access." },
+        "consumerName": { "type": "string", "description": "Name of the person who took the substances (for multi-user journals). Null = the journal owner.", "default": null }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "title", "startTime"]
+    },
+    "CheckIn": {
+      "type": "object",
+      "description": "An in-session check-in recording the user's state at a specific time.",
+      "properties": {
+        "timestamp": { "type": "integer", "description": "Unix millisecond timestamp of the check-in." },
+        "overallIntensity": { "type": "number", "description": "Overall subjective intensity of the experience at this point, 0.0 to 1.0 (or 0-100%)." },
+        "effectScores": {
+          "type": "object",
+          "description": "Per-effect intensity scores. Keys are effect names, values are 0.0-1.0 scores.",
+          "additionalProperties": { "type": "number" },
+          "default": {}
+        },
+        "mood": { "type": "string", "description": "Mood label at time of check-in.", "default": null },
+        "notes": { "type": "string", "description": "Free-text notes for this check-in.", "default": null }
+      },
+      "required": ["timestamp", "overallIntensity"]
+    },
+    "Dose": {
+      "type": "object",
+      "description": "An individual ingestion record. Belongs to exactly one session and references one substance.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Device-keyed unique ID." },
+        "docType": { "type": "string", "const": "dose" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string" },
+        "sessionId": { "type": "string", "description": "ID of the parent session. Links doses to sessions." },
+        "substanceId": { "type": "string", "description": "ID of the substance ingested (e.g. 'cid:5761')." },
+        "routeOfAdministration": { "type": "string", "description": "Administration route: 'Oral', 'Sublingual', 'Insufflated', 'Inhalation', 'Smoked', 'Intravenous', 'Intramuscular', 'Subcutaneous', 'Rectal', 'Transdermal', 'Buccal', 'Topical', 'Ophthalmic'." },
+        "amount": { "type": "number", "description": "Dose amount in the specified unit." },
+        "unit": { "type": "string", "description": "Unit of measurement: 'mg', 'µg', 'ug', 'ml', 'drops', 'puffs', 'tabs', 'sprays', or custom unit name.", "examples": ["mg", "µg", "ml"] },
+        "timestamp": { "type": "integer", "description": "Unix millisecond timestamp of ingestion." },
+        "redosing": { "type": "boolean", "default": false, "description": "True if this is a redose (taken after the initial dose, during the same session)." },
+        "notes": { "type": "string", "description": "Notes specific to this dose.", "default": null },
+        "isDoseEstimate": { "type": "boolean", "default": false, "description": "True if the dose amount is estimated rather than exactly measured." },
+        "estimatedDoseStandardDeviation": { "type": "number", "description": "Standard deviation of the estimate when isDoseEstimate is true.", "default": null },
+        "customUnitId": { "type": "string", "description": "If using a custom unit, the ID of the CustomUnit definition.", "default": null },
+        "stomachFullness": {
+          "type": "string",
+          "enum": ["Empty", "Light snack", "Moderate meal", "Full meal"],
+          "description": "Stomach fullness at time of ingestion. Affects absorption rate.",
+          "default": null
+        }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "sessionId", "substanceId", "routeOfAdministration", "amount", "unit", "timestamp"]
+    },
+    "Interaction": {
+      "type": "object",
+      "description": "A pairwise substance interaction risk assessment. From TripSit interaction chart + PsychonautWiki SMW.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Stable ID. Usually '{substanceAId}-{substanceBId}'." },
+        "docType": { "type": "string", "const": "interaction" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string", "default": "system" },
+        "substanceAId": { "type": "string", "description": "First substance ID (alphabetically sorted pair)." },
+        "substanceBId": { "type": "string", "description": "Second substance ID." },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["DANGEROUS", "UNSAFE", "UNCERTAIN", "LOW", "UNKNOWN"],
+          "description": "Risk level: DANGEROUS = life-threatening, UNSAFE = significant risk, UNCERTAIN = unknown or debated, LOW = generally safe combination, UNKNOWN = no data."
+        },
+        "description": { "type": "string", "description": "Human-readable description of the interaction mechanism and risks.", "default": null },
+        "sources": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Source citations for this interaction assessment." }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "substanceAId", "substanceBId", "riskLevel"]
+    },
+    "Effect": {
+      "type": "object",
+      "description": "A named psychoactive effect with optional description and category.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Stable effect identifier." },
+        "docType": { "type": "string", "const": "effect" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string", "default": "system" },
+        "name": { "type": "string", "description": "Effect name, e.g. 'Anxiety', 'Euphoria', 'Visual distortion'." },
+        "url": { "type": "string", "description": "URL to external reference or PsychonautWiki page for this effect.", "default": null },
+        "description": { "type": "string", "description": "Descriptive text for the effect.", "default": null },
+        "category": { "type": "string", "description": "Effect category: 'cognitive', 'physical', 'visual', 'auditory', 'multisensory', 'transpersonal', etc.", "default": null },
+        "substanceIds": { "type": "array", "items": { "type": "string" }, "default": [], "description": "IDs of substances known to produce this effect." }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "name"]
+    },
+    "Note": {
+      "type": "object",
+      "description": "A user note. Can be attached to a session, a dose, or standalone (no parent). Supports conflict resolution via sibling tracking.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Device-keyed unique ID." },
+        "docType": { "type": "string", "const": "note" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string" },
+        "sessionId": { "type": "string", "description": "Parent session ID, if attached to a session.", "default": null },
+        "doseId": { "type": "string", "description": "Parent dose ID, if attached to a dose.", "default": null },
+        "title": { "type": "string", "description": "Optional note title.", "default": null },
+        "body": { "type": "string", "description": "Note body text (markdown supported)." },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "isPinned": { "type": "boolean", "default": false, "description": "When true, note is pinned for quick access." },
+        "conflictSiblings": {
+          "type": "array",
+          "description": "Conflict siblings produced during sync when multiple devices edited the same note concurrently. UI must render a conflict banner when non-empty.",
+          "items": { "$ref": "#/$defs/ConflictSibling" },
+          "default": []
+        }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "body"]
+    },
+    "ConflictSibling": {
+      "type": "object",
+      "description": "A conflicting version of a note from another device, produced during sync.",
+      "properties": {
+        "body": { "type": "string", "description": "The conflicting note body text." },
+        "deviceOrigin": { "type": "string", "description": "The device that produced this version." },
+        "updatedAt": { "type": "integer", "description": "When this version was last modified." }
+      },
+      "required": ["body", "deviceOrigin", "updatedAt"]
+    },
+    "TimelineEvent": {
+      "type": "object",
+      "description": "A timestamped event within a session. Used for the session timeline view.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Device-keyed unique ID." },
+        "docType": { "type": "string", "const": "timelineEvent" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string" },
+        "sessionId": { "type": "string", "description": "Parent session ID." },
+        "timestamp": { "type": "integer", "description": "Unix millisecond timestamp of the event." },
+        "eventType": {
+          "type": "string",
+          "enum": ["ONSET", "COMEUP", "PEAK", "PLATEAU", "OFFSET", "AFTERGLOW", "END", "OBSERVATION", "SAFETY_CHECK", "SIDE_EFFECT", "EMERGENCY", "NOTE"],
+          "description": "Type of timeline event."
+        },
+        "label": { "type": "string", "description": "Short human-readable label for the event." },
+        "body": { "type": "string", "description": "Detailed description or notes for the event.", "default": null },
+        "relatedEffectIds": { "type": "array", "items": { "type": "string" }, "default": [], "description": "IDs of effects associated with this event." },
+        "intensity": { "type": "number", "description": "Subjective intensity at this event, 0.0-1.0.", "default": null }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "sessionId", "timestamp", "eventType", "label"]
+    },
+    "CustomUnit": {
+      "type": "object",
+      "description": "A user-defined dosing unit for flexible measurement: drops, puffs, tabs, sprays, etc.",
+      "allOf": [{ "$ref": "#/$defs/VaultDocument" }],
+      "properties": {
+        "id": { "type": "string", "description": "Device-keyed unique ID." },
+        "docType": { "type": "string", "const": "customUnit" },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "deviceOrigin": { "type": "string" },
+        "substanceId": { "type": "string", "description": "ID of the substance this unit applies to." },
+        "name": { "type": "string", "description": "Unit name, e.g. 'drops', 'puffs', 'tabs', 'sprays'." },
+        "description": { "type": "string", "description": "Optional description of what this unit means.", "default": null },
+        "estimatedMgPerUnit": { "type": "number", "description": "Estimated mg-equivalent per unit. Used for tolerance estimation. Null = unknown.", "default": null },
+        "isEstimate": { "type": "boolean", "default": false, "description": "When true, the estimatedMgPerUnit is approximate and doses using this unit should display '~' prefix." }
+      },
+      "required": ["id", "docType", "createdAt", "updatedAt", "deviceOrigin", "substanceId", "name"]
+    }
+  }
+}

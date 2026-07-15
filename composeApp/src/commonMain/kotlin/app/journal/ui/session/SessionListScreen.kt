@@ -386,7 +386,7 @@ private fun SessionCard(
                         val instant = Instant.fromEpochMilliseconds(session.startTime)
                         val local = instant.toLocalDateTime(tz)
                         val dateText = if (useRelativeTime) relativeTime(session.startTime)
-                        else "${local.year}-${(local.month.ordinal + 1).toString().padStart(2,'0')}-${local.day.toString().padStart(2,'0')} ${local.hour.toString().padStart(2,'0')}:${local.minute.toString().padStart(2,'0')}"
+                                                else "${local.day.toString().padStart(2,'0')} ${local.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${local.year} ${local.hour.toString().padStart(2,'0')}:${local.minute.toString().padStart(2,'0')}"
                         Text(
                             text = dateText,
                             style = MaterialTheme.typography.bodySmall,

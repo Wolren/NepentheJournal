@@ -47,11 +47,22 @@ expect class JournalStore(repo: JournalRepository) {
 }
 
 /**
- * Serialization helper shared across persistence and export.
+ * Canonical JSON serialization config for the entire app.
+ * Used by persistence, sync, and export.
+ *
+ * Config: ignoreUnknownKeys=true (forward compat), encodeDefaults=true (consistent wire format).
+ * For human-readable output (export, Obsidian), use AppJson.pretty instead.
  */
-object JournalJson {
+object AppJson {
     val json = Json {
         prettyPrint = false
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
+
+    /** Pretty-printed variant for user-facing export files. */
+    val pretty = Json {
+        prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
@@ -99,4 +110,14 @@ object JournalJson {
         repo.setObsidianFileOrganization(snapshot.obsidianFileOrganization)
         repo.setShowSessionsTrendChart(snapshot.showSessionsTrendChart)
     }
+}
+
+/**
+ * Serialization helper. Deprecated — use AppJson directly.
+ */
+@Deprecated("Use AppJson.json", replaceWith = ReplaceWith("AppJson.json"))
+object JournalJson {
+    val json = AppJson.json
+    fun snapshot(repo: JournalRepository): JournalSnapshot = AppJson.snapshot(repo)
+    fun apply(repo: JournalRepository, snapshot: JournalSnapshot) = AppJson.apply(repo, snapshot)
 }
