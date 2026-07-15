@@ -4,10 +4,24 @@ import app.journal.data.JournalRepository
 import app.journal.model.*
 import kotlin.test.*
 import java.io.File
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 class ObsidianExportManagerTest {
 
     private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-export-${System.nanoTime()}")
+
+    /** Replicate the renderer's filename logic so tests pass in any timezone. */
+    private fun expectedFilename(startTime: Long, title: String, sessionId: String): String {
+        val dt = Instant.fromEpochMilliseconds(startTime)
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+        val dateStr = "${dt.year}-${dt.monthNumber.toString().padStart(2, '0')}-${dt.dayOfMonth.toString().padStart(2, '0')}"
+        val timeStr = "${dt.hour.toString().padStart(2, '0')}-${dt.minute.toString().padStart(2, '0')}"
+        val slug = title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(64)
+        val id = sessionId.filter { it.isLetterOrDigit() }.take(16)
+        return "$dateStr-$timeStr-$slug-$id.md"
+    }
 
     @AfterTest
     fun cleanup() {
@@ -93,11 +107,13 @@ class ObsidianExportManagerTest {
         val actualFiles = dir.listFiles()?.map { it.name } ?: emptyList()
         assertTrue(actualFiles.isNotEmpty(), "files should exist in ${dir.absolutePath}, got: $actualFiles")
 
-        // Filename format: YYYY-MM-DD-HH-MM-slug-sanitizedId.md
-        val lsdTripFile = File(testDir, "Nepenthe/2024-07-12-18-00-lsd-trip-s1.md")
-        assertTrue(lsdTripFile.exists(), "lsd-trip.md should exist at ${lsdTripFile.absolutePath}, files in dir: ${actualFiles.joinToString()}")
-        val mdmaFile = File(testDir, "Nepenthe/2024-07-13-21-46-mdma-session-s2.md")
-        assertTrue(mdmaFile.exists(), "mdma file should exist at ${mdmaFile.absolutePath}")
+        // Filename format: YYYY-MM-DD-HH-MM-slug-sanitizedId.md (timezone-dependent)
+        val expectedFile1 = expectedFilename(1720800000000L, "LSD Trip", "s:1")
+        val expectedFile2 = expectedFilename(1720900000000L, "MDMA Session", "s:2")
+        val lsdTripFile = File(testDir, "Nepenthe/$expectedFile1")
+        assertTrue(lsdTripFile.exists(), "expected $expectedFile1 at ${lsdTripFile.absolutePath}, files: ${actualFiles.joinToString()}")
+        val mdmaFile = File(testDir, "Nepenthe/$expectedFile2")
+        assertTrue(mdmaFile.exists(), "expected $expectedFile2 at ${mdmaFile.absolutePath}")
     }
 
     @Test
@@ -119,8 +135,8 @@ class ObsidianExportManagerTest {
         ))
 
         assertEquals(1, result.written)
-        // startTime 1720800000000 = 2024-07-12
-        val file = File(testDir, "Nepenthe/2024/07/2024-07-12-18-00-lsd-trip-s1.md")
+        val fname = expectedFilename(1720800000000L, "LSD Trip", "s:1")
+        val file = File(testDir, "Nepenthe/2024/07/$fname")
         assertTrue(file.exists(), "date-organized file should exist at $file")
     }
 
@@ -134,7 +150,8 @@ class ObsidianExportManagerTest {
         ))
 
         assertEquals(1, result.written)
-        assertTrue(File(testDir, "MyJournal/2024-07-12-18-00-lsd-trip-s1.md").exists())
+        val fname = expectedFilename(1720800000000L, "LSD Trip", "s:1")
+        assertTrue(File(testDir, "MyJournal/$fname").exists())
     }
 
     @Test
