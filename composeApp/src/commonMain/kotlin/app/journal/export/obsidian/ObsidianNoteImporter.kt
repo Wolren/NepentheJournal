@@ -3,6 +3,7 @@ package app.journal.export.obsidian
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
 import app.journal.model.*
+import app.journal.util.ExportImport
 import app.journal.util.currentTimeMillis
 
 /**
@@ -24,11 +25,11 @@ object ObsidianNoteImporter {
     private const val MAX_NOTES_PER_SESSION = 200
     private const val MAX_TIMELINE_EVENTS_PER_SESSION = 500
 
-    /** Earliest valid timestamp: 2000-01-01T00:00:00Z */
-    private const val MIN_VALID_TIMESTAMP = 946684800000L
+    /** Earliest valid timestamp. Shared with ExportImport. */
+    private const val MIN_VALID_TIMESTAMP = ExportImport.MIN_VALID_TIMESTAMP
 
-    /** Maximum allowed margin into the future (10 years from import time). */
-    private const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 10
+    /** Maximum allowed margin into the future. Shared with ExportImport. */
+    private const val TIMESTAMP_FUTURE_MARGIN_MS = ExportImport.TIMESTAMP_FUTURE_MARGIN_MS
 
     /**
      * Import all Obsidian notes from [vaultDir] into [repo].

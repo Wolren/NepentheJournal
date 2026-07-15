@@ -16,10 +16,10 @@ object ExportImport {
     private val json = AppJson.pretty
 
     /** Earliest valid timestamp: any non-negative value after epoch. */
-    private const val MIN_VALID_TIMESTAMP = 0L
+    const val MIN_VALID_TIMESTAMP = 0L
 
     /** Maximum allowed margin into the future (10 years from import time). */
-    private const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 10
+    const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 10
 
     @Serializable
     data class SessionExportBundle(

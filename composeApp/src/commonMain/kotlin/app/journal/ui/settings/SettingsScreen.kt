@@ -712,7 +712,7 @@ fun SettingsScreen(syncEngine: SyncEngine) {
                                                     val cfg = SyncConfig(
                                                         id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
                                                         deviceId = "desktop-main", displayName = "Windows Desktop",
-                                                        listenerPort = manualPort.toIntOrNull() ?: 4985, continuousSync = continuousSync, enableDeltaSync = true
+                                                        listenerPort = manualPort.toIntOrNull() ?: 4984, continuousSync = continuousSync, enableDeltaSync = true
                                                     )
                                                     syncEngine.startHosting(cfg).fold(
                                                         onSuccess = { logLines = listOf("Hosting on port ${it.port}") + logLines },
