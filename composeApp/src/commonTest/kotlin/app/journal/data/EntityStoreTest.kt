@@ -148,10 +148,10 @@ class EntityStoreTest {
     }
 
     @Test
-    fun withMutableMapAllowsDirectMutation() {
+    fun batchAllowsDirectMutation() {
         val store = EntityStore(idOf)
         store.put(TestEntity("a", "Alice", 1))
-        store.withMutableMap { this["a"] = TestEntity("a", "Mutated", 99) }
+        store.batch { this["a"] = TestEntity("a", "Mutated", 99) }
         assertEquals("Mutated", store.get("a")?.name)
     }
 

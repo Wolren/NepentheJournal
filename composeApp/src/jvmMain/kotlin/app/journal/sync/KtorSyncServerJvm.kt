@@ -128,7 +128,8 @@ class SyncServerRouter(
             }
 
             post("/pairing/verify") {
-                val clientIp = call.request.local.remoteHost
+                val clientIp = call.request.headers["X-Forwarded-For"]
+                    ?: call.request.local.remoteHost
                 if (isRateLimited(clientIp)) {
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Too many attempts. Try again later.")),

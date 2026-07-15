@@ -90,9 +90,13 @@ internal class EntityStore<T>(
     val size: Int get() = map.size
     val keys: Set<String> get() = map.keys.toSet()
 
-    /** Execute a block with the mutable map for batch operations. */
-    fun withMutableMap(action: MutableMap<String, T>.() -> Unit) {
+    /**
+     * Execute a block with the mutable map for batch operations.
+     * Single emit after the block completes.
+     */
+    fun batch(action: MutableMap<String, T>.() -> Unit) {
         map.action()
+        emit()
     }
 
     /** Iterate over a snapshot of values. Safe during concurrent modification. */
