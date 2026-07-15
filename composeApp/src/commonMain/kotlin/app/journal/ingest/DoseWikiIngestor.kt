@@ -25,6 +25,11 @@ object DoseWikiIngestor {
 
     private var ingested = false
 
+    /** Reset the ingested flag — only needed for testing. */
+    internal fun reset() {
+        ingested = false
+    }
+
     /**
      * Load and ingest DoseWiki data. Safe to call multiple times —
      * second call is a no-op.
