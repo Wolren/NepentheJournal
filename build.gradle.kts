@@ -35,9 +35,9 @@ subprojects {
                 "io.netty:netty-handler-proxy:4.2.16.Final",
                 "io.netty:netty-codec-socks:4.2.16.Final",
                 // Bouncy Castle - GOST CTR keystream reuse (critical), broken algorithm
-                "org.bouncycastle:bcprov-jdk18on:1.84",
-                "org.bouncycastle:bcpkix-jdk18on:1.84",
-                "org.bouncycastle:bcutil-jdk18on:1.84",
+                "org.bouncycastle:bcprov-jdk18on:1.85",
+                "org.bouncycastle:bcpkix-jdk18on:1.85",
+                "org.bouncycastle:bcutil-jdk18on:1.85",
                 // Apache HTTP Components - XSS in HttpClient
                 "org.apache.httpcomponents:httpclient:4.5.14",
                 "org.apache.httpcomponents:httpmime:4.5.14",
