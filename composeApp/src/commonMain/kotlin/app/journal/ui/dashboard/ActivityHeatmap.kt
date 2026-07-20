@@ -1,8 +1,8 @@
 package app.journal.ui.dashboard
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -11,7 +11,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,50 +81,83 @@ fun ActivityHeatmap(
             val step = cellSize + gap
             val cols = ((availWidth - 4.dp) / step).toInt().coerceIn(5, 100)
             val firstVisibleDate = today.minus(cols * 7 - 1, DateTimeUnit.DAY)
-            val gridWidth = step * cols
-            val leftover = availWidth - gridWidth
-
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .padding(start = if (leftover > 0.dp) leftover / 2 else 0.dp),
-                    horizontalArrangement = Arrangement.spacedBy(gap)
-                ) {
+            
+            val cellSizePx = with(LocalDensity.current) { cellSize.toPx() }
+            val gapPx = with(LocalDensity.current) { gap.toPx() }
+            val stepPx = cellSizePx + gapPx
+            val availWidthPx = with(LocalDensity.current) { availWidth.toPx() }
+            val gridWidthPx = stepPx * cols
+            val leftoverPx = (availWidthPx - gridWidthPx).coerceAtLeast(0f)
+            
+            val cells = remember(firstVisibleDate, cols, dayCounts, today) {
+                buildList {
                     for (col in 0 until cols) {
-                        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-                            for (row in 0 until rows) {
-                                val date = firstVisibleDate.plus(col * 7 + row, DateTimeUnit.DAY)
-                                val isFuture = date > today
-                                val count = if (isFuture) 0 else (dayCounts[date] ?: 0)
-                                val bg = if (isFuture) Color.Transparent else colorFor(count)
-                                val isToday = date == today
-
-                                val mod = Modifier
-                                    .size(cellSize)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(bg)
-                                    .then(
-                                        if (isToday) Modifier.border(
-                                            1.5.dp, Color.White.copy(alpha = 0.7f),
-                                            RoundedCornerShape(2.dp)
-                                        ) else Modifier
-                                    )
-                                    .then(
-                                        if (!isFuture) Modifier.clickable {
-                                            onCellClick(date, count)
-                                        } else Modifier
-                                    )
-
-                                Box(mod)
+                        for (row in 0 until 7) {
+                            val date = firstVisibleDate.plus(col * 7 + row, DateTimeUnit.DAY)
+                            val isFuture = date > today
+                            val count = if (isFuture) 0 else (dayCounts[date] ?: 0)
+                            add(Triple(date, count, isFuture))
+                        }
+                    }
+                }
+            }
+            
+            val heightDp = cellSize * 7 + gap * 6
+            
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(heightDp)
+                        .padding(start = if (leftoverPx > 0f) with(LocalDensity.current) { (leftoverPx / 2f).toDp() } else 0.dp)
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(cells) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val leftPad = if (leftoverPx > 0f) leftoverPx / 2f else 0f
+                                    val x = down.position.x - leftPad
+                                    val y = down.position.y
+                                    val col = (x / stepPx).toInt()
+                                    val row = (y / stepPx).toInt()
+                                    if (col in 0 until cols && row in 0..6) {
+                                        val idx = col * 7 + row
+                                        if (idx < cells.size) {
+                                            val (date, count, isFuture) = cells[idx]
+                                            if (!isFuture) onCellClick(date, count)
+                                        }
+                                    }
+                                }
+                            }
+                    ) {
+                        val leftPad = if (leftoverPx > 0f) leftoverPx / 2f else 0f
+                        var idx = 0
+                        for (col in 0 until cols) {
+                            for (row in 0 until 7) {
+                                val (date, count, isFuture) = cells[idx]
+                                val x = leftPad + col * stepPx
+                                val y = row * stepPx
+                                if (!isFuture) {
+                                    val bg = colorFor(count)
+                                    drawRoundRect(bg, Offset(x, y), Size(cellSizePx, cellSizePx), CornerRadius(2f, 2f))
+                                    if (date == today) {
+                                        drawRoundRect(
+                                            Color.White.copy(alpha = 0.7f),
+                                            Offset(x, y), Size(cellSizePx, cellSizePx),
+                                            CornerRadius(2f, 2f),
+                                            style = Stroke(width = 1.5f)
+                                        )
+                                    }
+                                }
+                                idx++
                             }
                         }
                     }
                 }
-
+                
                 Spacer(Modifier.height(8.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween

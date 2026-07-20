@@ -239,7 +239,7 @@ private fun SaferSection(
                 Text(title, style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
-                SelectableText(
+                Text(
                     text = body,
                     style = MaterialTheme.typography.bodySmall.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant

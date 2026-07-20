@@ -3,6 +3,8 @@ package app.journal.sync
 import java.io.File
 import java.io.FileOutputStream
 import java.math.BigInteger
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.security.*
 import java.security.cert.X509Certificate
 import java.util.*
@@ -17,6 +19,36 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.security.cert.Certificate
+
+/**
+ * Resolve this machine's site-local (LAN) IPv4 address for sync discovery.
+ *
+ * Enumerates all network interfaces, picks the first site-local IPv4 address
+ * (192.168.x.x, 10.x.x.x, 172.16-31.x.x), falling back to any non-loopback
+ * IPv4 address. Returns null if no suitable address is found.
+ */
+fun resolveLocalIpV4(): String? {
+    val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
+    val candidates = mutableListOf<String>()
+    while (interfaces.hasMoreElements()) {
+        val iface = interfaces.nextElement()
+        if (iface.isLoopback || !iface.isUp) continue
+        val addresses = iface.inetAddresses
+        while (addresses.hasMoreElements()) {
+            val addr = addresses.nextElement()
+            if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                val host = addr.hostAddress ?: continue
+                if (addr.isSiteLocalAddress) {
+                    // Site-local is the best candidate — return immediately
+                    return host
+                }
+                candidates.add(host)
+            }
+        }
+    }
+    // Fall back to any non-loopback IPv4
+    return candidates.firstOrNull()
+}
 
 actual fun generateSelfSignedP12(
     storePath: String,

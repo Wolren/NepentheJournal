@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -454,10 +456,11 @@ fun DoseEditDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                LazyColumn(
-                                    modifier = Modifier.heightIn(max = 200.dp)
+                                val scrollState = rememberScrollState()
+                                Column(
+                                    modifier = Modifier.heightIn(max = 200.dp).verticalScroll(scrollState)
                                 ) {
-                                    itemsIndexed(filtered.take(50)) { idx, sub ->
+                                    filtered.take(50).forEachIndexed { idx, sub ->
                                         Surface(
                                             onClick = {
                                                 selectedSubstanceId = sub.id
@@ -482,14 +485,12 @@ fun DoseEditDialog(
                                         }
                                     }
                                     if (filtered.size > 50) {
-                                        item {
-                                            Text(
-                                                "+ ${filtered.size - 50} more...",
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                                            )
-                                        }
+                                        Text(
+                                            "+ ${filtered.size - 50} more...",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                                        )
                                     }
                                 }
                             }

@@ -18,6 +18,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.journal.util.isDesktopPlatform
 
 /**
  * Reusable screen scaffold with TopAppBar and LazyColumn content.
@@ -36,7 +37,7 @@ fun ScreenScaffold(
     content: LazyListScope.() -> Unit
 ) {
     // Desktop Esc key handler
-    val keyHandler = if (onBack != null) {
+    val keyHandler = if (onBack != null && isDesktopPlatform()) {
         Modifier.onPreviewKeyEvent { event ->
             if (event.key == Key.Escape) {
                 try { onBack() } catch (_: Exception) { }

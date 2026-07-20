@@ -6,37 +6,31 @@ import app.journal.model.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 
-/**
- * ViewModel for [SessionListScreen].
- *
- * Encapsulates all filtering, sorting, and tag-extraction logic that was
- * previously inline in the Composable. Testable without Compose runtime.
- *
- * Create via [create] for production (uses [JournalRepository.instance])
- * or directly with a mock [IJournalRepository] for tests.
- */
+data class SubstanceFilterItem(val id: String, val name: String)
+
 class SessionListViewModel(
-    val repo: IJournalRepository,
+    @PublishedApi internal val repo: IJournalRepository = JournalRepository.instance,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
     /** All sessions from the repository. */
     val sessions: StateFlow<List<Session>> = repo.sessions
 
     // ---- Filter state ----
-    val filterTags = MutableStateFlow<Set<String>>(emptySet())
+    val filterSubstanceIds = MutableStateFlow<Set<String>>(emptySet())
     val showFavoritesOnly = MutableStateFlow(false)
     val showArchived = MutableStateFlow(false)
     val consumerFilter = MutableStateFlow<String?>(null)
     val searchQuery = MutableStateFlow("")
 
-    /** Distinct tags across all sessions, sorted. */
-    val allTags = sessions.map { list ->
-        list.flatMap { it.tags }.distinct().sorted()
+    /** Distinct substances used across all sessions, sorted by name. */
+    val allSessionSubstances = combine(repo.doses, repo.substances) { doses, subs ->
+        val nameMap = subs.associate { it.id to it.name }
+        doses.map { it.substanceId }
+            .distinct()
+            .mapNotNull { id -> nameMap[id]?.let { name -> SubstanceFilterItem(id, name) } }
+            .sortedBy { it.name }
     }
 
     /** Distinct consumer names across all sessions, sorted. */
@@ -45,36 +39,46 @@ class SessionListViewModel(
     }
 
     /** Filtered and sorted sessions derived from filter state. */
-    val filteredSessions = combine(
-        sessions, filterTags, showFavoritesOnly, showArchived,
+    val filteredSessions = combine6(
+        sessions, filterSubstanceIds, showFavoritesOnly, showArchived,
         consumerFilter, searchQuery
-    ) { all, tags, favsOnly, archived, consumer, query ->
+    ) { all: List<Session>, subIds: Set<String>, favsOnly: Boolean, archived: Boolean, consumer: String?, query: String ->
         val q = if (query.isNotBlank()) query.lowercase() else null
+        val matchingSessionIds = if (subIds.isEmpty()) null
+            else buildSet<String> {
+                for (s in all) {
+                    for (d in repo.dosesForSession(s.id)) {
+                        if (d.substanceId in subIds) {
+                            add(s.id)
+                            break
+                        }
+                    }
+                }
+            }
         all
             .filter { s ->
-                if (tags.isNotEmpty() && s.tags.none { it in tags }) return@filter false
+                if (matchingSessionIds != null && s.id !in matchingSessionIds) return@filter false
                 if (favsOnly && !s.isFavorite) return@filter false
                 if (!archived && s.isArchived) return@filter false
                 if (consumer != null && s.consumerName != consumer) return@filter false
                 if (q != null) {
                     s.title.lowercase().contains(q) ||
-                    s.tags.any { it.lowercase().contains(q) } ||
                     s.intention?.lowercase()?.contains(q) == true
                 } else true
             }
             .sortedByDescending { it.startTime }
     }
 
-    fun toggleTag(tag: String) {
-        filterTags.value = if (tag in filterTags.value) {
-            filterTags.value - tag
+    fun toggleSubstance(substanceId: String) {
+        filterSubstanceIds.value = if (substanceId in filterSubstanceIds.value) {
+            filterSubstanceIds.value - substanceId
         } else {
-            filterTags.value + tag
+            filterSubstanceIds.value + substanceId
         }
     }
 
     fun clearFilters() {
-        filterTags.value = emptySet()
+        filterSubstanceIds.value = emptySet()
         showFavoritesOnly.value = false
         showArchived.value = false
         consumerFilter.value = null
@@ -87,10 +91,10 @@ class SessionListViewModel(
 }
 
 /**
- * Combines multiple StateFlows into a single flow using [kotlinx.coroutines.flow.combine].
- * Kotlin's built-in combine only takes up to 5 flows; this wraps 6.
+ * Kotlin's built-in combine only takes up to 5 flows.
+ * This provides a 6-flow variant.
  */
-private fun <T1, T2, T3, T4, T5, T6, R> combine(
+private fun <T1, T2, T3, T4, T5, T6, R> combine6(
     flow1: kotlinx.coroutines.flow.Flow<T1>,
     flow2: kotlinx.coroutines.flow.Flow<T2>,
     flow3: kotlinx.coroutines.flow.Flow<T3>,
@@ -103,8 +107,12 @@ private fun <T1, T2, T3, T4, T5, T6, R> combine(
     transform = { args: Array<*> ->
         @Suppress("UNCHECKED_CAST")
         transform(
-            args[0] as T1, args[1] as T2, args[2] as T3,
-            args[3] as T4, args[4] as T5, args[5] as T6
+            args[0] as T1,
+            args[1] as T2,
+            args[2] as T3,
+            args[3] as T4,
+            args[4] as T5,
+            args[5] as T6
         )
     }
 )

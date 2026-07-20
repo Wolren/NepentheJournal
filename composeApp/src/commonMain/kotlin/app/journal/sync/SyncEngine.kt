@@ -2,6 +2,7 @@ package app.journal.sync
 
 import app.journal.model.SyncConfig
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * P2P Sync orchestration with support for:
@@ -47,6 +48,12 @@ interface SyncEngine {
 
     /** Observe overall sync status. */
     fun observeStatus(): Flow<SyncStatusSnapshot>
+
+    /** Observe LAN-discovered peers from mDNS scanning. */
+    fun observeDiscoveredPeers(): Flow<List<DiscoveredPeer>> = emptyFlow()
+
+    /** Observe debug log lines from sync operations. */
+    fun observeDebugLog(): Flow<String> = emptyFlow()
 }
 
 data class TrustedDeviceInfo(

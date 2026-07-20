@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 
 /**
  * JVM implementation of SyncEngine using TLS + HMAC-authenticated HTTP transport
@@ -38,6 +39,25 @@ class SyncTransport(
     private var lastSyncTime: Long? = null
     private var activePeers = Collections.synchronizedList(mutableListOf<ConnectedPeer>())
     private var tokenRefreshJob: Job? = null
+
+    // Background coroutine scope for mDNS and other long-lived tasks
+    private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    // Mutual exclusion for sync operations — prevents concurrent pairing/trust-store races.
+    // ReentrantLock allows recursive syncWith() calls (fingerprint-probe and post-pairing paths).
+    private val syncLock = ReentrantLock()
+
+    // Active discovered peers from LAN scanning
+    private val _discoveredPeers = MutableStateFlow<List<DiscoveredPeer>>(emptyList())
+
+    // Debug log — keeps the last 200 sync-related events for the UI debug viewer
+    private val _debugLog = MutableSharedFlow<String>(replay = 200)
+    private fun appendDebug(msg: String) {
+        Log.withTag("SyncTransport").i { msg }
+        _debugLog.tryEmit("[${timestamp()}] $msg")
+    }
+    private fun timestamp(): String =
+        java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
 
     private val _status = MutableStateFlow(SyncStatusSnapshot(
         isHosting = false, hostAddress = null,
@@ -71,6 +91,7 @@ class SyncTransport(
         withContext(Dispatchers.IO) {
             try {
                 server?.stop()
+                appendDebug("Starting sync server on port ${config.listenerPort}")
                 val fp = deviceFingerprint
                 val srv = KtorSyncServer(
                     repo = repo,
@@ -94,6 +115,7 @@ class SyncTransport(
                     pairingToken = token,
                     pairedDeviceCount = trustStore.count()
                 )
+                appendDebug("Server started on ${info.address}:${info.port} (fp=$fp)")
                 tokenRefreshJob?.cancel()
                 tokenRefreshJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
                     while (isActive) {
@@ -102,6 +124,34 @@ class SyncTransport(
                         _status.value = _status.value.copy(
                             pairingToken = authenticator.currentPairingToken()
                         )
+                    }
+                }
+                // Ensure mDNS service is registered for LAN discovery
+                if (lanDiscovery == null) {
+                    try {
+                        val discovery = LanDiscovery()
+                        lanDiscovery = discovery
+                        backgroundScope.launch {
+                            discovery.startDiscovery().collect { event ->
+                                when (event) {
+                                    is LanDiscoveryEvent.PeerFound -> {
+                                        appendDebug("mDNS found: ${event.peer.displayName} (${event.peer.host}:${event.peer.port})")
+                                        _discoveredPeers.value = _discoveredPeers.value
+                                            .filter { it.deviceId != event.peer.deviceId }
+                                            .plus(event.peer)
+                                    }
+                                    is LanDiscoveryEvent.PeerLost -> {
+                                        _discoveredPeers.value = _discoveredPeers.value
+                                            .filter { it.deviceId != event.deviceId }
+                                    }
+                                    is LanDiscoveryEvent.DiscoveryError -> {
+                                        Log.withTag("SyncTransport").w { "Discovery: ${event.reason}" }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.withTag("SyncTransport").w { "mDNS init failed: ${e.message}" }
                     }
                 }
                 lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
@@ -116,9 +166,12 @@ class SyncTransport(
     override suspend fun stopHosting() {
         server?.stop()
         server = null
+        appendDebug("Sync server stopped")
         tokenRefreshJob?.cancel()
         tokenRefreshJob = null
         lanDiscovery?.unregisterService()
+        lanDiscovery?.stop()
+        lanDiscovery = null
         authenticator.clearPendingPairing()
         activePeers.clear()
         _status.value = _status.value.copy(
@@ -130,13 +183,16 @@ class SyncTransport(
 
     override suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> =
         withContext(Dispatchers.IO) {
+            syncLock.lock()
             try {
                 val fp = deviceFingerprint // ensure identity
 
+                // Try to find an existing trusted peer by fingerprint or deviceId
                 val existingPeer = peer.fingerprint?.let { trustStore.getPeer(it) }
                     ?: (peer.deviceId?.let { trustStore.getPeerById(it) })
 
                 if (existingPeer != null) {
+                    appendDebug("Found trusted peer: ${existingPeer.displayName} (fp=${existingPeer.fingerprint.take(8)}...)")
                     val secret = existingPeer.sharedSecret
                     val client = KtorSyncClient(
                         repo = repo,
@@ -149,12 +205,14 @@ class SyncTransport(
                     )
                     try {
                         val since = lastSyncTime ?: 0L
+                        appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since")
                         val exchange = client.pushChanges(
                             host = peer.host, port = peer.port,
                             deviceId = deviceId, deviceName = deviceDisplayName, since = since
                         )
                         if (exchange.isFailure) {
                             val error = exchange.exceptionOrNull()
+                            appendDebug("Push failed: ${error?.message}")
                             _status.value = _status.value.copy(lastError = error?.message)
                             return@withContext Result.failure(error ?: Exception("Sync exchange failed"))
                         }
@@ -164,27 +222,69 @@ class SyncTransport(
                         val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
                         if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)
                         updateStatus()
+                        appendDebug("Sync with ${existingPeer.displayName} succeeded")
 
-                        // If continuous requested, upgrade to WebSocket
                         if (continuous) {
                             try {
                                 startContinuousSync(peer)
-                            } catch (_: Exception) {
-                                // WS upgrade optional — HTTP sync still succeeded
-                            }
+                            } catch (_: Exception) { }
                         }
                         Result.success(Unit)
                     } finally {
                         client.close()
                     }
                 } else {
+                    appendDebug("No existing peer by fingerprint/deviceId for ${peer.host}:${peer.port}")
+
+                    // If no pairing token was provided, try to identify the host by fingerprint
+                    if (peer.pairingToken.isNullOrBlank()) {
+                        appendDebug("No pairing token — attempting fingerprint-based re-connect")
+                        try {
+                            val probeClient = KtorSyncClient(
+                                repo = repo,
+                                tlsIdentity = tlsIdentity,
+                                trustedFingerprint = null
+                            )
+                            try {
+                                val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
+                                if (hostInfo.isSuccess) {
+                                    val info = hostInfo.getOrThrow()
+                                    appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
+                                    val knownPeer = trustStore.getPeer(info.fingerprint)
+                                    if (knownPeer != null) {
+                                        appendDebug("Already paired with ${knownPeer.displayName} — re-using stored secret")
+                                        val trustedPeer = DiscoveredPeer(
+                                            deviceId = knownPeer.deviceId,
+                                            displayName = knownPeer.displayName,
+                                            host = peer.host,
+                                            port = peer.port,
+                                            isTrusted = true,
+                                            fingerprint = knownPeer.fingerprint
+                                        )
+                                        return@withContext syncWith(trustedPeer, continuous)
+                                    }
+                                    appendDebug("Host fingerprint not in trust store — needs pairing")
+                                } else {
+                                    appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
+                                }
+                            } finally {
+                                probeClient.close()
+                            }
+                        } catch (e: Exception) {
+                            appendDebug("Fingerprint probe failed: ${e.message}")
+                        }
+                    }
+
+                    // Standard pairing flow
                     val pairResult = pairWithPeer(peer)
                     if (pairResult.isFailure) {
                         val error = pairResult.exceptionOrNull()
+                        appendDebug("Pairing failed: ${error?.message}")
                         _status.value = _status.value.copy(lastError = error?.message)
                         return@withContext Result.failure(error ?: Exception("Pairing failed"))
                     }
-                    val nowTrusted = trustStore.getPeerById(pairResult.getOrThrow().deviceId)
+                    appendDebug("Pairing succeeded")
+                    val nowTrusted = trustStore.getPeerById(pairResult.getOrThrow().hostDeviceId)
                     if (nowTrusted != null) {
                         val trustedPeer = DiscoveredPeer(
                             deviceId = nowTrusted.deviceId,
@@ -194,13 +294,18 @@ class SyncTransport(
                             isTrusted = true,
                             fingerprint = nowTrusted.fingerprint
                         )
+                        appendDebug("Re-syncing with trusted peer ${nowTrusted.displayName}")
                         return@withContext syncWith(trustedPeer, continuous)
                     }
+                    appendDebug("CRITICAL: Peer stored during pairing but not found by hostDeviceId")
                     Result.failure(Exception("Pairing completed but device not found in trust store"))
                 }
             } catch (e: Exception) {
+                appendDebug("syncWith exception: ${e.message}")
                 _status.value = _status.value.copy(lastError = e.message)
                 Result.failure(e)
+            } finally {
+                syncLock.unlock()
             }
         }
 
@@ -209,11 +314,13 @@ class SyncTransport(
             try {
                 val token = peer.pairingToken
                 if (token.isNullOrBlank()) {
+                    appendDebug("pairWithPeer: no token provided for ${peer.host}:${peer.port}")
                     return@withContext Result.failure(
                         Exception("Pairing token required. Enter the token shown on the host device.")
                     )
                 }
 
+                appendDebug("pairWithPeer: checking host info at ${peer.host}:${peer.port}")
                 val client = KtorSyncClient(
                     repo = repo,
                     tlsIdentity = tlsIdentity,
@@ -222,11 +329,12 @@ class SyncTransport(
                 try {
                     val hostInfo = client.requestHostInfo(peer.host, peer.port)
                     if (hostInfo.isFailure) {
+                        appendDebug("pairWithPeer: host unreachable: ${hostInfo.exceptionOrNull()?.message}")
                         return@withContext Result.failure(
                             hostInfo.exceptionOrNull() ?: Exception("Could not reach peer for pairing")
                         )
                     }
-
+                    appendDebug("pairWithPeer: host reachable, completing pairing with token=$token")
                     val result = client.completePairing(
                         host = peer.host, port = peer.port,
                         token = token,
@@ -237,6 +345,7 @@ class SyncTransport(
 
                     if (result.isSuccess) {
                         val pr = result.getOrThrow()
+                        appendDebug("pairWithPeer: success, hostDeviceId=${pr.hostDeviceId}, sharedSecret=${pr.sharedSecret.take(8)}...")
                         trustStore.addPeer(DeviceTrustStore.TrustedPeer(
                             deviceId = pr.hostDeviceId,
                             displayName = pr.hostDeviceName,
@@ -244,13 +353,17 @@ class SyncTransport(
                             sharedSecret = pr.sharedSecret,
                             pairedAt = System.currentTimeMillis()
                         ))
+                        appendDebug("pairWithPeer: stored trusted peer ${pr.hostDeviceName} (id=${pr.hostDeviceId})")
                         updateStatus()
+                    } else {
+                        appendDebug("pairWithPeer: host rejected pairing: ${result.exceptionOrNull()?.message}")
                     }
                     result
                 } finally {
                     client.close()
                 }
             } catch (e: Exception) {
+                appendDebug("pairWithPeer exception: ${e.message}")
                 Result.failure(e)
             }
         }
@@ -350,17 +463,35 @@ class SyncTransport(
         lanDiscovery?.stop()
         val discovery = LanDiscovery()
         lanDiscovery = discovery
-        val flow = discovery.startDiscovery()
+        val rawFlow = discovery.startDiscovery()
         val srv = server
         if (srv != null && srv.isRunning) {
             discovery.registerService(srv.actualPort, deviceId, deviceFingerprint)
         }
-        return flow
+        // Route events into the shared discovered-peers state for screens to observe
+        return rawFlow.onEach { event ->
+            when (event) {
+                is LanDiscoveryEvent.PeerFound -> {
+                    _discoveredPeers.value = _discoveredPeers.value
+                        .filter { it.deviceId != event.peer.deviceId }
+                        .plus(event.peer)
+                }
+                is LanDiscoveryEvent.PeerLost -> {
+                    _discoveredPeers.value = _discoveredPeers.value
+                        .filter { it.deviceId != event.deviceId }
+                }
+                is LanDiscoveryEvent.DiscoveryError -> { }
+            }
+        }
     }
 
     override suspend fun stopDiscovery() {
-        lanDiscovery?.stop()
-        lanDiscovery = null
+        val srv = server
+        if (srv == null || !srv.isRunning) {
+            lanDiscovery?.stop()
+            lanDiscovery = null
+        }
+        // If server is still running, keep LanDiscovery alive for mDNS service registration
     }
 
     override suspend fun connectManually(host: String, port: Int, token: String?): Result<Unit> {
@@ -377,6 +508,11 @@ class SyncTransport(
     }
 
     // ---- Status ----
+
+    override fun observeDebugLog(): Flow<String> = _debugLog
+
+    override fun observeDiscoveredPeers(): Flow<List<DiscoveredPeer>> =
+        _discoveredPeers.asStateFlow()
 
     override fun observeStatus(): Flow<SyncStatusSnapshot> = _status.asStateFlow()
 

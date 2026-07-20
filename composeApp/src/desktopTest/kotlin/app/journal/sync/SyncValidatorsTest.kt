@@ -115,26 +115,6 @@ class SyncValidatorsTest {
     }
 
     @Test
-    fun tooManySessionTagsRejected() {
-        val tags = (1..51).map { "tag-$it" }
-        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
-            sessions = listOf(session("s:1").copy(tags = tags)))))
-    }
-
-    @Test
-    fun maxSessionTagsAccepted() {
-        val tags = (1..50).map { "tag-$it" }
-        assertNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
-            sessions = listOf(session("s:1").copy(tags = tags)))))
-    }
-
-    @Test
-    fun sessionTagTooLongRejected() {
-        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
-            sessions = listOf(session("s:1").copy(tags = listOf("a".repeat(101)))))))
-    }
-
-    @Test
     fun doseAmountNegativeRejected() {
         assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(dose("d:1", "s:1").copy(amount = -1.0)))))

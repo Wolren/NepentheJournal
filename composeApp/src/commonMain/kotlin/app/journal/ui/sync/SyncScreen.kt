@@ -3,6 +3,7 @@ package app.journal.ui.sync
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
@@ -90,6 +91,28 @@ fun SyncScreen(syncEngine: SyncEngine) {
     var manualToken by remember { mutableStateOf("") }
     var continuousSync by remember { mutableStateOf(false) }
     var logLines by remember { mutableStateOf(listOf(LogEntry("Sync engine ready", LogType.INFO))) }
+
+    // LAN discovery state
+    var discoveredPeers by remember { mutableStateOf<List<DiscoveredPeer>>(emptyList()) }
+    var isScanning by remember { mutableStateOf(false) }
+
+    // Debug log state
+    var debugLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showDebugLog by remember { mutableStateOf(false) }
+
+    // Start/stop LAN discovery collection when screen enters
+    LaunchedEffect(Unit) {
+        syncEngine.observeDiscoveredPeers().collect { peers ->
+            discoveredPeers = peers
+        }
+    }
+
+    // Collect debug log lines
+    LaunchedEffect(Unit) {
+        syncEngine.observeDebugLog().collect { line ->
+            debugLines = (debugLines + line).take(200)
+        }
+    }
 
     // Loading states for async operations
     var isStartingHost by remember { mutableStateOf(false) }
@@ -426,6 +449,108 @@ fun SyncScreen(syncEngine: SyncEngine) {
                         }
                     )
 
+                    // ---- LAN scan ----
+                    Spacer(Modifier.height(8.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Wifi,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text("Scan LAN", style = MaterialTheme.typography.titleSmall)
+                        }
+                        if (isScanning) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Text("Scanning",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        } else {
+                            AppTonalButton(
+                                onClick = {
+                                    scope.launch {
+                                        isScanning = true
+                                        logLines = listOf(LogEntry("Scanning LAN for devices...", LogType.INFO)) + logLines
+                                        try {
+                                            syncEngine.startDiscovery(DiscoveryMode.HYBRID).collect {
+                                                // Events are routed to observeDiscoveredPeers() by the engine
+                                            }
+                                        } catch (e: Exception) {
+                                            logLines = listOf(LogEntry("Scan failed: ${e.message ?: e::class.simpleName ?: "Unknown"}", LogType.ERROR)) + logLines
+                                        } finally {
+                                            isScanning = false
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            ) {
+                                Text("Scan")
+                            }
+                        }
+                    }
+
+                    // Discovered peers list
+                    if (discoveredPeers.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Discovered devices",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(4.dp))
+                        discoveredPeers.forEach { peer ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clickable {
+                                        manualHost = peer.host
+                                        manualPort = peer.port.toString()
+                                        if (peer.pairingToken != null) manualToken = peer.pairingToken
+                                        logLines = listOf(LogEntry("Selected ${peer.displayName} (${peer.host}:${peer.port})", LogType.INFO)) + logLines
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(peer.displayName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium)
+                                        Text("${peer.host}:${peer.port}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Icon(
+                                        Icons.Default.Link,
+                                        contentDescription = "Connect",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(12.dp))
 
                     if (isSyncing) {
@@ -628,7 +753,19 @@ fun SyncScreen(syncEngine: SyncEngine) {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Event Log", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Event Log", style = MaterialTheme.typography.labelLarge)
+                        if (debugLines.isNotEmpty()) {
+                            TextButton(onClick = { showDebugLog = !showDebugLog }) {
+                                Text(if (showDebugLog) "Hide debug" else "Show debug",
+                                    style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(6.dp))
                     logLines.take(15).forEach { entry ->
                         Row(
@@ -662,6 +799,25 @@ fun SyncScreen(syncEngine: SyncEngine) {
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
+                    }
+
+                    // Debug log toggle
+                    if (showDebugLog && debugLines.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(8.dp))
+                        Text("Debug Log", style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(4.dp))
+                        debugLines.takeLast(30).forEach { line ->
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = 1.dp)
+                            )
+                        }
                     }
                 }
             }

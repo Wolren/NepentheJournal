@@ -25,10 +25,8 @@ private const val MAX_FIELD_LEN = 65536
 private const val MAX_ID_LEN = 128
 private const val MAX_NAME_LEN = 200
 private const val MAX_TITLE_LEN = 500
-private const val MAX_TAGS_PER_ENTITY = 50
-private const val MAX_TAG_LEN = 100
-private const val MAX_ROA_LEN = 50
 private const val MAX_UNIT_LEN = 20
+private const val MAX_ROA_LEN = 50
 private const val MAX_LABEL_LEN = 200
 
 /**
@@ -90,8 +88,6 @@ private fun validateSessions(sessions: List<Session>): String? {
         if ((s.setting?.length ?: 0) > MAX_FIELD_LEN) return "Session setting too long"
         if ((s.intention?.length ?: 0) > MAX_FIELD_LEN) return "Session intention too long"
         if ((s.outcome?.length ?: 0) > MAX_FIELD_LEN) return "Session outcome too long"
-        if (s.tags.size > MAX_TAGS_PER_ENTITY) return "Too many session tags"
-        if (s.tags.any { it.length > MAX_TAG_LEN }) return "Session tag too long"
         if (s.rating != null && (s.rating < 1 || s.rating > 10)) return "Invalid rating"
     }
     return null
@@ -115,7 +111,6 @@ private fun validateNotes(notes: List<Note>): String? {
         if (n.id.length > MAX_ID_LEN) return "Note ID too long"
         if (n.body.length > MAX_FIELD_LEN) return "Note body too long"
         if (n.title?.length ?: 0 > MAX_TITLE_LEN) return "Note title too long"
-        if (n.tags.size > MAX_TAGS_PER_ENTITY) return "Too many note tags"
     }
     return null
 }

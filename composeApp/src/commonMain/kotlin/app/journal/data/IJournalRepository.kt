@@ -116,8 +116,6 @@ interface IJournalRepository : IngestRepository {
     // ---- Query indices ----
     fun sessionIdsOnDateRange(fromDate: String? = null, toDate: String? = null): List<String>
     fun sessionIdsForSubstance(substanceId: String): List<String>
-    fun sessionIdsWithTag(tag: String): List<String>
-    fun sessionIdsWithAnyTag(tags: List<String>): Set<String>
     fun rebuildIndices()
 
     /**

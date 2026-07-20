@@ -79,7 +79,7 @@ actual class LanDiscovery {
 
         awaitClose {
             b.stop()
-            browser = null
+            // NSNetServiceBrowser kept alive — call stop() to fully shut down
         }
     }
 

@@ -124,4 +124,42 @@ class ExportImportTest {
         ExportImport.importSessions(repo, bundleJson)
         assertEquals("s:1", repo.doses.value.first().sessionId)
     }
+
+    @Test
+    fun importSkipsNegativeTimestamp() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(Substance(id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"), cachedAt = 0L, sourceVersion = "test"))
+        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:1","docType":"session","createdAt":-1,"updatedAt":1000,"deviceOrigin":"test","title":"Bad","startTime":2000},"doses":[]}]}"""
+        val count = ExportImport.importSessions(repo, bundleJson)
+        assertEquals(0, count, "session with negative createdAt should be skipped")
+    }
+
+    @Test
+    fun importSkipsFutureTimestamp() {
+        val repo = JournalRepository()
+        val farFuture = currentTimeMillis() + 31536000000L * 3  // 3 years — exceeds 2-year margin
+        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:2","docType":"session","createdAt":$farFuture,"updatedAt":1000,"deviceOrigin":"test","title":"Future","startTime":2000},"doses":[]}]}"""
+        val count = ExportImport.importSessions(repo, bundleJson)
+        assertEquals(0, count, "session with excessively future timestamp should be skipped")
+    }
+
+    @Test
+    fun importSkipsNanDoseAmount() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(Substance(id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"), cachedAt = 0L, sourceVersion = "test"))
+        repo.upsertSession(sampleSession("s:1"))
+        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:1","docType":"session","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","title":"NaN Dose","startTime":2000},"doses":[{"id":"d:1","docType":"dose","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","sessionId":"s:1","substanceId":"sub:1","routeOfAdministration":"Oral","amount":NaN,"unit":"mg","timestamp":2000}]}]}"""
+        val count = ExportImport.importSessions(repo, bundleJson)
+        assertEquals(0, count, "session with NaN dose should be skipped")
+    }
+
+    @Test
+    fun importSkipsInvalidIdWithPathTraversal() {
+        val repo = JournalRepository()
+        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"../../etc/passwd","docType":"session","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","title":"Bad","startTime":2000},"doses":[]}]}"""
+        val count = ExportImport.importSessions(repo, bundleJson)
+        assertEquals(0, count, "session with path traversal ID should be skipped")
+    }
 }

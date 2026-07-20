@@ -30,7 +30,7 @@ class CsvExporterTest {
         val repo = JournalRepository()
         val csv = CsvExporter.exportSessionsCsv(repo)
 
-        assertTrue(csv.startsWith("id,title,date,start_time,end_time,duration_hours,tags,set,setting,intention,outcome,rating,shulgin_rating,consumer,is_favorite,is_archived,substances,dose_count"))
+        assertTrue(csv.startsWith("id,title,date,start_time,end_time,duration_hours,set,setting,intention,outcome,rating,shulgin_rating,consumer,is_favorite,is_archived,substances,dose_count"))
         assertTrue(csv.contains("\n"))
     }
 
@@ -63,7 +63,7 @@ class CsvExporterTest {
 
         assertEquals(1, lines.size, "Only header row expected for empty repo")
         assertEquals(
-            "id,title,date,start_time,end_time,duration_hours,tags,set,setting,intention,outcome,rating,shulgin_rating,consumer,is_favorite,is_archived,substances,dose_count",
+            "id,title,date,start_time,end_time,duration_hours,set,setting,intention,outcome,rating,shulgin_rating,consumer,is_favorite,is_archived,substances,dose_count",
             lines[0]
         )
     }
@@ -186,23 +186,6 @@ class CsvExporterTest {
     }
 
     // ---- CSV formatting ----
-
-    @Test
-    fun csvEscapesCommasProperly() {
-        val repo = JournalRepository()
-        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
-        repo.upsertSession(
-            sampleSession("s:1").copy(
-                tags = listOf("tag,with,commas", "another")
-            )
-        )
-        repo.upsertDose(sampleDose("d:1", "s:1", "sub:1"))
-
-        val csv = CsvExporter.exportSessionsCsv(repo)
-        // Tags should be quoted: "tag,with,commas;another"
-        assertTrue(csv.contains("\"tag,with,commas;another\""),
-            "Tags with commas should be RFC 4180 quoted")
-    }
 
     @Test
     fun csvEscapesQuotesInFields() {

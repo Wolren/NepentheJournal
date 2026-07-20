@@ -24,7 +24,7 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     // Bounded set of recently seen nonces to prevent replay attacks within the timestamp window.
     // Uses ConcurrentHashMap.newKeySet() for thread-safe add-and-check.
     private val seenNonces = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private val MAX_SEEN_NONCES = 50_000
+    private val MAX_SEEN_NONCES = 5_000
 
     /**
      * Check and record a nonce for replay protection.

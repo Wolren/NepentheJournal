@@ -45,6 +45,7 @@ import app.journal.model.Session
 import app.journal.sync.SyncEngine
 import app.journal.sync.createSyncEngine
 import app.journal.util.currentTimeMillis
+import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
@@ -143,10 +144,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                         }
                     }
 
-                    val isSoftwareRender = remember {
-                        System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE" ||
-                        System.getProperty("skiko.renderApi", "").uppercase() == "SOFTWARE_FAST"
-                    }
+                    val isSoftwareRender = remember { isSoftwareRender() }
                     val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember {
                         if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
                         else spring(dampingRatio = 1f, stiffness = 4000f)
@@ -204,7 +202,6 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                             id = "session:live:${now}",
                                             title = "Live Session",
                                             startTime = now,
-                                            tags = emptyList(),
                                             createdAt = now, updatedAt = now,
                                             deviceOrigin = platformDeviceOrigin()
                                         )

@@ -18,8 +18,8 @@ object ExportImport {
     /** Earliest valid timestamp: any non-negative value after epoch. */
     const val MIN_VALID_TIMESTAMP = 0L
 
-    /** Maximum allowed margin into the future (10 years from import time). */
-    const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 10
+    /** Maximum allowed margin into the future (2 years from import time). */
+    const val TIMESTAMP_FUTURE_MARGIN_MS = 31536000000L * 2
 
     @Serializable
     data class SessionExportBundle(

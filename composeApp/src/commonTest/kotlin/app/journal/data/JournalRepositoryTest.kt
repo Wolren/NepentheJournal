@@ -184,33 +184,6 @@ class JournalRepositoryTest {
     }
 
     @Test
-    fun sessionIdsWithTagMatchesTaggedSessions() {
-        val repo = JournalRepository()
-        repo.upsertSession(Session(
-            id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "Session 1", startTime = 1000L, tags = listOf("deep", "focus")
-        ))
-        repo.upsertSession(Session(
-            id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "Session 2", startTime = 2000L, tags = listOf("deep", "social")
-        ))
-        assertEquals(2, repo.sessionIdsWithTag("deep").size)
-        assertEquals(1, repo.sessionIdsWithTag("focus").size)
-        assertEquals(setOf("s:1", "s:2"), repo.sessionIdsWithAnyTag(listOf("focus", "social")))
-    }
-
-    @Test
-    fun sessionIdsWithAnyTagReturnsAllWhenEmptyFilter() {
-        val repo = JournalRepository()
-        repo.upsertSession(sampleSession("s:1"))
-        repo.upsertSession(sampleSession("s:2"))
-        val result = repo.sessionIdsWithAnyTag(emptyList())
-        assertTrue("s:1" in result && "s:2" in result)
-    }
-
-    // ==================== Query indices ====================
-
-    @Test
     fun sessionIdsOnDateRangeFiltersCorrectly() {
         val repo = JournalRepository()
         // startTime in ms: 2024-01-15 = 1705276800000
@@ -385,7 +358,7 @@ class JournalRepositoryTest {
             sessions = listOf(
                 sampleSession("s:1", 1000L),
                 Session(id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-                    title = "S2", startTime = 2000L, tags = listOf("deep"))
+                    title = "S2", startTime = 2000L)
             ),
             doses = listOf(
                 sampleDose("d:1", "sub:1", "s:1", 1000L),
@@ -394,9 +367,6 @@ class JournalRepositoryTest {
         )
         // Session indices
         assertEquals(2, repo.sessions.value.size)
-        val tagged = repo.sessionIdsWithTag("deep")
-        assertEquals(1, tagged.size, "only session s:2 has 'deep' tag")
-        assertEquals("s:2", tagged.first())
         // Dose indices
         assertEquals(2, repo.dosesForSession("s:1").size)
         assertEquals(1, repo.sessionIdsForSubstance("sub:1").size)

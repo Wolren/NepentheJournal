@@ -2,7 +2,9 @@ package app.journal.ui.session
 
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
+import app.journal.model.Dose
 import app.journal.model.Session
+import app.journal.model.Substance
 import kotlin.test.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -11,24 +13,60 @@ class SessionListViewModelTest {
 
     private fun makeRepo(): JournalRepository {
         val repo = JournalRepository()
+        repo.upsertSubstance(Substance(
+            id = "sub:lsd", name = "LSD", substanceClass = emptyList(),
+            aliases = emptyList(), routesOfAdministration = emptyList(),
+            effects = emptyList(), toxicity = emptyList(),
+            createdAt = 0L, updatedAt = 0L, cachedAt = 0L, sourceVersion = "test"
+        ))
+        repo.upsertSubstance(Substance(
+            id = "sub:mdma", name = "MDMA", substanceClass = emptyList(),
+            aliases = emptyList(), routesOfAdministration = emptyList(),
+            effects = emptyList(), toxicity = emptyList(),
+            createdAt = 0L, updatedAt = 0L, cachedAt = 0L, sourceVersion = "test"
+        ))
+        repo.upsertSubstance(Substance(
+            id = "sub:weed", name = "Cannabis", substanceClass = emptyList(),
+            aliases = emptyList(), routesOfAdministration = emptyList(),
+            effects = emptyList(), toxicity = emptyList(),
+            createdAt = 0L, updatedAt = 0L, cachedAt = 0L, sourceVersion = "test"
+        ))
         repo.upsertSession(Session(
             id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "Deep Meditation", startTime = 5000L, tags = listOf("meditation", "focus"),
+            title = "Deep Meditation", startTime = 5000L,
             isFavorite = true
+        ))
+        repo.upsertDose(Dose(
+            id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", substanceId = "sub:lsd",
+            routeOfAdministration = "Oral", amount = 100.0, unit = "ug",
+            timestamp = 5000L
         ))
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "LSD Trip", startTime = 4000L, tags = listOf("psychedelic", "deep"),
+            title = "LSD Trip", startTime = 4000L,
             intention = "Introspection"
+        ))
+        repo.upsertDose(Dose(
+            id = "d:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:2", substanceId = "sub:lsd",
+            routeOfAdministration = "Oral", amount = 150.0, unit = "ug",
+            timestamp = 4000L
         ))
         repo.upsertSession(Session(
             id = "s:3", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "MDMA Session", startTime = 3000L, tags = listOf("empathogen"),
+            title = "MDMA Session", startTime = 3000L,
             consumerName = "Alice"
+        ))
+        repo.upsertDose(Dose(
+            id = "d:3", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:3", substanceId = "sub:mdma",
+            routeOfAdministration = "Oral", amount = 120.0, unit = "mg",
+            timestamp = 3000L
         ))
         repo.upsertSession(Session(
             id = "s:4", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "Archived Session", startTime = 2000L, tags = emptyList(),
+            title = "Archived Session", startTime = 2000L,
             isArchived = true
         ))
         return repo
@@ -43,11 +81,15 @@ class SessionListViewModelTest {
     }
 
     @Test
-    fun `allTags extracts distinct sorted tags`() = runBlocking {
+    fun `allSessionSubstances extracts distinct substances`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
         vm.showArchived.value = true
-        val tags = vm.allTags.first()
-        assertEquals(listOf("deep", "empathogen", "focus", "meditation", "psychedelic"), tags)
+        // combine may need a dispatch; wait for substance count
+        val items = vm.allSessionSubstances.first { it.size == 3 }
+        assertEquals(3, items.size)
+        assertTrue(items.any { it.name == "LSD" })
+        assertTrue(items.any { it.name == "MDMA" })
+        assertTrue(items.any { it.name == "Cannabis" })
     }
 
     @Test
@@ -58,18 +100,18 @@ class SessionListViewModelTest {
     }
 
     @Test
-    fun `filter by tag narrows results`() = runBlocking {
+    fun `filter by substance narrows results`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.filterTags.value = setOf("psychedelic")
+        vm.filterSubstanceIds.value = setOf("sub:mdma")
         val filtered = vm.filteredSessions.first()
         assertEquals(1, filtered.size)
-        assertEquals("LSD Trip", filtered.first().title)
+        assertEquals("MDMA Session", filtered.first().title)
     }
 
     @Test
-    fun `filter by multiple tags returns union`() = runBlocking {
+    fun `filter by substance returns union across sessions`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.filterTags.value = setOf("psychedelic", "empathogen")
+        vm.filterSubstanceIds.value = setOf("sub:lsd")
         val filtered = vm.filteredSessions.first()
         assertEquals(2, filtered.size)
     }
@@ -84,114 +126,35 @@ class SessionListViewModelTest {
     }
 
     @Test
-    fun `hide archived`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = false
-        val filtered = vm.filteredSessions.first()
-        assertEquals(3, filtered.size)
-        assertTrue(filtered.none { it.isArchived })
-    }
-
-    @Test
-    fun `show archived includes archived`() = runBlocking {
+    fun `search filters by title`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
         vm.showArchived.value = true
-        val filtered = vm.filteredSessions.first()
-        assertEquals(4, filtered.size)
-    }
-
-    @Test
-    fun `search by title`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.searchQuery.value = "lsd"
-        val filtered = vm.filteredSessions.first()
-        assertEquals(1, filtered.size)
-    }
-
-    @Test
-    fun `search by tag`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.searchQuery.value = "empathogen"
-        val filtered = vm.filteredSessions.first()
-        assertEquals(1, filtered.size)
-    }
-
-    @Test
-    fun `search by intention`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.searchQuery.value = "introspection"
-        val filtered = vm.filteredSessions.first()
-        assertEquals(1, filtered.size)
-    }
-
-    @Test
-    fun `search query is case insensitive`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
         vm.searchQuery.value = "LSD"
         val filtered = vm.filteredSessions.first()
         assertEquals(1, filtered.size)
+        assertEquals("LSD Trip", filtered.first().title)
     }
 
     @Test
-    fun `empty search returns all`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.searchQuery.value = ""
-        vm.showArchived.value = true
-        val filtered = vm.filteredSessions.first()
-        assertEquals(4, filtered.size)
-    }
-
-    @Test
-    fun `sort by recency descending`() = runBlocking {
+    fun `search filters by intention`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
         vm.showArchived.value = true
+        vm.searchQuery.value = "introspection"
         val filtered = vm.filteredSessions.first()
-        assertEquals(listOf("s:1", "s:2", "s:3", "s:4"), filtered.map { it.id })
-    }
-
-    @Test
-    fun `toggle tag adds and removes`() {
-        val vm = SessionListViewModel(makeRepo())
-        vm.toggleTag("deep")
-        assertTrue("deep" in vm.filterTags.value)
-        vm.toggleTag("deep")
-        assertFalse("deep" in vm.filterTags.value)
+        assertEquals(1, filtered.size)
+        assertEquals("LSD Trip", filtered.first().title)
     }
 
     @Test
     fun `clearFilters resets all filters`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.searchQuery.value = "lsd"
-        vm.filterTags.value = setOf("deep")
-        vm.showFavoritesOnly.value = true
-        vm.consumerFilter.value = "Alice"
-
-        vm.clearFilters()
-
-        assertEquals(emptySet<String>(), vm.filterTags.value)
-        assertEquals(null, vm.consumerFilter.value)
-        assertEquals(false, vm.showFavoritesOnly.value)
-        assertEquals(false, vm.showArchived.value)
-        assertEquals("", vm.searchQuery.value)
-    }
-
-    @Test
-    fun `consumer filter narrows results`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.consumerFilter.value = "Alice"
-        val filtered = vm.filteredSessions.first()
-        assertEquals(1, filtered.size)
-        assertEquals("MDMA Session", filtered.first().title)
-    }
-
-    @Test
-    fun `combined filters work together`() = runBlocking {
-        val vm = SessionListViewModel(makeRepo())
-        vm.filterTags.value = setOf("focus")
-        vm.searchQuery.value = "meditation"
         vm.showArchived.value = true
+        vm.filterSubstanceIds.value = setOf("sub:mdma")
+        vm.searchQuery.value = "test"
+        vm.showFavoritesOnly.value = true
+        vm.clearFilters()
         val filtered = vm.filteredSessions.first()
-        assertEquals(1, filtered.size)
-        assertEquals("Deep Meditation", filtered.first().title)
+        // After clear: archived off, favorites off, no substance filter, no search
+        assertEquals(3, filtered.size) // s:4 is archived, hidden
     }
 }

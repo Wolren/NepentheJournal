@@ -98,9 +98,8 @@ fun renderSessionToObsidianNote(
             appendLine("substances:")
             substances.forEach { name -> appendLine("  - \"${yamlEscape(name)}\"") }
         }
-        if (session.tags.isNotEmpty() || session.isFavorite || session.isArchived) {
+        if (session.isFavorite || session.isArchived) {
             val allTags = buildList {
-                addAll(session.tags)
                 if (session.isFavorite) add("favorite")
                 if (session.isArchived) add("archived")
             }
@@ -205,10 +204,6 @@ fun renderSessionToObsidianNote(
             for (note in notes.sortedByDescending { it.createdAt }) {
                 val noteTitle = note.title ?: "Note"
                 appendLine("### ${mdCell(noteTitle)}")
-                if (note.tags.isNotEmpty()) {
-                    appendLine("*Tags: ${note.tags.joinToString(", ") { "`$it`" }}*")
-                    appendLine()
-                }
                 if (note.isPinned) {
                     appendLine("> **Pinned**")
                     appendLine()

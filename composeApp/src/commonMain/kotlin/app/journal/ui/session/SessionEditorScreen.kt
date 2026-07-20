@@ -56,10 +56,6 @@ fun SessionEditorScreen(
     var shulginRating by remember {
         mutableStateOf(sessionToEdit?.shulginRating ?: "")
     }
-    var tagInput by remember { mutableStateOf("") }
-    var tags by remember {
-        mutableStateOf(sessionToEdit?.tags?.toMutableList() ?: mutableListOf())
-    }
 
     // Dose editing
     var showDoseDialog by remember { mutableStateOf(false) }
@@ -98,7 +94,6 @@ fun SessionEditorScreen(
             notes != (s?.notes ?: "") ||
             rating != (s?.rating?.toString() ?: "") ||
             shulginRating != (s?.shulginRating ?: "") ||
-            tags.toList() != (s?.tags ?: emptyList<String>()) ||
             currentDoseIds != originalDoseIds
         }
     }
@@ -115,7 +110,6 @@ fun SessionEditorScreen(
             title = title.ifBlank { "Untitled Session" },
             startTime = startTime,
             endTime = if (endTimeValue != null && endTimeValue > 1000L && endTimeValue != startTime) endTimeValue else null,
-            tags = tags.toList(),
             set = set.ifBlank { null },
             setting = setting.ifBlank { null },
             intention = intention.ifBlank { null },
@@ -334,85 +328,6 @@ fun SessionEditorScreen(
                             },
                             label = { Text(n.toString(), style = MaterialTheme.typography.labelSmall) },
                             modifier = Modifier.height(32.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Tags
-        item {
-            Text("Tags", style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = tagInput,
-                    onValueChange = { tagInput = it },
-                    placeholder = { Text("Add tag...") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                AppTonalButton(
-                    onClick = {
-                        val t = tagInput.trim().lowercase()
-                        if (t.isNotEmpty() && t !in tags) {
-                            tags = (tags + t).toMutableList()
-                            tagInput = ""
-                        }
-                    },
-                    enabled = tagInput.isNotBlank()
-                ) { Text("Add") }
-            }
-            // Previous tags from other sessions — tap to reuse
-            val allSessions by repo.sessions.collectAsState()
-            val existingTags = remember(allSessions) {
-                allSessions.flatMap { it.tags }.distinct().filter { it !in tags }.take(15)
-            }
-            if (existingTags.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text("Previous tags",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                Spacer(Modifier.height(2.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    existingTags.forEach { tag ->
-                        SuggestionChip(
-                            onClick = {
-                                if (tag !in tags) {
-                                    tags = (tags + tag).toMutableList()
-                                }
-                            },
-                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
-                            border = null
-                        )
-                    }
-                }
-            }
-            if (tags.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    tags.forEach { tag ->
-                        InputChip(
-                            selected = false,
-                            onClick = { tags = tags.filter { it != tag }.toMutableList() },
-                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
-                            trailingIcon = {
-                                Icon(Icons.Default.Close, contentDescription = "Remove $tag",
-                                    modifier = Modifier.size(14.dp))
-                            }
                         )
                     }
                 }

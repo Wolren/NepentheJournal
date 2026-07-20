@@ -25,6 +25,7 @@ import app.journal.model.Substance
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
+import app.journal.util.isDesktopPlatform
 import app.journal.ui.components.*
 
 @Composable
@@ -223,6 +224,7 @@ private fun SubstanceCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
+        useAnimations = isDesktopPlatform(),
     ) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {

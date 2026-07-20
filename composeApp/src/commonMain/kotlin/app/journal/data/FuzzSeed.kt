@@ -18,15 +18,6 @@ object FuzzSeed {
     // Consumer names for multi-consumer testing
     private val consumers = listOf(null, "Alex", "Sam", "Jordan", "Casey")
 
-    // Tag pool
-    private val tagPool = listOf(
-        "introspective", "nature", "social", "therapeutic", "creative",
-        "low dose", "high dose", "evening", "morning", "outdoors",
-        "indoor", "alone", "with friends", "with partner", "music",
-        "art", "meditation", "dancing", "walking", "festival",
-        "ceremony", "microdose", "trip", "therapy", "exploration"
-    )
-
     // Set/mindset pool
     private val sets = listOf(
         "Curious and open",
@@ -115,7 +106,6 @@ object FuzzSeed {
                 val sessionStart = sixMonthsAgo + rng.nextLong(170L * dayMs)
                 val durationHours = (2 + rng.nextInt(10)).toLong()
                 val sessionEnd = sessionStart + durationHours * hourMs
-                val tags = (1..rng.nextInt(1, 5)).map { tagPool[rng.nextInt(tagPool.size)] }.distinct()
                 val consumer = consumers[rng.nextInt(consumers.size)]
                 val rating = if (rng.nextFloat() < 0.85f) 3 + rng.nextInt(8) else null
 
@@ -128,7 +118,6 @@ object FuzzSeed {
                     title = generateTitle(comboSubstances, i),
                     startTime = sessionStart,
                     endTime = sessionEnd,
-                    tags = tags,
                     set = sets[rng.nextInt(sets.size)],
                     setting = settings[rng.nextInt(settings.size)],
                     intention = intentions[rng.nextInt(intentions.size)],

@@ -28,7 +28,7 @@ import kotlinx.datetime.toLocalDateTime
 data class SessionDataRow(
     val id: String, val title: String, val date: String,
     val startTime: String, val endTime: String?,
-    val durationHours: Double?, val tags: String,
+    val durationHours: Double?,
     val set: String?, val setting: String?, val intention: String?,
     val outcome: String?, val rating: Int?,
     val shulginRating: String?, val consumerName: String?,
@@ -140,7 +140,6 @@ class JournalRepository internal constructor() : IJournalRepository {
     // ---- Precomputed query indices ----
     private val _sessionsByDate = mutableMapOf<LocalDate, MutableList<String>>()
     private val _sessionsPerSubstance = mutableMapOf<String, MutableSet<String>>()
-    private val _sessionsByTag = mutableMapOf<String, MutableSet<String>>()
     /** substanceId -> list of effects that reference this substance */
     private val _effectsBySubstance = mutableMapOf<String, MutableList<Effect>>()
     /** substanceId -> list of custom units */
@@ -180,7 +179,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (timelineEvents.isNotEmpty()) timelineEventsStore.putAll(timelineEvents)
         if (customUnits.isNotEmpty()) customUnitsStore.putAll(customUnits)
         // Rebuild all indices after bulk upsert to handle updates to existing entities
-        // where old index entries (tags, dates, per-session children) need to be replaced.
+        // where old index entries (dates, per-session children) need to be replaced.
         if (sessions.isNotEmpty() || doses.isNotEmpty() || effects.isNotEmpty() ||
             notes.isNotEmpty() || timelineEvents.isNotEmpty() || customUnits.isNotEmpty()
         ) {
@@ -214,25 +213,17 @@ class JournalRepository internal constructor() : IJournalRepository {
     private fun addSessionToIndices(session: Session) {
         val date = sessionDate(session)
         _sessionsByDate.getOrPut(date) { mutableListOf() }.add(session.id)
-        for (tag in session.tags) {
-            _sessionsByTag.getOrPut(tag) { mutableSetOf() }.add(session.id)
-        }
     }
 
     private fun removeSessionFromIndices(session: Session) {
         val date = sessionDate(session)
         _sessionsByDate[date]?.remove(session.id)
         if (_sessionsByDate[date]?.isEmpty() == true) _sessionsByDate.remove(date)
-        for (tag in session.tags) {
-            _sessionsByTag[tag]?.remove(session.id)
-            if (_sessionsByTag[tag]?.isEmpty() == true) _sessionsByTag.remove(tag)
-        }
     }
 
     private fun rebuildAllIndices() {
         _sessionsByDate.clear()
         _sessionsPerSubstance.clear()
-        _sessionsByTag.clear()
         _effectsBySubstance.clear()
         _customUnitsBySubstance.clear()
         _substanceDoseStats.clear()
@@ -625,18 +616,6 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun sessionIdsForSubstance(substanceId: String): List<String> =
         synchronized(lock) { _sessionsPerSubstance[substanceId]?.toList() ?: emptyList() }
 
-    override fun sessionIdsWithTag(tag: String): List<String> =
-        synchronized(lock) { _sessionsByTag[tag]?.toList() ?: emptyList() }
-
-    override fun sessionIdsWithAnyTag(tags: List<String>): Set<String> = synchronized(lock) {
-        if (tags.isEmpty()) return sessionsStore.keys
-        val result = mutableSetOf<String>()
-        for (tag in tags) {
-            _sessionsByTag[tag]?.let { result.addAll(it) }
-        }
-        result
-    }
-
     override fun rebuildIndices() { rebuildAllIndices() }
 
     // ========================
@@ -662,7 +641,6 @@ class JournalRepository internal constructor() : IJournalRepository {
                 date = dt.date.toString(), startTime = dt.toString(),
                 endTime = endDt?.toString(),
                 durationHours = durationHours?.let { kotlin.math.round(it * 100) / 100.0 },
-                tags = session.tags.joinToString(";"),
                 set = session.set, setting = session.setting,
                 intention = session.intention, outcome = session.outcome,
                 rating = session.rating, shulginRating = session.shulginRating,
@@ -780,7 +758,6 @@ class JournalRepository internal constructor() : IJournalRepository {
         _eventsBySession.clear()
         _sessionsByDate.clear()
         _sessionsPerSubstance.clear()
-        _sessionsByTag.clear()
         _substanceDoseStats.clear()
         _doseStatsSessionIds.clear()
         _useShulginRating.value = false

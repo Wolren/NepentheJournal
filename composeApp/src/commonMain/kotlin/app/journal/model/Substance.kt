@@ -154,6 +154,52 @@ data class BindingdbData(
     val records: List<BindingdbRecord> = emptyList(),
 )
 
+/**
+ * A single binding affinity measurement from a Wikipedia pharmacology table.
+ *
+ * Wikipedia drug/pharmacology articles often include binding affinity tables
+ * under the Pharmacology section, listing target receptors/proteins with
+ * Ki, EC50, IC50, and Emax values. Values are extracted from wikicode tables
+ * like "Activities of [substance]".
+ */
+@Immutable
+@Serializable
+data class WikipediaRecord(
+    /** Cleaned target name (e.g. "5-HT2A", "SERT", "NMDA"). */
+    val targetName: String? = null,
+    /** Primary Ki value in nM (single value, not a range). */
+    val kiNM: Double? = null,
+    /** Minimum Ki in nM if the Ki is expressed as a range (e.g. "113-695"). */
+    val kiNMMin: Double? = null,
+    /** Maximum Ki in nM if the Ki is expressed as a range. */
+    val kiNMMax: Double? = null,
+    /** Operator for inequality Ki values (e.g. ">" for ">10,000"). */
+    val kiNMOperator: String? = null,
+    /** EC50 value in nM, if present. */
+    val ec50NM: Double? = null,
+    /** IC50 value in nM, if present. */
+    val ic50NM: Double? = null,
+    /** Maximal efficacy percentage (Emax), if present. */
+    val emaxPercent: Double? = null,
+    /** Species annotation if specified (e.g. "rat", "mouse"). */
+    val species: String? = null,
+    /** The raw text of the affinity cell for reference. */
+    val rawText: String? = null,
+)
+
+/**
+ * Wikipedia pharmacology data.
+ *
+ * Extracted from binding affinity tables in drug/pharmacology Wikipedia
+ * articles. Each record represents the substance's interaction with one
+ * molecular target (receptor, transporter, enzyme, ion channel).
+ */
+@Immutable
+@Serializable
+data class WikipediaData(
+    val records: List<WikipediaRecord> = emptyList(),
+)
+
 @Immutable
 @Serializable
 data class Substance(
@@ -196,6 +242,8 @@ data class Substance(
     val pdspData: PdspData? = null,
     // --- BindingDB pharmacology data ---
     val bindingdbData: BindingdbData? = null,
+    // --- Wikipedia pharmacology data ---
+    val wikipediaData: WikipediaData? = null,
     val erowidUrl: String = "",
     /** Source attributions: "psychonautwiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
     val sources: List<String> = emptyList(),

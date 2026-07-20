@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -22,6 +23,7 @@ import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
+import app.journal.util.isDesktopPlatform
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -44,19 +46,19 @@ fun SessionListScreen(
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
-    var tagDropdownExpanded by remember { mutableStateOf(false) }
+    var substanceDropdownExpanded by remember { mutableStateOf(false) }
 
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val filterTags by viewModel.filterTags.collectAsState()
+    val filterSubstanceIds by viewModel.filterSubstanceIds.collectAsState()
     val consumerFilter by viewModel.consumerFilter.collectAsState()
     val showFavs by viewModel.showFavoritesOnly.collectAsState()
     val showArch by viewModel.showArchived.collectAsState()
-    val allTags by viewModel.allTags.collectAsState(initial = emptyList())
+    val allSessionSubstances by viewModel.allSessionSubstances.collectAsState(initial = emptyList())
     val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // Search bar with tag filter as trailing icon
+            // Search bar with substance filter as trailing icon
             Box {
                 OutlinedTextField(
                     value = searchQuery,
@@ -70,11 +72,11 @@ fun SessionListScreen(
                                     Icon(Icons.Default.Close, contentDescription = "Clear")
                                 }
                             }
-                            IconButton(onClick = { tagDropdownExpanded = true }) {
+                            IconButton(onClick = { substanceDropdownExpanded = true }) {
                                 Icon(
                                     Icons.Default.Label,
-                                    contentDescription = "Filter by tag",
-                                    tint = if (filterTags.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                    contentDescription = "Filter by substance",
+                                    tint = if (filterSubstanceIds.isNotEmpty()) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -85,34 +87,34 @@ fun SessionListScreen(
                     shape = RoundedCornerShape(12.dp)
                 )
                 DropdownMenu(
-                    expanded = tagDropdownExpanded,
-                    onDismissRequest = { tagDropdownExpanded = false },
+                    expanded = substanceDropdownExpanded,
+                    onDismissRequest = { substanceDropdownExpanded = false },
                     offset = DpOffset(0.dp, 0.dp)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Clear all filters", fontWeight = if (filterTags.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = { viewModel.filterTags.value = emptySet(); tagDropdownExpanded = false },
+                        text = { Text("Clear filters", fontWeight = if (filterSubstanceIds.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = { viewModel.filterSubstanceIds.value = emptySet(); substanceDropdownExpanded = false },
                         leadingIcon = {
-                            if (filterTags.isEmpty()) {
+                            if (filterSubstanceIds.isEmpty()) {
                                 Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
                                     Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
                                 }
                             } else Box(Modifier.size(18.dp))
                         }
                     )
-                    if (allTags.isEmpty()) {
+                    if (allSessionSubstances.isEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("No tags yet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = { tagDropdownExpanded = false },
+                            text = { Text("No substances used yet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            onClick = { substanceDropdownExpanded = false },
                             enabled = false
                         )
                     } else {
-                        allTags.forEach { tag ->
-                            val isSelected = tag in filterTags
+                        allSessionSubstances.forEach { item ->
+                            val isSelected = item.id in filterSubstanceIds
                             DropdownMenuItem(
-                                text = { Text(tag, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                text = { Text(item.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
-                                    viewModel.filterTags.value = if (isSelected) filterTags - tag else filterTags + tag
+                                    viewModel.toggleSubstance(item.id); substanceDropdownExpanded = false
                                 },
                                 leadingIcon = {
                                     if (isSelected) {
@@ -152,7 +154,7 @@ fun SessionListScreen(
                         Text(
                             text = when {
                                 searchQuery.isNotBlank() -> "No sessions match \"$searchQuery\""
-                                filterTags.isNotEmpty() -> "No sessions with selected tags"
+                                filterSubstanceIds.isNotEmpty() -> "No sessions with selected substances"
                                 showFavs -> "No favorite sessions"
                                 else -> "No sessions yet"
                             },
@@ -233,7 +235,6 @@ fun SessionListScreen(
                         id = "session:live:${now}",
                         title = liveSessionTitle.ifBlank { "Live Session" },
                         startTime = now,
-                        tags = emptyList(),
                         createdAt = now, updatedAt = now,
                         deviceOrigin = "desktop"
                     )
@@ -347,10 +348,18 @@ private fun SessionCard(
     val subColor = remember(session.title) { AdaptiveColors.colorFor(session.title) }
     val accent = subColor.getComposeColor(isDark)
 
+    // Pre-join substance names for O(1) lookup in the FlowRow below
+    val substanceNameMap = remember(doses) {
+        doses.associate { dose ->
+            dose.substanceId to (repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId)
+        }
+    }
+
     HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
+        useAnimations = isDesktopPlatform(),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)
@@ -419,27 +428,29 @@ private fun SessionCard(
                     }
                 }
 
-                // Substances (neutral tags, no substance-specific colors)
+                // Substances
                 if (doses.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
-                    Row(
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         doses.forEach { dose ->
-                            val substance = repo.getSubstance(dose.substanceId)
-                            if (substance != null) {
-                                val doseColor = app.journal.ui.theme.AdaptiveColors.colorFor(substance.name)
+                            val subName = substanceNameMap[dose.substanceId]
+                            if (subName != null) {
+                                val doseColor = app.journal.ui.theme.AdaptiveColors.colorFor(subName)
                                 val doseAccent = doseColor.getComposeColor(isDark)
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = doseAccent.copy(alpha = 0.15f)
+                                    color = doseAccent
                                 ) {
                                     Text(
-                                        text = "${substance.name} ${dose.amount} ${dose.unit}",
+                                        text = "$subName ${dose.amount} ${dose.unit}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = doseAccent,
+                                        color = Color.White,
                                         fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                                     )
                                 }
@@ -458,39 +469,23 @@ private fun SessionCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             doses.forEachIndexed { i, dose ->
-                                val substance = repo.getSubstance(dose.substanceId)
+                                val subName = substanceNameMap[dose.substanceId]
                                 val fraction = (dose.amount / totalAmount).toFloat()
                                 if (fraction > 0.01f) {
-                                    val color = if (substance != null)
-                                        app.journal.ui.theme.AdaptiveColors.colorFor(substance.name).getComposeColor(isDark)
+                                    val color = if (subName != null)
+                                        app.journal.ui.theme.AdaptiveColors.colorFor(subName).getComposeColor(isDark)
                                     else MaterialTheme.colorScheme.primary
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxHeight()
                                             .weight(fraction.coerceAtLeast(0.02f)),
-                                        color = if (i % 2 == 0) color else color.copy(alpha = 0.7f),
+                                        color = color,
                                         shape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
                                                 else if (i == doses.lastIndex) RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
                                                 else RoundedCornerShape(0.dp)
                                     ) {}
                                 }
                             }
-                        }
-                    }
-                }
-
-                // Tags
-                if (session.tags.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        session.tags.take(4).forEach { tag ->
-                            TagChip(tag = tag)
-                        }
-                        if (session.tags.size > 4) {
-                            Text("+${session.tags.size - 4}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.CenterVertically))
                         }
                     }
                 }

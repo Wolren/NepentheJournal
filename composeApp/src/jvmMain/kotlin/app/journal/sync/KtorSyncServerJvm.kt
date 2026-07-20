@@ -58,8 +58,9 @@ class KtorSyncServer(
             }
 
             server!!.start(wait = false)
-            Log.withTag("KtorSyncServer").i { "Server started on 0.0.0.0:$port (fingerprint=$fp)" }
-            HostingInfo("0.0.0.0", port, fp)
+            val lanIp = resolveLocalIpV4() ?: "127.0.0.1"
+            Log.withTag("KtorSyncServer").i { "Server started on $lanIp:$port (fingerprint=$fp)" }
+            HostingInfo(lanIp, port, fp)
         } catch (e: Exception) {
             Log.withTag("KtorSyncServer").e(e) { "Server start failed: ${e.message}" }
             throw e
@@ -379,7 +380,6 @@ class SyncServerRouter(
                     sessionId = session.id,
                     title = "Sync conflict — ${session.title}",
                     body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
-                    tags = listOf("sync-conflict"),
                     createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                     updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                     deviceOrigin = batch.deviceId

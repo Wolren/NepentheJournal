@@ -1,14 +1,10 @@
 package app.journal.ui.session
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -17,11 +13,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
@@ -30,7 +33,6 @@ import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import app.journal.ui.components.*
-
 private data class CalendarMonth(val year: Int, val month: Month) {
     fun previous(): CalendarMonth {
         return if (month == Month.JANUARY) CalendarMonth(year - 1, Month.DECEMBER)
@@ -55,6 +57,15 @@ private data class CalendarMonth(val year: Int, val month: Month) {
     }
     private fun isLeapYear(y: Int): Boolean = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 }
+
+/** Precomputed cell data for the calendar Canvas grid. */
+private data class CalendarCellData(
+    val day: Int,
+    val date: LocalDate,
+    val hasSession: Boolean,
+    val isToday: Boolean,
+    val isSelected: Boolean,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,81 +154,105 @@ fun CalendarScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Calendar grid
+            // Calendar grid — Canvas for perf (single composable instead of ~42 Boxes)
             val daysInMonth = currentMonth.daysInMonth()
             val firstDayOfWeek = currentMonth.firstDayOfWeek() // 0=Mon, 6=Sun
             val totalCells = firstDayOfWeek + daysInMonth
-            val rows = (totalCells + 6) / 7
+            val rowsCount = (totalCells + 6) / 7
+            val cellHeight = 44.dp
 
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                for (row in 0 until rows) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        for (col in 0..6) {
-                            val cellIndex = row * 7 + col
-                            val day = cellIndex - firstDayOfWeek + 1
+            val cellData = remember(currentMonth, sessionDates, selectedDate, today.date) {
+                val result = mutableListOf<CalendarCellData?>()
+                for (row in 0 until rowsCount) {
+                    for (col in 0..6) {
+                        val cellIndex = row * 7 + col
+                        val day = cellIndex - firstDayOfWeek + 1
+                        if (day in 1..daysInMonth) {
+                            val date = LocalDate(currentMonth.year, currentMonth.month, day)
+                            result.add(CalendarCellData(
+                                day = day, date = date,
+                                hasSession = date in sessionDates,
+                                isToday = date == today.date,
+                                isSelected = date == selectedDate
+                            ))
+                        } else {
+                            result.add(null)
+                        }
+                    }
+                }
+                result
+            }
 
-                            if (day in 1..daysInMonth) {
-                                val date = LocalDate(currentMonth.year, currentMonth.month, day)
-                                val hasSession = date in sessionDates
-                                val isToday = date == today.date
-                                val isSelected = date == selectedDate
+            val textMeasurer = rememberTextMeasurer()
 
-                                // Outer cell: equal width, fixed height so cells never balloon on desktop.
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .clickable { selectedDate = date },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Inner circular day marker
-                                    Box(
-                                        modifier = Modifier
-                                            .size(38.dp)
-                                            .clip(CircleShape)
-                                            .then(
-                                                if (isSelected) Modifier.background(
-                                                    MaterialTheme.colorScheme.primary
-                                                )
-                                                else Modifier
-                                            )
-                                            .then(
-                                                if (isToday && !isSelected) Modifier.border(
-                                                    1.5.dp,
-                                                    MaterialTheme.colorScheme.primary,
-                                                    CircleShape
-                                                )
-                                                else Modifier
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                day.toString(),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                                        else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (hasSession) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(4.dp)
-                                                        .clip(CircleShape)
-                                                        .background(
-                                                            if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                                            else MaterialTheme.colorScheme.primary
-                                                        )
-                                                )
-                                            }
+            val primary = MaterialTheme.colorScheme.primary
+            val onPrimary = MaterialTheme.colorScheme.onPrimary
+            val onSurface = MaterialTheme.colorScheme.onSurface
+
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val cellWPx = with(LocalDensity.current) { (maxWidth / 7f).toPx() }
+                val cellHPx = with(LocalDensity.current) { cellHeight.toPx() }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(cellHeight * rowsCount)
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(currentMonth) {
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    val col = (down.position.x / cellWPx).toInt().coerceIn(0, 6)
+                                    val row = (down.position.y / cellHPx).toInt().coerceIn(0, rowsCount - 1)
+                                    val idx = row * 7 + col
+                                    if (idx < cellData.size) {
+                                        cellData[idx]?.let { data ->
+                                            selectedDate = data.date
                                         }
                                     }
                                 }
-                            } else {
-                                Spacer(Modifier.weight(1f).height(44.dp))
+                            }
+                    ) {
+                        val circleRadius = cellHPx * 0.43f
+                        val dayStyle = TextStyle(
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        cellData.forEachIndexed { idx, data ->
+                            if (data != null) {
+                                val col = idx % 7
+                                val row = idx / 7
+                                val cx = col * cellWPx + cellWPx / 2f
+                                val cy = row * cellHPx + cellHPx / 2f
+
+                                if (data.isSelected) {
+                                    drawCircle(primary, radius = circleRadius, center = Offset(cx, cy))
+                                } else if (data.isToday) {
+                                    drawCircle(primary, radius = circleRadius, center = Offset(cx, cy), style = Stroke(width = 1.5f))
+                                }
+
+                                val textColor = if (data.isSelected) onPrimary else onSurface
+                                val measured = textMeasurer.measure(
+                                    data.day.toString(),
+                                    style = dayStyle.copy(
+                                        color = textColor,
+                                        fontWeight = if (data.isToday || data.isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                )
+                                val textY = if (data.hasSession) cy - measured.size.height / 2f - 3f
+                                    else cy - measured.size.height / 2f
+                                drawText(
+                                    textLayoutResult = measured,
+                                    topLeft = Offset(cx - measured.size.width / 2f, textY)
+                                )
+
+                                if (data.hasSession) {
+                                    val dotColor = if (data.isSelected) onPrimary else primary
+                                    drawCircle(dotColor, radius = 2f, center = Offset(cx, cy + cellHPx * 0.28f))
+                                }
                             }
                         }
                     }

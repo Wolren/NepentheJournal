@@ -12,28 +12,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Card with smooth elevation transition on hover and press.
- *
- * - Hover raises the card (subtle lift on desktop)
- * - Press lowers it (push-in feedback)
- * - Springs are tuned for fluid motion
- *
- * Drop-in replacement for [Card] with onClick. On mobile the hover
- * state is inactive and elevation stays at [restingElevation].
- */
 @Composable
 fun HoverCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    useAnimations: Boolean = true,
     restingElevation: Dp = 1.dp,
     hoverElevation: Dp = 4.dp,
     pressedElevation: Dp = 0.dp,
-    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.medium,
+    shape: Shape = MaterialTheme.shapes.medium,
     content: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -46,14 +38,17 @@ fun HoverCard(
         else -> restingElevation
     }
 
-    val elevation by animateDpAsState(
-        targetValue = targetElevation,
-        animationSpec = spring(
-            dampingRatio = 0.7f,
-            stiffness = 400f
-        ),
-        label = "cardElevation"
-    )
+    val elevation: Dp
+    if (useAnimations) {
+        val anim by animateDpAsState(
+            targetValue = targetElevation,
+            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+            label = "cardElevation"
+        )
+        elevation = anim
+    } else {
+        elevation = targetElevation
+    }
 
     Card(
         onClick = onClick,

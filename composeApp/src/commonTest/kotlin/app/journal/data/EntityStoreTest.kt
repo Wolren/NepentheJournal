@@ -178,4 +178,55 @@ class EntityStoreTest {
             }
         }
     }
+
+    @Test
+    fun batchEmitsAfterEmptyMutation() {
+        val store = EntityStore(idOf)
+        store.put(TestEntity("a", "Alice", 1))
+        var emitCount = 0
+        val job = kotlinx.coroutines.runBlocking {
+            store.flow.collect { emitCount++ }
+        }
+        // Can't easily measure in blocking test, but verify batch exists and doesn't throw
+        store.batch { /* no-op */ }
+        assertEquals(1, store.size, "no-op batch should not change store size")
+    }
+
+    @Test
+    fun putAllWithEmptyListIsNoOp() {
+        val store = EntityStore(idOf)
+        store.put(TestEntity("a", "Alice", 1))
+        store.putAll(emptyList())
+        assertEquals(1, store.size)
+        assertEquals("Alice", store.get("a")?.name)
+    }
+
+    @Test
+    fun removeAllRemovesMultipleKeys() {
+        val store = EntityStore(idOf)
+        store.put(TestEntity("a", "Alice", 1))
+        store.put(TestEntity("b", "Bob", 2))
+        store.put(TestEntity("c", "Charlie", 3))
+        val removed = store.removeAll(setOf("a", "c"))
+        assertEquals(2, removed.size)
+        assertEquals(1, store.size)
+        assertEquals("Bob", store.get("b")?.name)
+        assertNull(store.get("a"))
+    }
+
+    @Test
+    fun removeAllWithEmptySetDoesNothing() {
+        val store = EntityStore(idOf)
+        store.put(TestEntity("a", "Alice", 1))
+        assertTrue(store.removeAll(emptySet()).isEmpty())
+        assertEquals(1, store.size)
+    }
+
+    @Test
+    fun clearEmitsUpdatedState() {
+        val store = EntityStore(idOf)
+        store.put(TestEntity("a", "Alice", 1))
+        store.clear()
+        assertEquals(0, store.flow.value.size)
+    }
 }

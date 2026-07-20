@@ -47,7 +47,6 @@ data class Session(
     val title: String,
     val startTime: Long,
     val endTime: Long? = null,
-    val tags: List<String> = emptyList(),
     val set: String? = null,
     val setting: String? = null,
     val intention: String? = null,

@@ -21,21 +21,21 @@ object CsvExporter {
         val dateFrom: String? = null,
         val dateTo: String? = null,
         val substanceNames: List<String> = emptyList(),
-        val tags: List<String> = emptyList()
+        val tags: String = ""
     )
 
     // ---- Table definitions ----
 
     private val sessionTable = CsvTable(listOf(
         "id", "title", "date", "start_time", "end_time",
-        "duration_hours", "tags", "set", "setting",
+        "duration_hours", "set", "setting",
         "intention", "outcome", "rating", "shulgin_rating",
         "consumer", "is_favorite", "is_archived",
         "substances", "dose_count"
     )) { df: SessionDataRow ->
         listOf(
             df.id, df.title, df.date, df.startTime, df.endTime,
-            df.durationHours?.toString(), df.tags, df.set, df.setting,
+            df.durationHours?.toString(), df.set, df.setting,
             df.intention, df.outcome, df.rating?.toString(), df.shulginRating,
             df.consumerName, if (df.isFavorite) "true" else "false",
             if (df.isArchived) "true" else "false",
@@ -83,12 +83,12 @@ object CsvExporter {
     }
 
     private val noteTable = CsvTable(listOf(
-        "id", "session_id", "title", "body", "tags",
+        "id", "session_id", "title", "body",
         "is_pinned", "created_at", "updated_at"
     )) { note: Note ->
         listOf(
             note.id, note.sessionId, note.title, note.body,
-            note.tags.joinToString(";"), if (note.isPinned) "true" else "false",
+            if (note.isPinned) "true" else "false",
             note.createdAt.toString(), note.updatedAt.toString()
         )
     }
@@ -158,11 +158,6 @@ object CsvExporter {
                 sessionsWithSub.addAll(repo.sessionIdsForSubstance(sid))
             }
             ids = ids.intersect(sessionsWithSub)
-        }
-
-        if (filter.tags.isNotEmpty()) {
-            val taggedIds = repo.sessionIdsWithAnyTag(filter.tags)
-            ids = ids.intersect(taggedIds)
         }
 
         return ids

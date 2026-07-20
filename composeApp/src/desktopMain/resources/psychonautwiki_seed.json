@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 3,
   "savedAt": 1783942757808,
   "sessions": [],
   "substances": [
@@ -1208,7 +1208,7 @@
       "cid": 62787,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149832064,
       "deviceOrigin": "system",
       "pwikiId": "2,5-DMA",
       "name": "2,5-DMA",
@@ -1277,7 +1277,8 @@
         "psychonautwiki",
         "pubchem",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -1517,6 +1518,64 @@
             "affinityNM": 465.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 2583.0,
+            "kiNMMax": 6017.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 8435.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 1039.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 104.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 5363.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 4385.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "ec50NM": 30000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 7000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 8000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 8000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 100000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 100000.0
+          }
+        ]
       }
     },
     {
@@ -1525,7 +1584,7 @@
       "cid": 76310,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149834474,
       "deviceOrigin": "system",
       "pwikiId": "2-Aminoindane",
       "name": "2-Aminoindane",
@@ -1627,7 +1686,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "pdsp"
+        "pdsp",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -1868,6 +1928,41 @@
             "kiNanoMolar": 10000.0,
             "reference": "Halberstadt Adam L et al 2019",
             "source": "PC12"
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "2-AI",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "MDAI",
+            "kiNM": 114.0
+          },
+          {
+            "targetName": "MMAI",
+            "kiNM": 31.0
+          },
+          {
+            "targetName": "MEAI",
+            "kiNM": 134.0
+          },
+          {
+            "targetName": "''d''-Amphetamine",
+            "kiNMMin": 698.0,
+            "kiNMMax": 1765.0
+          },
+          {
+            "targetName": "MDA",
+            "kiNMMin": 160.0,
+            "kiNMMax": 162.0
+          },
+          {
+            "targetName": "MDMA",
+            "kiNMMin": 50.0,
+            "kiNMMax": 85.0
           }
         ]
       }
@@ -2568,7 +2663,7 @@
       "cid": 9977044,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149839793,
       "deviceOrigin": "system",
       "pwikiId": "25B-NBOMe",
       "name": "25B-NBOMe",
@@ -2685,14 +2780,165 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemblId": "CHEMBL3590188",
       "chemspiderId": "8152636",
-      "unii": "S6NAA81PHK"
+      "unii": "S6NAA81PHK",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 1255.0,
+            "kiNMMax": 3600.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1472.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.19,
+            "kiNMMax": 0.8
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 0.5
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 1.7,
+            "kiNMMax": 6.2
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 4087.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 48.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 4720.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNMMin": 430.0,
+            "kiNMMax": 1256.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 6180.0
+          },
+          {
+            "targetName": "α1D",
+            "kiNM": 2253.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 430.0,
+            "kiNMMax": 3551.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 1264.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 646.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 6719.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 718.0,
+            "kiNMMax": 2700.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 2253.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 80.0
+          },
+          {
+            "targetName": "H3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 5241.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 310.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 64.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 642.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 280.0,
+            "emaxPercent": 37.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 388.0,
+            "kiNMMax": 840.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 1100.0,
+            "kiNMMax": 1718.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 7200.0,
+            "kiNMMax": 10000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:125181419",
@@ -2861,7 +3107,7 @@
       "cid": 46856354,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149842410,
       "deviceOrigin": "system",
       "pwikiId": "25C-NBOMe",
       "name": "25C-NBOMe",
@@ -3000,13 +3246,163 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "24583389",
-      "unii": "9FGW3C260N"
+      "unii": "9FGW3C260N",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 2353.0,
+            "kiNMMax": 5000.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 2372.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1024.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 5776.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.7,
+            "kiNMMax": 1.6
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 1.1,
+            "ec50NM": 100.0,
+            "emaxPercent": 16.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 5.2,
+            "kiNMMax": 5.4,
+            "ec50NM": 3.24,
+            "emaxPercent": 103.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 4796.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 36.2
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 1729.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNMMin": 810.0,
+            "kiNMMax": 2319.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 560.0,
+            "kiNMMax": 3175.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 224.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 185.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 12000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 1600.0,
+            "kiNMMax": 7508.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 878.0,
+            "kiNMMax": 3500.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 90.0
+          },
+          {
+            "targetName": "M1–M3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 5410.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 441.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 41.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 520.0,
+            "emaxPercent": 29.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1500.0,
+            "kiNMMax": 10000.0,
+            "ic50NM": 7300.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 1600.0,
+            "kiNMMax": 10000.0,
+            "ic50NM": 5900.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 14000.0,
+            "ic50NM": 70000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:118536027",
@@ -3014,7 +3410,7 @@
       "cid": 118536027,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149844832,
       "deviceOrigin": "system",
       "pwikiId": "25D-NBOMe",
       "name": "25D-NBOMe",
@@ -3157,13 +3553,97 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "48059920",
-      "unii": "7RET11HE13"
+      "unii": "7RET11HE13",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 4510.0,
+            "kiNMMax": 7100.0,
+            "ec50NM": 5900.0,
+            "emaxPercent": 55.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 5354.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.22,
+            "kiNMMax": 2.52
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 2.05,
+            "kiNMMax": 3.89
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 0.69,
+            "kiNMMax": 13.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 168.9
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 6744.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 700.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 370.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 8700.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 2600.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 6400.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 630.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 810.0,
+            "emaxPercent": 34.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1400.0,
+            "kiNMMax": 1780.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 2200.0,
+            "kiNMMax": 6700.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 14000.0,
+            "kiNMMax": 34500.0,
+            "ic50NM": 106000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:135391539",
@@ -3285,7 +3765,7 @@
       "cid": 10001761,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149847345,
       "deviceOrigin": "system",
       "pwikiId": "25I-NBOH",
       "name": "25I-NBOH",
@@ -3441,13 +3921,154 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "8177342",
-      "unii": "W9G4BGW8K4"
+      "unii": "W9G4BGW8K4",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 2220.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 37000.0,
+            "emaxPercent": 74.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 2446.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1277.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.061,
+            "kiNMMax": 1.12
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 1.9,
+            "kiNMMax": 2.8,
+            "ec50NM": 111.0,
+            "emaxPercent": 21.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 0.13,
+            "kiNMMax": 1.4
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 965.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 111.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 3472.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 3924.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 2257.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 3043.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 1003.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 1088.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 678.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 844.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 160.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 264.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNM": 47.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 328.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1155.0,
+            "kiNMMax": 1220.0,
+            "ic50NM": 1720.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 4060.0,
+            "ic50NM": 629.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 8500.0,
+            "ic50NM": 30700.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:10251906",
@@ -3455,7 +4076,7 @@
       "cid": 10251906,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149849841,
       "deviceOrigin": "system",
       "pwikiId": "25I-NBOMe",
       "name": "25I-NBOMe",
@@ -3617,7 +4238,8 @@
         "pubchem",
         "tripsit",
         "iuphar",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -3809,6 +4431,146 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 85.0,
+            "kiNMMax": 1800.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNMMin": 3742.0,
+            "kiNMMax": 5886.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 533.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.044,
+            "kiNMMax": 2.2
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 1.4,
+            "kiNMMax": 231.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 0.43,
+            "kiNMMax": 7.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNMMin": 2200.0,
+            "kiNMMax": 2795.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNMMin": 32.0,
+            "kiNMMax": 73.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNMMin": 1542.0,
+            "kiNMMax": 1670.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 320.0,
+            "kiNMMax": 1106.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 348.0
+          },
+          {
+            "targetName": "D1",
+            "kiNMMin": 3718.0,
+            "kiNMMax": 6700.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 900.0,
+            "kiNMMax": 1600.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 117.0,
+            "kiNMMax": 2100.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 647.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 7847.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 90.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 500.0
+          },
+          {
+            "targetName": "H3",
+            "kiNM": 500.0
+          },
+          {
+            "targetName": "M1–M4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 1381.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNM": 82.0
+          },
+          {
+            "targetName": "DOR",
+            "kiNM": 500.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 288.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 440.0,
+            "emaxPercent": 32.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1000.0,
+            "kiNMMax": 1009.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 1300.0,
+            "kiNMMax": 4574.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 5031.0,
+            "kiNMMax": 5400.0
+          }
+        ]
       }
     },
     {
@@ -3817,7 +4579,7 @@
       "cid": 118536028,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149852237,
       "deviceOrigin": "system",
       "pwikiId": "25N-NBOMe",
       "name": "25N-NBOMe",
@@ -3957,14 +4719,178 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "52085577",
       "unii": "0G7SSW2N0S",
-      "chebiId": "180519"
+      "chebiId": "180519",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 1860.0,
+            "kiNMMax": 4200.0,
+            "ec50NM": 4800.0,
+            "emaxPercent": 36.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 5620.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.11,
+            "kiNMMax": 1.41
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 4.47,
+            "kiNMMax": 8.7
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 1.06,
+            "kiNMMax": 21.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 55.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1B, α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 501.0,
+            "kiNMMax": 590.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 1100.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 692.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 7080.0
+          },
+          {
+            "targetName": "β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 18000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 2400.0,
+            "kiNMMax": 6760.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 2190.0,
+            "kiNMMax": 4500.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNMMin": 91.0,
+            "kiNMMax": 210.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 1070.0
+          },
+          {
+            "targetName": "H3, H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 537.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 58.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 2820.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 2200.0,
+            "emaxPercent": 34.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1410.0,
+            "kiNMMax": 5810.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 7200.0,
+            "kiNMMax": 11300.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 13000.0,
+            "kiNMMax": 37900.0,
+            "ic50NM": 245000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:98527",
@@ -3972,7 +4898,7 @@
       "cid": 98527,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149854808,
       "deviceOrigin": "system",
       "pwikiId": "2C-B",
       "name": "2C-B",
@@ -4117,7 +5043,8 @@
         "pubchem",
         "tripsit",
         "iuphar",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -4503,6 +5430,165 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 130.0,
+            "kiNMMax": 311.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 104.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 26.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 120.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.66,
+            "kiNMMax": 32.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 13.5,
+            "kiNMMax": 97.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 32.0,
+            "kiNMMax": 90.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 320.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 210.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 309.0,
+            "kiNMMax": 320.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 103.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 12000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 2200.0,
+            "kiNMMax": 25200.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 7116.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 822.0
+          },
+          {
+            "targetName": "M4–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 2155.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 90.0,
+            "kiNMMax": 3000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 9700.0,
+            "kiNMMax": 13300.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 27400.0,
+            "kiNMMax": 31000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 6500.0,
+            "kiNMMax": 30000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 125000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 58000.0
+          }
+        ]
       }
     },
     {
@@ -4511,7 +5597,7 @@
       "cid": 10265873,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149857393,
       "deviceOrigin": "system",
       "pwikiId": "2C-B-FLY",
       "name": "2C-B-FLY",
@@ -4646,7 +5732,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -4799,6 +5886,174 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 147.0,
+            "kiNMMax": 350.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 185.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1.4
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 110.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 11.0,
+            "kiNMMax": 11.6
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 0.9
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 10.6,
+            "kiNMMax": 12.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 150.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 606.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 11000.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 145.0,
+            "kiNMMax": 780.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 624.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 233.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNMMin": 1400.0,
+            "kiNMMax": 4963.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 1900.0,
+            "kiNMMax": 6835.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 6800.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNMMin": 3400.0,
+            "kiNMMax": 5753.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNM": 643.0
+          },
+          {
+            "targetName": "M2",
+            "kiNM": 2029.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 339.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 520.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 873.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 30.0,
+            "ec50NM": 30000.0,
+            "emaxPercent": 48.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 10000.0,
+            "ic50NM": 73000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 17000.0,
+            "ic50NM": 97000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 26000.0,
+            "ic50NM": 187000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 19000.0
+          }
+        ]
       }
     },
     {
@@ -4807,7 +6062,7 @@
       "cid": 29979100,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149859802,
       "deviceOrigin": "system",
       "pwikiId": "2C-C",
       "name": "2C-C",
@@ -4928,7 +6183,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -4944,6 +6200,80 @@
             "affinityNM": 3750.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 190.0,
+            "kiNMMax": 740.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 25.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 5.47,
+            "kiNMMax": 13.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "ec50NM": 280.0,
+            "emaxPercent": 81.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 5.4,
+            "kiNMMax": 90.0,
+            "ec50NM": 24.2,
+            "emaxPercent": 94.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 530.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 2100.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 17000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 14000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 110.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 51.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 24000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 30000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 30000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 305000.0
+          }
+        ]
       }
     },
     {
@@ -4952,7 +6282,7 @@
       "cid": 135740,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149862163,
       "deviceOrigin": "system",
       "pwikiId": "2C-D",
       "name": "2C-D",
@@ -5082,7 +6412,8 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -5107,6 +6438,81 @@
             "assay": "Agonist activity at human trace amine associated receptor 1 expressed in RD-HGA16 CHO-K1 cells coexpressed with Galpha16"
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 440.0,
+            "kiNMMax": 1630.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 25.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 23.9,
+            "kiNMMax": 32.4
+          },
+          {
+            "targetName": "5-HT2B",
+            "ec50NM": 230.0,
+            "emaxPercent": 77.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 12.7,
+            "kiNMMax": 150.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 12000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 290.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 24000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 7100.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 17000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 150.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 55.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 31000.0,
+            "ic50NM": 77000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 30000.0,
+            "ic50NM": 45000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 30000.0,
+            "ic50NM": 626000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 24000.0
+          }
+        ]
       }
     },
     {
@@ -5115,7 +6521,7 @@
       "cid": 24729233,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149864569,
       "deviceOrigin": "system",
       "pwikiId": "2C-E",
       "name": "2C-E",
@@ -5248,7 +6654,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -5433,6 +6840,162 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 307.0,
+            "kiNMMax": 1190.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 20.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 253.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 73.2
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 626.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 4.5,
+            "kiNMMax": 43.9
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 25.1,
+            "ec50NM": 190.0,
+            "emaxPercent": 66.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 5.4,
+            "kiNMMax": 104.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 2971.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 426.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 100.0,
+            "kiNMMax": 490.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 306.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 90.2
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 3200.0,
+            "kiNMMax": 3339.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 1345.0,
+            "kiNMMax": 19000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 2557.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 1725.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 66.0,
+            "kiNMMax": 70.0,
+            "emaxPercent": 72.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 275000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 124000.0
+          }
+        ]
       }
     },
     {
@@ -5441,7 +7004,7 @@
       "cid": 76632,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149866950,
       "deviceOrigin": "system",
       "pwikiId": "2C-H",
       "name": "2C-H",
@@ -5494,7 +7057,8 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -5600,6 +7164,79 @@
             "affinityNM": 11000.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 70.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 1600.0,
+            "kiNMMax": 3000.0,
+            "ic50NM": 17800.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "ec50NM": 6200.0,
+            "emaxPercent": 46.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 4100.0,
+            "kiNMMax": 5520.0,
+            "emaxPercent": 76.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 7900.0,
+            "ec50NM": 11000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 1000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 14000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 9000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 17000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 900.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 30000.0,
+            "ic50NM": 311000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 30000.0,
+            "ic50NM": 125000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 30000.0,
+            "ic50NM": 857000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 1700.0
+          }
+        ]
       }
     },
     {
@@ -5608,7 +7245,7 @@
       "cid": 10267191,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149869283,
       "deviceOrigin": "system",
       "pwikiId": "2C-I",
       "name": "2C-I",
@@ -5736,7 +7373,8 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -5769,6 +7407,183 @@
             "assay": "Tested for the binding affinity against the site labelled by the 5-hydroxytryptamine 2A receptor - 5-hydroxytryptamine 2"
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 107.0,
+            "kiNMMax": 970.0,
+            "ec50NM": 4900.0,
+            "emaxPercent": 102.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 56.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 40.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 131.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 3.5,
+            "kiNMMax": 9.3
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 9.3
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 9.3,
+            "kiNMMax": 40.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 1316.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 70.0,
+            "kiNMMax": 305.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 608.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 315.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 4512.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 1013.0,
+            "kiNMMax": 2700.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 989.0,
+            "kiNMMax": 5000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 2788.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 6100.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M2",
+            "kiNM": 1429.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 950.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 1129.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 2151.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 5470.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNM": 2522.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 120.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 50.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 950.0,
+            "kiNMMax": 4900.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 15000.0,
+            "ic50NM": 22000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 30000.0,
+            "ic50NM": 126000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 125000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 55000.0
+          }
+        ]
       }
     },
     {
@@ -5777,7 +7592,7 @@
       "cid": 44350080,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149871694,
       "deviceOrigin": "system",
       "pwikiId": "2C-P",
       "name": "2C-P",
@@ -5908,14 +7723,81 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemblId": "CHEMBL339136",
       "chemspiderId": "21106226",
-      "unii": "DPS1JI878J"
+      "unii": "DPS1JI878J",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 110.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNM": 8.1
+          },
+          {
+            "targetName": "5-HT2B",
+            "ec50NM": 130.0,
+            "emaxPercent": 72.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNM": 40.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 3500.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 90.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 8400.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 2300.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 5200.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 21000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 20.0,
+            "ec50NM": 4200.0,
+            "emaxPercent": 72.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 19000.0,
+            "ic50NM": 30000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 18000.0,
+            "ic50NM": 94000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 40000.0,
+            "ic50NM": 198000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:12315927",
@@ -6053,7 +7935,7 @@
       "cid": 12074193,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149874324,
       "deviceOrigin": "system",
       "pwikiId": "2C-T-2",
       "name": "2C-T-2",
@@ -6180,7 +8062,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -6341,6 +8224,170 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 370.0,
+            "kiNMMax": 1740.0,
+            "ec50NM": 3000.0,
+            "emaxPercent": 76.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 858.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 86.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 415.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 9.0,
+            "kiNMMax": 40.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 6.0,
+            "kiNMMax": 69.0,
+            "ec50NM": 130.0,
+            "emaxPercent": 75.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 14.0,
+            "kiNMMax": 54.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 1362.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 969.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 17000.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 230.0,
+            "kiNMMax": 730.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 982.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 166.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 9202.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 1184.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 2795.0,
+            "kiNMMax": 5100.0
+          },
+          {
+            "targetName": "D3",
+            "kiNMMin": 1835.0,
+            "kiNMMax": 11000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 692.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M5",
+            "kiNM": 1502.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 2080.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 3870.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 40.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 86.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 13000.0,
+            "ic50NM": 62000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 30000.0,
+            "ic50NM": 153000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 30000.0,
+            "ic50NM": 332000.0
+          }
+        ]
       }
     },
     {
@@ -6495,7 +8542,7 @@
       "cid": 24728635,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149876871,
       "deviceOrigin": "system",
       "pwikiId": "2C-T-7",
       "name": "2C-T-7",
@@ -6635,7 +8682,8 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -6643,7 +8691,81 @@
       "chemblId": "CHEMBL126432",
       "drugbankId": "DB01458",
       "chemspiderId": "21106233",
-      "unii": "TJG366J9BA"
+      "unii": "TJG366J9BA",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 520.0,
+            "kiNMMax": 878.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 5.3,
+            "kiNMMax": 6.5
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 39.0,
+            "kiNMMax": 54.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 180.0,
+            "kiNMMax": 335.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 5000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 7500.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 10.0,
+            "kiNMMax": 33.0,
+            "ec50NM": 30000.0,
+            "emaxPercent": 83.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 12000.0,
+            "ic50NM": 44000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 27000.0,
+            "ic50NM": 135000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 34000.0,
+            "ic50NM": 261000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 46000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 180000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:6405",
@@ -9471,7 +11593,7 @@
       "cid": 9991554,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149884707,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-DET",
       "name": "4-HO-DET",
@@ -9599,7 +11721,8 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -9648,6 +11771,80 @@
             "assay": "Evaluated for the effective concentration at [125I]-DOI-labeled rat 5-hydroxytryptamine 2A receptor"
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 396.0,
+            "kiNMMax": 1840.0,
+            "ec50NM": 1030.0,
+            "emaxPercent": 80.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 2242.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 585.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 568.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 269.0,
+            "kiNMMax": 400.0,
+            "emaxPercent": 100.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 73.0,
+            "ec50NM": 6.3,
+            "emaxPercent": 71.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 388.0,
+            "kiNMMax": 436.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 1429.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 230.0
+          },
+          {
+            "targetName": "5-HT7A",
+            "kiNM": 826.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 1079.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 9984.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 3026.0
+          },
+          {
+            "targetName": "NR2B",
+            "kiNM": 8720.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 1411.0,
+            "kiNMMax": 1800.0,
+            "ic50NM": 383.0
+          }
+        ]
       }
     },
     {
@@ -9656,7 +11853,7 @@
       "cid": 21854223,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149887037,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-DPT",
       "name": "4-HO-DPT",
@@ -9769,14 +11966,34 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "drugbankId": "DB13990",
       "chemspiderId": "10579817",
-      "unii": "KS597YAU98"
+      "unii": "KS597YAU98",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT2A",
+            "ec50NM": 1.6,
+            "emaxPercent": 103.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "ec50NM": 2.2,
+            "emaxPercent": 94.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "ec50NM": 212.0,
+            "emaxPercent": 83.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:21854225",
@@ -9784,7 +12001,7 @@
       "cid": 21854225,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149889428,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-DiPT",
       "name": "4-HO-DiPT",
@@ -9898,13 +12115,136 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "10579819",
-      "unii": "YG9OUS518B"
+      "unii": "YG9OUS518B",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 5700.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0,
+            "emaxPercent": 95.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1860.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0,
+            "emaxPercent": 79.0
+          },
+          {
+            "targetName": "5-HT1F",
+            "ec50NM": 557.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 120.0,
+            "kiNMMax": 922.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 85.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 2.8,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT4",
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 10000.0,
+            "emaxPercent": 20.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 12000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "α2B, α2C",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1–D3",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 1725.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNMMin": 816.0,
+            "kiNMMax": 1063.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 2215.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NR2B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 419.0,
+            "kiNMMax": 1800.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 11000.0,
+            "ic50NM": 46000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 26000.0,
+            "ic50NM": 100000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:138454310",
@@ -9912,7 +12252,7 @@
       "cid": 138454310,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149891654,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-EPT",
       "name": "4-HO-EPT",
@@ -10005,12 +12345,119 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
-      "unii": "Y3J8M5UX6G"
+      "unii": "Y3J8M5UX6G",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 163.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 1097.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 644.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 591.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNM": 546.0,
+            "ec50NM": 3.2,
+            "emaxPercent": 100.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 62.0,
+            "ec50NM": 4.3,
+            "emaxPercent": 89.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNM": 1272.0,
+            "ec50NM": 129.0,
+            "emaxPercent": 89.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 1576.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 284.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 438.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 2073.0
+          },
+          {
+            "targetName": "α2B, α2C",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 3010.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 985.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 406.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 1400.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 1773.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NR2B",
+            "kiNM": 5947.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 1257.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:21786582",
@@ -10018,7 +12465,7 @@
       "cid": 21786582,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149894033,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-MET",
       "name": "4-HO-MET",
@@ -10147,7 +12594,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -10163,6 +12611,102 @@
             "affinityNM": 3268.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 135.0,
+            "kiNMMax": 950.0,
+            "ec50NM": 1390.0,
+            "emaxPercent": 90.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 331.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 197.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 161.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 4.0,
+            "kiNMMax": 177.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 12.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 141.0,
+            "kiNMMax": 164.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 304.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 70.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 60.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 9700.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 1666.0,
+            "kiNMMax": 2400.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 4000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 6700.0
+          },
+          {
+            "targetName": "H1",
+            "kiNMMin": 483.0,
+            "kiNMMax": 820.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 3100.0,
+            "ec50NM": 10000.0,
+            "emaxPercent": 71.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 200.0,
+            "kiNMMax": 2310.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 13000.0,
+            "ic50NM": 11000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 26000.0,
+            "ic50NM": 100000.0
+          }
+        ]
       }
     },
     {
@@ -10171,7 +12715,7 @@
       "cid": 21786584,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149896412,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-MPT",
       "name": "4-HO-MPT",
@@ -10270,13 +12814,100 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemspiderId": "10513074",
-      "unii": "37A55H0XW4"
+      "unii": "37A55H0XW4",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 106.0,
+            "kiNMMax": 910.0,
+            "ec50NM": 490.0,
+            "emaxPercent": 90.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 224.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 170.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 246.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 71.0,
+            "kiNMMax": 114.0,
+            "emaxPercent": 53.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 8.0,
+            "ec50NM": 3.4,
+            "emaxPercent": 58.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 150.0,
+            "kiNMMax": 203.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 664.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 48.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 99.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 3625.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 1844.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 921.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 92.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 891.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 1166.0
+          },
+          {
+            "targetName": "NR2B",
+            "kiNM": 3658.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 910.0,
+            "kiNMMax": 1180.0,
+            "ic50NM": 575.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:10082683",
@@ -10284,7 +12915,7 @@
       "cid": 10082683,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149898887,
       "deviceOrigin": "system",
       "pwikiId": "4-HO-MiPT",
       "name": "4-HO-MiPT",
@@ -10426,14 +13057,94 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemblId": "CHEMBL171419",
       "chemspiderId": "8258221",
-      "unii": "4GAJ9OJ8YZ"
+      "unii": "4GAJ9OJ8YZ",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 1626.0,
+            "kiNMMax": 5870.0,
+            "ec50NM": 2590.0,
+            "emaxPercent": 83.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 1415.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 614.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 113.0,
+            "kiNMMax": 695.0,
+            "emaxPercent": 102.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 66.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 750.0,
+            "kiNMMax": 1301.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 390.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 1038.0
+          },
+          {
+            "targetName": "α2A, α2B, α2C",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 1272.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 2765.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 248.0,
+            "kiNMMax": 483.0
+          },
+          {
+            "targetName": "NET, DAT",
+            "kiNM": 10000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:15100753",
@@ -11331,7 +14042,7 @@
       "cid": 50878551,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149903049,
       "deviceOrigin": "system",
       "pwikiId": "5-MeO-DALT",
       "name": "5-MeO-DALT",
@@ -11438,7 +14149,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -11734,6 +14446,155 @@
             "affinityNM": 501.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 3.26,
+            "kiNMMax": 48.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNMMin": 551.0,
+            "kiNMMax": 735.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNMMin": 53.0,
+            "kiNMMax": 107.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNMMin": 322.0,
+            "kiNMMax": 500.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 48.0,
+            "kiNMMax": 218.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 45.0,
+            "kiNMMax": 59.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 456.0,
+            "kiNMMax": 1083.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 3312.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNMMin": 87.0,
+            "kiNMMax": 153.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNMMin": 87.0,
+            "kiNMMax": 90.0
+          },
+          {
+            "targetName": "α1A–α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 215.0,
+            "kiNMMax": 228.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNMMin": 726.0,
+            "kiNMMax": 956.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNMMin": 1467.0,
+            "kiNMMax": 641.0
+          },
+          {
+            "targetName": "β1–β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1–D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 699.0
+          },
+          {
+            "targetName": "D4–D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNMMin": 505.0,
+            "kiNMMax": 1373.0
+          },
+          {
+            "targetName": "H3",
+            "kiNM": 1712.0
+          },
+          {
+            "targetName": "H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "nACh",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNMMin": 301.0,
+            "kiNMMax": 398.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 340.0
+          },
+          {
+            "targetName": "MOR, DOR",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNMMin": 899.0,
+            "kiNMMax": 1132.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 499.0,
+            "kiNMMax": 1408.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 3378.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 100000.0
+          }
+        ]
       }
     },
     {
@@ -11742,7 +14603,7 @@
       "cid": 1832,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149905610,
       "deviceOrigin": "system",
       "pwikiId": "5-MeO-DMT",
       "name": "5-MeO-DMT",
@@ -11866,7 +14727,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -13307,6 +16169,78 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT4",
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNMMin": 277.0,
+            "kiNMMax": 505.0,
+            "ec50NM": 110.0,
+            "emaxPercent": 107.0
+          },
+          {
+            "targetName": "MT1",
+            "kiNM": 210.0,
+            "ec50NM": 257.0
+          },
+          {
+            "targetName": "MT2",
+            "kiNM": 16.0,
+            "ec50NM": 112.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 574.0,
+            "kiNMMax": 1890.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNMMin": 206.0,
+            "kiNMMax": 2174.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 2859.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 10000.0,
+            "ic50NM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0,
+            "ec50NM": 10000.0,
+            "ic50NM": 10000.0
+          }
+        ]
       }
     },
     {
@@ -13414,7 +16348,7 @@
       "cid": 151182,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149908758,
       "deviceOrigin": "system",
       "pwikiId": "5-MeO-DiPT",
       "name": "5-MeO-DiPT",
@@ -13540,7 +16474,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -13691,6 +16626,121 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 16.0,
+            "kiNMMax": 170.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNMMin": 5137.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNMMin": 293.0,
+            "kiNMMax": 1718.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 162.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 35.0,
+            "kiNMMax": 163.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 1740.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNMMin": 2190.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 324.0,
+            "emaxPercent": 87.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNMMin": 1231.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "α1A, α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNMMin": 2865.0,
+            "kiNMMax": 3081.0
+          },
+          {
+            "targetName": "β1, β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1–D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 760.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNMMin": 291.0,
+            "kiNMMax": 3002.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 874.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 65000.0
+          }
+        ]
       }
     },
     {
@@ -13699,7 +16749,7 @@
       "cid": 2763156,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149911267,
       "deviceOrigin": "system",
       "pwikiId": "5-MeO-MiPT",
       "name": "5-MeO-MiPT",
@@ -13825,7 +16875,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -13978,6 +17029,123 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": null
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 12.0,
+            "kiNMMax": 143.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNMMin": 303.0,
+            "kiNMMax": 728.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNMMin": 23.0,
+            "kiNMMax": 103.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 113.0,
+            "kiNMMax": 449.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 53.0,
+            "kiNMMax": 59.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 790.0,
+            "kiNMMax": 2186.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNMMin": 130.0,
+            "kiNMMax": 281.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNMMin": 20.0,
+            "kiNMMax": 122.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 12000.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNMMin": 637.0,
+            "kiNMMax": 2174.0
+          },
+          {
+            "targetName": "β1–β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNMMin": 1422.0,
+            "kiNMMax": 6331.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 879.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNMMin": 90.0,
+            "kiNMMax": 918.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 3300.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 22000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 84000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 26000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 100000.0
           }
         ]
       }
@@ -24281,7 +27449,7 @@
       "cid": 10544447,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149927415,
       "deviceOrigin": "system",
       "pwikiId": "Bromo-DragonFLY",
       "name": "Bromo-DragonFLY",
@@ -24428,14 +27596,143 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemblId": "CHEMBL1177916",
       "chemspiderId": "8719838",
-      "unii": "GC9M7R36OI"
+      "unii": "GC9M7R36OI",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 234.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 1050.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 347.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 1620.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.04,
+            "kiNMMax": 1.86
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 0.126,
+            "kiNMMax": 0.19
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 0.02,
+            "kiNMMax": 1.48
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 339.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 148.0
+          },
+          {
+            "targetName": "α1A–α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 398.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 550.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 955.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 1100.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 2140.0
+          },
+          {
+            "targetName": "β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 955.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 2240.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 417.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 427.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 2340.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 4070.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "kiNM": 352.0,
+            "ic50NM": 540.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:10257",
@@ -24443,7 +27740,7 @@
       "cid": 10257,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149929879,
       "deviceOrigin": "system",
       "pwikiId": "Bufotenin",
       "name": "Bufotenin",
@@ -24538,7 +27835,8 @@
         "pubchem",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -25349,6 +28647,79 @@
             "species": "Rat",
             "affinityType": "Ki",
             "affinityNM": 4.46
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 25.0
+          },
+          {
+            "targetName": "5-HT1F",
+            "kiNM": 32.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 6.2,
+            "kiNMMax": 630.0
+          },
+          {
+            "targetName": "5-HT5B",
+            "kiNM": 1585.0
+          },
+          {
+            "targetName": "α1A–α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A–α2C",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β1–β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1, D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 692.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1, σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 1120.0,
+            "ec50NM": 30.5,
+            "ic50NM": 1200.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0,
+            "ec50NM": 10000.0
           }
         ]
       }
@@ -27313,7 +30684,7 @@
       "cid": 56843046,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149933160,
       "deviceOrigin": "system",
       "pwikiId": "Butylone",
       "name": "Butylone",
@@ -27405,7 +30776,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "pdsp"
+        "pdsp",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -27518,6 +30890,14 @@
             "kiNanoMolar": 10000.0,
             "reference": "Simmler LD et al 2013",
             "source": "HEK293 cells"
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "SERT",
+            "kiNM": 6.22
           }
         ]
       }
@@ -36984,7 +40364,7 @@
       "cid": 6090,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149943830,
       "deviceOrigin": "system",
       "pwikiId": "DET",
       "name": "DET",
@@ -37099,7 +40479,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -37202,6 +40583,39 @@
             "affinityNM": 575.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 370.0,
+            "ec50NM": 138.0,
+            "emaxPercent": 98.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNM": 530.0,
+            "emaxPercent": 90.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNM": 970.0,
+            "ec50NM": 660.0,
+            "emaxPercent": 106.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 1200.0
+          },
+          {
+            "targetName": "NET",
+            "ic50NM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "ic50NM": 10000.0
+          }
+        ]
       }
     },
     {
@@ -37210,7 +40624,7 @@
       "cid": 6089,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149946441,
       "deviceOrigin": "system",
       "pwikiId": "DMT",
       "name": "DMT",
@@ -37369,7 +40783,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -38400,6 +41815,83 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1E",
+            "kiNMMin": 456.0,
+            "kiNMMax": 517.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNMMin": 88.0,
+            "kiNMMax": 206.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNMMin": 1300.0,
+            "kiNMMax": 1745.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 974.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 1561.0,
+            "kiNMMax": 2100.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 258.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 259.0
+          },
+          {
+            "targetName": "β1–β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 220.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 2200.0,
+            "kiNMMax": 3300.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 5209.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 650.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 6500.0,
+            "kiNMMax": 10000.0,
+            "ec50NM": 4166.0,
+            "ic50NM": 3900.0
+          }
+        ]
       }
     },
     {
@@ -38408,7 +41900,7 @@
       "cid": 62065,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149948854,
       "deviceOrigin": "system",
       "pwikiId": "DOB",
       "name": "DOB",
@@ -38563,7 +42055,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -39258,6 +42751,126 @@
             "affinityNM": 8538.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 941.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 636.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 5311.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 5535.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 506.0
+          },
+          {
+            "targetName": "α1A, α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 4266.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 1527.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 594.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 2425.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 303.0
+          },
+          {
+            "targetName": "D1, D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 808.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 9120.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1, M2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 1152.0
+          },
+          {
+            "targetName": "M4, M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 1000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 1596.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 2193.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 8538.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 100000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 100000.0
+          }
+        ]
       }
     },
     {
@@ -39550,7 +43163,7 @@
       "cid": null,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149951844,
       "deviceOrigin": "system",
       "pwikiId": "DOM",
       "name": "DOM",
@@ -39665,11 +43278,139 @@
       "erowidUrl": "https://www.erowid.org/experiences/subs/exp_DOM.shtml",
       "sources": [
         "psychonautwiki",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
-      "userAnnotations": {}
+      "userAnnotations": {},
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 3656.0,
+            "kiNMMax": 14200.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 209.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 3542.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 2.1,
+            "kiNMMax": 507.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 12.0,
+            "kiNMMax": 149.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 19.0,
+            "kiNMMax": 3980.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 8155.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 1591.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNMMin": 3219.0,
+            "kiNMMax": 7393.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 874.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 921.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 49.0
+          },
+          {
+            "targetName": "D1–D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1, M2, M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "ec50NM": 30000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1, σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 100000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 100000.0,
+            "ec50NM": 100000.0,
+            "ic50NM": 70000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 100000.0,
+            "ec50NM": 42000.0,
+            "ic50NM": 64000.0
+          },
+          {
+            "targetName": "MAO-A",
+            "ic50NM": 24000.0
+          },
+          {
+            "targetName": "MAO-B",
+            "ic50NM": 100000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:31703",
@@ -40360,7 +44101,7 @@
       "cid": 6091,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149954602,
       "deviceOrigin": "system",
       "pwikiId": "DPT",
       "name": "DPT",
@@ -40493,7 +44234,8 @@
         "pubchem",
         "tripsit",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -40670,6 +44412,141 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": null
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1B",
+            "kiNMMin": 854.0,
+            "kiNMMax": 8081.0,
+            "ec50NM": 1210.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 619.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 2338.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 3.0,
+            "kiNMMax": 2579.0,
+            "emaxPercent": 97.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 42.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 281.0,
+            "kiNMMax": 3500.0,
+            "ec50NM": 444.0,
+            "emaxPercent": 93.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 4373.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 4543.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 284.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 9249.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 1361.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 2014.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 881.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 443.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 458.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 339.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 514.0
+          },
+          {
+            "targetName": "β1–β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 125.0
+          },
+          {
+            "targetName": "H2–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 340.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 397.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 2917.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 157.0,
+            "kiNMMax": 480.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0,
+            "ec50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 1500.0,
+            "ec50NM": 100000.0
           }
         ]
       }
@@ -43037,7 +46914,7 @@
       "cid": 26903,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149959844,
       "deviceOrigin": "system",
       "pwikiId": "DiPT",
       "name": "DiPT",
@@ -43138,7 +47015,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -43303,6 +47181,130 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": null
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 121.0,
+            "kiNMMax": 2270.0,
+            "emaxPercent": 58.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 3742.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 1200.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 399.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 290.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 3423.0
+          },
+          {
+            "targetName": "α1A, α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 2870.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 2523.0
+          },
+          {
+            "targetName": "β1, β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1, D2",
+            "kiNM": 25000.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1",
+            "kiNMMin": 920.0,
+            "kiNMMax": 3583.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 356.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 1798.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 2702.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNMMin": 180.0,
+            "kiNMMax": 1258.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 8900.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNMMin": 4100.0,
+            "kiNMMax": 10000.0
           }
         ]
       }
@@ -51039,7 +55041,7 @@
       "cid": 38240,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149967457,
       "deviceOrigin": "system",
       "pwikiId": "Escaline",
       "name": "Escaline",
@@ -51157,7 +55159,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -51284,6 +55287,117 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": 215.6
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 724.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 216.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 148.0,
+            "kiNMMax": 551.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 177.0,
+            "kiNMMax": 4366.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1A–α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 2450.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 4790.0
+          },
+          {
+            "targetName": "β1–β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1, D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 380.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 525.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ1, σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
           }
         ]
       }
@@ -69418,7 +73532,7 @@
       "cid": 5284570,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149979367,
       "deviceOrigin": "system",
       "pwikiId": "Hydromorphone",
       "name": "Hydromorphone",
@@ -69506,7 +73620,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -69847,6 +73962,14 @@
             "affinityNM": 2.6
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "0.47 nM",
+            "kiNM": 18.5
+          }
+        ]
       }
     },
     {
@@ -69855,7 +73978,7 @@
       "cid": 197060,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149981952,
       "deviceOrigin": "system",
       "pwikiId": "Ibogaine",
       "name": "Ibogaine",
@@ -69997,7 +74120,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -70650,6 +74774,115 @@
             "species": "Rat",
             "affinityType": "IC50",
             "affinityNM": 4000.0
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 100000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 100000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 12500.0,
+            "kiNMMax": 16000.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 100000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 70000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNMMin": 16000.0,
+            "kiNMMax": 31600.0
+          },
+          {
+            "targetName": "M2",
+            "kiNMMin": 31000.0,
+            "kiNMMax": 50100.0
+          },
+          {
+            "targetName": "M3",
+            "kiNM": 12500.0
+          },
+          {
+            "targetName": "nACh",
+            "kiNMMin": 1050.0,
+            "kiNMMax": 17000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNMMin": 2500.0,
+            "kiNMMax": 9310.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNMMin": 90.0,
+            "kiNMMax": 400.0
+          },
+          {
+            "targetName": "MOR",
+            "kiNMMin": 6920.0,
+            "kiNMMax": 11040.0,
+            "emaxPercent": 5.0
+          },
+          {
+            "targetName": "DOR",
+            "kiNM": 100000.0
+          },
+          {
+            "targetName": "KOR",
+            "kiNMMin": 3680.0,
+            "kiNMMax": 3770.0
+          },
+          {
+            "targetName": "NOP",
+            "kiNM": 100000.0
+          },
+          {
+            "targetName": "PCP",
+            "kiNMMin": 1010.0,
+            "kiNMMax": 9800.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 549.0,
+            "ec50NM": 153000.0
+          },
+          {
+            "targetName": "NET",
+            "ic50NM": 100000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 1980.0,
+            "ic50NM": 20000.0
+          },
+          {
+            "targetName": "OCT2",
+            "ic50NM": 9310.0
+          },
+          {
+            "targetName": "VGSC",
+            "kiNMMin": 3600.0,
+            "kiNMMax": 8100.0
+          },
+          {
+            "targetName": "VGCC",
+            "ic50NM": 28000.0
+          },
+          {
+            "targetName": "hERG",
+            "kiNM": 710.0
           }
         ]
       }
@@ -73265,7 +77498,7 @@
       "cid": 5761,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149987966,
       "deviceOrigin": "system",
       "pwikiId": "LSD",
       "name": "LSD",
@@ -73437,7 +77670,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -75318,6 +79552,64 @@
             "affinityNM": null
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT4",
+            "kiNM": 1000.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNMMin": 670.0,
+            "kiNMMax": 1128.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 8677.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 12.0,
+            "kiNMMax": 46.0
+          },
+          {
+            "targetName": "β1",
+            "kiNMMin": 140.0,
+            "kiNMMax": 1601.0
+          },
+          {
+            "targetName": "β2",
+            "kiNMMin": 740.0,
+            "kiNMMax": 3461.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 61.0,
+            "kiNMMax": 126.0
+          },
+          {
+            "targetName": "D4",
+            "kiNMMin": 26.0,
+            "kiNMMax": 158.0
+          },
+          {
+            "targetName": "D5",
+            "kiNMMin": 75.0,
+            "kiNMMax": 344.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 10000.0,
+            "ec50NM": 20000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNMMin": 5600.0,
+            "kiNMMax": 30000.0,
+            "ic50NM": 100000.0
+          }
+        ]
       }
     },
     {
@@ -75473,7 +79765,7 @@
       "cid": 71301249,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149990725,
       "deviceOrigin": "system",
       "pwikiId": "LSZ",
       "name": "LSZ",
@@ -75592,13 +79884,119 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "drugbankId": "DB15196",
-      "unii": "8SWJ525W4R"
+      "unii": "8SWJ525W4R",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 0.45
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 2.4
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 2.4
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 276.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 0.54,
+            "kiNMMax": 19.2
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 27.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNM": 37.0,
+            "ec50NM": 992.0,
+            "emaxPercent": 39.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 27.3
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 14.5
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 14.3
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 850.2
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β1",
+            "kiNM": 75.8
+          },
+          {
+            "targetName": "β2",
+            "kiNM": 1069.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 292.0
+          },
+          {
+            "targetName": "D2",
+            "kiNMMin": 73.6,
+            "kiNMMax": 110.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 6.0
+          },
+          {
+            "targetName": "D4",
+            "kiNMMin": 36.0,
+            "kiNMMax": 95.5
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 402.2
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 2504.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:11597698",
@@ -77438,7 +81836,7 @@
       "cid": 1614,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149995247,
       "deviceOrigin": "system",
       "pwikiId": "MDA",
       "name": "MDA",
@@ -77576,7 +81974,8 @@
         "pubchem",
         "tripsit",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -78305,6 +82704,131 @@
             "affinityNM": 478.0
           }
         ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "SERT",
+            "kiNMMin": 5600.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 13000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 26000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 3000.0,
+            "kiNMMax": 6418.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 3548.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 1100.0,
+            "kiNMMax": 2600.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 690.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 229.0
+          },
+          {
+            "targetName": "β1, β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 160.0,
+            "kiNMMax": 180.0,
+            "ec50NM": 3600.0,
+            "emaxPercent": 11.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "(''S'')-Amphetamine (''d'')",
+            "kiNMMin": 698.0,
+            "kiNMMax": 1765.0
+          },
+          {
+            "targetName": "(''S'')-Methamphetamine (''d'')",
+            "kiNMMin": 736.0,
+            "kiNMMax": 1292.0
+          },
+          {
+            "targetName": "(''R'')-Methamphetamine (''l'')",
+            "kiNM": 4640.0
+          },
+          {
+            "targetName": "'''MDA'''",
+            "kiNM": 160.0
+          },
+          {
+            "targetName": "(''S'')-MDA (''d'')",
+            "kiNM": 100.0
+          },
+          {
+            "targetName": "(''R'')-MDA (''l'')",
+            "kiNM": 310.0
+          },
+          {
+            "targetName": "MDMA",
+            "kiNMMin": 49.6,
+            "kiNMMax": 72.0
+          },
+          {
+            "targetName": "(''S'')-MDMA (''d'')",
+            "kiNM": 74.0
+          },
+          {
+            "targetName": "(''R'')-MDMA (''l'')",
+            "kiNM": 340.0
+          },
+          {
+            "targetName": "MDEA",
+            "kiNM": 47.0
+          },
+          {
+            "targetName": "MBDB",
+            "kiNM": 540.0
+          },
+          {
+            "targetName": "MDAI",
+            "kiNM": 114.0
+          }
+        ]
       }
     },
     {
@@ -78313,7 +82837,7 @@
       "cid": 125558,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784149997579,
       "deviceOrigin": "system",
       "pwikiId": "MDAI",
       "name": "MDAI",
@@ -78400,7 +82924,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -78442,6 +82967,57 @@
             "species": "Rat",
             "affinityType": "Kd",
             "affinityNM": 0.104
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "2-AI",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "MDAI",
+            "kiNM": 114.0
+          },
+          {
+            "targetName": "MMAI",
+            "kiNM": 31.0
+          },
+          {
+            "targetName": "MEAI",
+            "kiNM": 134.0
+          },
+          {
+            "targetName": "''d''-Amphetamine",
+            "kiNMMin": 698.0,
+            "kiNMMax": 1765.0
+          },
+          {
+            "targetName": "''d''-Methamphetamine",
+            "kiNMMin": 736.0,
+            "kiNMMax": 1292.0
+          },
+          {
+            "targetName": "MDA",
+            "kiNM": 160.0
+          },
+          {
+            "targetName": "MDMA",
+            "kiNMMin": 49.6,
+            "kiNMMax": 72.0
+          },
+          {
+            "targetName": "(''R'')-MDMA (''l''-MDMA)",
+            "kiNM": 340.0
+          },
+          {
+            "targetName": "MDEA",
+            "kiNM": 47.0
+          },
+          {
+            "targetName": "MBDB",
+            "kiNM": 540.0
           }
         ]
       }
@@ -78694,7 +83270,7 @@
       "cid": 1615,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150000510,
       "deviceOrigin": "system",
       "pwikiId": "MDMA",
       "name": "MDMA",
@@ -78862,7 +83438,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -80426,6 +85003,72 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": null
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "NET",
+            "kiNMMin": 27000.0,
+            "kiNMMax": 30500.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 2532.0,
+            "kiNMMax": 15000.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 1785.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNMMin": 1123.0,
+            "kiNMMax": 1346.0
+          },
+          {
+            "targetName": "β1, β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "nACh",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNMMin": 2400.0,
+            "kiNMMax": 3100.0,
+            "ec50NM": 35000.0,
+            "emaxPercent": 26.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 220.0
           }
         ]
       }
@@ -83807,7 +88450,7 @@
       "cid": 4076,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150006918,
       "deviceOrigin": "system",
       "pwikiId": "Mescaline",
       "name": "Mescaline",
@@ -83957,7 +88600,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -84537,6 +89181,107 @@
             "species": "Human",
             "affinityType": "Ki",
             "affinityNM": null
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 5205.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNMMin": 793.0,
+            "kiNMMax": 800.0,
+            "emaxPercent": 91.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 15000.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 1400.0,
+            "kiNMMax": 8930.0
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 745.0
+          },
+          {
+            "targetName": "β1–β2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 11000.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "I1",
+            "kiNM": 2678.0
+          },
+          {
+            "targetName": "σ1–σ2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 30000.0,
+            "ic50NM": 900000.0
           }
         ]
       }
@@ -85120,7 +89865,7 @@
       "cid": 44350127,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150009911,
       "deviceOrigin": "system",
       "pwikiId": "Methallylescaline",
       "name": "Methallylescaline",
@@ -85244,14 +89989,132 @@
       "sources": [
         "psychonautwiki",
         "pubchem",
-        "tripsit"
+        "tripsit",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
       "userAnnotations": {},
       "chemblId": "CHEMBL126803",
       "chemspiderId": "21106346",
-      "unii": "CVN0S9V910"
+      "unii": "CVN0S9V910",
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNMMin": 5100.0,
+            "kiNMMax": 10000.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 2754.0
+          },
+          {
+            "targetName": "5-HT1E",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT2A",
+            "kiNMMin": 72.0,
+            "kiNMMax": 955.0
+          },
+          {
+            "targetName": "5-HT2B",
+            "kiNM": 110.0
+          },
+          {
+            "targetName": "5-HT2C",
+            "kiNMMin": 5.1,
+            "kiNMMax": 520.0
+          },
+          {
+            "targetName": "5-HT3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 10000.0,
+            "ec50NM": 219.0,
+            "emaxPercent": 21.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "5-HT7",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α1A–α1D",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNMMin": 550.0,
+            "kiNMMax": 1500.0
+          },
+          {
+            "targetName": "α2B, α2C",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "β1–β3",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D1, D2",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 10000.0,
+            "ec50NM": 2450.0,
+            "emaxPercent": 86.0
+          },
+          {
+            "targetName": "D4, D5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "H1–H4",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "M1–M5",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "TAAR1",
+            "kiNM": 3900.0,
+            "ec50NM": 10000.0
+          },
+          {
+            "targetName": "σ1",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "σ2",
+            "kiNM": 5248.0
+          },
+          {
+            "targetName": "SERT",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NET",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DAT",
+            "kiNM": 10000.0
+          }
+        ]
+      }
     },
     {
       "id": "cid:10836",
@@ -112937,7 +117800,7 @@
       "cid": 5073,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150046073,
       "deviceOrigin": "system",
       "pwikiId": "Risperidone",
       "name": "Risperidone",
@@ -113005,7 +117868,8 @@
         "pubchem",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -117790,6 +122654,86 @@
             "species": "Human",
             "affinityType": "IC50",
             "affinityNM": 34200.0
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT1A",
+            "kiNM": 423.0
+          },
+          {
+            "targetName": "5-HT1B",
+            "kiNM": 14.9
+          },
+          {
+            "targetName": "5-HT1D",
+            "kiNM": 84.6
+          },
+          {
+            "targetName": "5-HT5A",
+            "kiNM": 206.0
+          },
+          {
+            "targetName": "5-HT6",
+            "kiNM": 2060.0
+          },
+          {
+            "targetName": "α1A",
+            "kiNM": 5.0
+          },
+          {
+            "targetName": "α1B",
+            "kiNM": 9.0
+          },
+          {
+            "targetName": "α2A",
+            "kiNM": 16.5
+          },
+          {
+            "targetName": "α2B",
+            "kiNM": 108.0
+          },
+          {
+            "targetName": "α2C",
+            "kiNM": 1.3
+          },
+          {
+            "targetName": "D1",
+            "kiNM": 244.0
+          },
+          {
+            "targetName": "D2",
+            "kiNM": 3.57
+          },
+          {
+            "targetName": "D2S",
+            "kiNM": 4.73
+          },
+          {
+            "targetName": "D2L",
+            "kiNM": 4.16
+          },
+          {
+            "targetName": "D3",
+            "kiNM": 3.6
+          },
+          {
+            "targetName": "D4",
+            "kiNM": 4.66
+          },
+          {
+            "targetName": "D5",
+            "kiNM": 290.0
+          },
+          {
+            "targetName": "H1",
+            "kiNM": 20.1
+          },
+          {
+            "targetName": "H2",
+            "kiNM": 120.0
           }
         ]
       }
@@ -131622,7 +136566,7 @@
       "cid": 33741,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150060006,
       "deviceOrigin": "system",
       "pwikiId": "Tramadol",
       "name": "Tramadol",
@@ -131728,7 +136672,8 @@
         "psychonautwiki",
         "pubchem",
         "tripsit",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -131826,6 +136771,34 @@
             "species": "Human",
             "affinityType": "IC50",
             "affinityNM": 1100.0
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "5-HT reuptake",
+            "kiNM": 1820.0
+          },
+          {
+            "targetName": "5-HT release",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "NE reuptake",
+            "kiNM": 2770.0
+          },
+          {
+            "targetName": "NE release",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DA reuptake",
+            "kiNM": 10000.0
+          },
+          {
+            "targetName": "DA release",
+            "kiNM": 10000.0
           }
         ]
       }
@@ -132744,7 +137717,7 @@
       "cid": 5732,
       "docType": "substance",
       "createdAt": 1783690415546,
-      "updatedAt": 1783690415546,
+      "updatedAt": 1784150063406,
       "deviceOrigin": "system",
       "pwikiId": "Zolpidem",
       "name": "Zolpidem",
@@ -132874,7 +137847,8 @@
         "tripsit",
         "iuphar",
         "pdsp",
-        "bindingdb"
+        "bindingdb",
+        "wikipedia"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -133953,6 +138927,18 @@
             "species": "Rat",
             "affinityType": "IC50",
             "affinityNM": 4700.0
+          }
+        ]
+      },
+      "wikipediaData": {
+        "records": [
+          {
+            "targetName": "GABAA Benzodiazepine Type Ic",
+            "kiNM": 25.0
+          },
+          {
+            "targetName": "GABAA Benzodiazepineb",
+            "kiNM": 26.0
           }
         ]
       }

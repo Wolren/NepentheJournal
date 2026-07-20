@@ -19,7 +19,6 @@ class ObsidianNoteRendererTest {
         title = "LSD Exploration",
         startTime = 1720728000000L,
         endTime = 1720742400000L,
-        tags = listOf("psychedelic", "introspection"),
         set = "Calm and curious",
         setting = "Home, dim lights",
         intention = "Introspection",
@@ -68,7 +67,6 @@ class ObsidianNoteRendererTest {
         assertTrue(note.content.contains("rating: 8"), "Should contain rating")
         assertTrue(note.content.contains("substances:"), "Should have substances section")
         assertTrue(note.content.contains("  - \"LSD\""), "Should list LSD as substance")
-        assertTrue(note.content.contains("\"psychedelic\""), "Should have psychedelic tag")
         assertTrue(note.content.contains("\"favorite\""), "Should have favorite tag")
 
         // Body structure
@@ -169,7 +167,7 @@ class ObsidianNoteRendererTest {
     }
 
     @Test
-    fun noTagsInFrontmatterWhenEmpty() {
+    fun noTagsInFrontmatterWhenPlainSession() {
         val session = Session(
             id = "s:no-tags", createdAt = 0L, updatedAt = 0L,
             deviceOrigin = "test", title = "Plain", startTime = 1000L
@@ -180,7 +178,7 @@ class ObsidianNoteRendererTest {
             substanceNameResolver = { null }
         )
         assertTrue(note.content.contains("source: \"Nepenthe Journal\""), "Should have source")
-        assertFalse(note.content.contains("tags: []"), "Should not have empty tags")
+        assertFalse(note.content.contains("tags:"), "Should not have tags line")
     }
 
     @Test
