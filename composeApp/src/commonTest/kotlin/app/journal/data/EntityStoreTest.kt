@@ -207,8 +207,8 @@ class EntityStoreTest {
         store.put(TestEntity("a", "Alice", 1))
         store.put(TestEntity("b", "Bob", 2))
         store.put(TestEntity("c", "Charlie", 3))
-        val removed = store.removeAll(setOf("a", "c"))
-        assertEquals(2, removed.size)
+        val removed: Int = store.removeAll(setOf("a", "c"))
+        assertEquals(2, removed)
         assertEquals(1, store.size)
         assertEquals("Bob", store.get("b")?.name)
         assertNull(store.get("a"))
@@ -218,7 +218,8 @@ class EntityStoreTest {
     fun removeAllWithEmptySetDoesNothing() {
         val store = EntityStore(idOf)
         store.put(TestEntity("a", "Alice", 1))
-        assertTrue(store.removeAll(emptySet()).isEmpty())
+        val removedCount = store.removeAll(emptySet())
+        assertEquals(0, removedCount)
         assertEquals(1, store.size)
     }
 

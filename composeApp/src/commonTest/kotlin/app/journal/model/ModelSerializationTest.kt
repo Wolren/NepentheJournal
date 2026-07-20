@@ -68,14 +68,13 @@ class ModelSerializationTest {
             id = "dose:2", sessionId = "session:1", substanceId = "sub:1",
             routeOfAdministration = "Oral", amount = 100.0, unit = "mg",
             timestamp = 2000L, isDoseEstimate = true,
-            estimatedDoseStandardDeviation = 10.0, estimatedDoseNotes = "Half a tab",
+            estimatedDoseStandardDeviation = 10.0,
             createdAt = 1000L, updatedAt = 2000L, deviceOrigin = "test"
         )
         val json = AppJson.json.encodeToString(original)
         val restored = AppJson.json.decodeFromString<Dose>(json)
         assertTrue(restored.isDoseEstimate)
-        assertEquals(10.0, restored.estimatedDoseStandardDeviation, 0.001)
-        assertEquals("Half a tab", restored.estimatedDoseNotes)
+        assertEquals(10.0, restored.estimatedDoseStandardDeviation!!, 0.001)
     }
 
     @Test
@@ -174,20 +173,20 @@ class ModelSerializationTest {
         val restored = AppJson.json.decodeFromString<TimelineEvent>(json)
         assertEquals(original.eventType, restored.eventType)
         assertEquals(original.label, restored.label)
-        assertEquals(original.intensity, restored.intensity, 0.01f)
+        assertEquals(original.intensity!!, restored.intensity!!, 0.01f)
     }
 
     @Test
     fun customUnitRoundtrip() {
         val original = CustomUnit(
             id = "unit:1", substanceId = "sub:1",
-            name = "Tablet", namePlural = "Tablets",
-            abbreviation = "tab", unitCount = 1.0,
+            name = "Tablet",
+            estimatedMgPerUnit = 10.0,
             createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test"
         )
         val json = AppJson.json.encodeToString(original)
         val restored = AppJson.json.decodeFromString<CustomUnit>(json)
         assertEquals("Tablet", restored.name)
-        assertEquals(1.0, restored.unitCount, 0.001)
+        assertEquals(10.0, restored.estimatedMgPerUnit!!, 0.001)
     }
 }
