@@ -99,6 +99,8 @@ kotlin {
         // Wire jvmMain into both Android and Desktop
         androidMain.dependsOn(jvmMain)
         desktopMain.dependsOn(jvmMain)
+        // Wire iosMain explicitly (template disabled)
+        getByName("iosMain").dependsOn(commonMain)
     }
 }
 
