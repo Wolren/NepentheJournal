@@ -56,7 +56,7 @@ jobs:
 
       - name: Compile Android sources
         run: |
-          ./gradlew composeApp:compileKotlinAndroid \
+          ./gradlew composeApp:compileDebugKotlinAndroid \
             -x checkDebugAarMetadata \
             --no-daemon
 
