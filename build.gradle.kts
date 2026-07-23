@@ -1,7 +1,7 @@
 plugins {
-    kotlin("multiplatform")           version "2.4.10" apply false
-    kotlin("plugin.serialization")    version "2.4.10" apply false
-    kotlin("plugin.compose")          version "2.4.10" apply false
+    kotlin("multiplatform")           version libs.versions.kotlin.get() apply false
+    kotlin("plugin.serialization")    version libs.versions.kotlin.get() apply false
+    kotlin("plugin.compose")          version libs.versions.kotlin.get() apply false
     id("org.jetbrains.compose")       version "1.11.1" apply false
     id("com.android.application")     version "9.3.0" apply false
 }

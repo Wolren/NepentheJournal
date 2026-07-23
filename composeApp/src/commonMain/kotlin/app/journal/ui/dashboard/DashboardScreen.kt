@@ -1,14 +1,11 @@
 package app.journal.ui.dashboard
 
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -200,18 +197,7 @@ fun DashboardScreen(
             item { Spacer(Modifier.height(8.dp)) }
         }
 
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-            adapter = rememberScrollbarAdapter(scrollState),
-            style = ScrollbarStyle(
-                minimalHeight = 24.dp,
-                thickness = 6.dp,
-                shape = RoundedCornerShape(3.dp),
-                hoverDurationMillis = 300,
-                unhoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                hoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-            )
-        )
+        DesktopScrollbar(scrollState)
     }
 
     clickedDayInfo?.let { info ->

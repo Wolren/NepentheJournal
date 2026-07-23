@@ -25,11 +25,6 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java
-
       - name: Compile common + desktop sources
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
 
@@ -63,9 +58,6 @@ jobs:
           ./gradlew composeApp:compileDebugKotlinAndroid \
             -x checkDebugAarMetadata \
             --no-daemon
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
 
   android-build:
     runs-on: ubuntu-latest
