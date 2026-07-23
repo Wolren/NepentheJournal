@@ -8,6 +8,7 @@ on:
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx2g
   GRADLE_CACHE_KEY: kotlin-2.4-gradle-9.5
+  CODEQL_EXTRACTOR_KOTLIN_COMPILER_VERSION_CHECK: false
 
 jobs:
   check:
