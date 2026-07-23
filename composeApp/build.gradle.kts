@@ -99,8 +99,12 @@ kotlin {
         // Wire jvmMain into both Android and Desktop
         androidMain.dependsOn(jvmMain)
         desktopMain.dependsOn(jvmMain)
-        // Wire iosMain explicitly (template disabled)
-        getByName("iosMain").dependsOn(commonMain)
+        // Wire iosMain explicitly (default hierarchy template disabled)
+        val iosMain = getByName("iosMain") { dependsOn(commonMain) }
+        // Connect iOS leaf targets to iosMain
+        listOf(iosArm64(), iosSimulatorArm64()).forEach {
+            getByName("${it.name}Main").dependsOn(iosMain)
+        }
     }
 }
 
