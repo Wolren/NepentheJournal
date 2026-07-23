@@ -77,7 +77,7 @@ fun renderSessionToObsidianNote(
 
     val substances: Set<String> = doses.mapNotNull { dose ->
         substanceNameResolver(dose.substanceId)
-    }.toSortedSet()
+    }.toMutableSet()
 
     val durationStr = formatDuration(session.startTime, session.endTime)
 

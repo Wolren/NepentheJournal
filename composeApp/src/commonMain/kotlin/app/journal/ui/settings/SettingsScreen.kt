@@ -29,6 +29,7 @@ import app.journal.data.JournalRepository
 import app.journal.sync.*
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
+import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
 import app.journal.util.PlatformFile
 import kotlinx.coroutines.launch
@@ -112,7 +113,7 @@ fun SettingsScreen(syncEngine: SyncEngine) {
     }
 
     fun formatTimestamp(epochMs: Long): String {
-        val diff = System.currentTimeMillis() - epochMs
+        val diff = currentTimeMillis() - epochMs
         val seconds = diff / 1000; val minutes = seconds / 60; val hours = minutes / 60; val days = hours / 24
         return when {
             seconds < 60 -> "just now"; minutes < 60 -> "${minutes}m ago"; hours < 24 -> "${hours}h ago"

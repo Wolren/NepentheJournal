@@ -22,6 +22,7 @@ import app.journal.data.JournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.ui.substances.detail.SectionCard
+import kotlin.math.roundToInt
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -257,7 +258,7 @@ fun SubstanceCompanionScreen(
                             )
                             ToleranceStat(
                                 label = "Since last dose",
-                                value = "${"%.1f".format(toleranceInfo.daysSinceLastDose)} days"
+                                value = "${(toleranceInfo.daysSinceLastDose * 10).roundToInt() / 10.0} days"
                             )
                             ToleranceStat(
                                 label = "Doses last 30d",
@@ -371,6 +372,6 @@ private fun formatAmount(amount: Double, unit: String): String {
     return if (amount == amount.toLong().toDouble()) {
         "${amount.toLong()} $unit"
     } else {
-        "${"%.2f".format(amount)} $unit"
+        "${(amount * 100).roundToInt() / 100.0} $unit"
     }
 }

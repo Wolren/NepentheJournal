@@ -89,7 +89,7 @@ internal fun ThemeContent(
                         Text("Opacity", style = MaterialTheme.typography.bodySmall)
                         Slider(value = editBgOpacity, onValueChange = { onBgOpacityChange(it); applyTheme() },
                             modifier = Modifier.weight(1f).height(16.dp), valueRange = 0f..1f)
-                        Text("%.0f%%".format(editBgOpacity * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                        Text("${(editBgOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Cards & shapes", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
@@ -108,7 +108,7 @@ internal fun ThemeContent(
                         Text("Font scale", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
                         Slider(value = editFontScale, onValueChange = { onFontScaleChange(it); applyTheme() },
                             modifier = Modifier.weight(1f).height(16.dp), valueRange = 0.8f..1.3f, steps = 9)
-                        Text("%.0f%%".format(editFontScale * 100), style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                        Text("${(editFontScale * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Animations", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))

@@ -123,7 +123,7 @@ object ObsidianExportManager {
         val vaultNorm = ObsidianVaultOps.normalizePath(config.vaultPath)
         val dirNorm = ObsidianVaultOps.normalizePath(dir)
         if (!dirNorm.startsWith(vaultNorm.trimEnd('/').trimEnd('\\'))) {
-            throw SecurityException(
+            throw Exception(
                 "Resolved export directory is outside vault: $dirNorm not under $vaultNorm"
             )
         }

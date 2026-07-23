@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Substance
+import kotlin.math.roundToInt
 
 private val AFFINITY_LOG_MIN = -2.0  // 0.01 nM
 private val AFFINITY_LOG_MAX = 4.0   // 10000 nM
@@ -345,11 +346,17 @@ private fun AffinityBar(
 }
 
 private fun formatAffinity(nm: Double): String = when {
-    nm < 0.01 -> "%.2e".format(nm)
-    nm < 1.0 -> "%.2f".format(nm)
-    nm < 100.0 -> "%.1f".format(nm)
-    nm < 10000.0 -> "%.0f".format(nm)
-    else -> "%.0f".format(nm)
+    nm < 0.01 -> {
+        var exp = 0
+        var m = nm
+        while (m < 1.0) { m *= 10; exp-- }
+        while (m >= 10.0) { m /= 10; exp++ }
+        "${(m * 100).roundToInt() / 100.0}e$exp"
+    }
+    nm < 1.0 -> "${(nm * 100).roundToInt() / 100.0}"
+    nm < 100.0 -> "${(nm * 10).roundToInt() / 10.0}"
+    nm < 10000.0 -> "${nm.toInt()}"
+    else -> "${nm.toInt()}"
 }
 
 @Composable

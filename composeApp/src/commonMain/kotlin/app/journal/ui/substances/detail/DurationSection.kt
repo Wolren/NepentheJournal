@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.model.DoseWikiDuration
 import app.journal.model.DoseWikiStage
+import kotlin.math.roundToInt
 
 private data class DurationPhase(
     val label: String,
@@ -172,11 +173,11 @@ internal fun DurationTimelineSection(
             totalRaw = total.third
             totalMinStr = total.first?.let {
                 val h = it / 60.0
-                if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+                if (h >= 1) "${(h * 10).roundToInt() / 10.0} hr" else "${it.toInt()} min"
             } ?: ""
             totalMaxStr = total.second?.let {
                 val h = it / 60.0
-                if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+                if (h >= 1) "${(h * 10).roundToInt() / 10.0} hr" else "${it.toInt()} min"
             } ?: ""
         } else {
             totalMax = phases.maxOfOrNull { it.maxMinutes } ?: return
@@ -191,11 +192,11 @@ internal fun DurationTimelineSection(
         totalMax = totalParsed?.second ?: phases.maxOfOrNull { it.maxMinutes } ?: return
         totalMinStr = totalParsed?.first?.let {
             val h = it / 60.0
-            if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+            if (h >= 1) "${(h * 10).roundToInt() / 10.0} hr" else "${it.toInt()} min"
         } ?: ""
         totalMaxStr = totalParsed?.second?.let {
             val h = it / 60.0
-            if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+            if (h >= 1) "${(h * 10).roundToInt() / 10.0} hr" else "${it.toInt()} min"
         } ?: ""
     }
 
