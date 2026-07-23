@@ -144,7 +144,7 @@ object DataInitializer {
                     Log.withTag("DataInit").w { "Seed resource $SEED_RESOURCE not found" }
                     return false
                 }
-            val snapshot = JournalJson.json.decodeFromString<JournalSnapshot>(text)
+            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(text)
             // Normalize substance classes (case, plural, joined-string cleanup)
             val normalizedSnapshot = snapshot.copy(
                 substances = snapshot.substances.map { sub ->
@@ -180,7 +180,7 @@ object DataInitializer {
     fun reloadDefaultSubstances(repo: JournalRepository) {
         try {
             val text = readBundledResource(SEED_RESOURCE) ?: return
-            val snapshot = JournalJson.json.decodeFromString<JournalSnapshot>(text)
+            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(text)
             val normalized = snapshot.copy(
                 substances = snapshot.substances.map { sub ->
                     sub.copy(substanceClass = SubstanceClassNormalizer.normalize(sub.substanceClass))

@@ -481,4 +481,197 @@ class JournalRepositoryTest {
         repo.upsertDose(sampleDose("d:2", "sub:2", "s:1", 2000L))
         assertEquals(2, repo.substanceDoseStats.size)
     }
+
+    // ==================== upsertNoteWithConflict ====================
+
+    @Test
+    fun upsertNoteWithConflictReturnsNullForNullSessionId() {
+        val repo = JournalRepository()
+        val note = Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = null, body = "no session")
+        assertNull(repo.upsertNoteWithConflict(note, "remote"))
+        assertTrue(repo.notes.value.isEmpty())
+    }
+
+    @Test
+    fun upsertNoteWithConflictCreatesConflictSiblingOnBodyMismatch() {
+        val repo = JournalRepository()
+        val local = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "local version")
+        repo.upsertNote(local)
+        val remote = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "remote",
+            sessionId = "s:1", body = "remote version")
+        val resolved = repo.upsertNoteWithConflict(remote, "remote")
+        assertNotNull(resolved)
+        assertEquals(1, resolved.conflictSiblings.size)
+        assertEquals("remote version", resolved.conflictSiblings.first().body)
+        assertEquals("remote", resolved.conflictSiblings.first().deviceOrigin)
+    }
+
+    @Test
+    fun upsertNoteWithConflictNoConflictWhenBodiesMatch() {
+        val repo = JournalRepository()
+        val local = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "same body")
+        repo.upsertNote(local)
+        val remote = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "remote",
+            sessionId = "s:1", body = "same body")
+        val resolved = repo.upsertNoteWithConflict(remote, "remote")
+        assertNotNull(resolved)
+        assertTrue(resolved.conflictSiblings.isEmpty())
+    }
+
+    @Test
+    fun upsertNoteWithConflictUpdatesExistingNote() {
+        val repo = JournalRepository()
+        val local = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "old")
+        repo.upsertNote(local)
+        val remote = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "remote",
+            sessionId = "s:1", body = "new")
+        repo.upsertNoteWithConflict(remote, "remote")
+        // The stored note should have the remote body (last write wins) plus conflict sibling
+        val stored = repo.notes.value.find { it.id == "n:1" }
+        assertNotNull(stored)
+        assertEquals("new", stored.body)
+        assertEquals(1, stored.conflictSiblings.size)
+    }
+
+    // ==================== upsertTimelineEvent ====================
+
+    @Test
+    fun upsertTimelineEventIndexesBySession() {
+        val repo = JournalRepository()
+        val event = TimelineEvent(
+            id = "e:1", sessionId = "s:1", timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        )
+        repo.upsertTimelineEvent(event)
+        assertEquals(1, repo.eventsForSession("s:1").size)
+        assertEquals("e:1", repo.eventsForSession("s:1").first().id)
+    }
+
+    @Test
+    fun upsertTimelineEventUpdateReplacesInIndex() {
+        val repo = JournalRepository()
+        val event = TimelineEvent(
+            id = "e:1", sessionId = "s:1", timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        )
+        repo.upsertTimelineEvent(event)
+        // Update with same ID but different session
+        val updated = event.copy(sessionId = "s:2", label = "Moved")
+        repo.upsertTimelineEvent(updated)
+        // Old session should not have the event
+        assertTrue(repo.eventsForSession("s:1").isEmpty())
+        // New session should have it
+        assertEquals(1, repo.eventsForSession("s:2").size)
+        assertEquals("Moved", repo.eventsForSession("s:2").first().label)
+    }
+
+    @Test
+    fun upsertTimelineEventAcrossSessionsDoesNotDuplicate() {
+        val repo = JournalRepository()
+        val event = TimelineEvent(
+            id = "e:1", sessionId = "s:1", timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        )
+        repo.upsertTimelineEvent(event)
+        // Upsert same event again (same session) — should not duplicate
+        repo.upsertTimelineEvent(event)
+        assertEquals(1, repo.eventsForSession("s:1").size)
+    }
+
+    // ==================== deleteTimelineEvent ====================
+
+    @Test
+    fun deleteTimelineEventRemovesFromIndex() {
+        val repo = JournalRepository()
+        repo.upsertTimelineEvent(TimelineEvent(
+            id = "e:1", sessionId = "s:1", timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        ))
+        repo.upsertTimelineEvent(TimelineEvent(
+            id = "e:2", sessionId = "s:1", timestamp = 2000L,
+            eventType = TimelineEventType.PEAK, label = "Peak",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        ))
+        assertEquals(2, repo.eventsForSession("s:1").size)
+        repo.deleteTimelineEvent("e:1")
+        assertEquals(1, repo.eventsForSession("s:1").size)
+        assertEquals("e:2", repo.eventsForSession("s:1").first().id)
+    }
+
+    @Test
+    fun deleteTimelineEventIsIdempotent() {
+        val repo = JournalRepository()
+        repo.upsertTimelineEvent(TimelineEvent(
+            id = "e:1", sessionId = "s:1", timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
+        ))
+        repo.deleteTimelineEvent("e:1")
+        // Second delete should be a no-op
+        repo.deleteTimelineEvent("e:1")
+        assertTrue(repo.eventsForSession("s:1").isEmpty())
+        assertTrue(repo.timelineEvents.value.isEmpty())
+    }
+
+    // ==================== substanceDoseStats on deleteSubstance ====================
+
+    @Test
+    fun deleteSubstanceClearsDoseStats() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        assertEquals(1, repo.substanceDoseStats.size)
+        repo.deleteSubstance("sub:1")
+        assertTrue(repo.substanceDoseStats.isEmpty())
+    }
+
+    @Test
+    fun deleteSubstanceDoesNotAffectOtherSubstanceStats() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSubstance(sampleSubstance("sub:2", "MDMA"))
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:2", "s:1", 2000L))
+        assertEquals(2, repo.substanceDoseStats.size)
+        repo.deleteSubstance("sub:1")
+        assertEquals(1, repo.substanceDoseStats.size)
+        assertTrue(repo.substanceDoseStats.containsKey("sub:2"))
+    }
+
+    // ==================== upsertNote index consistency ====================
+
+    @Test
+    fun upsertNoteWithNullSessionIdDoesNotIndexButStillStores() {
+        val repo = JournalRepository()
+        val note = Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = null, body = "orphan note")
+        repo.upsertNote(note)
+        // Note is stored in the store
+        assertEquals(1, repo.notes.value.size)
+        // But not indexed by session
+        assertTrue(repo.notesForSession("any").isEmpty())
+    }
+
+    @Test
+    fun upsertNoteMovingBetweenSessionsUpdatesIndex() {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", body = "a"))
+        assertEquals(1, repo.notesForSession("s:1").size)
+        // Move to different session
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:2", body = "b"))
+        assertTrue(repo.notesForSession("s:1").isEmpty())
+        assertEquals(1, repo.notesForSession("s:2").size)
+    }
 }

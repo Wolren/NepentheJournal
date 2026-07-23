@@ -91,7 +91,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     var useRelativeTime by remember { mutableStateOf(true) }
-    val sessionListViewModel = remember { SessionListViewModel.create() }
+    val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember { createSyncEngine(JournalRepository.instance) }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     val showArch by sessionListViewModel.showArchived.collectAsState()

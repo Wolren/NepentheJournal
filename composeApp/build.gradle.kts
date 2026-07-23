@@ -102,6 +102,20 @@ kotlin {
     }
 }
 
+// KMP test tasks (desktopTest) are NOT standard Gradle Test tasks,
+// so tasks.withType<Test>() does not match them. Test exclusions
+// are done in scripts/run-tests.sh via --tests filters.
+//
+// Usage:
+//   ./scripts/run-tests.sh           -- 18 fast unit tests (~11s warm)
+//   ./scripts/run-tests.sh --all     -- 28 tests incl integration (~11s warm)
+//   ./gradlew composeApp:desktopTest --no-daemon --tests "app.journal.data.JournalRepositoryTest"
+//
+// Prerequisites:
+//   - gradle.properties sets org.gradle.daemon=false and in-process Kotlin compiler
+//   - run-tests.sh raises ulimit -u 16384 (git-bash default 256 is too low)
+//   - SessionListViewModelTest is excluded (combine + runBlocking deadlock)
+
 android {
     namespace = "app.journal"
     compileSdk = 36

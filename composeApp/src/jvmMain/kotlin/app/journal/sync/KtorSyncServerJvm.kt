@@ -89,11 +89,6 @@ class SyncServerRouter(
     private val fingerprint: String
 ) {
     private val json = AppJson.json
-    /** WS-specific: no polymorphic module (decodes concrete types only). Uses encodeDefaults=true for consistent wire format. */
-    private val wsJson = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
 
     fun installRouting(app: Application) {
@@ -388,13 +383,8 @@ class SyncServerRouter(
             } else repo.upsertSession(session)
         }
         batch.notes.forEach { note ->
-            val existing = repo.notes.value.find { it.id == note.id }
-            val resolved = if (existing != null && existing.body != note.body) {
-                note.copy(conflictSiblings = existing.conflictSiblings +
-                        ConflictSibling(note.body, batch.deviceId, note.updatedAt))
-            } else note
-            repo.upsertNote(resolved)
-            if (resolved.conflictSiblings.isNotEmpty()) conflicts++
+            val resolved = repo.upsertNoteWithConflict(note, batch.deviceId)
+            if (resolved != null && resolved.conflictSiblings.isNotEmpty()) conflicts++
         }
         onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${batch.deviceName}")
     }

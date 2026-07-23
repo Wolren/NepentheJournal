@@ -86,7 +86,8 @@ class SessionListViewModel(
     }
 
     companion object {
-        fun create(): SessionListViewModel = SessionListViewModel(JournalRepository.instance)
+        fun create(repo: IJournalRepository = JournalRepository.instance): SessionListViewModel =
+            SessionListViewModel(repo)
     }
 }
 

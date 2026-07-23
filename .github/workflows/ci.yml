@@ -6,7 +6,7 @@ on:
     branches: [master]
 
 env:
-  GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx3g
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx2g
   GRADLE_CACHE_KEY: kotlin-2.4-gradle-9.5
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
       - name: Compile common + desktop sources
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
 
-      - name: Run common + desktop tests
+      - name: Run unit tests (excludes integration tests)
         run: ./gradlew composeApp:desktopTest --no-daemon
 
       - name: Compile Android sources

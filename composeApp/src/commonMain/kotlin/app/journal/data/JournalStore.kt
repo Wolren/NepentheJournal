@@ -111,13 +111,3 @@ object AppJson {
         repo.setShowSessionsTrendChart(snapshot.showSessionsTrendChart)
     }
 }
-
-/**
- * Serialization helper. Deprecated — use AppJson directly.
- */
-@Deprecated("Use AppJson.json", replaceWith = ReplaceWith("AppJson.json"))
-object JournalJson {
-    val json = AppJson.json
-    fun snapshot(repo: JournalRepository): JournalSnapshot = AppJson.snapshot(repo)
-    fun apply(repo: JournalRepository, snapshot: JournalSnapshot) = AppJson.apply(repo, snapshot)
-}

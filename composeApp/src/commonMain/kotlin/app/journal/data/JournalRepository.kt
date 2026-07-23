@@ -345,19 +345,8 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
 
-        // Update substance dose stats (count of distinct sessions containing this substance).
-        val subId = dose.substanceId
-        val sessionCount = dosesStore.all
-            .filter { it.substanceId == subId }
-            .map { it.sessionId }
-            .distinct()
-            .count()
-        val prevLast = _substanceDoseStats[subId]?.second ?: 0L
-        _substanceDoseStats[subId] = Pair(
-            sessionCount,
-            maxOf(prevLast, dose.timestamp)
-        )
-        _doseStatsSessionIds.getOrPut(subId) { mutableSetOf() }.add(dose.sessionId)
+        // Update substance dose stats incrementally (distinct session count + last used timestamp).
+        updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
 
         bumpToleranceVersion()
         bumpMutationCount()
@@ -553,8 +542,9 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (prevSessionId != null) {
             _notesBySession[prevSessionId]?.removeAll { it.id == note.id }
         }
-        val sessionId = note.sessionId ?: return
-        _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
+        note.sessionId?.let { sessionId ->
+            _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
+        }
         bumpMutationCount()
     }
 
