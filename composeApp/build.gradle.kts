@@ -129,7 +129,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
-    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,*.properties}" } }
+    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,LICENSE.md,LICENSE.txt,NOTICE.md,*.properties}" } }
     buildTypes { getByName("release") { isMinifyEnabled = false } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
