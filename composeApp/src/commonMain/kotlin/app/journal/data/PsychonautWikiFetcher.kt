@@ -29,7 +29,7 @@ class PsychonautWikiFetcher(
     suspend fun fetchAll(
         onProgress: (fetched: Int, chunksDone: Int, chunksTotal: Int) -> Unit = { _, _, _ -> }
     ): Int {
-        withContext(Dispatchers.IO) {
+        withContext(Dispatchers.Default) {
             val ingestor = PsychonautWikiIngestor(httpClient = client, repository = repo)
             try {
                 walkAll(resolver = { queryWithRetry(it) }, ingestor = ingestor, onProgress = onProgress)
