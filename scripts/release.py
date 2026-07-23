@@ -21,13 +21,11 @@ It does NOT push tags or create GitHub releases — those are manual/CI steps.
 """
 
 import argparse
-import json
 import os
 import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -54,7 +52,7 @@ def check_git_clean():
         ["git", "status", "--porcelain"],
         capture_output=True, text=True, cwd=ROOT
     )
-    dirty = [l for l in result.stdout.splitlines() if l.strip()]
+    dirty = [line for line in result.stdout.splitlines() if line.strip()]
     if dirty:
         print("Warning: uncommitted changes:")
         for d in dirty:
@@ -184,11 +182,11 @@ def main():
     print()
     print(f"  tarball: {tarball}")
     print()
-    print(f"To create a GitHub release:")
+    print("To create a GitHub release:")
     print(f"  gh release create {version} {tarball} \\")
     print(f"      {os.path.join(dist_dir, '*')} \\")
     print(f"      --title 'Data release {version}' \\")
-    print(f"      --notes 'See docs/journal-snapshot-spec.md for format details.'")
+    print("      --notes 'See docs/journal-snapshot-spec.md for format details.'")
 
 
 if __name__ == "__main__":

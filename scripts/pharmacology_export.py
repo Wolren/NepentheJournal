@@ -23,7 +23,6 @@ import argparse
 import csv
 import json
 import os
-import sys
 
 # ---------------------------------------------------------------------------
 # Column names (snake_case, consistent across sources)
@@ -360,7 +359,7 @@ def main():
     print()
 
     # Summary
-    print(f"Summary:")
+    print("Summary:")
     print(f"  PDSP:      {len(pdsp_rows):>6,} Ki binding records ({len(set(r['substance_id'] for r in pdsp_rows))} substances)")
     print(f"  IUPHAR:    {len(iuphar_rows):>6,} ligand-target interactions ({len(set(r['substance_id'] for r in iuphar_rows))} substances)")
     print(f"  ChEMBL:    {len(chembl_rows):>6,} bioactivity measurements ({len(set(r['substance_id'] for r in chembl_rows))} substances)")

@@ -18,7 +18,6 @@ DoseWiki content: CC0 (public domain). See https://dose.wiki
 
 import json
 import os
-import sys
 import urllib.request
 
 SOURCE_URL = "https://dosewiki-admin.vercel.app/SubstanceIndex.json"
@@ -105,7 +104,7 @@ def main():
     with_duration = sum(1 for s in slimmed if "duration" in s)
     with_interactions = sum(1 for s in slimmed if "interactions" in s)
 
-    print(f"\nStats:")
+    print("\nStats:")
     print(f"  With subjective effects: {with_effects}")
     print(f"  With dosage data:       {with_dosage}")
     print(f"  With duration data:      {with_duration}")

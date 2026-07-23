@@ -953,9 +953,9 @@ def main() -> None:
             json.dump(snapshot, f, indent=2, ensure_ascii=False)
         print(f"\nWritten: {args.output}")
     else:
-        print(f"\nDry-run: no changes written")
+        print("\nDry-run: no changes written")
 
-    print(f"\nSummary:")
+    print("\nSummary:")
     print(f"  Substances processed:  {processed}")
     print(f"  Pages fetched:        {stats['fetched']}")
     print(f"  Records merged:       {stats['merged']}")
