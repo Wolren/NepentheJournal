@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * JVM implementation of SyncEngine using TLS + HMAC-authenticated HTTP transport
@@ -70,11 +71,19 @@ class SyncTransport(
     val pairingToken: String? get() = _status.value.pairingToken
 
     // ---- WebSocket continuous sync ----
-    private data class WsConnection(
+    private class WsConnection(
         val session: WebSocketSession,
         val client: KtorSyncClient,
-        val mutationJob: Job
-    )
+        val mutationJob: Job,
+        val peerHost: String,
+        val peerPort: Int,
+        val peerFingerprint: String
+    ) {
+        @Volatile
+        var lastPongSeq: Long = -1L
+        var heartbeatJob: Job? = null
+        var incomingJob: Job? = null
+    }
     private val wsConnections = ConcurrentHashMap<String, WsConnection>()
 
     // ---- LAN discovery ----
@@ -127,8 +136,8 @@ class SyncTransport(
                     }
                 }
                 // Ensure mDNS service is registered for LAN discovery
-                if (lanDiscovery == null) {
-                    try {
+                try {
+                    if (lanDiscovery == null) {
                         val discovery = LanDiscovery()
                         lanDiscovery = discovery
                         backgroundScope.launch {
@@ -150,11 +159,12 @@ class SyncTransport(
                                 }
                             }
                         }
-                    } catch (e: Exception) {
-                        Log.withTag("SyncTransport").w { "mDNS init failed: ${e.message}" }
                     }
+                    lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
+                } catch (e: Exception) {
+                    Log.withTag("SyncTransport").w { "mDNS init/register failed: ${e.message} — continuing without LAN discovery" }
+                    lanDiscovery = null
                 }
-                lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
                 Result.success(info)
             } catch (e: Exception) {
                 Log.withTag("SyncTransport").e(e) { "startHosting: failed" }
@@ -399,24 +409,7 @@ class SyncTransport(
                 trustedFingerprint = existingPeer.fingerprint
             )
 
-            val session = client.connectWs(peer.host, peer.port) { delta ->
-                val validationError = validateWsDelta(delta)
-                if (validationError != null) {
-                    Log.withTag("SyncTransport").w { "Invalid WS delta from ${peer.displayName}: $validationError" }
-                    return@connectWs
-                }
-                repo.applyBatch(
-                    sessions = delta.sessions,
-                    doses = delta.doses,
-                    substances = delta.substances,
-                    effects = delta.effects,
-                    interactions = delta.interactions,
-                    notes = delta.notes,
-                    timelineEvents = delta.timelineEvents,
-                    customUnits = delta.customUnits
-                )
-                lastSyncTime = System.currentTimeMillis()
-            }
+            val session = client.connectWs(peer.host, peer.port) { /* incoming frames handled by launchIncomingReader */ }
 
             // Subscribe to local mutations and push over WebSocket
             val mutationJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
@@ -436,7 +429,24 @@ class SyncTransport(
                     }
             }
 
-            wsConnections[existingPeer.deviceId] = WsConnection(session, client, mutationJob)
+            val wsConnection = WsConnection(
+                session = session,
+                client = client,
+                mutationJob = mutationJob,
+                peerHost = peer.host,
+                peerPort = peer.port,
+                peerFingerprint = existingPeer.fingerprint
+            )
+
+            // Launch incoming frame reader (handles WsPong, WsDelta from server)
+            wsConnection.incomingJob = launchIncomingReader(existingPeer.deviceId, session, wsConnection)
+            // Launch heartbeat (sends WsPing every 30s, triggers reconnect if no pong in 10s)
+            wsConnection.heartbeatJob = launchHeartbeat(existingPeer.deviceId, session, wsConnection)
+
+            wsConnections[existingPeer.deviceId] = wsConnection
+
+            // Ensure stale cleanup is running
+            startStaleCleanup()
 
             val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
             if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)
@@ -449,6 +459,8 @@ class SyncTransport(
     override suspend fun stopContinuousSync(deviceId: String) {
         wsConnections.remove(deviceId)?.let { conn ->
             conn.mutationJob.cancel()
+            conn.heartbeatJob?.cancel()
+            conn.incomingJob?.cancel()
             conn.session.close()
             conn.client.close()
         }
@@ -555,4 +567,225 @@ class SyncTransport(
         d.sessions.isEmpty() && d.doses.isEmpty() && d.substances.isEmpty() &&
         d.effects.isEmpty() && d.interactions.isEmpty() && d.notes.isEmpty() &&
         d.timelineEvents.isEmpty() && d.customUnits.isEmpty()
+
+    // ===== WS Heartbeat & Incoming Reader =====
+
+    /** Launch a coroutine that reads incoming WS frames — processes pongs, pings, deltas, acks. */
+    private fun launchIncomingReader(
+        deviceId: String,
+        session: WebSocketSession,
+        wsConnection: WsConnection
+    ): Job = backgroundScope.launch {
+        try {
+            for (frame in session.incoming) {
+                if (frame is Frame.Text) {
+                    val text = frame.readText()
+                    try {
+                        val msg = wsJson.decodeFromString<WsMessage>(text)
+                        when (msg) {
+                            is WsPong -> {
+                                wsConnection.lastPongSeq = msg.seq
+                            }
+                            is WsDelta -> {
+                                val skipped = validateAndApplyDelta(msg)
+                                lastSyncTime = System.currentTimeMillis()
+                                if (skipped > 0) {
+                                    appendDebug("WS delta from $deviceId: $skipped invalid items skipped")
+                                }
+                            }
+                            is WsAck -> { /* server acknowledged our delta — nothing to do */ }
+                            is WsPing -> {
+                                session.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
+                            }
+                        }
+                    } catch (_: Exception) { /* malformed frame — skip */ }
+                }
+            }
+        } catch (e: Exception) {
+            if (e !is CancellationException) {
+                Log.withTag("SyncTransport").w { "Incoming reader for $deviceId error: ${e.message}" }
+                triggerReconnect(deviceId)
+            }
+        }
+    }
+
+    /** Launch a heartbeat coroutine that sends WsPing every 30s and expects a WsPong within 10s. */
+    private fun launchHeartbeat(
+        deviceId: String,
+        session: WebSocketSession,
+        wsConnection: WsConnection
+    ): Job = backgroundScope.launch {
+        var seq = 0L
+        while (isActive) {
+            try {
+                seq++
+                wsConnection.lastPongSeq = -1L
+                session.send(Frame.Text(wsJson.encodeToString(WsPing(seq = seq))))
+
+                // Wait up to 10 seconds for a matching WsPong
+                var waited = 0L
+                while (waited < 10_000 && wsConnection.lastPongSeq < seq) {
+                    delay(500)
+                    waited += 500
+                }
+
+                if (wsConnection.lastPongSeq < seq) {
+                    Log.withTag("SyncTransport").w { "Heartbeat timeout for $deviceId — no pong within 10s" }
+                    appendDebug("Heartbeat timeout: no pong from $deviceId within 10s")
+                    triggerReconnect(deviceId)
+                    return@launch
+                }
+
+                delay(30_000L - waited.coerceAtMost(30_000))
+            } catch (e: Exception) {
+                if (e !is CancellationException) {
+                    Log.withTag("SyncTransport").w { "Heartbeat error for $deviceId: ${e.message}" }
+                    triggerReconnect(deviceId)
+                }
+                return@launch
+            }
+        }
+    }
+
+    // ===== WS Reconnection =====
+
+    /** Trigger reconnection to a WS peer with exponential backoff: 1s, 2s, 4s, 8s, 16s (capped 30s). Max 5 attempts. */
+    private fun triggerReconnect(deviceId: String) {
+        val conn = wsConnections[deviceId] ?: return
+        val host = conn.peerHost
+        val port = conn.peerPort
+        val fingerprint = conn.peerFingerprint
+        backgroundScope.launch {
+            stopContinuousSync(deviceId)
+
+            for (attempt in 1..5) {
+                val delayMs = (1000L * (1L shl (attempt - 1))).coerceAtMost(30_000)
+                appendDebug("Reconnecting WS to $deviceId (attempt $attempt/5 in ${delayMs / 1000}s)")
+                delay(delayMs)
+                try {
+                    val peer = trustStore.getPeerById(deviceId) ?: break
+                    val dp = DiscoveredPeer(
+                        deviceId = peer.deviceId,
+                        displayName = peer.displayName,
+                        host = host,
+                        port = port,
+                        isTrusted = true,
+                        fingerprint = fingerprint
+                    )
+                    startContinuousSync(dp)
+                    if (wsConnections.containsKey(deviceId)) {
+                        appendDebug("Reconnected to $deviceId after $attempt attempt(s)")
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    Log.withTag("SyncTransport").w { "Reconnect attempt $attempt for $deviceId failed: ${e.message}" }
+                }
+            }
+            appendDebug("Failed to reconnect to $deviceId after 5 attempts")
+            _status.value = _status.value.copy(lastError = "WS reconnect failed for $deviceId")
+        }
+    }
+
+    // ===== Data Validation =====
+
+    companion object {
+        private const val MIN_VALID_TIMESTAMP = 946684800000L // 2000-01-01T00:00:00Z
+        private const val MAX_FUTURE_MS = 86_400_000L // allow 1 day in the future
+    }
+
+    /** Validate entity timestamps: must be between year 2000 and now+1day. */
+    private fun isReasonableTimestamp(ts: Long): Boolean {
+        val now = System.currentTimeMillis()
+        return ts in MIN_VALID_TIMESTAMP..(now + MAX_FUTURE_MS)
+    }
+
+    /**
+     * Apply a WsDelta with per-entity data validation.
+     * Skips entities with blank IDs, unreasonable timestamps, or (for doses) non-finite/negative amounts.
+     * Returns the count of skipped invalid items.
+     */
+    private fun validateAndApplyDelta(delta: WsDelta): Int {
+        var skipped = 0
+
+        val sessions = delta.sessions.filter { s ->
+            val ok = s.id.isNotBlank() && isReasonableTimestamp(s.createdAt) && isReasonableTimestamp(s.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val doses = delta.doses.filter { d ->
+            val ok = d.id.isNotBlank() && isReasonableTimestamp(d.createdAt) && isReasonableTimestamp(d.updatedAt)
+                    && d.amount.isFinite() && d.amount >= 0.0
+            if (!ok) skipped++; ok
+        }
+        val substances = delta.substances.filter { s ->
+            val ok = s.id.isNotBlank() && isReasonableTimestamp(s.createdAt) && isReasonableTimestamp(s.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val effects = delta.effects.filter { e ->
+            val ok = e.id.isNotBlank() && isReasonableTimestamp(e.createdAt) && isReasonableTimestamp(e.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val interactions = delta.interactions.filter { i ->
+            val ok = i.id.isNotBlank() && isReasonableTimestamp(i.createdAt) && isReasonableTimestamp(i.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val notes = delta.notes.filter { n ->
+            val ok = n.id.isNotBlank() && isReasonableTimestamp(n.createdAt) && isReasonableTimestamp(n.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val timelineEvents = delta.timelineEvents.filter { t ->
+            val ok = t.id.isNotBlank() && isReasonableTimestamp(t.createdAt) && isReasonableTimestamp(t.updatedAt)
+            if (!ok) skipped++; ok
+        }
+        val customUnits = delta.customUnits.filter { u ->
+            val ok = u.id.isNotBlank() && isReasonableTimestamp(u.createdAt) && isReasonableTimestamp(u.updatedAt)
+            if (!ok) skipped++; ok
+        }
+
+        if (skipped > 0) {
+            Log.withTag("SyncTransport").w { "Data validation: skipped $skipped invalid items in WS delta" }
+        }
+
+        repo.applyBatch(
+            sessions = sessions, doses = doses, substances = substances,
+            effects = effects, interactions = interactions, notes = notes,
+            timelineEvents = timelineEvents, customUnits = customUnits
+        )
+        return skipped
+    }
+
+    // ===== Stale Connection Cleanup =====
+
+    private var staleCleanupJob: Job? = null
+
+    /** Periodically (every 5 min) check for inactive WebSocket sessions and remove them. */
+    private fun startStaleCleanup() {
+        if (staleCleanupJob?.isActive == true) return
+        staleCleanupJob = backgroundScope.launch {
+            while (isActive) {
+                delay(5 * 60_000L) // every 5 minutes
+                val toRemove = mutableListOf<String>()
+                wsConnections.forEach { (deviceId, conn) ->
+                    try {
+                        if (!conn.session.isActive) {
+                            toRemove.add(deviceId)
+                        }
+                    } catch (_: Exception) {
+                        toRemove.add(deviceId)
+                    }
+                }
+                toRemove.forEach { deviceId ->
+                    Log.withTag("SyncTransport").w { "Stale WS connection to $deviceId — removing" }
+                    appendDebug("Stale cleanup: removing connection to $deviceId")
+                    wsConnections.remove(deviceId)?.let { conn ->
+                        conn.mutationJob.cancel()
+                        conn.heartbeatJob?.cancel()
+                        conn.incomingJob?.cancel()
+                        conn.client.close()
+                    }
+                    activePeers.removeAll { it.deviceId == deviceId }
+                }
+                if (toRemove.isNotEmpty()) updateStatus()
+            }
+        }
+    }
 }

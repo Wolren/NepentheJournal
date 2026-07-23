@@ -123,4 +123,32 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             Log.withTag("JournalStore").e(e) { "Failed to save journal data: ${e.message}" }
         }
     }
+
+    actual fun restoreFromBackup(): Boolean {
+        Log.withTag("JournalStore").w { "restoreFromBackup not implemented on Android" }
+        return false
+    }
+
+    actual fun triggerAutoBackup() {
+        val target = File(dataPath())
+        if (!target.exists()) return
+        try {
+            val autoDir = File(baseDir, ".auto")
+            autoDir.mkdirs()
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
+            val backupFile = File(autoDir, "$timestamp.json")
+            target.copyTo(backupFile, overwrite = false)
+            Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").e(e) { "Failed to create auto-backup: ${e.message}" }
+        }
+    }
+
+    @Volatile
+    actual var lastLoadHadIssues: Boolean = false
+        private set
+
+    @Volatile
+    actual var lastLoadIssueSummary: String = ""
+        private set
 }

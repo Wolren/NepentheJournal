@@ -143,6 +143,10 @@ interface IJournalRepository : IngestRepository {
         interactions: List<Interaction> = emptyList()
     )
 
+    // ---- Full-text search ----
+    fun search(query: String): List<SearchResult>
+    fun rebuildSearchIndex()
+
     // ---- Lifecycle ----
     fun autoSave(store: JournalStore, scope: CoroutineScope): Job
     fun clearAll()

@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.journal.model.DoseWikiDuration
+import app.journal.model.DoseWikiStage
 
 private data class DurationPhase(
     val label: String,
@@ -61,12 +63,141 @@ private fun parseDurationProfile(profile: Map<String, String>): List<DurationPha
     }
 }
 
+/**
+ * Convert a DoseWikiStage to minutes. Returns null if stage is null or has no data.
+ */
+private fun stageToMinutes(stage: DoseWikiStage?): Pair<Double, Double>? {
+    if (stage == null) return null
+    val minRaw = stage.min ?: return null
+    val maxRaw = stage.max ?: minRaw
+    val multiplier = when (stage.unit?.lowercase()) {
+        "hours", "hour", "hr" -> 60.0
+        "days", "day" -> 1440.0
+        else -> 1.0
+    }
+    return Pair(minRaw * multiplier, maxRaw * multiplier)
+}
+
+/**
+ * Format a DoseWikiStage as a human-readable display string.
+ */
+private fun formatStage(stage: DoseWikiStage?): String {
+    if (stage == null) return ""
+    val min = stage.min ?: return ""
+    val max = stage.max ?: return "$min ${stage.unit ?: "min"}"
+    val unit = stage.unit ?: "min"
+    return if (min == max) "$min $unit" else "$min - $max $unit"
+}
+
+/**
+ * Stage key to phase label mapping.
+ */
+private val stageLabelMap = mapOf(
+    "onset" to "Onset",
+    "come_up" to "Comeup",
+    "peak" to "Peak",
+    "offset" to "Offset",
+    "after_effects" to "Afterglow",
+    "total_duration" to "Total",
+)
+
+/**
+ * Parse phases from DoseWiki structured duration data.
+ * Uses the first route's stages. The stage names map directly to phase labels.
+ */
+private fun parseDoseWikiDuration(duration: DoseWikiDuration): List<DurationPhase> {
+    val stages = duration.routes?.firstOrNull()?.stages ?: return emptyList()
+
+    val stageKeys = listOf("onset", "come_up", "peak", "offset", "after_effects")
+
+    val phaseResults = mutableListOf<DurationPhase>()
+
+    // Return a helper to get stage by key
+    fun stageForKey(key: String): DoseWikiStage? = when (key) {
+        "onset" -> stages.onset
+        "come_up" -> stages.come_up
+        "peak" -> stages.peak
+        "offset" -> stages.offset
+        "after_effects" -> stages.after_effects
+        else -> null
+    }
+
+    for (key in stageKeys) {
+        val stage = stageForKey(key)
+        val parsed = stageToMinutes(stage) ?: continue
+        val label = stageLabelMap[key] ?: key
+        phaseResults.add(
+            DurationPhase(
+                label = label,
+                minMinutes = parsed.first,
+                maxMinutes = parsed.second,
+                display = formatStage(stage)
+            )
+        )
+    }
+
+    return phaseResults
+}
+
+/**
+ * Get the total duration stage from DoseWiki data.
+ */
+private fun getDoseWikiTotal(duration: DoseWikiDuration): Triple<Double?, Double?, String>? {
+    val totalStage = duration.routes?.firstOrNull()?.stages?.total_duration ?: return null
+    val parsed = stageToMinutes(totalStage) ?: return null
+    return Triple(parsed.first, parsed.second, formatStage(totalStage))
+}
+
 @Composable
-internal fun DurationTimelineSection(profile: Map<String, String>) {
-    val phases = remember(profile) { parseDurationProfile(profile) }
-    val totalRaw = profile["total"]
-    val totalParsed = totalRaw?.let { parseDurationValue(it) }
-    val totalMax = totalParsed?.second ?: phases.maxOfOrNull { it.maxMinutes } ?: return
+internal fun DurationTimelineSection(
+    profile: Map<String, String>,
+    doseWikiDuration: DoseWikiDuration? = null
+) {
+    val doseWikiPhases = remember(doseWikiDuration) {
+        doseWikiDuration?.let { parseDoseWikiDuration(it) }
+    }
+    val phases = remember(doseWikiDuration, profile) {
+        doseWikiPhases ?: parseDurationProfile(profile)
+    }
+
+    val totalMax: Double
+    val totalRaw: String?
+    val totalMinStr: String
+    val totalMaxStr: String
+
+    if (doseWikiDuration != null) {
+        val total = getDoseWikiTotal(doseWikiDuration)
+        if (total != null) {
+            totalMax = total.second ?: total.first ?: phases.maxOfOrNull { it.maxMinutes } ?: return
+            totalRaw = total.third
+            totalMinStr = total.first?.let {
+                val h = it / 60.0
+                if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+            } ?: ""
+            totalMaxStr = total.second?.let {
+                val h = it / 60.0
+                if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+            } ?: ""
+        } else {
+            totalMax = phases.maxOfOrNull { it.maxMinutes } ?: return
+            totalRaw = null
+            totalMinStr = ""
+            totalMaxStr = ""
+        }
+    } else {
+        val totalRawFromProfile = profile["total"]
+        val totalParsed = totalRawFromProfile?.let { parseDurationValue(it) }
+        totalRaw = totalRawFromProfile
+        totalMax = totalParsed?.second ?: phases.maxOfOrNull { it.maxMinutes } ?: return
+        totalMinStr = totalParsed?.first?.let {
+            val h = it / 60.0
+            if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+        } ?: ""
+        totalMaxStr = totalParsed?.second?.let {
+            val h = it / 60.0
+            if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
+        } ?: ""
+    }
 
     if (phases.isEmpty()) return
 
@@ -255,14 +386,6 @@ internal fun DurationTimelineSection(profile: Map<String, String>) {
             // Total — visual bar
             if (totalRaw != null) {
                 Spacer(Modifier.height(8.dp))
-                val totalMin = totalParsed?.first?.let {
-                    val h = (it / 60.0)
-                    if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
-                } ?: ""
-                val totalMaxStr = totalParsed?.second?.let {
-                    val h = (it / 60.0)
-                    if (h >= 1) "${"%.1f".format(h)} hr" else "${"%.0f".format(it)} min"
-                } ?: ""
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -285,8 +408,18 @@ internal fun DurationTimelineSection(profile: Map<String, String>) {
                                 shape = RoundedCornerShape(4.dp)
                             ) {}
                             Canvas(modifier = Modifier.fillMaxWidth().height(8.dp)) {
-                                val frac = if (totalParsed != null && totalParsed.second > 0)
-                                    (totalParsed.first / totalParsed.second).toFloat().coerceIn(0.1f, 1f)
+                                val totalMinVal = if (doseWikiDuration != null) {
+                                    getDoseWikiTotal(doseWikiDuration)?.first
+                                } else {
+                                    profile["total"]?.let { parseDurationValue(it) }?.first
+                                }
+                                val totalMaxVal = if (doseWikiDuration != null) {
+                                    getDoseWikiTotal(doseWikiDuration)?.second
+                                } else {
+                                    profile["total"]?.let { parseDurationValue(it) }?.second
+                                }
+                                val frac = if (totalMinVal != null && totalMaxVal != null && totalMaxVal > 0)
+                                    (totalMinVal / totalMaxVal).toFloat().coerceIn(0.1f, 1f)
                                 else 0.3f
                                 drawRoundRect(
                                     totalColor.copy(alpha = 0.5f),
@@ -297,7 +430,7 @@ internal fun DurationTimelineSection(profile: Map<String, String>) {
                         }
 
                         Text(
-                            if (totalMin == totalMaxStr) totalMaxStr else "$totalMin - $totalMaxStr",
+                            if (totalMinStr == totalMaxStr) totalMaxStr else "$totalMinStr - $totalMaxStr",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface

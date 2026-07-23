@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.DoseWikiLookup
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
@@ -64,6 +65,11 @@ fun SubstanceDetailScreen(
 
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Pre-load DoseWiki duration data for the duration curve
+    val doseWikiDuration = remember(substance.name) {
+        DoseWikiLookup.getDuration(substance.name)
+    }
 
     ScreenScaffold(
         title = substance.name,
@@ -229,7 +235,7 @@ fun SubstanceDetailScreen(
 
         // Duration
         if (substance.durationProfile.isNotEmpty()) {
-            item { DurationTimelineSection(profile = substance.durationProfile) }
+            item { DurationTimelineSection(profile = substance.durationProfile, doseWikiDuration = doseWikiDuration) }
         }
 
         // Pharmacology

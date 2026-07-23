@@ -1,10 +1,14 @@
 package app.journal.ui.substances
 
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -16,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -44,6 +49,7 @@ fun SubstanceScreen(
     val query by viewModel.query.collectAsState()
     val activeCategories by viewModel.activeCategories.collectAsState()
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    val scrollState = rememberLazyListState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -165,7 +171,9 @@ fun SubstanceScreen(
                     }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(
+                    state = scrollState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     itemsIndexed(results, key = { _, s -> s.id }) { _, substance ->
                         AnimatedListItem {
                         val stats = substanceDoseStats[substance.id]
@@ -207,6 +215,19 @@ fun SubstanceScreen(
         ) {
             Icon(Icons.Default.Add, contentDescription = "New Substance")
         }
+
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            adapter = rememberScrollbarAdapter(scrollState),
+            style = ScrollbarStyle(
+                minimalHeight = 24.dp,
+                thickness = 6.dp,
+                shape = RoundedCornerShape(3.dp),
+                hoverDurationMillis = 300,
+                unhoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                hoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            )
+        )
     }
 }
 

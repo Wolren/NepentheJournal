@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
+import app.journal.data.JournalStore
 import app.journal.model.Session
 import app.journal.sync.SyncEngine
 import app.journal.sync.createSyncEngine
@@ -49,6 +50,7 @@ import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
+import app.journal.ui.search.SearchOverlay
 import app.journal.ui.session.CalendarScreen
 import app.journal.ui.session.SessionEditorScreen
 import app.journal.ui.session.SessionListScreen
@@ -84,10 +86,61 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 
+    // ── Data integrity: startup recovery dialog ──
+    val journalStore = remember { JournalStore(repo as JournalRepository) }
+    var showRecoveryDialog by remember { mutableStateOf(false) }
+    var recoveryMessage by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        // Check after the first render cycle to let the UI settle
+        kotlinx.coroutines.delay(100)
+        if (journalStore.lastLoadHadIssues) {
+            recoveryMessage = journalStore.lastLoadIssueSummary
+            showRecoveryDialog = true
+        }
+    }
+
+    // ── Data integrity: auto-backup on close ──
+    DisposableEffect(Unit) {
+        onDispose {
+            journalStore.triggerAutoBackup()
+        }
+    }
+
+    // ── Recovery dialog ──
+    if (showRecoveryDialog) {
+        AlertDialog(
+            onDismissRequest = { showRecoveryDialog = false },
+            title = { Text("Data Recovery Notice") },
+            text = {
+                Text("Your journal data had issues when loading:\n\n$recoveryMessage\n\nDo you want to continue with the partially recovered data or restore from the previous backup (.bak)?")
+            },
+            confirmButton = {
+                TextButton(onClick = { showRecoveryDialog = false }) {
+                    Text("Continue")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    val restored = journalStore.restoreFromBackup()
+                    if (restored) {
+                        recoveryMessage = "Restored from backup successfully."
+                    } else {
+                        recoveryMessage = "No backup available to restore from."
+                    }
+                    showRecoveryDialog = false
+                }) {
+                    Text("Restore from backup")
+                }
+            }
+        )
+    }
+
     var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
     var editingSessionId by remember { mutableStateOf<String?>(null) }
     var selectedTimelineSessionId by remember { mutableStateOf<String?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     var useRelativeTime by remember { mutableStateOf(true) }
@@ -135,6 +188,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                     SystemBackHandler {
                         when {
                             liveSessionId != null -> liveSessionId = null
+                            showSearch -> showSearch = false
                             companionSubstanceId != null -> companionSubstanceId = null
                             editingSessionId != null -> editingSessionId = null
                             selectedTimelineSessionId != null -> selectedTimelineSessionId = null
@@ -156,6 +210,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
 
                     AnimatedContent(
                         targetState = when {
+                            showSearch -> "search"
                             companionSubstanceId != null -> "companion_substance"
                             liveSessionId != null -> "live_session"
                             editingSessionId != null -> "editor_session"
@@ -182,6 +237,19 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                 .background(MaterialTheme.colorScheme.background)
                         ) {
                             when (state) {
+                            "search" -> {
+                                SearchOverlay(
+                                    onBack = { showSearch = false },
+                                    onSessionClick = { sessionId ->
+                                        selectedTimelineSessionId = sessionId
+                                        showSearch = false
+                                    },
+                                    onSubstanceClick = { subId ->
+                                        selectedSubstanceId = subId
+                                        showSearch = false
+                                    }
+                                )
+                            }
                             "live_session" -> {
                                 val session = stableLiveId?.let { id ->
                                     if (id == "__new__") null
@@ -318,7 +386,9 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                 ) { innerPadding ->
                                     Box(Modifier.padding(innerPadding).fillMaxSize()) {
                                         when (selectedScreen) {
-                                            Screen.DASHBOARD -> DashboardScreen()
+                                            Screen.DASHBOARD -> DashboardScreen(
+                                                onSearchClick = { showSearch = true }
+                                            )
                                             Screen.SESSIONS -> SessionListScreen(
                                                 viewModel = sessionListViewModel,
                                                 onNewSession = { editingSessionId = "__new__" },

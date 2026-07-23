@@ -44,6 +44,26 @@ expect class JournalStore(repo: JournalRepository) {
     fun load()
     fun save()
     fun dataPath(): String
+
+    /** Whether the most recent [load] encountered parse issues that required recovery. */
+    var lastLoadHadIssues: Boolean
+        private set
+
+    /** Human-readable description of issues found during the last [load]. */
+    var lastLoadIssueSummary: String
+        private set
+
+    /**
+     * Creates a timestamped auto-backup in the .auto/ subdirectory.
+     * Platform-specific: may also rotate old backups.
+     */
+    fun triggerAutoBackup()
+
+    /**
+     * Replaces the main journal file from the .bak backup and reloads.
+     * Returns true if restore succeeded, false if no .bak was available.
+     */
+    fun restoreFromBackup(): Boolean
 }
 
 /**

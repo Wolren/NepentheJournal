@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
+import app.journal.data.JournalStore
 import app.journal.model.SyncConfig
 import app.journal.sync.*
 import app.journal.ui.components.*
@@ -108,6 +109,29 @@ internal fun DataSettingsContent(
                         Text("Import", maxLines = 1)
                     }
                 }
+                Spacer(Modifier.height(4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppOutlinedButton(onClick = {
+                        scope.launch {
+                            val path = FilePicker.saveFile("nepenthe-journal.json", "JSON files", listOf("json"))
+                            if (path != null) {
+                                try {
+                                    val json = ExportImport.exportFullJournal(repo)
+                                    PlatformFile.writeText(path, json)
+                                    onStatusChange("Exported full journal as JSON")
+                                } catch (e: Exception) {
+                                    onStatusChange("Full JSON export failed: ${e.message}")
+                                }
+                            }
+                        }
+                    }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Schema, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Export as JSON", maxLines = 1)
+                    }
+                    // Spacer to keep alignment
+                    Box(modifier = Modifier.weight(1f))
+                }
                 if (statusText != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(statusText, style = MaterialTheme.typography.labelSmall,
@@ -172,6 +196,26 @@ internal fun DataSettingsContent(
                             }
                         }
                     }, modifier = Modifier.weight(1f)) { Text("All (Zip)", maxLines = 1) }
+                }
+                Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                Text("Backup", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppOutlinedButton(onClick = {
+                        scope.launch {
+                            try {
+                                val store = JournalStore(repo)
+                                store.save()
+                                onStatusChange("Backup saved to ${store.dataPath()}")
+                            } catch (e: Exception) {
+                                onStatusChange("Backup failed: ${e.message}")
+                            }
+                        }
+                    }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Backup, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Create Backup", maxLines = 1)
+                    }
                 }
             }
         }

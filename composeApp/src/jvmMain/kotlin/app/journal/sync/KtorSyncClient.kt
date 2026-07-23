@@ -13,9 +13,13 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.websocket.*
+import app.journal.log.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Mac
@@ -114,38 +118,45 @@ class KtorSyncClient(
     ): Result<SyncResponse> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
 
-        try {
-            val batch = SyncBatch(
-                deviceId = deviceId,
-                deviceName = deviceName,
-                since = since,
-                sessions = changed(repo.sessions.value, since) { it.updatedAt },
-                doses = changed(repo.doses.value, since) { it.updatedAt },
-                substances = changed(repo.substances.value, since) { it.updatedAt },
-                effects = changed(repo.effects.value, since) { it.updatedAt },
-                interactions = changed(repo.interactions.value, since) { it.updatedAt },
-                notes = changed(repo.notes.value, since) { it.updatedAt },
-                timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
-                customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
-            )
+        val batch = SyncBatch(
+            deviceId = deviceId,
+            deviceName = deviceName,
+            since = since,
+            sessions = changed(repo.sessions.value, since) { it.updatedAt },
+            doses = changed(repo.doses.value, since) { it.updatedAt },
+            substances = changed(repo.substances.value, since) { it.updatedAt },
+            effects = changed(repo.effects.value, since) { it.updatedAt },
+            interactions = changed(repo.interactions.value, since) { it.updatedAt },
+            notes = changed(repo.notes.value, since) { it.updatedAt },
+            timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
+            customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
+        )
 
-            val bodyText = json.encodeToString(batch)
-            val authHeader = authenticateRequest(deviceId, bodyText)
+        val bodyText = json.encodeToString(batch)
+        val authHeader = authenticateRequest(deviceId, bodyText)
 
-            val response = client.post("http://$host:$port/sync/push") {
+        val response = retryWithBackoff {
+            client.post("http://$host:$port/sync/push") {
                 contentType(ContentType.Application.Json)
                 header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                 header(SyncAuthenticator.AUTH_HEADER, authHeader)
                 setBody(bodyText)
             }.body<SyncResponse>()
-
-            // Atomic exchange: apply server's changes returned in push response
-            applyPull(response)
-            if (response.success) Result.success(response)
-            else Result.failure(Exception(response.error ?: "Push failed"))
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+
+        response.fold(
+            onSuccess = { syncResponse ->
+                try {
+                    applyPull(syncResponse)
+                } catch (e: Exception) {
+                    Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
+                    return@withContext Result.failure(e)
+                }
+                if (syncResponse.success) Result.success(syncResponse)
+                else Result.failure(Exception(syncResponse.error ?: "Push failed"))
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
     suspend fun pullChanges(
@@ -154,21 +165,29 @@ class KtorSyncClient(
     ): Result<SyncResponse> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
 
-        try {
-            val uri = "/sync/pull?since=$since"
-            val authHeader = authenticateRequest(deviceId, uri)
+        val uri = "/sync/pull?since=$since"
+        val authHeader = authenticateRequest(deviceId, uri)
 
-            val response = client.get("http://$host:$port$uri") {
+        val response = retryWithBackoff {
+            client.get("http://$host:$port$uri") {
                 header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                 header(SyncAuthenticator.AUTH_HEADER, authHeader)
             }.body<SyncResponse>()
-
-            applyPull(response)
-            if (response.success) Result.success(response)
-            else Result.failure(Exception(response.error ?: "Pull failed"))
-        } catch (e: Exception) {
-            Result.failure(e)
         }
+
+        response.fold(
+            onSuccess = { syncResponse ->
+                try {
+                    applyPull(syncResponse)
+                } catch (e: Exception) {
+                    Log.withTag("SyncClient").e(e) { "applyPull failed after successful pull" }
+                    return@withContext Result.failure(e)
+                }
+                if (syncResponse.success) Result.success(syncResponse)
+                else Result.failure(Exception(syncResponse.error ?: "Pull failed"))
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
     suspend fun fetchHostInfo(host: String, port: Int): Result<HostInfo> =
@@ -242,6 +261,34 @@ class KtorSyncClient(
     }
 
     fun close() { client.close() }
+
+    /**
+     * Execute [operation] with exponential backoff retry (1s, 2s, 4s).
+     * Only retries on [IOException] or [TimeoutCancellationException] (transient network errors).
+     * Does NOT retry on auth failures, validation errors, or other non-transient errors.
+     */
+    private suspend fun <T> retryWithBackoff(
+        maxAttempts: Int = 3,
+        operation: suspend () -> T
+    ): Result<T> {
+        var lastException: Exception? = null
+        for (attempt in 1..maxAttempts) {
+            try {
+                return Result.success(operation())
+            } catch (e: Exception) {
+                lastException = e
+                if (e !is IOException && e !is TimeoutCancellationException) {
+                    return Result.failure(e)
+                }
+                if (attempt < maxAttempts) {
+                    val delayMs = 1000L * (1L shl (attempt - 1)) // 1s, 2s, 4s
+                    Log.withTag("SyncClient").w { "Attempt $attempt/$maxAttempts failed: ${e.message}, retrying in ${delayMs}ms" }
+                    delay(delayMs)
+                }
+            }
+        }
+        return Result.failure(lastException ?: Exception("Retry exhausted"))
+    }
 
     companion object {
         inline fun <reified T> changed(

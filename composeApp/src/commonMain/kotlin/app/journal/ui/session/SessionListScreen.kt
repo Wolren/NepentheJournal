@@ -1,10 +1,14 @@
 package app.journal.ui.session
 
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -55,6 +59,7 @@ fun SessionListScreen(
     val showArch by viewModel.showArchived.collectAsState()
     val allSessionSubstances by viewModel.allSessionSubstances.collectAsState(initial = emptyList())
     val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
+    val scrollState = rememberLazyListState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -165,6 +170,7 @@ fun SessionListScreen(
                 }
             } else {
                 LazyColumn(
+                    state = scrollState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
@@ -205,6 +211,19 @@ fun SessionListScreen(
                 Icon(Icons.Default.Add, contentDescription = "New Session")
             }
         }
+
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            adapter = rememberScrollbarAdapter(scrollState),
+            style = ScrollbarStyle(
+                minimalHeight = 24.dp,
+                thickness = 6.dp,
+                shape = RoundedCornerShape(3.dp),
+                hoverDurationMillis = 300,
+                unhoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                hoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            )
+        )
     }
 
     // Live session confirmation dialog
@@ -248,7 +267,6 @@ fun SessionListScreen(
         )
     }
 
-    // Delete confirmation
     if (showDeleteConfirm != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = null },

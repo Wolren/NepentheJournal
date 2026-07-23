@@ -137,6 +137,9 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val _notesBySession = mutableMapOf<String, MutableList<Note>>()
     private val _eventsBySession = mutableMapOf<String, MutableList<TimelineEvent>>()
 
+    // ---- Full-text search index ----
+    val searchIndex = SearchIndex()
+
     // ---- Precomputed query indices ----
     private val _sessionsByDate = mutableMapOf<LocalDate, MutableList<String>>()
     private val _sessionsPerSubstance = mutableMapOf<String, MutableSet<String>>()
@@ -255,6 +258,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         customUnitsStore.forEachValue { unit ->
             _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         }
+        rebuildSearchIndex()
     }
 
     /** Incrementally update precomputed dose stats for a substance — counts distinct sessions only. */
@@ -754,6 +758,18 @@ class JournalRepository internal constructor() : IJournalRepository {
         _useSubstanceColors.value = true
         bumpToleranceVersion()
         bumpMutationCount()
+    }
+
+    // ========================
+    //  Full-text search
+    // ========================
+
+    override fun search(query: String): List<SearchResult> = synchronized(lock) {
+        searchIndex.search(query)
+    }
+
+    override fun rebuildSearchIndex() {
+        searchIndex.rebuild(this)
     }
 
     companion object {

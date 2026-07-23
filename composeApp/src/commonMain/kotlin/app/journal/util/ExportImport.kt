@@ -1,6 +1,7 @@
 package app.journal.util
 
 import app.journal.data.IJournalRepository
+import app.journal.data.JournalRepository
 import app.journal.model.Dose
 import app.journal.model.Session
 import kotlinx.serialization.Serializable
@@ -51,6 +52,16 @@ object ExportImport {
             sessions = bundles
         )
         return json.encodeToString(export)
+    }
+
+    /**
+     * Exports the full journal as a pretty-printed JSON string.
+     * Includes all entities: sessions, substances, doses, notes, timeline events,
+     * interactions, effects, custom units, and settings.
+     */
+    fun exportFullJournal(repo: JournalRepository): String {
+        val snapshot = AppJson.snapshot(repo)
+        return json.encodeToString(snapshot)
     }
 
     /**
