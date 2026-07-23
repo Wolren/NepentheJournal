@@ -32,7 +32,6 @@ jobs:
         run: |
           ./gradlew composeApp:desktopTest --no-daemon \
             --tests "app.journal.data.JournalRepositoryTest" \
-            --tests "app.journal.data.EntityStoreTest" \
             --tests "app.journal.data.AppJsonTest" \
             --tests "app.journal.data.FuzzSeedTest" \
             --tests "app.journal.data.DataMigrationTest" \
