@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -27,19 +28,13 @@ data class SearchResult(
  */
 class SearchIndex {
 
-    // Inverted index: lowercase word -> SearchResult entries containing that word
     private val index = mutableMapOf<String, MutableSet<SearchResult>>()
-
-    // Entity ID -> words it contributed (for clean rebuild)
     private var isBuilt = false
+    private val lock = PlatformLock()
 
     val isEmpty: Boolean get() = !isBuilt
 
-    /**
-     * Rebuild the entire search index from the repository's current state.
-     * Call after loading data or after batch mutations.
-     */
-    fun rebuild(repo: JournalRepository) = synchronized(this) {
+    fun rebuild(repo: JournalRepository) = lock.withLock {
         index.clear()
         isBuilt = false
 
@@ -51,13 +46,9 @@ class SearchIndex {
                 title = session.title,
                 score = 10,
                 texts = listOfNotNull(
-                    session.title,
-                    session.set,
-                    session.setting,
-                    session.intention,
-                    session.outcome,
-                    session.shulginRating,
-                    dt.date.toString()
+                    session.title, session.set, session.setting,
+                    session.intention, session.outcome,
+                    session.shulginRating, dt.date.toString()
                 )
             )
         }
@@ -68,8 +59,7 @@ class SearchIndex {
                 title = sub.name,
                 score = 8,
                 texts = listOfNotNull(
-                    sub.name,
-                    sub.summary,
+                    sub.name, sub.summary,
                     sub.chemicalProperties?.iupacName,
                     sub.chemicalProperties?.molecularFormula,
                     sub.cid?.toString()
@@ -93,11 +83,8 @@ class SearchIndex {
                 title = "$subName (${dose.amount} ${dose.unit})",
                 score = 3,
                 texts = listOfNotNull(
-                    subName,
-                    dose.routeOfAdministration,
-                    dose.notes,
-                    dose.amount.toString(),
-                    dose.unit
+                    subName, dose.routeOfAdministration,
+                    dose.notes, dose.amount.toString(), dose.unit
                 )
             )
         }
@@ -123,29 +110,23 @@ class SearchIndex {
         isBuilt = true
     }
 
-    /**
-     * Search the index for entities matching the query.
-     * Returns results sorted by relevance (multi-term matches first, then single term).
-     */
-    fun search(query: String): List<SearchResult> = synchronized(this) {
-        if (!isBuilt || query.isBlank()) return emptyList()
+    fun search(query: String): List<SearchResult> = lock.withLock {
+        if (!isBuilt || query.isBlank()) return@withLock emptyList()
 
         val terms = query.lowercase()
-            .split(Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\$%^&*+=|~`\"'\\u2013\\u2014]+"))
+            .split(Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\\$%^&*+=|~`\"'\\u2013\\u2014]+"))
             .filter { it.length >= 2 }
 
-        if (terms.isEmpty()) return emptyList()
+        if (terms.isEmpty()) return@withLock emptyList()
 
-        // Single term: return all matches containing that substring, ranked by score
         if (terms.size == 1) {
             val term = terms[0]
             val results = index.entries
                 .filter { it.key.contains(term) }
                 .flatMap { it.value }
-            return sortAndDedupe(results)
+            return@withLock sortAndDedupe(results)
         }
 
-        // Multiple terms: rank by how many terms hit each entity
         val entityScores = mutableMapOf<String, MutableList<SearchResult>>()
         for ((word, results) in index) {
             val matchingTerms = terms.filter { word.contains(it) }
@@ -155,27 +136,19 @@ class SearchIndex {
             }
         }
 
-        return entityScores.entries
+        return@withLock entityScores.entries
             .sortedByDescending { (_, results) ->
-                // Rank: count of distinct matching terms + max entity score
                 val distinctTerms = results.map { r ->
                     terms.count { t ->
-                        index.entries.any { (w, rs) ->
-                            w.contains(t) && rs.any { it.entityId == r.entityId }
-                        }
+                        index.entries.any { (w, rs) -> w.contains(t) && rs.any { it.entityId == r.entityId } }
                     }
                 }.maxOrNull() ?: 0
                 distinctTerms * 100 + (results.maxOfOrNull { it.score } ?: 0)
             }
             .take(50)
-            .mapNotNull { (_, results) ->
-                results.maxByOrNull { it.score }
-            }
+            .mapNotNull { (_, results) -> results.maxByOrNull { it.score } }
     }
 
-    /**
-     * Get the session ID from a search result if the result type is "session".
-     */
     fun sessionId(result: SearchResult): String? =
         if (result.entityType == "session") result.entityId else null
 
@@ -189,7 +162,7 @@ class SearchIndex {
         texts: List<String?>
     ) {
         val fullText = texts.filterNotNull().joinToString(" ").lowercase()
-        val words = fullText.split(Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\$%^&*+=|~`\"'\\u2013\\u2014]+"))
+        val words = fullText.split(Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\\$%^&*+=|~`\"'\\u2013\\u2014]+"))
             .filter { it.length >= 2 }
             .distinct()
 
