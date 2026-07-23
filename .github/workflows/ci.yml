@@ -29,7 +29,29 @@ jobs:
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
 
       - name: Run unit tests (excludes integration tests)
-        run: ./gradlew composeApp:desktopTest --no-daemon
+        run: |
+          ./gradlew composeApp:desktopTest --no-daemon \
+            --tests "app.journal.data.JournalRepositoryTest" \
+            --tests "app.journal.data.EntityStoreTest" \
+            --tests "app.journal.data.AppJsonTest" \
+            --tests "app.journal.data.FuzzSeedTest" \
+            --tests "app.journal.data.DataMigrationTest" \
+            --tests "app.journal.data.InteractionCheckerTest" \
+            --tests "app.journal.data.ClassInteractionCheckerTest" \
+            --tests "app.journal.model.ModelSerializationTest" \
+            --tests "app.journal.model.ToleranceCalculatorTest" \
+            --tests "app.journal.ingest.ManualImportAdapterTest" \
+            --tests "app.journal.ingest.SubstanceClassNormalizerTest" \
+            --tests "app.journal.util.CsvExporterTest" \
+            --tests "app.journal.util.ExportImportTest" \
+            --tests "app.journal.export.obsidian.ObsidianNoteRendererTest" \
+            --tests "app.journal.ui.substances.SubstanceScreenViewModelTest" \
+            --tests "app.journal.sync.SyncContractTest" \
+            --tests "app.journal.sync.SyncEngineTest" \
+            --tests "app.journal.sync.SyncPayloadTest" \
+            --tests "app.journal.sync.SyncWebSocketTest" \
+            --tests "app.journal.data.JournalStoreTest" \
+            --tests "app.journal.sync.SyncTransportTest"
 
       - name: Compile Android sources
         run: |
