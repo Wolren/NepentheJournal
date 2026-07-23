@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import app.journal.util.PlatformLock
 import kotlinx.datetime.toLocalDateTime
 
 // Tabular export data classes (R/Pandas-friendly)
@@ -153,10 +154,10 @@ class JournalRepository internal constructor() : IJournalRepository {
      * (distinctSessionCount, lastUsedTimestamp). Updated incrementally on dose mutations.
      */
     override val substanceDoseStats: Map<String, Pair<Int, Long>>
-        get() = synchronized(lock) { _substanceDoseStats.toMap() }
+        get() = lock.withLock { _substanceDoseStats.toMap() }
     private val _substanceDoseStats = mutableMapOf<String, Pair<Int, Long>>()
     private val _doseStatsSessionIds = mutableMapOf<String, MutableSet<String>>()
-    private val lock = Any()
+    private val lock = PlatformLock()
 
     // ========================
     //  Bulk apply (seed load)
@@ -172,7 +173,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         notes: List<Note> = emptyList(),
         timelineEvents: List<TimelineEvent> = emptyList(),
         customUnits: List<CustomUnit> = emptyList()
-    ) = synchronized(lock) {
+    ) = lock.withLock {
         if (sessions.isNotEmpty()) sessionsStore.putAll(sessions)
         if (doses.isNotEmpty()) dosesStore.putAll(doses)
         if (substances.isNotEmpty()) substancesStore.putAll(substances)
@@ -191,7 +192,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun applySnapshot(snapshot: JournalSnapshot) = synchronized(lock) {
+    override fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
         sessionsStore.applyAll(snapshot.sessions)
         substancesStore.applyAll(snapshot.substances)
         dosesStore.applyAll(snapshot.doses)
@@ -275,17 +276,17 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Sessions
     // ========================
 
-    override fun upsertSession(session: Session) = synchronized(lock) {
+    override fun upsertSession(session: Session) = lock.withLock {
         val oldSession = sessionsStore.put(session)
         if (oldSession != null) removeSessionFromIndices(oldSession)
         addSessionToIndices(session)
         bumpMutationCount()
     }
 
-    override fun getSession(id: String): Session? = synchronized(lock) { sessionsStore.get(id) }
+    override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
 
-    override fun deleteSession(id: String) = synchronized(lock) {
-        val session = sessionsStore.get(id) ?: return
+    override fun deleteSession(id: String) = lock.withLock {
+        val session = sessionsStore.get(id) ?: return@withLock
         sessionsStore.remove(id)
         removeSessionFromIndices(session)
 
@@ -330,7 +331,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Doses
     // ========================
 
-    override fun upsertDose(dose: Dose) = synchronized(lock) {
+    override fun upsertDose(dose: Dose) = lock.withLock {
         val prev = dosesStore.put(dose)
         val prevSessionId = prev?.sessionId
         val prevSubstanceId = prev?.substanceId
@@ -357,10 +358,10 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun dosesForSession(sessionId: String): List<Dose> =
-        synchronized(lock) { _dosesBySession[sessionId]?.toList() ?: emptyList() }
+        lock.withLock { _dosesBySession[sessionId]?.toList() ?: emptyList() }
 
-    override fun deleteDose(id: String) = synchronized(lock) {
-        val removed = dosesStore.remove(id) ?: return
+    override fun deleteDose(id: String) = lock.withLock {
+        val removed = dosesStore.remove(id) ?: return@withLock
         _dosesBySession[removed.sessionId]?.removeAll { it.id == id }
         _sessionsPerSubstance[removed.substanceId]?.remove(removed.sessionId)
         if (_sessionsPerSubstance[removed.substanceId]?.isEmpty() == true)
@@ -370,14 +371,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteNote(id: String) = synchronized(lock) {
-        val removed = notesStore.remove(id) ?: return
+    override fun deleteNote(id: String) = lock.withLock {
+        val removed = notesStore.remove(id) ?: return@withLock
         removed.sessionId?.let { _notesBySession[it]?.removeAll { n -> n.id == id } }
         bumpMutationCount()
     }
 
-    override fun deleteTimelineEvent(id: String) = synchronized(lock) {
-        val removed = timelineEventsStore.remove(id) ?: return
+    override fun deleteTimelineEvent(id: String) = lock.withLock {
+        val removed = timelineEventsStore.remove(id) ?: return@withLock
         _eventsBySession[removed.sessionId]?.removeAll { e -> e.id == id }
         bumpMutationCount()
     }
@@ -386,15 +387,15 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Substances
     // ========================
 
-    override fun upsertSubstance(substance: Substance) = synchronized(lock) {
+    override fun upsertSubstance(substance: Substance) = lock.withLock {
         substancesStore.put(substance)
         bumpToleranceVersion()
         bumpMutationCount()
     }
 
-    override fun getSubstance(id: String): Substance? = synchronized(lock) { substancesStore.get(id) }
+    override fun getSubstance(id: String): Substance? = lock.withLock { substancesStore.get(id) }
 
-    override fun searchSubstances(query: String): List<Substance> = synchronized(lock) {
+    override fun searchSubstances(query: String): List<Substance> = lock.withLock {
         val q = query.lowercase()
         substancesStore.all.filter {
             it.name.lowercase().contains(q) ||
@@ -402,7 +403,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun deleteSubstance(id: String) = synchronized(lock) {
+    override fun deleteSubstance(id: String) = lock.withLock {
         substancesStore.remove(id)
 
         // Cascade: remove all child entities for this substance
@@ -438,18 +439,18 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Interactions
     // ========================
 
-    override fun upsertInteraction(interaction: Interaction) = synchronized(lock) {
+    override fun upsertInteraction(interaction: Interaction) = lock.withLock {
         interactionsStore.put(interaction)
         bumpMutationCount()
     }
 
-    override fun getInteraction(id: String): Interaction? = synchronized(lock) { interactionsStore.get(id) }
+    override fun getInteraction(id: String): Interaction? = lock.withLock { interactionsStore.get(id) }
 
     // ========================
     //  Effects
     // ========================
 
-    override fun upsertEffect(effect: Effect) = synchronized(lock) {
+    override fun upsertEffect(effect: Effect) = lock.withLock {
         val prev = effectsStore.put(effect)
         if (prev != null) {
             for (subId in prev.substanceIds) {
@@ -464,16 +465,16 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun getEffect(id: String): Effect? = synchronized(lock) { effectsStore.get(id) }
+    override fun getEffect(id: String): Effect? = lock.withLock { effectsStore.get(id) }
 
     override fun effectsForSubstance(substanceId: String): List<Effect> =
-        synchronized(lock) { _effectsBySubstance[substanceId]?.toList() ?: emptyList() }
+        lock.withLock { _effectsBySubstance[substanceId]?.toList() ?: emptyList() }
 
     // ========================
     //  Custom Units
     // ========================
 
-    override fun upsertCustomUnit(unit: CustomUnit) = synchronized(lock) {
+    override fun upsertCustomUnit(unit: CustomUnit) = lock.withLock {
         val prev = customUnitsStore.put(unit)
         if (prev != null) {
             _customUnitsBySubstance[prev.substanceId]?.removeAll { it.id == unit.id }
@@ -485,15 +486,15 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteCustomUnit(id: String) = synchronized(lock) {
-        val removed = customUnitsStore.remove(id) ?: return
+    override fun deleteCustomUnit(id: String) = lock.withLock {
+        val removed = customUnitsStore.remove(id) ?: return@withLock
         _customUnitsBySubstance[removed.substanceId]?.removeAll { it.id == id }
         if (_customUnitsBySubstance[removed.substanceId]?.isEmpty() == true)
             _customUnitsBySubstance.remove(removed.substanceId)
         bumpMutationCount()
     }
 
-    override fun customUnitsForSubstance(substanceId: String): List<CustomUnit> = synchronized(lock) {
+    override fun customUnitsForSubstance(substanceId: String): List<CustomUnit> = lock.withLock {
         _customUnitsBySubstance[substanceId]?.toList() ?: emptyList()
     }
 
@@ -501,36 +502,36 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Preferences
     // ========================
 
-    override fun setShulginRating(enabled: Boolean) = synchronized(lock) {
+    override fun setShulginRating(enabled: Boolean) = lock.withLock {
         _useShulginRating.value = enabled
         bumpMutationCount()
     }
 
-    override fun setSubstanceColors(enabled: Boolean) = synchronized(lock) {
+    override fun setSubstanceColors(enabled: Boolean) = lock.withLock {
         _useSubstanceColors.value = enabled
     }
 
-    override fun setObsidianVaultPath(path: String) = synchronized(lock) {
+    override fun setObsidianVaultPath(path: String) = lock.withLock {
         _obsidianVaultPath.value = path
         bumpMutationCount()
     }
 
-    override fun setObsidianAutoExport(enabled: Boolean) = synchronized(lock) {
+    override fun setObsidianAutoExport(enabled: Boolean) = lock.withLock {
         _obsidianAutoExport.value = enabled
         bumpMutationCount()
     }
 
-    override fun setObsidianSubfolder(folder: String) = synchronized(lock) {
+    override fun setObsidianSubfolder(folder: String) = lock.withLock {
         _obsidianSubfolder.value = folder
         bumpMutationCount()
     }
 
-    override fun setObsidianFileOrganization(org: String) = synchronized(lock) {
+    override fun setObsidianFileOrganization(org: String) = lock.withLock {
         _obsidianFileOrganization.value = org
         bumpMutationCount()
     }
 
-    override fun setShowSessionsTrendChart(enabled: Boolean) = synchronized(lock) {
+    override fun setShowSessionsTrendChart(enabled: Boolean) = lock.withLock {
         _showSessionsTrendChart.value = enabled
         bumpMutationCount()
     }
@@ -539,7 +540,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Notes
     // ========================
 
-    override fun upsertNote(note: Note) = synchronized(lock) {
+    override fun upsertNote(note: Note) = lock.withLock {
         val prev = notesStore.put(note)
         val prevSessionId = prev?.sessionId
         // Remove previous entry from index to prevent duplicates on update
@@ -552,8 +553,8 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = synchronized(lock) {
-        val sessionId = note.sessionId ?: return null
+    override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = lock.withLock {
+        val sessionId = note.sessionId ?: return@withLock null
         val existing = notesStore.get(note.id)
         val resolved = if (existing != null && existing.body != note.body) {
             note.copy(conflictSiblings = existing.conflictSiblings +
@@ -572,13 +573,13 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun notesForSession(sessionId: String): List<Note> =
-        synchronized(lock) { _notesBySession[sessionId]?.toList() ?: emptyList() }
+        lock.withLock { _notesBySession[sessionId]?.toList() ?: emptyList() }
 
     // ========================
     //  Timeline Events
     // ========================
 
-    override fun upsertTimelineEvent(event: TimelineEvent) = synchronized(lock) {
+    override fun upsertTimelineEvent(event: TimelineEvent) = lock.withLock {
         val prev = timelineEventsStore.put(event)
         val prevSessionId = prev?.sessionId
         // Remove previous entry from index to prevent duplicates on update
@@ -590,13 +591,13 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun eventsForSession(sessionId: String): List<TimelineEvent> =
-        synchronized(lock) { (_eventsBySession[sessionId] ?: emptyList()).sortedBy { it.timestamp } }
+        lock.withLock { (_eventsBySession[sessionId] ?: emptyList()).sortedBy { it.timestamp } }
 
     // ========================
     //  Query indices (public)
     // ========================
 
-    override fun sessionIdsOnDateRange(fromDate: String?, toDate: String?): List<String> = synchronized(lock) {
+    override fun sessionIdsOnDateRange(fromDate: String?, toDate: String?): List<String> = lock.withLock {
         val from = fromDate?.let { LocalDate.parse(it) }
         val to = toDate?.let { LocalDate.parse(it) }
         _sessionsByDate.entries
@@ -608,7 +609,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun sessionIdsForSubstance(substanceId: String): List<String> =
-        synchronized(lock) { _sessionsPerSubstance[substanceId]?.toList() ?: emptyList() }
+        lock.withLock { _sessionsPerSubstance[substanceId]?.toList() ?: emptyList() }
 
     override fun rebuildIndices() { rebuildAllIndices() }
 
@@ -616,7 +617,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  DataFrame export
     // ========================
 
-    override fun sessionsDataFrame(): List<SessionDataRow> = synchronized(lock) {
+    override fun sessionsDataFrame(): List<SessionDataRow> = lock.withLock {
         val subNameCache = substancesStore.all.associate { it.id to it.name }
         sessionsStore.all.map { session ->
             val sessionDoses = dosesForSession(session.id)
@@ -646,7 +647,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun dosesDataFrame(): List<DoseDataRow> = synchronized(lock) {
+    override fun dosesDataFrame(): List<DoseDataRow> = lock.withLock {
         val subNameCache = substancesStore.all.associate { it.id to it.name }
         dosesStore.all.map { dose ->
             DoseDataRow(
@@ -661,7 +662,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun substancesDataFrame(): List<SubstanceDataRow> = synchronized(lock) {
+    override fun substancesDataFrame(): List<SubstanceDataRow> = lock.withLock {
         substancesStore.all.map { sub ->
             SubstanceDataRow(
                 id = sub.id, name = sub.name,
@@ -680,7 +681,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun exportSessionBundles(): List<Pair<Session, List<Dose>>> = synchronized(lock) {
+    override fun exportSessionBundles(): List<Pair<Session, List<Dose>>> = lock.withLock {
         sessionsStore.all.map { session ->
             session to (_dosesBySession[session.id]?.toList() ?: emptyList())
         }
@@ -720,7 +721,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         doses: List<Dose>,
         timelineEvents: List<TimelineEvent>,
         interactions: List<Interaction>
-    ) = synchronized(lock) {
+    ) = lock.withLock {
         Log.withTag("Repo").d { "bulkInsert: ${sessions.size} sessions, ${doses.size} doses, ${timelineEvents.size} events, ${interactions.size} interactions" }
         sessionsStore.applyAll(sessions)
         dosesStore.applyAll(doses)
@@ -735,7 +736,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Clear
     // ========================
 
-    override fun clearAll() = synchronized(lock) {
+    override fun clearAll() = lock.withLock {
         Log.withTag("Repo").w { "clearAll: wiping all journal data" }
         sessionsStore.clear()
         substancesStore.clear()
@@ -764,7 +765,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Full-text search
     // ========================
 
-    override fun search(query: String): List<SearchResult> = synchronized(lock) {
+    override fun search(query: String): List<SearchResult> = lock.withLock {
         searchIndex.search(query)
     }
 

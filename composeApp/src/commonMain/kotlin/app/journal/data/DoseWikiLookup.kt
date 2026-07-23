@@ -15,7 +15,7 @@ object DoseWikiLookup {
 
     private const val RESOURCE_PATH = "/dosewiki_slim.json"
 
-    @Volatile
+    @kotlin.concurrent.Volatile
     private var substances: List<DoseWikiSubstance>? = null
 
     private fun ensureLoaded(): List<DoseWikiSubstance>? {
