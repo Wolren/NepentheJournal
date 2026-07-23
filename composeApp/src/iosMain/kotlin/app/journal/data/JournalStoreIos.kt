@@ -20,8 +20,22 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
     actual fun dataPath(): String = "$baseDir/journal-data.json"
     private fun tempPath(): String = dataPath() + ".tmp"
     private fun backupPath(): String = dataPath() + ".bak"
+    private fun versionedBackupPath(index: Int): String = backupPath() + ".$index"
+
+    /** Set to true when [load] had to use [recoverSnapshot] (partial recovery). */
+    @kotlin.concurrent.Volatile
+    actual var lastLoadHadIssues: Boolean = false
+        private set
+
+    /** Human-readable summary of what was recovered during the last [load]. */
+    @kotlin.concurrent.Volatile
+    actual var lastLoadIssueSummary: String = ""
+        private set
 
     actual fun load() {
+        lastLoadHadIssues = false
+        lastLoadIssueSummary = ""
+
         if (fileManager.fileExistsAtPath(tempPath())) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             fileManager.removeItemAtPath(tempPath(), null)
@@ -42,11 +56,84 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             val snapshot = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }
                 .getOrElse { e ->
                     Log.withTag("JournalStore").w { "Journal data failed full parse, attempting per-list recovery: ${e.message}" }
-                    recoverSnapshot(text)
+                    val recovered = recoverSnapshot(text)
+                    lastLoadHadIssues = true
+                    lastLoadIssueSummary = "Recovered from parse failure: ${e.message}"
+                    recovered
                 }
             AppJson.apply(repo, snapshot)
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
+        }
+    }
+
+    actual fun triggerAutoBackup() {
+        try {
+            if (!fileManager.fileExistsAtPath(dataPath())) {
+                Log.withTag("JournalStore").w { "Cannot auto-backup: no journal file exists" }
+                return
+            }
+            val autoDir = "$baseDir/.auto"
+            fileManager.createDirectoryAtPath(autoDir, withIntermediateDirectories = true, attributes = null, error = null)
+
+            val dateFormatter = NSDateFormatter()
+            dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+            val timestamp = dateFormatter.stringFromDate(NSDate())
+            val backupFile = "$autoDir/$timestamp.json"
+
+            if (fileManager.fileExistsAtPath(backupFile)) {
+                fileManager.removeItemAtPath(backupFile, null)
+            }
+            val success = fileManager.copyItemAtPath(dataPath(), toPath = backupFile, error = null)
+            if (success) {
+                Log.withTag("JournalStore").i { "Auto-backup created: $backupFile" }
+            } else {
+                Log.withTag("JournalStore").e { "Failed to create auto-backup at $backupFile" }
+                return
+            }
+
+            // Rotate auto-backups: keep only the 10 most recent
+            val contents = fileManager.contentsOfDirectoryAtPath(autoDir, error = null)
+                ?.filterIsInstance<NSString>()
+                ?.map { it as String }
+                ?.filter { it.endsWith(".json") }
+                ?.sortedDescending()
+                ?: emptyList()
+            if (contents.size > 10) {
+                val toDelete = contents.drop(10)
+                for (old in toDelete) {
+                    fileManager.removeItemAtPath("$autoDir/$old", null)
+                    Log.withTag("JournalStore").i { "Removed old auto-backup: $old" }
+                }
+            }
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").e(e) { "Failed to create auto-backup: ${e.message}" }
+        }
+    }
+
+    actual fun restoreFromBackup(): Boolean {
+        return try {
+            val backup = backupPath()
+            if (!fileManager.fileExistsAtPath(backup)) {
+                Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
+                return false
+            }
+            // Remove current file if exists
+            if (fileManager.fileExistsAtPath(dataPath())) {
+                fileManager.removeItemAtPath(dataPath(), null)
+            }
+            val success = fileManager.copyItemAtPath(backup, toPath = dataPath(), error = null)
+            if (success) {
+                Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
+                load()
+                true
+            } else {
+                Log.withTag("JournalStore").e { "Failed to restore from backup" }
+                false
+            }
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").e(e) { "Failed to restore from backup: ${e.message}" }
+            false
         }
     }
 
