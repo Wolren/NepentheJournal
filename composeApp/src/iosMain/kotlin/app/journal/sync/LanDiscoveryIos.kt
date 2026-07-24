@@ -9,10 +9,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import platform.Foundation.*
 
-// Protocol type alias — removed from kotlinx.cinterop in Kotlin 2.4.0
-// but still referenced by generated ObjC protocol interfaces
-private typealias Protocol = Any
-
 @OptIn(ExperimentalForeignApi::class)
 actual class LanDiscovery {
     private var browser: NSNetServiceBrowser? = null
@@ -31,8 +27,6 @@ actual class LanDiscovery {
     ) : NSNetServiceBrowserDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
-        @Suppress("CONFLICTING_OVERLOADS")
-        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
         override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
         override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
 
@@ -58,8 +52,6 @@ actual class LanDiscovery {
     ) : NSNetServiceDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
-        @Suppress("CONFLICTING_OVERLOADS")
-        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
         override fun netServiceDidResolveAddress(sender: NSNetService) {
             val host = sender.hostName ?: return
             val port = sender.port.toInt()

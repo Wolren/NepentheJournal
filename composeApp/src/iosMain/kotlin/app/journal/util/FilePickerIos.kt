@@ -9,9 +9,6 @@ import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
 
-// Protocol type alias — removed from kotlinx.cinterop in Kotlin 2.4.0
-private typealias Protocol = Any
-
 @OptIn(ExperimentalForeignApi::class)
 actual object FilePicker {
 
@@ -73,8 +70,6 @@ private class SaveFileDelegate(
 ) : UIDocumentPickerDelegateProtocol {
     override fun isEqual(`object`: Any?): Boolean = false
     override fun `class`(): ObjCClass? = null
-    @Suppress("CONFLICTING_OVERLOADS")
-    override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
     override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
         onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })
     }
