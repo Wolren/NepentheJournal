@@ -1,6 +1,8 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -8,6 +10,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import platform.Foundation.*
+
+private interface Protocol
 
 @OptIn(ExperimentalForeignApi::class)
 actual class LanDiscovery {
@@ -27,6 +31,9 @@ actual class LanDiscovery {
     ) : NSNetServiceBrowserDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
         override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
         override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
 
@@ -52,6 +59,14 @@ actual class LanDiscovery {
     ) : NSNetServiceDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
+        override fun isProxy(): Boolean = false
+        override fun isKindOfClass(aClass: ObjCClass?): Boolean = false
+        override fun isMemberOfClass(aClass: ObjCClass?): Boolean = false
+        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
+        override fun respondsToSelector(aSelector: CPointer<out CPointed>?): Boolean = false
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
         override fun netServiceDidResolveAddress(sender: NSNetService) {
             val host = sender.hostName ?: return
             val port = sender.port.toInt()
