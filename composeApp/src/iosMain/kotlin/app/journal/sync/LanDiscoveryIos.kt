@@ -4,11 +4,14 @@ import app.journal.log.Log
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import platform.Foundation.*
+
+// Protocol type alias — removed from kotlinx.cinterop in Kotlin 2.4.0
+// but still referenced by generated ObjC protocol interfaces
+private typealias Protocol = Any
 
 @OptIn(ExperimentalForeignApi::class)
 actual class LanDiscovery {

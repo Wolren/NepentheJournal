@@ -3,12 +3,14 @@ package app.journal.util
 import app.journal.log.Log
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
+
+// Protocol type alias — removed from kotlinx.cinterop in Kotlin 2.4.0
+private typealias Protocol = Any
 
 @OptIn(ExperimentalForeignApi::class)
 actual object FilePicker {
@@ -60,9 +62,8 @@ actual object FilePicker {
 }
 
 internal fun fallbackExportPath(fileName: String): String {
-    val docs = NSSearchPathForDirectoriesInDomains(
-        NSDocumentDirectory, NSUserDomainMask, true
-    ).firstOrNull() as? String ?: NSTemporaryDirectory()
+    val docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)
+        .firstOrNull() as? String ?: NSTemporaryDirectory()
     return "$docs/$fileName"
 }
 
@@ -74,7 +75,6 @@ private class SaveFileDelegate(
     override fun `class`(): ObjCClass? = null
     @Suppress("CONFLICTING_OVERLOADS")
     override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
-
     override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
         onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })
     }
