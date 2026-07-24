@@ -24,7 +24,7 @@ actual object FilePicker {
     ): String? = withContext(Dispatchers.Main) {
         try {
             val type = UTType.typeWithFilenameExtension(extensions.firstOrNull() ?: "csv")
-                ?: UTType.data
+                ?: UTType.typeWithIdentifier("public.data")
             val controller = UIDocumentPickerViewController(
                 forExportingURLs = listOf(
                     NSURL(fileURLWithPath = NSTemporaryDirectory() + defaultName)
@@ -64,7 +64,7 @@ actual object FilePicker {
         try {
             val types = extensions.mapNotNull { UTType.typeWithFilenameExtension(it) }
             val controller = UIDocumentPickerViewController(
-                forOpeningContentTypes = if (types.isNotEmpty()) types else listOf(UTType.data),
+                forOpeningContentTypes = if (types.isNotEmpty()) types else listOf(UTType.typeWithIdentifier("public.data")),
                 asCopy = true
             )
 
