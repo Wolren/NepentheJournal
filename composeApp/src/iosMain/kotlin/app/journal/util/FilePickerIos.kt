@@ -2,15 +2,15 @@ package app.journal.util
 
 import app.journal.log.Log
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.ObjCClass
-import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
 
+@OptIn(ExperimentalForeignApi::class)
 actual object FilePicker {
 
     actual suspend fun saveFile(
@@ -20,14 +20,10 @@ actual object FilePicker {
     ): String? = withContext(Dispatchers.Main) {
         try {
             val controller = UIDocumentPickerViewController(
-                forExportingURLs = listOf(
-                    NSURL(fileURLWithPath = NSTemporaryDirectory() + defaultName)
-                ),
+                forExportingURLs = listOf(NSURL(fileURLWithPath = NSTemporaryDirectory() + defaultName)),
                 asCopy = true
             )
-
             var resultUrl: String? = null
-
             controller.delegate = SaveFileDelegate { url -> resultUrl = url }
             presentViewController(controller)
             resultUrl
@@ -47,9 +43,7 @@ actual object FilePicker {
                 forOpeningContentTypes = if (types.isNotEmpty()) types else listOf(UTType.typeWithIdentifier("public.data")),
                 asCopy = true
             )
-
             var resultUrl: String? = null
-
             controller.delegate = SaveFileDelegate { url -> resultUrl = url }
             presentViewController(controller)
             resultUrl
@@ -72,22 +66,19 @@ internal fun fallbackExportPath(fileName: String): String {
     return "$docs/$fileName"
 }
 
+@OptIn(ExperimentalForeignApi::class)
 private class SaveFileDelegate(
     private val onResult: (String?) -> Unit
 ) : UIDocumentPickerDelegateProtocol {
-    override fun isEqual(object: Any?): Boolean = false
+    override fun isEqual(`object`: Any?): Boolean = false
     override fun `class`(): ObjCClass? = null
-    override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
-    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
-    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
+    override fun performSelector(aSelector: CPointer<*>?): Any? = null
+    override fun performSelector(aSelector: CPointer<*>?, withObject: Any?): Any? = null
+    override fun performSelector(aSelector: CPointer<*>?, withObject: Any?, _withObject: Any?): Any? = null
 
-    override fun documentPicker(
-        controller: UIDocumentPickerViewController,
-        didPickDocumentsAtURLs: List<*>
-    ) {
+    override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
         onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })
     }
-
     override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
         onResult(null)
     }
