@@ -39,6 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
@@ -46,6 +52,7 @@ import app.journal.model.Session
 import app.journal.sync.SyncEngine
 import app.journal.sync.createSyncEngine
 import app.journal.util.currentTimeMillis
+import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
 import app.journal.ui.dashboard.DashboardScreen
@@ -164,8 +171,20 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                 modifier = Modifier.fillMaxSize(),
                 color = colorScheme.background
             ) {
-                Box(Modifier.fillMaxSize()) {
-                    // Background image layer (renders behind content)
+                // Desktop keyboard shortcuts
+                val desktopHandler = if (isDesktopPlatform()) {
+                    Modifier.onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyUp && event.isCtrlPressed) {
+                            when (event.key) {
+                                Key.F -> { showSearch = true; true }
+                                Key.N -> { liveSessionId = "__new__"; true }
+                                else -> false
+                            }
+                        } else false
+                    }
+                } else Modifier
+                Box(Modifier.fillMaxSize().then(desktopHandler)) {
+                    // Background image layer
                     BackgroundImage(
                         imagePath = themeConfig.backgroundImagePath,
                         opacity = themeConfig.backgroundOpacity
