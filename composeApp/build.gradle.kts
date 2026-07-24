@@ -9,6 +9,15 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// Force latest stable Netty to fix Dependabot vulnerabilities
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group.startsWith("io.netty")) {
+            useVersion("4.2.16.Final")
+        }
+    }
+}
+
 kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
