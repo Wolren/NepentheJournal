@@ -35,24 +35,8 @@ actual object FilePicker {
 
             var resultUrl: String? = null
 
-            controller.delegate = object : UIDocumentPickerDelegateProtocol {
-                @ObjCSignatureOverride
-                override fun documentPicker(
-                    controller: UIDocumentPickerViewController,
-                    didPickDocumentsAtURLs: List<*>
-                ) {
-                    resultUrl = didPickDocumentsAtURLs.firstOrNull()
-                        ?.let { (it as? NSURL)?.path }
-                }
-
-                @ObjCSignatureOverride
-                override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
-                    // User cancelled — resultUrl stays null
-                }
-            }
-
+            controller.delegate = SaveFileDelegate { url -> resultUrl = url }
             presentViewController(controller)
-            // Return the selected path — the caller writes to this path
             resultUrl
         } catch (e: Exception) {
             Log.withTag("FilePicker").e(e) { "Failed to open save file dialog" }
@@ -73,22 +57,7 @@ actual object FilePicker {
 
             var resultUrl: String? = null
 
-            controller.delegate = object : UIDocumentPickerDelegateProtocol {
-                @ObjCSignatureOverride
-                override fun documentPicker(
-                    controller: UIDocumentPickerViewController,
-                    didPickDocumentsAtURLs: List<*>
-                ) {
-                    resultUrl = didPickDocumentsAtURLs.firstOrNull()
-                        ?.let { (it as? NSURL)?.path }
-                }
-
-                @ObjCSignatureOverride
-                override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
-                    // User cancelled
-                }
-            }
-
+            controller.delegate = SaveFileDelegate { url -> resultUrl = url }
             presentViewController(controller)
             resultUrl
         } catch (e: Exception) {
@@ -112,4 +81,20 @@ internal fun fallbackExportPath(fileName: String): String {
         NSDocumentDirectory, NSUserDomainMask, true
     ).firstOrNull() as? String ?: NSTemporaryDirectory()
     return "$docs/$fileName"
+}
+
+@ObjCSignatureOverride
+private class SaveFileDelegate(
+    private val onResult: (String?) -> Unit
+) : UIDocumentPickerDelegateProtocol {
+    override fun documentPicker(
+        controller: UIDocumentPickerViewController,
+        didPickDocumentsAtURLs: List<*>
+    ) {
+        onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })
+    }
+
+    override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        onResult(null)
+    }
 }

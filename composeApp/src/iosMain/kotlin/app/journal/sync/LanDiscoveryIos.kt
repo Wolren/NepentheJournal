@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -12,60 +13,66 @@ actual class LanDiscovery {
     actual fun startDiscovery(): Flow<LanDiscoveryEvent> = callbackFlow {
         val b = NSNetServiceBrowser()
         browser = b
+        b.delegate = NetServiceBrowserDelegate(this@callbackFlow)
+        b.searchForServicesOfType("_nepenthe._tcp", inDomain = "")
+        awaitClose { b.stop() }
+    }
 
-        val delegate = object : NSNetServiceBrowserDelegateProtocol {
-            override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
-            override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
+    private class NetServiceBrowserDelegate(
+        private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
+    ) : NSNetServiceBrowserDelegateProtocol {
+        override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
+        override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
 
-            override fun netServiceBrowser(
-                aBrowser: NSNetServiceBrowser,
-                didFindService: NSNetService,
-                moreComing: Boolean
-            ) {
-                didFindService.delegate = object : NSNetServiceDelegateProtocol {
-                    override fun netServiceDidResolveAddress(sender: NSNetService) {
-                        val host = sender.hostName ?: return
-                        val port = sender.port.toInt()
-                        val dict = sender.TXTRecordData()?.let { NSNetService.dictionaryFromTXTRecordData(it) }
-                        val deviceId = dict?.get("deviceId".encodeToByteArray())
-                            ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
-                        val fingerprint = dict?.get("fingerprint".encodeToByteArray())
-                            ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
-                        trySend(LanDiscoveryEvent.PeerFound(
-                            DiscoveredPeer(
-                                deviceId = deviceId, displayName = sender.name ?: "Unknown",
-                                host = host, port = port,
-                                isTrusted = fingerprint != null, fingerprint = fingerprint
-                            )
-                        ))
-                    }
-
-                    override fun netService(sender: NSNetService, didNotResolve: Map<Any?, *>) {
-                        trySend(LanDiscoveryEvent.DiscoveryError("Resolve failed: $didNotResolve"))
-                    }
-
-                    override fun netServiceDidStop(sender: NSNetService) {}
-                }
-                didFindService.resolveWithTimeout(5.0)
-            }
-
-            override fun netServiceBrowser(
-                aBrowser: NSNetServiceBrowser,
-                didRemoveService: NSNetService,
-                moreComing: Boolean
-            ) {
-                trySend(LanDiscoveryEvent.PeerLost(didRemoveService.name ?: "unknown"))
-            }
-
-            override fun netServiceBrowser(browser: NSNetServiceBrowser, didNotSearch: Map<Any?, *>) {
-                trySend(LanDiscoveryEvent.DiscoveryError("Search failed: $didNotSearch"))
-            }
+        override fun netServiceBrowser(
+            aBrowser: NSNetServiceBrowser,
+            didFindService: NSNetService,
+            moreComing: Boolean
+        ) {
+            didFindService.delegate = NetServiceDelegate(flow)
+            didFindService.resolveWithTimeout(5.0)
         }
 
-        b.delegate = delegate
-        b.searchForServicesOfType("_nepenthe._tcp", inDomain = "")
+        @ObjCSignatureOverride
+        override fun netServiceBrowser(
+            aBrowser: NSNetServiceBrowser,
+            didRemoveService: NSNetService,
+            moreComing: Boolean
+        ) {
+            flow.trySend(LanDiscoveryEvent.PeerLost(didRemoveService.name ?: "unknown"))
+        }
 
-        awaitClose { b.stop() }
+        override fun netServiceBrowser(browser: NSNetServiceBrowser, didNotSearch: Map<Any?, *>) {
+            flow.trySend(LanDiscoveryEvent.DiscoveryError("Search failed: $didNotSearch"))
+        }
+    }
+
+    @ObjCSignatureOverride
+    private class NetServiceDelegate(
+        private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
+    ) : NSNetServiceDelegateProtocol {
+        override fun netServiceDidResolveAddress(sender: NSNetService) {
+            val host = sender.hostName ?: return
+            val port = sender.port.toInt()
+            val dict = sender.TXTRecordData()?.let { NSNetService.dictionaryFromTXTRecordData(it) }
+            val deviceId = dict?.get("deviceId".encodeToByteArray())
+                ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
+            val fingerprint = dict?.get("fingerprint".encodeToByteArray())
+                ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
+            flow.trySend(LanDiscoveryEvent.PeerFound(
+                DiscoveredPeer(
+                    deviceId = deviceId, displayName = sender.name ?: "Unknown",
+                    host = host, port = port,
+                    isTrusted = fingerprint != null, fingerprint = fingerprint
+                )
+            ))
+        }
+
+        override fun netService(sender: NSNetService, didNotResolve: Map<Any?, *>) {
+            flow.trySend(LanDiscoveryEvent.DiscoveryError("Resolve failed: $didNotResolve"))
+        }
+
+        override fun netServiceDidStop(sender: NSNetService) {}
     }
 
     actual fun registerService(port: Int, deviceId: String, fingerprint: String) {
