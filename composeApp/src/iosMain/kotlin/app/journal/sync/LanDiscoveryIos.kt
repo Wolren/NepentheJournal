@@ -2,6 +2,7 @@ package app.journal.sync
 
 import app.journal.log.Log
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -28,9 +29,17 @@ actual class LanDiscovery {
     ) : NSNetServiceBrowserDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
-        override fun performSelector(aSelector: CPointer<*>?): Any? = null
-        override fun performSelector(aSelector: CPointer<*>?, withObject: Any?): Any? = null
-        override fun performSelector(aSelector: CPointer<*>?, withObject: Any?, _withObject: Any?): Any? = null
+        override fun isProxy(): Boolean = false
+        override fun isKindOfClass(aClass: ObjCClass?): Boolean = false
+        override fun isMemberOfClass(aClass: ObjCClass?): Boolean = false
+        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
+        override fun respondsToSelector(aSelector: CPointer<out CPointed>?): Boolean = false
+        override fun hash(): ULong = 0uL
+        override fun superclass(): ObjCClass? = null
+        override fun description(): String? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
 
         override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
         override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
@@ -57,9 +66,17 @@ actual class LanDiscovery {
     ) : NSNetServiceDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
-        override fun performSelector(aSelector: CPointer<*>?): Any? = null
-        override fun performSelector(aSelector: CPointer<*>?, withObject: Any?): Any? = null
-        override fun performSelector(aSelector: CPointer<*>?, withObject: Any?, _withObject: Any?): Any? = null
+        override fun isProxy(): Boolean = false
+        override fun isKindOfClass(aClass: ObjCClass?): Boolean = false
+        override fun isMemberOfClass(aClass: ObjCClass?): Boolean = false
+        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
+        override fun respondsToSelector(aSelector: CPointer<out CPointed>?): Boolean = false
+        override fun hash(): ULong = 0uL
+        override fun superclass(): ObjCClass? = null
+        override fun description(): String? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
 
         override fun netServiceDidResolveAddress(sender: NSNetService) {
             val host = sender.hostName ?: return

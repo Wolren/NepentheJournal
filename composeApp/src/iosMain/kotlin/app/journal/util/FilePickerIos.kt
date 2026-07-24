@@ -2,6 +2,7 @@ package app.journal.util
 
 import app.journal.log.Log
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
@@ -72,9 +73,17 @@ private class SaveFileDelegate(
 ) : UIDocumentPickerDelegateProtocol {
     override fun isEqual(`object`: Any?): Boolean = false
     override fun `class`(): ObjCClass? = null
-    override fun performSelector(aSelector: CPointer<*>?): Any? = null
-    override fun performSelector(aSelector: CPointer<*>?, withObject: Any?): Any? = null
-    override fun performSelector(aSelector: CPointer<*>?, withObject: Any?, _withObject: Any?): Any? = null
+    override fun isProxy(): Boolean = false
+    override fun isKindOfClass(aClass: ObjCClass?): Boolean = false
+    override fun isMemberOfClass(aClass: ObjCClass?): Boolean = false
+    override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
+    override fun respondsToSelector(aSelector: CPointer<out CPointed>?): Boolean = false
+    override fun hash(): ULong = 0uL
+    override fun superclass(): ObjCClass? = null
+    override fun description(): String? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
 
     override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
         onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })
