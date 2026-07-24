@@ -1,10 +1,9 @@
 package app.journal.util
 
 import app.journal.log.Log
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
@@ -74,7 +73,7 @@ private class SaveFileDelegate(
     override fun isEqual(`object`: Any?): Boolean = false
     override fun `class`(): ObjCClass? = null
     @Suppress("CONFLICTING_OVERLOADS")
-    override fun conformsToProtocol(aProtocol: Any?): Boolean = false
+    override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
 
     override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
         onResult(didPickDocumentsAtURLs.firstOrNull()?.let { (it as? NSURL)?.path })

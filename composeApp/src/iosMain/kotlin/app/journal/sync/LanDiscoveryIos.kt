@@ -4,6 +4,7 @@ import app.journal.log.Log
 import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -28,7 +29,7 @@ actual class LanDiscovery {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
         @Suppress("CONFLICTING_OVERLOADS")
-        override fun conformsToProtocol(aProtocol: Any?): Boolean = false
+        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
         override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
         override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
 
@@ -55,7 +56,7 @@ actual class LanDiscovery {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
         @Suppress("CONFLICTING_OVERLOADS")
-        override fun conformsToProtocol(aProtocol: Any?): Boolean = false
+        override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
         override fun netServiceDidResolveAddress(sender: NSNetService) {
             val host = sender.hostName ?: return
             val port = sender.port.toInt()
