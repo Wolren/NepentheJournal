@@ -1,6 +1,7 @@
 package app.journal.util
 
 import app.journal.log.Log
+import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -35,6 +36,7 @@ actual object FilePicker {
             var resultUrl: String? = null
 
             controller.delegate = object : UIDocumentPickerDelegateProtocol {
+                @ObjCSignatureOverride
                 override fun documentPicker(
                     controller: UIDocumentPickerViewController,
                     didPickDocumentsAtURLs: List<*>
@@ -43,6 +45,7 @@ actual object FilePicker {
                         ?.let { (it as? NSURL)?.path }
                 }
 
+                @ObjCSignatureOverride
                 override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
                     // User cancelled — resultUrl stays null
                 }
@@ -71,6 +74,7 @@ actual object FilePicker {
             var resultUrl: String? = null
 
             controller.delegate = object : UIDocumentPickerDelegateProtocol {
+                @ObjCSignatureOverride
                 override fun documentPicker(
                     controller: UIDocumentPickerViewController,
                     didPickDocumentsAtURLs: List<*>
@@ -79,6 +83,7 @@ actual object FilePicker {
                         ?.let { (it as? NSURL)?.path }
                 }
 
+                @ObjCSignatureOverride
                 override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
                     // User cancelled
                 }

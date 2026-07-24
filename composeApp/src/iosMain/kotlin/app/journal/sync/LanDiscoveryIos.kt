@@ -1,7 +1,6 @@
 package app.journal.sync
 
 import app.journal.log.Log
-import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -14,7 +13,6 @@ actual class LanDiscovery {
         val b = NSNetServiceBrowser()
         browser = b
 
-        @ObjCSignatureOverride
         val delegate = object : NSNetServiceBrowserDelegateProtocol {
             override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
             override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
@@ -24,8 +22,7 @@ actual class LanDiscovery {
                 didFindService: NSNetService,
                 moreComing: Boolean
             ) {
-                val service = didFindService
-                service.delegate = object : NSNetServiceDelegateProtocol {
+                didFindService.delegate = object : NSNetServiceDelegateProtocol {
                     override fun netServiceDidResolveAddress(sender: NSNetService) {
                         val host = sender.hostName ?: return
                         val port = sender.port.toInt()
@@ -36,12 +33,9 @@ actual class LanDiscovery {
                             ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
                         trySend(LanDiscoveryEvent.PeerFound(
                             DiscoveredPeer(
-                                deviceId = deviceId,
-                                displayName = sender.name ?: "Unknown",
-                                host = host,
-                                port = port,
-                                isTrusted = fingerprint != null,
-                                fingerprint = fingerprint
+                                deviceId = deviceId, displayName = sender.name ?: "Unknown",
+                                host = host, port = port,
+                                isTrusted = fingerprint != null, fingerprint = fingerprint
                             )
                         ))
                     }
@@ -51,9 +45,8 @@ actual class LanDiscovery {
                     }
 
                     override fun netServiceDidStop(sender: NSNetService) {}
-                    override fun netServiceDidUpdateTXTRecordData(sender: NSNetService) {}
                 }
-                service.resolveWithTimeout(5.0)
+                didFindService.resolveWithTimeout(5.0)
             }
 
             override fun netServiceBrowser(
