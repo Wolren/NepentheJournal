@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package app.journal.util
 
 import app.journal.data.JournalRepository
@@ -124,9 +126,9 @@ actual object ZipExporter {
         data.appendLEUint16(STORED_METHOD)
         data.appendLEUint16(0u) // last mod time (not set)
         data.appendLEUint16(0u) // last mod date (not set)
-        data.appendLEUint32(entry.crc32)
-        data.appendLEUint32(entry.compressedSize)
-        data.appendLEUint32(entry.uncompressedSize)
+        data.appendLEUint32(entry.crc32.toUInt())
+        data.appendLEUint32(entry.compressedSize.toUInt())
+        data.appendLEUint32(entry.uncompressedSize.toUInt())
         data.appendLEUint16(nameBytes.size.toUShort())
         data.appendLEUint16(0u) // extra field length
         data.appendBytes(nameBytes.refTo(0), nameBytes.size.toULong())
@@ -141,9 +143,9 @@ actual object ZipExporter {
         data.appendLEUint16(STORED_METHOD)
         data.appendLEUint16(0u) // last mod time
         data.appendLEUint16(0u) // last mod date
-        data.appendLEUint32(entry.crc32)
-        data.appendLEUint32(entry.compressedSize)
-        data.appendLEUint32(entry.uncompressedSize)
+        data.appendLEUint32(entry.crc32.toUInt())
+        data.appendLEUint32(entry.compressedSize.toUInt())
+        data.appendLEUint32(entry.uncompressedSize.toUInt())
         data.appendLEUint16(nameBytes.size.toUShort())
         data.appendLEUint16(0u) // extra field length
         data.appendLEUint16(0u) // file comment length
@@ -165,8 +167,8 @@ actual object ZipExporter {
         data.appendLEUint16(0u) // disk with central dir
         data.appendLEUint16(totalEntries) // entries on this disk
         data.appendLEUint16(totalEntries) // total entries
-        data.appendLEUint32(centralDirSize)
-        data.appendLEUint32(centralDirOffset)
+        data.appendLEUint32(centralDirSize.toUInt())
+        data.appendLEUint32(centralDirOffset.toUInt())
         data.appendLEUint16(0u) // comment length
     }
 
@@ -218,6 +220,3 @@ private fun NSMutableData.appendLEUint16(value: UShort) {
 private fun ByteArray.refTo(index: Int): CPointer<ByteVar> {
     return this.usePinned { it.addressOf(index) }
 }
-
-private val NSMutableData.length: NSInteger
-    get() = this.length

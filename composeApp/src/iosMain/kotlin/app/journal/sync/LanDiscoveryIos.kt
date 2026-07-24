@@ -26,23 +26,26 @@ actual class LanDiscovery {
                 // Discovery stopped
             }
 
-            override fun netServiceBrowser(aBrowser: NSNetServiceBrowser, didFindService: NSNetService, moreComing: Boolean) {
-                // Resolve the service to get address/port
+            override fun netServiceBrowser(
+                aBrowser: NSNetServiceBrowser,
+                didFindService: NSNetService,
+                moreComing: Boolean
+            ) {
                 val service = didFindService
                 service.delegate = object : NSObject(), NSNetServiceDelegateProtocol {
                     override fun netServiceDidResolveAddress(sender: NSNetService) {
-                        val addresses = sender.addresses?.firstOrNull() as? NSData
+                        val addressData = sender.addresses?.firstOrNull() as? NSData
                         val host = sender.hostName ?: return
                         val port = sender.port.toInt()
                         val deviceId = sender.TXTRecordData()?.let { data ->
                             NSNetService.dictionaryFromTXTRecordData(data)
                                 ?.get("deviceId".encodeToByteArray())
-                                ?.let { bytes -> bytes.decodeToString() }
+                                ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
                         }
                         val fingerprint = sender.TXTRecordData()?.let { data ->
                             NSNetService.dictionaryFromTXTRecordData(data)
                                 ?.get("fingerprint".encodeToByteArray())
-                                ?.let { bytes -> bytes.decodeToString() }
+                                ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
                         }
                         trySend(
                             LanDiscoveryEvent.PeerFound(
@@ -58,18 +61,25 @@ actual class LanDiscovery {
                         )
                     }
 
-                    override fun netService(sender: NSNetService, didNotResolve: Map<*, *>) {
+                    override fun netService(sender: NSNetService, didNotResolve: Map<Any?, Any?>?) {
                         trySend(LanDiscoveryEvent.DiscoveryError("Resolve failed: $didNotResolve"))
                     }
                 }
                 service.resolveWithTimeout(5.0)
             }
 
-            override fun netServiceBrowser(aBrowser: NSNetServiceBrowser, didRemoveService: NSNetService, moreComing: Boolean) {
+            override fun netServiceBrowser(
+                aBrowser: NSNetServiceBrowser,
+                didRemoveService: NSNetService,
+                moreComing: Boolean
+            ) {
                 trySend(LanDiscoveryEvent.PeerLost(didRemoveService.name ?: "unknown"))
             }
 
-            override fun netServiceBrowser(aBrowser: NSNetServiceBrowser, didNotSearch: Map<*, *>) {
+            override fun netServiceBrowser(
+                aBrowser: NSNetServiceBrowser,
+                didNotSearch: Map<Any?, Any?>?
+            ) {
                 trySend(LanDiscoveryEvent.DiscoveryError("Search failed: $didNotSearch"))
             }
         }
@@ -84,19 +94,20 @@ actual class LanDiscovery {
     }
 
     actual fun registerService(port: Int, deviceId: String, fingerprint: String) {
-        val data = NSNetService.dictionaryFromTXTRecordData(
-            mapOf<Any?, Any?>(
-                "deviceId" to deviceId.encodeToByteArray(),
-                "fingerprint" to fingerprint.encodeToByteArray()
-            )
+        val txtDict = mapOf<Any?, Any?>(
+            "deviceId" to deviceId.encodeToByteArray(),
+            "fingerprint" to fingerprint.encodeToByteArray()
         )
+        val data = NSNetService.dataFromTXTRecordDictionary(txtDict)
         val service = NSNetService(
             domain = "",
             type = "_nepenthe._tcp",
             name = "Nepenthe Journal",
             port = port.toLong()
         )
-        service.setTXTRecordData(data)
+        if (data != null) {
+            service.setTXTRecordData(data)
+        }
         service.publish()
     }
 
@@ -110,6 +121,13 @@ actual class LanDiscovery {
     }
 }
 
-private fun ByteArray.decodeToString(): String = StringBuilder().apply {
-    for (b in this@decodeToString) append(b.toInt().toChar())
-}.toString()
+/**
+ * Convert a ByteArray to a hex string for display.
+ * Used to decode TXT record values (which are NSData/ByteArray).
+ */
+private fun bytesToHexString(bytes: ByteArray): String =
+    bytes.joinToString("") { b ->
+        val v = b.toInt() and 0xFF
+        val hex = "0123456789abcdef"
+        "${hex[v shr 4]}${hex[v and 0xF]}"
+    }

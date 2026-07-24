@@ -1,11 +1,14 @@
 package app.journal.data
 
 import app.journal.log.Log
+import app.journal.model.*
 import app.journal.util.currentTimeMillis
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
 import platform.Foundation.*
 
+@OptIn(ExperimentalForeignApi::class)
 actual class JournalStore actual constructor(private val repo: JournalRepository) {
 
     private val fileManager = NSFileManager.defaultManager

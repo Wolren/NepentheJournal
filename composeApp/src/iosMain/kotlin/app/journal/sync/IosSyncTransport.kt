@@ -170,14 +170,14 @@ class IosSyncTransport(
                                         json.encodeToString(SyncResponse(false, error = "Authentication missing")),
                                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                                     )
-                                    return@post
+                                    return@get
                                 }
                                 val secret = pairingSecret ?: run {
                                     call.respondText(
                                         json.encodeToString(SyncResponse(false, error = "No shared secret")),
                                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
                                     )
-                                    return@post
+                                    return@get
                                 }
                                 val body = ""
                                 val verified = verifyAuth(deviceHeader, body, authHeader, secret)
@@ -186,7 +186,7 @@ class IosSyncTransport(
                                         json.encodeToString(SyncResponse(false, error = "HMAC verification failed")),
                                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                                     )
-                                    return@post
+                                    return@get
                                 }
                                 val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
                                 val response = buildSyncResponse(since)
@@ -217,7 +217,7 @@ class IosSyncTransport(
     override suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> {
         val secret = pairingSecret ?: return Result.failure(Exception("Not paired"))
         val client = HttpClient(Darwin)
-        try {
+        return try {
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), _status.value.lastSyncAt ?: 0L)
             if (batch != null) {
                 val pushReq = SyncPushRequest.fromBatch(batch, secret, deviceId)
@@ -309,7 +309,7 @@ class IosSyncTransport(
                 fingerprint = result.hostFingerprint
             ))
         } catch (e: Exception) {
-            Result.failure(e)
+            return Result.failure(e)
         } finally {
             pairingClient.close()
         }
@@ -325,6 +325,27 @@ class IosSyncTransport(
     }
 
     // ==========  Private helpers  ==========
+
+    /**
+     * Validate a SyncBatch from an incoming push request.
+     * Enforces field-length and item-count limits to prevent injection
+     * of malformed data from untrusted peers.
+     */
+    private fun validateSyncBatch(batch: SyncBatch): String? {
+        if (batch.sessions.size > MAX_ITEMS) return "Too many sessions"
+        if (batch.doses.size > MAX_ITEMS) return "Too many doses"
+        if (batch.substances.size > 100) return "Too many substances"
+        if (batch.notes.size > MAX_ITEMS) return "Too many notes"
+        if (batch.timelineEvents.size > MAX_ITEMS) return "Too many events"
+        if (batch.interactions.size > 100) return "Too many interactions"
+        if (batch.effects.size > 100) return "Too many effects"
+        if (batch.customUnits.size > 100) return "Too many custom units"
+        return null
+    }
+
+    private companion object {
+        private const val MAX_ITEMS = 500
+    }
 
     private fun verifyAuth(deviceId: String, body: String, authHeader: String, secret: ByteArray): Boolean {
         val parts = authHeader.split(":", limit = 3)

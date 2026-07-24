@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package app.journal.util
 
 import platform.Foundation.*
@@ -11,7 +13,7 @@ actual object PlatformFile {
 
     actual fun writeText(path: String, content: String) {
         try {
-            val parent = NSString.stringWithString(path).stringByDeletingLastPathComponent
+            val parent = (path as NSString).stringByDeletingLastPathComponent
             fileManager.createDirectoryAtPath(parent, withIntermediateDirectories = true,
                 attributes = null, error = null)
             (content as NSString).writeToFile(path, atomically = true,

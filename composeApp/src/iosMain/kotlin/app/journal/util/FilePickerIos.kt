@@ -26,7 +26,7 @@ actual object FilePicker {
             val type = UTType.typeWithFilenameExtension(extensions.firstOrNull() ?: "csv")
                 ?: UTType.data
             val controller = UIDocumentPickerViewController(
-                forExporting = listOf(
+                forExportingURLs = listOf(
                     NSURL.fileURLWithPath(
                         NSTemporaryDirectory() + defaultName
                     )

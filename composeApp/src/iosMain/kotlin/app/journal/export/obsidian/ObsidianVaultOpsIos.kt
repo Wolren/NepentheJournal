@@ -1,6 +1,7 @@
 package app.journal.export.obsidian
 
 import app.journal.log.Log
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.*
 
 /**
@@ -8,6 +9,7 @@ import platform.Foundation.*
  * Vault files are accessed via the filesystem directly — iOS can see
  * files in the Obsidian vault iCloud folder if the user grants access.
  */
+@OptIn(ExperimentalForeignApi::class)
 actual object ObsidianVaultOps {
 
     actual fun validateVaultPath(dirPath: String): Boolean {
