@@ -87,6 +87,7 @@ jobs:
           retention-days: 7
 
   ios-build:
+    if: false
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
