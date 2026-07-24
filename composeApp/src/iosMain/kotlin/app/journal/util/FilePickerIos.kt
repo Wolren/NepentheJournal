@@ -1,21 +1,16 @@
 package app.journal.util
 
 import app.journal.log.Log
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
+import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
-import kotlin.coroutines.resume
 
-/**
- * iOS file picker using UIDocumentPickerViewController.
- *
- * Opens a system document browser for export/import.
- * The delegate callback bridges to a coroutine via suspendCancellableCoroutine.
- */
 actual object FilePicker {
 
     actual suspend fun saveFile(
@@ -24,8 +19,6 @@ actual object FilePicker {
         extensions: List<String>
     ): String? = withContext(Dispatchers.Main) {
         try {
-            val type = UTType.typeWithFilenameExtension(extensions.firstOrNull() ?: "csv")
-                ?: UTType.typeWithIdentifier("public.data")
             val controller = UIDocumentPickerViewController(
                 forExportingURLs = listOf(
                     NSURL(fileURLWithPath = NSTemporaryDirectory() + defaultName)
@@ -72,10 +65,6 @@ actual object FilePicker {
     }
 }
 
-/**
- * Fallback: write CSV data directly to the app's Documents directory
- * when UIDocumentPicker is unavailable or the user cancels.
- */
 internal fun fallbackExportPath(fileName: String): String {
     val docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, true
@@ -83,10 +72,15 @@ internal fun fallbackExportPath(fileName: String): String {
     return "$docs/$fileName"
 }
 
-@ObjCSignatureOverride
 private class SaveFileDelegate(
     private val onResult: (String?) -> Unit
 ) : UIDocumentPickerDelegateProtocol {
+    override fun isEqual(object: Any?): Boolean = false
+    override fun `class`(): ObjCClass? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+    override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
+
     override fun documentPicker(
         controller: UIDocumentPickerViewController,
         didPickDocumentsAtURLs: List<*>

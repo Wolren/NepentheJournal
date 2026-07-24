@@ -1,6 +1,9 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
+import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -21,24 +24,23 @@ actual class LanDiscovery {
     private class NetServiceBrowserDelegate(
         private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
     ) : NSNetServiceBrowserDelegateProtocol {
+        override fun isEqual(object: Any?): Boolean = false
+        override fun `class`(): ObjCClass? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
+
         override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {}
         override fun netServiceBrowserDidStopSearch(aBrowser: NSNetServiceBrowser) {}
 
-        override fun netServiceBrowser(
-            aBrowser: NSNetServiceBrowser,
-            didFindService: NSNetService,
-            moreComing: Boolean
-        ) {
+        @ObjCSignatureOverride
+        override fun netServiceBrowser(aBrowser: NSNetServiceBrowser, didFindService: NSNetService, moreComing: Boolean) {
             didFindService.delegate = NetServiceDelegate(flow)
             didFindService.resolveWithTimeout(5.0)
         }
 
         @ObjCSignatureOverride
-        override fun netServiceBrowser(
-            aBrowser: NSNetServiceBrowser,
-            didRemoveService: NSNetService,
-            moreComing: Boolean
-        ) {
+        override fun netServiceBrowser(aBrowser: NSNetServiceBrowser, didRemoveService: NSNetService, moreComing: Boolean) {
             flow.trySend(LanDiscoveryEvent.PeerLost(didRemoveService.name ?: "unknown"))
         }
 
@@ -47,10 +49,15 @@ actual class LanDiscovery {
         }
     }
 
-    @ObjCSignatureOverride
     private class NetServiceDelegate(
         private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
     ) : NSNetServiceDelegateProtocol {
+        override fun isEqual(object: Any?): Boolean = false
+        override fun `class`(): ObjCClass? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
+        override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null
+
         override fun netServiceDidResolveAddress(sender: NSNetService) {
             val host = sender.hostName ?: return
             val port = sender.port.toInt()
@@ -60,11 +67,8 @@ actual class LanDiscovery {
             val fingerprint = dict?.get("fingerprint".encodeToByteArray())
                 ?.let { (it as? ByteArray)?.let(::bytesToHexString) }
             flow.trySend(LanDiscoveryEvent.PeerFound(
-                DiscoveredPeer(
-                    deviceId = deviceId, displayName = sender.name ?: "Unknown",
-                    host = host, port = port,
-                    isTrusted = fingerprint != null, fingerprint = fingerprint
-                )
+                DiscoveredPeer(deviceId = deviceId, displayName = sender.name ?: "Unknown",
+                    host = host, port = port, isTrusted = fingerprint != null, fingerprint = fingerprint)
             ))
         }
 
