@@ -1,11 +1,7 @@
 package app.journal.sync
 
 import app.journal.log.Log
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointed
-import kotlinx.cinterop.ObjCClass
 import kotlinx.cinterop.ObjCSignatureOverride
-import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
