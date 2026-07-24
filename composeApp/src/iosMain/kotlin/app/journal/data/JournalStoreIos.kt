@@ -193,7 +193,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             // Write temp, then rename atomically
             val tmpWritten = (text as NSString).writeToFile(tempPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
             if (!tmpWritten) {
-                Log.withTag("JournalStore").e { "Failed to write temp file: $tempPath" }
+                Log.withTag("JournalStore").e { "Failed to write temp file: ${tempPath()}" }
                 return
             }
 

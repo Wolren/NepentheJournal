@@ -1,6 +1,11 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
+import kotlinx.cinterop.ObjCClass
+import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -17,7 +22,7 @@ actual class LanDiscovery {
         val b = NSNetServiceBrowser()
         browser = b
 
-        val delegate = object : NSObject(), NSNetServiceBrowserDelegateProtocol {
+        val delegate = object : NSNetServiceBrowserDelegateProtocol {
             override fun netServiceBrowserWillSearch(aBrowser: NSNetServiceBrowser) {
                 // Discovery started
             }
@@ -26,13 +31,14 @@ actual class LanDiscovery {
                 // Discovery stopped
             }
 
+            @ObjCSignatureOverride
             override fun netServiceBrowser(
                 aBrowser: NSNetServiceBrowser,
                 didFindService: NSNetService,
                 moreComing: Boolean
             ) {
                 val service = didFindService
-                service.delegate = object : NSObject(), NSNetServiceDelegateProtocol {
+                service.delegate = object : NSNetServiceDelegateProtocol {
                     override fun netServiceDidResolveAddress(sender: NSNetService) {
                         val addressData = sender.addresses?.firstOrNull() as? NSData
                         val host = sender.hostName ?: return
@@ -61,13 +67,14 @@ actual class LanDiscovery {
                         )
                     }
 
-                    override fun netService(sender: NSNetService, didNotResolve: Map<Any?, Any?>?) {
+                    override fun netService(sender: NSNetService, didNotResolve: Map<Any?, *>) {
                         trySend(LanDiscoveryEvent.DiscoveryError("Resolve failed: $didNotResolve"))
                     }
                 }
                 service.resolveWithTimeout(5.0)
             }
 
+            @ObjCSignatureOverride
             override fun netServiceBrowser(
                 aBrowser: NSNetServiceBrowser,
                 didRemoveService: NSNetService,
@@ -76,10 +83,7 @@ actual class LanDiscovery {
                 trySend(LanDiscoveryEvent.PeerLost(didRemoveService.name ?: "unknown"))
             }
 
-            override fun netServiceBrowser(
-                aBrowser: NSNetServiceBrowser,
-                didNotSearch: Map<Any?, Any?>?
-            ) {
+            override fun netServiceBrowser(browser: NSNetServiceBrowser, didNotSearch: Map<Any?, *>) {
                 trySend(LanDiscoveryEvent.DiscoveryError("Search failed: $didNotSearch"))
             }
         }
@@ -103,7 +107,7 @@ actual class LanDiscovery {
             domain = "",
             type = "_nepenthe._tcp",
             name = "Nepenthe Journal",
-            port = port.toLong()
+            port = port
         )
         if (data != null) {
             service.setTXTRecordData(data)

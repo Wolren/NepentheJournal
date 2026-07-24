@@ -11,7 +11,7 @@ actual fun hmacSha256Hex(secret: ByteArray, data: ByteArray): String {
     val hmac = HmacSha256(secret)
     return hmac.digest(data).joinToString("") { b ->
         val v = b.toInt() and 0xFF
-        hexChars[v shr 4] + hexChars[v and 0xF]
+        "${hexChars[v shr 4]}${hexChars[v and 0xF]}"
     }
 }
 

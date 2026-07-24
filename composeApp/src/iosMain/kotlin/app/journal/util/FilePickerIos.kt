@@ -1,6 +1,10 @@
 package app.journal.util
 
 import app.journal.log.Log
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointed
+import kotlinx.cinterop.ObjCClass
+import kotlinx.cinterop.Protocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -27,16 +31,14 @@ actual object FilePicker {
                 ?: UTType.data
             val controller = UIDocumentPickerViewController(
                 forExportingURLs = listOf(
-                    NSURL.fileURLWithPath(
-                        NSTemporaryDirectory() + defaultName
-                    )
+                    NSURL(fileURLWithPath = NSTemporaryDirectory() + defaultName)
                 ),
                 asCopy = true
             )
 
             var resultUrl: String? = null
 
-            controller.delegate = object : NSObject(), UIDocumentPickerDelegateProtocol {
+            controller.delegate = object : UIDocumentPickerDelegateProtocol {
                 override fun documentPicker(
                     controller: UIDocumentPickerViewController,
                     didPickDocumentsAtURLs: List<*>
@@ -72,7 +74,7 @@ actual object FilePicker {
 
             var resultUrl: String? = null
 
-            controller.delegate = object : NSObject(), UIDocumentPickerDelegateProtocol {
+            controller.delegate = object : UIDocumentPickerDelegateProtocol {
                 override fun documentPicker(
                     controller: UIDocumentPickerViewController,
                     didPickDocumentsAtURLs: List<*>

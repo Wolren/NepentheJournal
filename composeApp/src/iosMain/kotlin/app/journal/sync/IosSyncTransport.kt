@@ -57,7 +57,7 @@ class IosSyncTransport(
 
     override suspend fun startHosting(config: SyncConfig): Result<HostingInfo> {
         return try {
-            val port = config.port
+            val port = config.listenerPort
             hostingJob = scope.launch {
                 Log.withTag("IosSync").i { "Starting iOS sync server on port $port" }
                 try {

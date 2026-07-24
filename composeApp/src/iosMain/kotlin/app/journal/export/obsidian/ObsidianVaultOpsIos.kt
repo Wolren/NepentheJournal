@@ -14,11 +14,8 @@ actual object ObsidianVaultOps {
 
     actual fun validateVaultPath(dirPath: String): Boolean {
         return try {
-            var isDir: kotlinx.cinterop.CValue<platform.posix.stat>? = null
-            val dir = NSString.stringWithString(dirPath)
             val fileManager = NSFileManager.defaultManager
-            var isDirectory: kotlinx.cinterop.BooleanVar? = null
-            val exists = fileManager.fileExistsAtPath(dirPath, isDirectory = null)
+            val exists = fileManager.fileExistsAtPath(dirPath)
             val writable = fileManager.isWritableFileAtPath(dirPath)
             Log.withTag("Obsidian").w { "Vault path not valid: $dirPath (exists=$exists, writable=$writable)" }
             exists && writable
@@ -55,8 +52,7 @@ actual object ObsidianVaultOps {
 
     actual fun writeFile(path: String, content: String) {
         try {
-            val nsPath = NSString.stringWithString(path)
-            val parentDir = nsPath.stringByDeletingLastPathComponent
+            val parentDir = path.trimEnd('/').substringBeforeLast('/', "").ifEmpty { "." }
             ensureDir(parentDir)
             val written = (content as NSString).writeToFile(path, atomically = true, encoding = NSUTF8StringEncoding, error = null)
             if (!written) {
@@ -92,8 +88,19 @@ actual object ObsidianVaultOps {
 
     actual fun normalizePath(path: String): String {
         return try {
-            val nsPath = NSString.stringWithString(path)
-            nsPath.stringByStandardizingPath
+            val p = path.trimEnd('/')
+            val isAbsolute = p.startsWith('/')
+            val parts = p.split('/')
+            val result = mutableListOf<String>()
+            for (part in parts) {
+                when (part) {
+                    ".", "" -> { /* skip */ }
+                    ".." -> if (result.isNotEmpty()) result.removeAt(result.lastIndex)
+                    else -> result.add(part)
+                }
+            }
+            val normalized = result.joinToString("/")
+            if (isAbsolute) "/$normalized" else normalized
         } catch (e: Exception) {
             Log.withTag("Obsidian").e(e) { "Error normalizing path: $path" }
             path
