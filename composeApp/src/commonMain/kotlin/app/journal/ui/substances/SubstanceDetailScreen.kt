@@ -34,12 +34,12 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceDetailScreen(
+    repo: JournalRepository = JournalRepository.instance,
     substanceId: String,
     onBack: () -> Unit,
     onEdit: (String) -> Unit = {},
     onCompanion: () -> Unit = {},
 ) {
-    val repo = remember { JournalRepository.instance }
     val substance = remember(substanceId) { repo.getSubstance(substanceId) }
     val allInteractions by repo.interactions.collectAsState()
     val allDoses by repo.doses.collectAsState()

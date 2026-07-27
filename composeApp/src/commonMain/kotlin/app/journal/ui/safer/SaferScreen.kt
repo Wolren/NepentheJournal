@@ -157,33 +157,17 @@ fun SaferScreen() {
                         )
                     )
                     Spacer(Modifier.height(10.dp))
-                    ResourceLink("DoseWiki", "dosewiki-admin.vercel.app", "In-app dosage and duration reference data") {
-                        uriHandler.openUri("https://dosewiki-admin.vercel.app/")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ResourceLink("PsychonautWiki", "psychonautwiki.org", "Comprehensive substance information, effects, and interaction database") {
-                        uriHandler.openUri("https://psychonautwiki.org")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ResourceLink("Erowid", "erowid.org", "Extensive library of substance experience reports and reference materials") {
-                        uriHandler.openUri("https://erowid.org")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ResourceLink("TripSit", "tripsit.me", "Real-time harm reduction chat, combination charts, and substance fact sheets") {
-                        uriHandler.openUri("https://tripsit.me")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ResourceLink("Dancesafe", "dancesafe.org", "Reagent testing kits, fentanyl test strips, and harm reduction education") {
-                        uriHandler.openUri("https://dancesafe.org")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ResourceLink("RollSafe", "rollsafe.org", "MDMA-specific harm reduction and supplementation guidelines") {
-                        uriHandler.openUri("https://rollsafe.org")
+                    resources.forEach { res ->
+                        Spacer(Modifier.height(8.dp))
+                        ResourceLink(res.name, res.url, res.description) {
+                            uriHandler.openUri(res.fullUrl)
+                        }
                     }
                 }
             }
         }
 
+        // Need help section
         item {
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -249,6 +233,22 @@ private fun SaferSection(
         }
     }
 }
+
+private data class Resource(
+    val name: String,
+    val url: String,
+    val description: String,
+    val fullUrl: String
+)
+
+private val resources = listOf(
+    Resource("DoseWiki", "dosewiki-admin.vercel.app", "In-app dosage and duration reference data", "https://dosewiki-admin.vercel.app/"),
+    Resource("PsychonautWiki", "psychonautwiki.org", "Comprehensive substance information, effects, and interaction database", "https://psychonautwiki.org"),
+    Resource("Erowid", "erowid.org", "Extensive library of substance experience reports and reference materials", "https://erowid.org"),
+    Resource("TripSit", "tripsit.me", "Real-time harm reduction chat, combination charts, and substance fact sheets", "https://tripsit.me"),
+    Resource("Dancesafe", "dancesafe.org", "Reagent testing kits, fentanyl test strips, and harm reduction education", "https://dancesafe.org"),
+    Resource("RollSafe", "rollsafe.org", "MDMA-specific harm reduction and supplementation guidelines", "https://rollsafe.org"),
+)
 
 @Composable
 private fun ResourceLink(

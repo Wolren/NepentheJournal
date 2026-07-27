@@ -10,7 +10,7 @@ enum class TimelineEventType {
 @Serializable
 data class TimelineEvent(
     override val id: String,
-    override val docType: String = "timelineEvent",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

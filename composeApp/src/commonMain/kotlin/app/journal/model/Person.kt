@@ -7,7 +7,7 @@ enum class PersonRole { PARTICIPANT, SITTER, OBSERVER }
 @Serializable
 data class Person(
     override val id: String,
-    override val docType: String = "person",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

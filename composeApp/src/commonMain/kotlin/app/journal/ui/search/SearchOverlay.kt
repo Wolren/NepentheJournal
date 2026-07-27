@@ -23,11 +23,11 @@ import app.journal.data.SearchResult
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchOverlay(
+    repo: JournalRepository = JournalRepository.instance,
     onBack: () -> Unit,
     onSessionClick: (String) -> Unit,
     onSubstanceClick: (String) -> Unit,
 ) {
-    val repo = remember { JournalRepository.instance }
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var hasSearched by remember { mutableStateOf(false) }

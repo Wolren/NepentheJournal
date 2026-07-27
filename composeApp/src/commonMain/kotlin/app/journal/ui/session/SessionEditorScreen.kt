@@ -28,10 +28,10 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionEditorScreen(
+    repo: JournalRepository = JournalRepository.instance,
     sessionToEdit: Session? = null,
     onBack: () -> Unit
 ) {
-    val repo = remember { JournalRepository.instance }
     val substances by repo.substances.collectAsState()
     val useShulgin by repo.useShulginRating.collectAsState()
     val isEditing = sessionToEdit != null

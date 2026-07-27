@@ -15,7 +15,7 @@ data class ConflictSibling(
 @Serializable
 data class Note(
     override val id: String,
-    override val docType: String = "note",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

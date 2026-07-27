@@ -102,7 +102,8 @@ class PsychonautWikiFetcher(
             } catch (e: Exception) { lastErr = e }
             delay(RETRY_BASE_MS * (attempt + 1))
         }
-        if (lastErr != null) throw lastErr!!
+        val err = lastErr
+        if (err != null) throw err
         return null
     }
 

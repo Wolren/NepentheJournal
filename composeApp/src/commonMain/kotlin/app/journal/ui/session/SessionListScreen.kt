@@ -24,6 +24,7 @@ import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatRelativeTime
 import app.journal.util.isDesktopPlatform
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -33,8 +34,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun SessionListScreen(
-    viewModel: SessionListViewModel = remember { SessionListViewModel.create() },
+fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
+    viewModel: SessionListViewModel,
     onNewSession: () -> Unit = {},
     onEditSession: (String) -> Unit = {},
     onSessionClick: (String) -> Unit = {},
@@ -511,20 +512,4 @@ private fun SessionCard(
     }
 }
 
-private fun relativeTime(epochMs: Long): String {
-    val now = currentTimeMillis()
-    val diff = now - epochMs
-    val mins = diff / 60000
-    val hours = diff / 3600000
-    val days = diff / 86400000
-    return when {
-        mins < 1 -> "Just now"
-        mins < 60 -> "${mins}m ago"
-        hours < 24 -> "${hours}h ago"
-        days < 2 -> "Yesterday"
-        days < 7 -> "${days}d ago"
-        days < 30 -> "${(days / 7)}w ago"
-        days < 365 -> "${(days / 30)}mo ago"
-        else -> "${(days / 365)}y ago"
-    }
-}
+private fun relativeTime(epochMs: Long): String = formatRelativeTime(epochMs)

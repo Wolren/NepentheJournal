@@ -86,10 +86,10 @@ class EntityStoreTest {
     }
 
     @Test
-    fun applyAllReplacesById() {
+    fun putAllReplacesById() {
         val store = EntityStore(idOf)
         store.put(TestEntity("a", "Alice", 1))
-        store.applyAll(listOf(
+        store.putAll(listOf(
             TestEntity("a", "Alice-Updated", 10),
             TestEntity("b", "Bob", 2)
         ))

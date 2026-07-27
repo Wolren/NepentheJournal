@@ -18,8 +18,10 @@ import app.journal.ui.components.AppTonalButton
 import kotlinx.coroutines.launch
 
 @Composable
-fun ObsidianSettingsCard() {
-    val repo = remember { JournalRepository.instance }
+fun ObsidianSettingsCard(
+    repo: JournalRepository = JournalRepository.instance
+) {
+
     val scope = rememberCoroutineScope()
 
     var obsidianExpanded by remember { mutableStateOf(false) }

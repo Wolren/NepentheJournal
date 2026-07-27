@@ -41,10 +41,10 @@ object ExportImport {
      */
     fun exportSessions(repo: IJournalRepository): String {
         val now = currentTimeMillis()
-        val bundles = repo.exportSessionBundles().map { (session, doses) ->
+        val bundles = repo.exportSessionBundles().map { bundle ->
             SessionWithDoses(
-                session = session,
-                doses = doses
+                session = bundle.session,
+                doses = bundle.doses
             )
         }
         val export = SessionExportBundle(

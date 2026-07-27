@@ -24,10 +24,10 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionTimelineScreen(
+    repo: JournalRepository = JournalRepository.instance,
     sessionId: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
-    val repo = remember { JournalRepository.instance }
     val session = remember(sessionId) { repo.getSession(sessionId) }
     val events = remember(sessionId) { repo.eventsForSession(sessionId) }
     val doses = remember(sessionId) { repo.dosesForSession(sessionId) }

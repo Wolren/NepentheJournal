@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Substance
+import app.journal.model.pharmacologySources
 import kotlin.math.roundToInt
 
 private val AFFINITY_LOG_MIN = -2.0  // 0.01 nM
@@ -61,9 +62,10 @@ private data class AggEntry(
 
 @Composable
 internal fun PharmacologySection(substance: Substance) {
-    val bindingdbRecords = substance.bindingdbData?.records.orEmpty()
-    val pdspRecords = substance.pdspData?.records.orEmpty()
-    val wikipediaRecords = substance.wikipediaData?.records.orEmpty()
+    val sources = substance.pharmacologySources
+    val bindingdbRecords = sources?.bindingdb?.records.orEmpty()
+    val pdspRecords = sources?.pdsp?.records.orEmpty()
+    val wikipediaRecords = sources?.wikipedia?.records.orEmpty()
     val totalRecords = bindingdbRecords.size + pdspRecords.size + wikipediaRecords.size
     if (totalRecords == 0) return
 

@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Effect(
     override val id: String,
-    override val docType: String = "effect",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",

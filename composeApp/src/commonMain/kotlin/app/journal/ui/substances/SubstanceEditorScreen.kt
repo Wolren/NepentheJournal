@@ -22,10 +22,10 @@ import app.journal.util.currentTimeMillis
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceEditorScreen(
+    repo: JournalRepository = JournalRepository.instance,
     substanceToEdit: Substance? = null,
     onBack: () -> Unit
 ) {
-    val repo = remember { JournalRepository.instance }
     val isEditing = substanceToEdit != null
     val now = currentTimeMillis()
 

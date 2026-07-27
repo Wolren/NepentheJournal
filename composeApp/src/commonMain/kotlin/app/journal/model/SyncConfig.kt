@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SyncConfig(
     override val id: String,
-    override val docType: String = "syncConfig",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

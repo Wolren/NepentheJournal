@@ -30,10 +30,11 @@ import app.journal.ui.components.*
 
 @Composable
 fun DashboardScreen(
+    repo: JournalRepository = JournalRepository.instance,
     onSearchClick: () -> Unit = {},
 ) {
-    val repo = remember { JournalRepository.instance }
     val sessions by repo.sessions.collectAsState()
+    val useRelativeTime by remember { mutableStateOf(true) }
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
     val showTrendChart by repo.showSessionsTrendChart.collectAsState()

@@ -26,8 +26,10 @@ import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LiveSessionScreen(session: Session, onBack: () -> Unit) {
-    val repo = remember { JournalRepository.instance }
+fun LiveSessionScreen(
+    repo: JournalRepository = JournalRepository.instance,
+    session: Session, onBack: () -> Unit
+) {
     val listState = rememberLazyListState()
 
     val allDoses by repo.doses.collectAsState()

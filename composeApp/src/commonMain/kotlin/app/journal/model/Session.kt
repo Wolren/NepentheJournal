@@ -40,7 +40,7 @@ enum class ShulginRating(val label: String, val numericValue: Int) {
 @Serializable
 data class Session(
     override val id: String,
-    override val docType: String = "session",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

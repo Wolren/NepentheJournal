@@ -30,11 +30,11 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceCompanionScreen(
+    repo: JournalRepository = JournalRepository.instance,
     substanceId: String,
     onBack: () -> Unit,
     onSessionClick: (String) -> Unit,
 ) {
-    val repo = remember { JournalRepository.instance }
     val substances by repo.substances.collectAsState()
     val sessions by repo.sessions.collectAsState()
     val doses by repo.doses.collectAsState()

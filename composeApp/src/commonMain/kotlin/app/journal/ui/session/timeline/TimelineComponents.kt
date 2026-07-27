@@ -145,7 +145,7 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
                         path.moveTo(padL, drawH)
                         for (event in intensityEvents) {
                             val x = padL + ((event.timestamp - firstT).toFloat() / eventRange * drawW).coerceIn(0f, drawW)
-                            val y = drawH - (event.intensity!! / 10f * drawH).coerceIn(0f, drawH)
+                            val y = drawH - ((event.intensity ?: 5f) / 10f * drawH).coerceIn(0f, drawH)
                             path.lineTo(x, y)
                         }
                         path.lineTo(w, drawH); path.close()
@@ -153,7 +153,7 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
                         var first = true
                         for (event in intensityEvents) {
                             val x = padL + ((event.timestamp - firstT).toFloat() / eventRange * drawW).coerceIn(0f, drawW)
-                            val y = drawH - (event.intensity!! / 10f * drawH).coerceIn(0f, drawH)
+                            val y = drawH - ((event.intensity ?: 5f) / 10f * drawH).coerceIn(0f, drawH)
                             if (first) { path.rewind(); path.moveTo(x, y); first = false } else { path.lineTo(x, y) }
                         }
                         drawPath(path, primaryColor, style = Stroke(width = 2.dp.toPx()))

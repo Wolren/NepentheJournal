@@ -8,7 +8,7 @@ enum class DiscoveryMode { MANUAL, LAN_AUTO_DISCOVERY, HYBRID }
 @Serializable
 data class Device(
     override val id: String,
-    override val docType: String = "device",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

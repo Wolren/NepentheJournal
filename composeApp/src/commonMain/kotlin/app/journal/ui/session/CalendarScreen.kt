@@ -70,10 +70,10 @@ private data class CalendarCellData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
+    repo: JournalRepository = JournalRepository.instance,
     onBack: () -> Unit,
-    onSessionTap: (String) -> Unit
+    onSessionTap: (String) -> Unit,
 ) {
-    val repo = remember { JournalRepository.instance }
     val sessions by repo.sessions.collectAsState()
 
     val tz = TimeZone.currentSystemDefault()

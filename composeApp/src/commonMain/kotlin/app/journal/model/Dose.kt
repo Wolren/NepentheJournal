@@ -16,7 +16,7 @@ enum class StomachFullness(val label: String) {
 @Serializable
 data class Dose(
     override val id: String,
-    override val docType: String = "dose",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

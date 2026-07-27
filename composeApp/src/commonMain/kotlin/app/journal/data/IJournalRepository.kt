@@ -133,7 +133,7 @@ interface IJournalRepository : IngestRepository {
      * Returns a consistent snapshot of all sessions with their doses.
      * Reads everything under the repo lock so the data is self-consistent.
      */
-    fun exportSessionBundles(): List<Pair<Session, List<Dose>>>
+    fun exportSessionBundles(): List<SessionBundle>
 
     // ---- Bulk insert (batch ops) ----
     fun bulkInsert(

@@ -25,34 +25,6 @@ import kotlinx.datetime.TimeZone
 import app.journal.util.PlatformLock
 import kotlinx.datetime.toLocalDateTime
 
-// Tabular export data classes (R/Pandas-friendly)
-data class SessionDataRow(
-    val id: String, val title: String, val date: String,
-    val startTime: String, val endTime: String?,
-    val durationHours: Double?,
-    val set: String?, val setting: String?, val intention: String?,
-    val outcome: String?, val rating: Int?,
-    val shulginRating: String?, val consumerName: String?,
-    val isFavorite: Boolean, val isArchived: Boolean,
-    val substanceNames: String, val doseCount: Int
-)
-
-data class DoseDataRow(
-    val id: String, val sessionId: String, val substanceId: String,
-    val substanceName: String, val route: String,
-    val amount: Double, val unit: String, val timestamp: Long,
-    val redosing: Boolean, val isEstimate: Boolean, val notes: String?
-)
-
-data class SubstanceDataRow(
-    val id: String, val name: String, val aliases: String,
-    val substanceClass: String, val cid: Long?,
-    val molecularFormula: String?, val molecularWeight: String?,
-    val iupacName: String?, val logP: Double?,
-    val routes: String, val effects: String,
-    val toxicity: String, val addictionPotential: String?
-)
-
 /**
  * Thread-safe in-memory journal repository.
  *
@@ -193,14 +165,14 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
-        sessionsStore.applyAll(snapshot.sessions)
-        substancesStore.applyAll(snapshot.substances)
-        dosesStore.applyAll(snapshot.doses)
-        notesStore.applyAll(snapshot.notes)
-        timelineEventsStore.applyAll(snapshot.timelineEvents)
-        interactionsStore.applyAll(snapshot.interactions)
-        effectsStore.applyAll(snapshot.effects)
-        customUnitsStore.applyAll(snapshot.customUnits)
+        sessionsStore.putAll(snapshot.sessions)
+        substancesStore.putAll(snapshot.substances)
+        dosesStore.putAll(snapshot.doses)
+        notesStore.putAll(snapshot.notes)
+        timelineEventsStore.putAll(snapshot.timelineEvents)
+        interactionsStore.putAll(snapshot.interactions)
+        effectsStore.putAll(snapshot.effects)
+        customUnitsStore.putAll(snapshot.customUnits)
         rebuildAllIndices()
         setShulginRating(snapshot.useShulginRating)
         setSubstanceColors(snapshot.useSubstanceColors)
@@ -243,12 +215,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         notesStore.forEachValue { note ->
             if (note.sessionId != null) {
-                _notesBySession.getOrPut(note.sessionId!!) { mutableListOf() }.add(note)
+                _notesBySession.getOrPut(note.sessionId) { mutableListOf() }.add(note)
             }
         }
         timelineEventsStore.forEachValue { event ->
             if (event.sessionId != null) {
-                _eventsBySession.getOrPut(event.sessionId!!) { mutableListOf() }.add(event)
+                _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
             }
         }
         effectsStore.forEachValue { effect ->
@@ -681,9 +653,9 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun exportSessionBundles(): List<Pair<Session, List<Dose>>> = lock.withLock {
-        sessionsStore.all.map { session ->
-            session to (_dosesBySession[session.id]?.toList() ?: emptyList())
+    override fun exportSessionBundles(): List<SessionBundle> = lock.withLock {
+        sessionsStore.all.sortedByDescending { it.startTime }.map { session ->
+            SessionBundle(session, dosesForSession(session.id))
         }
     }
 
@@ -721,16 +693,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         doses: List<Dose>,
         timelineEvents: List<TimelineEvent>,
         interactions: List<Interaction>
-    ) = lock.withLock {
-        Log.withTag("Repo").d { "bulkInsert: ${sessions.size} sessions, ${doses.size} doses, ${timelineEvents.size} events, ${interactions.size} interactions" }
-        sessionsStore.applyAll(sessions)
-        dosesStore.applyAll(doses)
-        timelineEventsStore.applyAll(timelineEvents)
-        interactionsStore.applyAll(interactions)
-        rebuildAllIndices()
-        bumpToleranceVersion()
-        bumpMutationCount()
-    }
+    ) = applyBatch(
+        sessions = sessions,
+        doses = doses,
+        timelineEvents = timelineEvents,
+        interactions = interactions
+    )
 
     // ========================
     //  Clear

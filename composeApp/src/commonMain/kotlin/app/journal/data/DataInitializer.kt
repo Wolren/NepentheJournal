@@ -99,7 +99,6 @@ object DataInitializer {
         }
 
         if (idMap.isEmpty()) {
-            //println("No ID migration needed")
             return
         }
 

@@ -27,22 +27,16 @@ object InteractionChecker {
 
     // ---- Cached index ----
     private var cachedInteractionHash: Int = 0
-    private var cachedIndex: Map<String, Interaction> = emptyMap()
+    private var cachedIndex: Map<InteractionKey, Interaction> = emptyMap()
 
-    /**
-     * Build or retrieve the cached interaction index.
-     * Rebuilds only when [allInteractions] content (by hashCode) differs.
-     */
-    private fun indexInteractions(allInteractions: List<Interaction>): Map<String, Interaction> {
+    private fun indexInteractions(allInteractions: List<Interaction>): Map<InteractionKey, Interaction> {
         val hash = allInteractions.hashCode()
         if (hash == cachedInteractionHash && cachedIndex.isNotEmpty()) {
             return cachedIndex
         }
-        val map = mutableMapOf<String, Interaction>()
+        val map = mutableMapOf<InteractionKey, Interaction>()
         for (interaction in allInteractions) {
-            val a = interaction.substanceAId
-            val b = interaction.substanceBId
-            val key = if (a < b) "$a|$b" else "$b|$a"
+            val key = InteractionKey.of(interaction.substanceAId, interaction.substanceBId)
             if (key !in map) map[key] = interaction
         }
         cachedInteractionHash = hash
@@ -58,31 +52,24 @@ object InteractionChecker {
         allInteractions: List<Interaction>
     ): InteractionCheckResult {
         if (ids.size < 2) return InteractionCheckResult()
-
         val index = indexInteractions(allInteractions)
         val idSet = ids.toSet()
         val idList = idSet.toList()
         val dangerous = mutableListOf<Pair<String, String>>()
         val unsafe = mutableListOf<Pair<String, String>>()
         val uncertain = mutableListOf<Pair<String, String>>()
-
-        for (i in idList.indices) {
-            for (j in i + 1 until idList.size) {
-                val a = idList[i]
-                val b = idList[j]
-                val key = if (a < b) "$a|$b" else "$b|$a"
-                val interaction = index[key]
-
-                if (interaction != null) {
-                    when (interaction.riskLevel) {
-                        InteractionRisk.DANGEROUS -> dangerous.add(a to b)
-                        InteractionRisk.UNSAFE -> unsafe.add(a to b)
-                        else -> uncertain.add(a to b)
-                    }
+        scanPairs(idList) { _, a, _, b ->
+            val key = InteractionKey.of(a, b)
+            val interaction = index[key]
+            if (interaction != null) {
+                when (interaction.riskLevel) {
+                    InteractionRisk.DANGEROUS -> dangerous.add(a to b)
+                    InteractionRisk.UNSAFE -> unsafe.add(a to b)
+                    else -> uncertain.add(a to b)
                 }
             }
+            null
         }
-
         return InteractionCheckResult(dangerous, unsafe, uncertain)
     }
 
@@ -101,7 +88,7 @@ object InteractionChecker {
 
         for (existing in existingIds) {
             if (existing == newId) continue
-            val key = if (newId < existing) "$newId|$existing" else "$existing|$newId"
+            val key = InteractionKey.of(newId, existing)
             val interaction = index[key]
 
             if (interaction != null) {

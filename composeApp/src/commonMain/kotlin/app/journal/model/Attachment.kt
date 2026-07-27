@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Attachment(
     override val id: String,
-    override val docType: String = "attachment",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,

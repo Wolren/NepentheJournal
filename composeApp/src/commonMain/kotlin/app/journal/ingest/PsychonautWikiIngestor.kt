@@ -133,10 +133,5 @@ class PsychonautWikiIngestor(
 @Serializable data class PwikiEffect(val name: String, val url: String? = null)
 @Serializable data class PwikiRef(val name: String)
 
-interface IngestRepository {
-    fun upsertSubstance(substance: app.journal.model.Substance)
-    fun upsertInteraction(interaction: app.journal.model.Interaction)
-    fun upsertEffect(effect: app.journal.model.Effect)
-}
 
 expect fun currentTimeMs(): Long

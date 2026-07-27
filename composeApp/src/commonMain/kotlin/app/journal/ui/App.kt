@@ -89,7 +89,7 @@ enum class Screen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App(repo: IJournalRepository = JournalRepository.instance) {
+fun App(repo: JournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 
@@ -229,18 +229,18 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
 
                     AnimatedContent(
                         targetState = when {
-                            showSearch -> "search"
-                            companionSubstanceId != null -> "companion_substance"
-                            liveSessionId != null -> "live_session"
-                            editingSessionId != null -> "editor_session"
-                            selectedTimelineSessionId != null -> "timeline"
-                            editingSubstanceId != null -> "editor_substance"
-                            selectedSubstanceId != null -> "detail_substance"
-                            showCalendar -> "calendar"
-                            else -> "main"
+                            showSearch -> NavigationState.Search
+                            companionSubstanceId != null -> NavigationState.CompanionSubstance
+                            liveSessionId != null -> NavigationState.LiveSession
+                            editingSessionId != null -> NavigationState.EditorSession
+                            selectedTimelineSessionId != null -> NavigationState.Timeline
+                            editingSubstanceId != null -> NavigationState.EditorSubstance
+                            selectedSubstanceId != null -> NavigationState.DetailSubstance
+                            showCalendar -> NavigationState.Calendar
+                            else -> NavigationState.Main
                         },
                         transitionSpec = {
-                            if (targetState == "main") {
+                            if (targetState is NavigationState.Main) {
                                 slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
                                 slideOutVertically(animationSpec = slideSpec) { it / 8 }
                             } else {
@@ -256,8 +256,9 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                 .background(MaterialTheme.colorScheme.background)
                         ) {
                             when (state) {
-                            "search" -> {
+                            NavigationState.Search -> {
                                 SearchOverlay(
+                                    repo = repo,
                                     onBack = { showSearch = false },
                                     onSessionClick = { sessionId ->
                                         selectedTimelineSessionId = sessionId
@@ -269,13 +270,14 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     }
                                 )
                             }
-                            "live_session" -> {
+                            NavigationState.LiveSession -> {
                                 val session = stableLiveId?.let { id ->
                                     if (id == "__new__") null
-                                    else JournalRepository.instance.getSession(id)
+                                    else repo.getSession(id)
                                 }
                                 if (session != null) {
                                     LiveSessionScreen(
+                                        repo = repo,
                                         session = session,
                                         onBack = { liveSessionId = null }
                                     )
@@ -292,36 +294,40 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                             createdAt = now, updatedAt = now,
                                             deviceOrigin = platformDeviceOrigin()
                                         )
-                                        JournalRepository.instance.upsertSession(newSession)
+                                        repo.upsertSession(newSession)
                                         liveSessionId = newSession.id
                                     }
                                 }
                             }
-                            "editor_session" -> {
+                            NavigationState.EditorSession -> {
                                 SessionEditorScreen(
+                                    repo = repo,
                                     sessionToEdit = editingSession,
                                     onBack = { editingSessionId = null }
                                 )
                             }
-                            "timeline" -> {
+                            NavigationState.Timeline -> {
                                 val id = stableTimelineId
                                 if (id != null) {
                                     SessionTimelineScreen(
+                                        repo = repo,
                                         sessionId = id,
                                         onBack = { selectedTimelineSessionId = null }
                                     )
                                 }
                             }
-                            "editor_substance" -> {
+                            NavigationState.EditorSubstance -> {
                                 SubstanceEditorScreen(
+                                    repo = repo,
                                     substanceToEdit = editingSubstance,
                                     onBack = { editingSubstanceId = null }
                                 )
                             }
-                            "detail_substance" -> {
+                            NavigationState.DetailSubstance -> {
                                 val id = stableSubstanceId
                                 if (id != null) {
                                     SubstanceDetailScreen(
+                                        repo = repo,
                                         substanceId = id,
                                         onBack = { selectedSubstanceId = null },
                                         onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null },
@@ -329,10 +335,11 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     )
                                 }
                             }
-                            "companion_substance" -> {
+                            NavigationState.CompanionSubstance -> {
                                 val id = companionSubstanceId
                                 if (id != null) {
                                     SubstanceCompanionScreen(
+                                        repo = repo,
                                         substanceId = id,
                                         onBack = { companionSubstanceId = null },
                                         onSessionClick = { sessionId: String ->
@@ -342,13 +349,14 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     )
                                 }
                             }
-                            "calendar" -> {
+                            NavigationState.Calendar -> {
                                 CalendarScreen(
+                                    repo = repo,
                                     onBack = { showCalendar = false },
                                     onSessionTap = { id -> selectedTimelineSessionId = id; showCalendar = false }
                                 )
                             }
-                            "main" -> {
+                            NavigationState.Main -> {
                                 Scaffold(
                                     modifier = Modifier.fillMaxSize(),
                                     topBar = {
@@ -406,6 +414,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     Box(Modifier.padding(innerPadding).fillMaxSize()) {
                                         when (selectedScreen) {
                                             Screen.DASHBOARD -> DashboardScreen(
+                                                repo = repo,
                                                 onSearchClick = { showSearch = true }
                                             )
                                             Screen.SESSIONS -> SessionListScreen(
@@ -422,7 +431,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                                 onNewSubstance = { editingSubstanceId = "__new__" }
                                             )
                                             Screen.SAFER -> SaferScreen()
-                                            Screen.SETTINGS -> SettingsScreen(syncEngine = syncEngine)
+                                            Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                         }  // closes when(selectedScreen)
                                     }  // closes inner Box(padding)
                                 }  // closes Scaffold innerPadding

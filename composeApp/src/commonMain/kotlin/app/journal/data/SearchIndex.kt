@@ -183,7 +183,7 @@ class SearchIndex {
     private fun sortAndDedupe(results: Iterable<SearchResult>): List<SearchResult> =
         results
             .groupBy { it.entityId }
-            .map { (_, rs) -> rs.maxByOrNull { it.score }!! }
+            .mapNotNull { (_, rs) -> rs.maxByOrNull { it.score } }
             .sortedByDescending { it.score }
             .take(50)
 }

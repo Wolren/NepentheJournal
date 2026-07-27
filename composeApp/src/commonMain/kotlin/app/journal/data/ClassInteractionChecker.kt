@@ -79,13 +79,14 @@ object ClassInteractionChecker {
      */
     fun check(substances: List<Substance>): List<ClassBasedWarning> {
         if (substances.size < 2) return emptyList()
-        // Precompute lowercase class sets once per substance
         val classSets = substances.map { sub ->
             sub.interactionClasses.mapTo(mutableSetOf()) { it.lowercase() }
         }
-        return scanPairsWithSets(substances, classSets) { classesA, classesB ->
-            matchRuleWithSet(classesA, classesB)
-        }
+        return scanPairs(substances.zip(classSets)) { _, (subA, setA), _, (subB, setB) ->
+            matchRuleWithSet(setA, setB)?.let { rule ->
+                ClassBasedWarning(rule.level, subA.name, subB.name, rule.message)
+            }
+        }.sortedByDescending { it.level.ordinal }
     }
 
     /**
@@ -93,33 +94,14 @@ object ClassInteractionChecker {
      */
     fun checkAgainst(substance: Substance, others: List<Substance>): List<ClassBasedWarning> {
         val combined = (listOf(substance) + others).distinctBy { it.id }
-        // Precompute lowercase class sets once
         val classSets = combined.map { sub ->
             sub.interactionClasses.mapTo(mutableSetOf()) { it.lowercase() }
         }
-        return scanPairsWithSets(combined, classSets) { classesA, classesB ->
-            matchRuleWithSet(classesA, classesB)
-        }
-    }
-
-    /**
-     * Pair-scanning kernel using precomputed Set<String> for O(1) containment.
-     */
-    private fun scanPairsWithSets(
-        substances: List<Substance>,
-        classSets: List<Set<String>>,
-        matcher: (classesA: Set<String>, classesB: Set<String>) -> Rule?
-    ): List<ClassBasedWarning> {
-        val result = mutableListOf<ClassBasedWarning>()
-        for (i in substances.indices) {
-            for (j in i + 1 until substances.size) {
-                matcher(classSets[i], classSets[j])?.let { rule ->
-                    result.add(ClassBasedWarning(rule.level, substances[i].name, substances[j].name, rule.message))
-                }
+        return scanPairs(combined.zip(classSets)) { _, (subA, setA), _, (subB, setB) ->
+            matchRuleWithSet(setA, setB)?.let { rule ->
+                ClassBasedWarning(rule.level, subA.name, subB.name, rule.message)
             }
-        }
-        result.sortByDescending { it.level.ordinal }
-        return result
+        }.sortedByDescending { it.level.ordinal }
     }
 
     private fun matchRuleWithSet(classesA: Set<String>, classesB: Set<String>): Rule? {

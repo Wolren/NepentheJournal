@@ -208,7 +208,7 @@ data class Substance(
     val oldId: String? = null,
     /** PubChem Compound ID (CID). Null for plants/mixtures without a single compound. */
     val cid: Long? = null,
-    override val docType: String = "substance",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",

@@ -30,15 +30,20 @@ import app.journal.sync.*
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatRelativeTime
 import app.journal.util.isDesktopPlatform
 import app.journal.util.PlatformFile
+import app.journal.ui.settings.detail.SyncSettingsCallbacks
+import app.journal.ui.settings.detail.SyncSettingsUiState
 import kotlinx.coroutines.launch
 import app.journal.ui.settings.detail.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(syncEngine: SyncEngine) {
-    val repo = remember { JournalRepository.instance }
+fun SettingsScreen(
+    repo: JournalRepository = JournalRepository.instance,
+    syncEngine: SyncEngine,
+) {
     val sessionCount by repo.totalSessionCount.collectAsState(initial = 0)
     val substanceCount by repo.totalSubstanceCount.collectAsState(initial = 0)
 
@@ -74,14 +79,7 @@ fun SettingsScreen(syncEngine: SyncEngine) {
     ))
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
-    var manualHost by remember { mutableStateOf("") }
-    var manualPort by remember { mutableStateOf("4984") }
-    var manualToken by remember { mutableStateOf("") }
-    var continuousSync by remember { mutableStateOf(false) }
-    var syncExpanded by remember { mutableStateOf(false) }
-    var isStartingHost by remember { mutableStateOf(false) }
-    var isStoppingHost by remember { mutableStateOf(false) }
-    var isSyncing by remember { mutableStateOf(false) }
+    var syncState by remember { mutableStateOf(SyncSettingsUiState()) }
     var dataExpanded by remember { mutableStateOf(false) }
     var aboutExpanded by remember { mutableStateOf(false) }
     var legalExpanded by remember { mutableStateOf(false) }
@@ -95,11 +93,6 @@ fun SettingsScreen(syncEngine: SyncEngine) {
         trustedDevices = syncEngine.trustedDevices()
     }
 
-    val isIpValid = manualHost.isBlank() || manualHost.matches(Regex("""^[\.\d]+$"""))
-    val isPortValid = (manualPort.toIntOrNull() ?: 0) in 1..65535
-    val hostError = if (manualHost.isNotBlank() && !isIpValid) "Invalid IP format" else null
-    val portError = if (manualPort.isNotBlank() && !isPortValid) "Port must be 1-65535" else null
-
     fun userMessage(msg: String): String = when {
         msg.contains("Connection refused") -> "Device not reachable. Check IP and port."
         msg.contains("timed out") -> "Connection timed out. Device may be offline."
@@ -112,14 +105,7 @@ fun SettingsScreen(syncEngine: SyncEngine) {
         else -> msg
     }
 
-    fun formatTimestamp(epochMs: Long): String {
-        val diff = currentTimeMillis() - epochMs
-        val seconds = diff / 1000; val minutes = seconds / 60; val hours = minutes / 60; val days = hours / 24
-        return when {
-            seconds < 60 -> "just now"; minutes < 60 -> "${minutes}m ago"; hours < 24 -> "${hours}h ago"
-            days < 7 -> "${days}d ago"; else -> "${days / 7}w ago"
-        }
-    }
+    fun formatTimestamp(epochMs: Long): String = formatRelativeTime(epochMs)
 
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
@@ -148,47 +134,33 @@ fun SettingsScreen(syncEngine: SyncEngine) {
         // ================ PREFERENCES ================
         item {
             val prefExpanded = remember { mutableStateOf(false) }
-            Card(modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            CollapsibleSettingsCard(
+                expanded = prefExpanded.value,
+                onToggle = { prefExpanded.value = !prefExpanded.value },
+                icon = Icons.Default.Edit, title = "Preferences"
             ) {
-                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { prefExpanded.value = !prefExpanded.value },
-                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.primary)
-                            Text("Preferences", style = MaterialTheme.typography.titleMedium)
-                        }
-                        Icon(if (prefExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                val useShulgin by repo.useShulginRating.collectAsState()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Rating scale", style = MaterialTheme.typography.bodyMedium)
+                        Text(if (useShulgin) "Shulgin scale (+/-, +, ++, +++, ++++)"
+                            else "Numeric scale (1-10)",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (prefExpanded.value) {
-                        Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                        val useShulgin by repo.useShulginRating.collectAsState()
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Rating scale", style = MaterialTheme.typography.bodyMedium)
-                                Text(if (useShulgin) "Shulgin scale (+/-, +, ++, +++, ++++)"
-                                    else "Numeric scale (1-10)",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked = useShulgin, onCheckedChange = { repo.setShulginRating(it) })
-                        }
-                        Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                        val showTrend by repo.showSessionsTrendChart.collectAsState()
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Sessions per week chart", style = MaterialTheme.typography.bodyMedium)
-                                Text(if (showTrend) "Shows weekly trend on Dashboard"
-                                    else "Hidden by default",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked = showTrend, onCheckedChange = { repo.setShowSessionsTrendChart(it) })
-                        }
+                    Switch(checked = useShulgin, onCheckedChange = { repo.setShulginRating(it) })
+                }
+                Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                val showTrend by repo.showSessionsTrendChart.collectAsState()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Sessions per week chart", style = MaterialTheme.typography.bodyMedium)
+                        Text(if (showTrend) "Shows weekly trend on Dashboard"
+                            else "Hidden by default",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    Switch(checked = showTrend, onCheckedChange = { repo.setShowSessionsTrendChart(it) })
                 }
             }
         }
@@ -209,68 +181,54 @@ fun SettingsScreen(syncEngine: SyncEngine) {
         // ================ DEVICE SYNC ================
         item {
             SyncSettingsContent(
-                syncEngine = syncEngine, status = status, logLines = logLines, trustedDevices = trustedDevices,
-                manualHost = manualHost, manualPort = manualPort, manualToken = manualToken,
-                continuousSync = continuousSync, hostError = hostError, portError = portError,
-                isPortValid = isPortValid, isIpValid = isIpValid, isSyncing = isSyncing,
-                syncExpanded = syncExpanded, isStartingHost = isStartingHost, isStoppingHost = isStoppingHost,
+                syncEngine = syncEngine, status = status, state = syncState,
+                callbacks = SyncSettingsCallbacks(
+                    onManualHostChange = { syncState = syncState.copy(manualHost = it) },
+                    onManualPortChange = { syncState = syncState.copy(manualPort = it) },
+                    onManualTokenChange = { syncState = syncState.copy(manualToken = it) },
+                    onContinuousSyncChange = { syncState = syncState.copy(continuousSync = it) },
+                    onSyncExpanded = { syncState = syncState.copy(syncExpanded = !syncState.syncExpanded) },
+                    onLogLine = { logLines = listOf(it) + logLines },
+                    onTrustedDevicesChange = { trustedDevices = it },
+                    onIsSyncingChange = { syncState = syncState.copy(isSyncing = it) },
+                    onIsStartingHostChange = { syncState = syncState.copy(isStartingHost = it) },
+                    onIsStoppingHostChange = { syncState = syncState.copy(isStoppingHost = it) },
+                ),
                 scope = scope, clipboard = clipboard, formatTimestamp = { formatTimestamp(it) },
                 userMessage = { userMessage(it) },
-                onManualHostChange = { manualHost = it }, onManualPortChange = { manualPort = it },
-                onManualTokenChange = { manualToken = it }, onContinuousSyncChange = { continuousSync = it },
-                onSyncExpanded = { syncExpanded = !syncExpanded },
-                onLogLine = { logLines = listOf(it) + logLines },
-                onTrustedDevicesChange = { trustedDevices = it },
-                onIsSyncingChange = { isSyncing = it },
-                onIsStartingHostChange = { isStartingHost = it },
-                onIsStoppingHostChange = { isStoppingHost = it },
             )
         }
 
         // ================ SUBSTANCE LIBRARY ================
         item {
-            Card(modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            CollapsibleSettingsCard(
+                expanded = libraryExpanded,
+                onToggle = { libraryExpanded = !libraryExpanded },
+                icon = Icons.Default.MenuBook, title = "Substance library"
             ) {
-                Column(modifier = Modifier.padding(16.dp).then(if (isDesktopPlatform()) Modifier.animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f)) else Modifier)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { libraryExpanded = !libraryExpanded },
-                        horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.MenuBook, null, tint = MaterialTheme.colorScheme.primary)
-                            Text("Substance library", style = MaterialTheme.typography.titleMedium)
+                Text("Reloads the default PsychonautWiki substance database from the bundled seed resource.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppButton(onClick = {
+                        scope.launch {
+                            isFetching = true; fetchStatus = "Reloading seed data..."
+                            try {
+                                app.journal.data.DataInitializer.reloadDefaultSubstances(repo)
+                                fetchStatus = "Reloaded ${repo.substances.value.size} substances from seed"
+                            } catch (e: Exception) { fetchStatus = "Reload failed: ${e.message}" }
+                            isFetching = false
                         }
-                        Icon(if (libraryExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }, enabled = !isFetching, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp)); Text("Reset to defaults")
                     }
-                    if (libraryExpanded) {
-                        Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                        Text("Reloads the default PsychonautWiki substance database from the bundled seed resource.",
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AppButton(onClick = {
-                                scope.launch {
-                                    isFetching = true; fetchStatus = "Reloading seed data..."
-                                    try {
-                                        app.journal.data.DataInitializer.reloadDefaultSubstances(repo)
-                                        fetchStatus = "Reloaded ${repo.substances.value.size} substances from seed"
-                                    } catch (e: Exception) { fetchStatus = "Reload failed: ${e.message}" }
-                                    isFetching = false
-                                }
-                            }, enabled = !isFetching, modifier = Modifier.weight(1f)) {
-                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(4.dp)); Text("Reset to defaults")
-                            }
-                        }
-                        fetchStatus?.let {
-                            Spacer(Modifier.height(4.dp)); Text(it, style = MaterialTheme.typography.labelSmall,
-                                color = if (it.startsWith("Loaded")) MaterialTheme.colorScheme.primary
-                                else if (it.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+                }
+                fetchStatus?.let {
+                    Spacer(Modifier.height(4.dp)); Text(it, style = MaterialTheme.typography.labelSmall,
+                        color = if (it.startsWith("Loaded")) MaterialTheme.colorScheme.primary
+                        else if (it.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

@@ -7,7 +7,7 @@ enum class InteractionRisk { DANGEROUS, UNSAFE, UNCERTAIN, LOW, UNKNOWN }
 @Serializable
 data class Interaction(
     override val id: String,
-    override val docType: String = "interaction",
+    
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",
