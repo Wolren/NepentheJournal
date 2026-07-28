@@ -59,7 +59,7 @@ The ETL pipeline lives at `scripts/matrix_build.py` and merges all sources into 
 python scripts/matrix_build.py --refresh -i seed.json -o seed.json -v
 ```
 
-Substances are baked in at build time -- no API calls happen in the running app.
+Substances are baked in at build time: no API calls happen in the running app.
 
 ### Data Flow
 
@@ -224,9 +224,9 @@ GNU General Public License v3.0. See [LICENSE](LICENSE).
 
 ## Acknowledgments
 
-- **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)) -- this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
-- **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)) -- public substance reference data accessed via their Semantic MediaWiki API and bundled as seed data.
-- **IUPHAR/BPS Guide to Pharmacology** -- ligand-target interaction data.
-- **PDSP Ki Database** (NIMH Psychoactive Drug Screening Program) -- Ki binding data.
-- **BindingDB** -- public affinity measurements.
+- **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)): this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
+- **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)): public substance reference data accessed via their Semantic MediaWiki API and bundled as seed data.
+- **IUPHAR/BPS Guide to Pharmacology**: ligand-target interaction data.
+- **PDSP Ki Database** (NIMH Psychoactive Drug Screening Program): Ki binding data.
+- **BindingDB**: public affinity measurements.
 
