@@ -22,6 +22,7 @@ import app.journal.model.ToleranceCalculator
 import app.journal.model.ToleranceInfo
 import app.journal.model.ToleranceLevel
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatDateShort
 import app.journal.ui.dashboard.ActivityHeatmap
 import app.journal.ui.dashboard.SessionsTrendChart
 import app.journal.ui.dashboard.TopSubstancesChart
@@ -104,7 +105,7 @@ fun DashboardScreen(
                     )
                 }
                 Text(
-                    formatDate(today),
+                    formatDateShort(today),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -238,13 +239,13 @@ private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vect
 private fun ToleranceCard(info: ToleranceInfo) {
     val levelColor = when (info.level) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.error
-        ToleranceLevel.MEDIUM -> Color(0xFFFF9800)
+        ToleranceLevel.MEDIUM -> toleranceMediumColor
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiary
         ToleranceLevel.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     }
     val levelBg = when (info.level) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-        ToleranceLevel.MEDIUM -> Color(0xFFFF9800).copy(alpha = 0.15f)
+        ToleranceLevel.MEDIUM -> toleranceMediumColor.copy(alpha = 0.15f)
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
         ToleranceLevel.NONE -> Color.Transparent
     }
@@ -285,15 +286,4 @@ private fun timeSinceLabel(hours: Long, days: Double): String = when {
     hours < 1 -> "Less than an hour ago"; hours < 24 -> "${hours}h ago"; days < 2 -> "Yesterday"
     days < 7 -> "${days.toInt()} days ago"; days < 30 -> "${(days / 7).toInt()} weeks ago"
     days < 365 -> "${(days / 30).toInt()} months ago"; else -> "${(days / 365).toInt()} years ago"
-}
-
-private fun formatDate(local: LocalDateTime): String {
-    val dow = when (local.dayOfWeek) { DayOfWeek.MONDAY -> "Monday"; DayOfWeek.TUESDAY -> "Tuesday"; DayOfWeek.WEDNESDAY -> "Wednesday"; DayOfWeek.THURSDAY -> "Thursday"; DayOfWeek.FRIDAY -> "Friday"; DayOfWeek.SATURDAY -> "Saturday"; DayOfWeek.SUNDAY -> "Sunday" }
-    val month = when (local.month) { Month.JANUARY -> "January"; Month.FEBRUARY -> "February"; Month.MARCH -> "March"; Month.APRIL -> "April"; Month.MAY -> "May"; Month.JUNE -> "June"; Month.JULY -> "July"; Month.AUGUST -> "August"; Month.SEPTEMBER -> "September"; Month.OCTOBER -> "October"; Month.NOVEMBER -> "November"; Month.DECEMBER -> "December"; else -> "Unknown" }
-    return "$dow, $month ${local.day}, ${local.year}"
-}
-
-private fun formatDateShort(date: LocalDate): String {
-    val monthAbbr = when (date.month) { Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"; Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"; Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"; Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"; else -> "???" }
-    return "${date.day} $monthAbbr ${date.year}"
 }

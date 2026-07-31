@@ -3,11 +3,15 @@ package app.journal.data
 import app.journal.NepentheApp
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.util.PlatformLock
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
 import java.io.File
 
 actual class JournalStore actual constructor(private val repo: JournalRepository) {
+
+    /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
+    private val saveLock = PlatformLock()
 
     private val baseDir: File
         get() = File(NepentheApp.appContext.filesDir, ".psychonautica")
@@ -19,7 +23,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
     private fun tempPath(): String = dataPath() + ".tmp"
     private fun backupPath(): String = dataPath() + ".bak"
 
-    actual fun load() {
+    actual fun load() = saveLock.withLock {
         val target = File(dataPath())
         val tmp = File(tempPath())
 
@@ -28,10 +32,10 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             tmp.delete()
         }
 
-        if (!target.exists()) return
+        if (!target.exists()) return@withLock
         if (target.length() > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
-            return
+            return@withLock
         }
         try {
             val text = target.readText()
@@ -89,7 +93,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         )
     }
 
-    actual fun save() {
+    actual fun save() = saveLock.withLock {
         val target = File(dataPath())
         val tmp = File(tempPath())
         val backup = File(backupPath())
@@ -102,13 +106,13 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
 
             if (text.length > 50_000_000) {
                 Log.withTag("JournalStore").e { "Serialized journal too large (${text.length} chars), refusing to save" }
-                return
+                return@withLock
             }
 
             tmp.writeText(text)
             if (!tmp.exists()) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tmp.absolutePath}" }
-                return
+                return@withLock
             }
 
             if (target.exists()) {

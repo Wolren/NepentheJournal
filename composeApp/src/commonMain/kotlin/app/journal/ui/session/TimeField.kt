@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.journal.log.Log
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
@@ -54,7 +55,7 @@ fun TimeField(
     }
     var dateStr by remember(local) {
         mutableStateOf(local?.let {
-            "${it.dayOfMonth} ${MONTH_NAMES[it.month.ordinal]} ${it.year}"
+            "${it.dayOfMonth} ${SHORT_MONTH_NAMES[it.month.ordinal]} ${it.year}"
         } ?: "")
     }
     var timeStr by remember(local) {
@@ -114,8 +115,8 @@ fun TimeField(
                 val dt = LocalDateTime(year, Month.entries[monthIdx], day,
                     hourStr.toInt(), minStr.toInt())
                 onChanged(dt.toInstant(tz).toEpochMilliseconds())
-            } catch (_: Exception) {
-                dateError = true
+            } catch (e: Exception) {
+                Log.withTag("TimeField").w(e) { "Parse failed" }; dateError = true
             }
         }
     }
@@ -134,7 +135,7 @@ fun TimeField(
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val picked = Instant.fromEpochMilliseconds(millis).toLocalDateTime(TimeZone.of("UTC"))
-                        dateStr = "${picked.dayOfMonth} ${MONTH_NAMES[picked.month.ordinal]} ${picked.year}"
+                        dateStr = "${picked.dayOfMonth} ${SHORT_MONTH_NAMES[picked.month.ordinal]} ${picked.year}"
                         tryParse()
                     }
                     showDatePicker = false

@@ -72,6 +72,19 @@ data class PairingResultResponse(
 )
 
 /**
+ * Host challenge-response: proves the host knows the shared secret for
+ * [deviceId] without revealing it. The client sends a fresh random challenge
+ * via /auth/verify, the host replies with HMAC-SHA256 of
+ * "challenge:<deviceId>:<timestamp>:<challenge>" using the stored secret.
+ * Prevents fingerprint-spoofed reconnects from reusing a stored secret.
+ */
+@Serializable
+data class HostChallengeResponse(
+    val timestamp: Long,
+    val signature: String
+)
+
+/**
  * Result of a completed pairing, stored by the client.
  */
 data class DevicePairingResult(

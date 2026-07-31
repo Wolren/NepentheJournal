@@ -118,18 +118,22 @@ kotlin {
 }
 
 // KMP test tasks (desktopTest) are NOT standard Gradle Test tasks,
-// so tasks.withType<Test>() does not match them. Test exclusions
-// are done in scripts/run-tests.sh via --tests filters.
+// so tasks.withType<Test>() does not match them. Test selection
+// is done in scripts/run-tests.sh via --tests filters.
 //
 // Usage:
-//   ./scripts/run-tests.sh           -- 18 fast unit tests (~11s warm)
-//   ./scripts/run-tests.sh --all     -- 28 tests incl integration (~11s warm)
+//   ./scripts/run-tests.sh           -- 21 fast unit tests (~11s warm)
+//   ./scripts/run-tests.sh --all     -- 31 tests incl integration (~11s warm)
 //   ./gradlew composeApp:desktopTest --no-daemon --tests "app.journal.data.JournalRepositoryTest"
 //
 // Prerequisites:
 //   - gradle.properties sets org.gradle.daemon=false and in-process Kotlin compiler
 //   - run-tests.sh raises ulimit -u 16384 (git-bash default 256 is too low)
-//   - SessionListViewModelTest is excluded (combine + runBlocking deadlock)
+//
+// NOTE: SessionListViewModelTest was previously excluded because it appeared
+// to deadlock (combine + runBlocking). Root cause was a bad test predicate:
+// it waited for 3 substances while the fixture had no dose for Cannabis.
+// Fixed 2026-07-31; the class now runs in the suite.
 
 android {
     namespace = "app.journal"

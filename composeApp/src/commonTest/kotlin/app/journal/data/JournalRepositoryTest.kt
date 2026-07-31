@@ -385,6 +385,38 @@ class JournalRepositoryTest {
     }
 
     @Test
+    fun applyBatchLastWriterWinsSkipsOlderEntities() {
+        val repo = JournalRepository()
+        val newer = Session(id = "s:lww", createdAt = 1000L, updatedAt = 2000L, deviceOrigin = "test",
+            title = "Newer", startTime = 1000L)
+        val older = newer.copy(title = "Older", updatedAt = 1000L)
+
+        // Blind upsert (default) overwrites; seed/restore semantics
+        repo.applyBatch(sessions = listOf(newer))
+        repo.applyBatch(sessions = listOf(older))
+        assertEquals("Older", repo.getSession("s:lww")?.title)
+
+        // LWW (sync path) must skip the stale entity
+        repo.applyBatch(sessions = listOf(newer))
+        repo.applyBatch(sessions = listOf(older), lastWriterWins = true)
+        assertEquals("Newer", repo.getSession("s:lww")?.title)
+    }
+
+    @Test
+    fun applyBatchLastWriterWinsAllowsEqualOrNewer() {
+        val repo = JournalRepository()
+        val base = Session(id = "s:eq", createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test",
+            title = "Base", startTime = 1000L)
+        repo.applyBatch(sessions = listOf(base), lastWriterWins = true)
+        // Equal updatedAt must apply (idempotent re-delivery)
+        repo.applyBatch(sessions = listOf(base.copy(title = "Same-ts")), lastWriterWins = true)
+        assertEquals("Same-ts", repo.getSession("s:eq")?.title)
+        // Newer must apply
+        repo.applyBatch(sessions = listOf(base.copy(title = "New", updatedAt = 3000L)), lastWriterWins = true)
+        assertEquals("New", repo.getSession("s:eq")?.title)
+    }
+
+    @Test
     fun applyBatchThenIndividualUpsertPreservesIndices() {
         val repo = JournalRepository()
         repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))

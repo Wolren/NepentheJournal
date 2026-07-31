@@ -57,5 +57,6 @@ data class Session(
     val checkins: List<CheckIn> = emptyList(),
     val isArchived: Boolean = false,
     val isFavorite: Boolean = false,
-    val consumerName: String? = null
+    val consumerName: String? = null,
+    val profile: SessionProfile? = null
 ) : VaultDocument

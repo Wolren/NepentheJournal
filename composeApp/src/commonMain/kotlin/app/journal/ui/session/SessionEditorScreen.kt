@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.InteractionCheckResult
 import app.journal.data.InteractionChecker
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import app.journal.model.*
 import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.*
@@ -47,6 +48,7 @@ fun SessionEditorScreen(
         mutableStateOf(sessionToEdit?.startTime ?: currentTimeMillis())
     }
     var endTime by remember { mutableStateOf(sessionToEdit?.endTime) }
+    var consumerName by remember { mutableStateOf(sessionToEdit?.consumerName ?: "") }
     var set by remember { mutableStateOf(sessionToEdit?.set ?: "") }
     var setting by remember { mutableStateOf(sessionToEdit?.setting ?: "") }
     var intention by remember { mutableStateOf(sessionToEdit?.intention ?: "") }
@@ -56,6 +58,14 @@ fun SessionEditorScreen(
     var shulginRating by remember {
         mutableStateOf(sessionToEdit?.shulginRating ?: "")
     }
+
+    // SessionProfile (demographics) state
+    val initialProfile = sessionToEdit?.profile
+    var profileExpanded by remember { mutableStateOf(false) }
+    var profileAge by remember { mutableStateOf(initialProfile?.age?.toString() ?: "") }
+    var profileGender by remember { mutableStateOf(initialProfile?.gender ?: "") }
+    var profileHeightCm by remember { mutableStateOf(initialProfile?.heightCm?.toString() ?: "") }
+    var profileWeightKg by remember { mutableStateOf(initialProfile?.weightKg?.toString() ?: "") }
 
     // Dose editing
     var showDoseDialog by remember { mutableStateOf(false) }
@@ -74,9 +84,13 @@ fun SessionEditorScreen(
         )
     }
 
+    // Stable provisional id for events of a not-yet-saved session. Events are
+    // persisted immediately when added, so they need an id that can be
+    // re-parented to the real session id on save (and purged on discard).
+    val draftSessionId = remember { "session:draft:${currentTimeMillis()}" }
+
     // End time validation
     val endTimeValue = endTime
-    val endTimeError = endTimeValue != null && endTimeValue <= startTime
 
     // Discard confirmation
     var showDiscardDialog by remember { mutableStateOf(false) }
@@ -86,7 +100,9 @@ fun SessionEditorScreen(
             val originalDoseIds = s?.let { repo.dosesForSession(it.id).map { d -> d.id }.toSet() }
                 ?: emptySet()
             val currentDoseIds = sessionDoses.map { it.id }.toSet()
+            val originalProfile = s?.profile
             title != (s?.title ?: "") ||
+            consumerName != (s?.consumerName ?: "") ||
             set != (s?.set ?: "") ||
             setting != (s?.setting ?: "") ||
             intention != (s?.intention ?: "") ||
@@ -94,12 +110,40 @@ fun SessionEditorScreen(
             notes != (s?.notes ?: "") ||
             rating != (s?.rating?.toString() ?: "") ||
             shulginRating != (s?.shulginRating ?: "") ||
+            profileAge != (originalProfile?.age?.toString() ?: "") ||
+            profileGender != (originalProfile?.gender ?: "") ||
+            profileHeightCm != (originalProfile?.heightCm?.toString() ?: "") ||
+            profileWeightKg != (originalProfile?.weightKg?.toString() ?: "") ||
             currentDoseIds != originalDoseIds
         }
     }
 
+    fun exitEditor() {
+        // New-session draft: purge any events still bound to the draft id.
+        // Events are persisted on add, so a discarded draft would otherwise
+        // leave orphaned rows pointing at a session that never existed.
+        if (sessionToEdit == null) {
+            repo.eventsForSession(draftSessionId).forEach { repo.deleteTimelineEvent(it.id) }
+        }
+        onBack()
+    }
+
     fun handleBack() {
-        if (hasUnsavedChanges) showDiscardDialog = true else onBack()
+        if (hasUnsavedChanges) showDiscardDialog = true else exitEditor()
+    }
+
+    fun buildProfile(): SessionProfile? {
+        val age = profileAge.toIntOrNull()
+        val height = profileHeightCm.toIntOrNull()
+        val weight = profileWeightKg.toIntOrNull()
+        val gender = profileGender.ifBlank { null }
+        if (age == null && gender == null && height == null && weight == null) return null
+        return SessionProfile(
+            age = age,
+            gender = gender,
+            heightCm = height,
+            weightKg = weight
+        )
     }
 
     fun saveSession() {
@@ -110,6 +154,7 @@ fun SessionEditorScreen(
             title = title.ifBlank { "Untitled Session" },
             startTime = startTime,
             endTime = if (endTimeValue != null && endTimeValue > 1000L && endTimeValue != startTime) endTimeValue else null,
+            consumerName = consumerName.ifBlank { null },
             set = set.ifBlank { null },
             setting = setting.ifBlank { null },
             intention = intention.ifBlank { null },
@@ -120,6 +165,7 @@ fun SessionEditorScreen(
             } else rating.toIntOrNull(),
             shulginRating = if (useShulgin) shulginRating.ifBlank { null } else null,
             checkins = sessionToEdit?.checkins ?: emptyList(),
+            profile = buildProfile(),
             createdAt = sessionToEdit?.createdAt ?: now,
             updatedAt = now,
             deviceOrigin = sessionToEdit?.deviceOrigin ?: "desktop"
@@ -136,8 +182,8 @@ fun SessionEditorScreen(
                 app.journal.export.obsidian.ObsidianExportManager.exportSession(
                     repo, sessionId, config
                 )
-            } catch (_: Exception) {
-                // Silent — auto-export failures are non-critical
+            } catch (e: Exception) {
+                Log.withTag("SessionEdit").w(e) { "Auto-export to Obsidian failed" }
             }
         }
 
@@ -150,6 +196,14 @@ fun SessionEditorScreen(
             keptIds.add(d.id)
         }
         (existingIds - keptIds).forEach { repo.deleteDose(it) }
+
+        // Re-parent timeline events from the draft id to the saved session id.
+        // Events added in the editor were persisted immediately under the
+        // draft id; without this they would be invisible in the timeline.
+        sessionEvents.forEach { event ->
+            val e = if (event.sessionId != sessionId) event.copy(sessionId = sessionId) else event
+            repo.upsertTimelineEvent(e)
+        }
 
         onBack()
     }
@@ -171,7 +225,7 @@ fun SessionEditorScreen(
             title = { Text("Discard changes?") },
             text = { Text("You have unsaved changes. Are you sure you want to go back?") },
             confirmButton = {
-                AppTextButton(onClick = { showDiscardDialog = false; onBack() }) {
+                AppTextButton(onClick = { showDiscardDialog = false; exitEditor() }) {
                     Text("Discard", color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -233,7 +287,7 @@ fun SessionEditorScreen(
                         tint = MaterialTheme.colorScheme.error)
                 }
             }
-            AppTextButton(onClick = ::saveSession) { Text("Save") }
+            AppButton(onClick = ::saveSession) { Text("Save") }
         }
     ) {
         // Title
@@ -248,453 +302,98 @@ fun SessionEditorScreen(
             )
         }
 
+        // Consumer name
+        item {
+            OutlinedTextField(
+                value = consumerName,
+                onValueChange = { consumerName = it },
+                label = { Text("Consumer name") },
+                placeholder = { Text("Me") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         // Start / End time
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    TimeField(
-                        label = "Start",
-                        epochMs = startTime,
-                        onChanged = { startTime = it },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TimeField(
-                        label = "End",
-                        epochMs = endTime,
-                        onChanged = { endTime = it },
-                        modifier = Modifier.weight(1f),
-                        clearable = endTime != null
-                    )
-                }
-            }
-            if (endTimeError) {
-                Text("End time must be after start time",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 4.dp, top = 2.dp))
-            }
-            // Duration display
-            val durationMs = if (endTimeValue != null && !endTimeError) endTimeValue - startTime else null
-            if (durationMs != null && durationMs > 0) {
-                val hours = durationMs / 3600000
-                val minutes = (durationMs % 3600000) / 60000
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                ) {
-                    Icon(Icons.Default.Schedule, null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(14.dp))
-                    Text("Duration: ${hours}h ${minutes}m",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            SessionTimeSection(
+                startTime = startTime,
+                endTime = endTime,
+                onStartTimeChange = { startTime = it },
+                onEndTimeChange = { endTime = it }
+            )
         }
 
         // Rating
         item {
-            Text("Rating", style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            if (useShulgin) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    ShulginRating.entries.forEach { s ->
-                        FilterChip(
-                            selected = shulginRating == s.name,
-                            onClick = {
-                                shulginRating = if (shulginRating == s.name) "" else s.name
-                            },
-                            label = { Text(s.label, style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.height(32.dp)
-                        )
-                    }
-                }
-            } else {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    (1..10).forEach { n ->
-                        FilterChip(
-                            selected = rating == n.toString(),
-                            onClick = {
-                                rating = if (rating == n.toString()) "" else n.toString()
-                            },
-                            label = { Text(n.toString(), style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.height(32.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Set & Setting
-        item {
-            OutlinedTextField(
-                value = set,
-                onValueChange = { set = it },
-                label = { Text("Set (mindset)") },
-                placeholder = { Text("Your mental state before the session...") },
-                minLines = 2, maxLines = 4,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-            OutlinedTextField(
-                value = setting,
-                onValueChange = { setting = it },
-                label = { Text("Setting (environment)") },
-                placeholder = { Text("Location, atmosphere, company...") },
-                minLines = 2, maxLines = 4,
-                modifier = Modifier.fillMaxWidth()
+            SessionRatingSection(
+                useShulgin = useShulgin,
+                shulginRating = shulginRating,
+                onShulginRatingChange = { shulginRating = it },
+                rating = rating,
+                onRatingChange = { rating = it }
             )
         }
 
-        // Intention
+        // Set & Setting, Intention, Outcome, Notes
         item {
-            OutlinedTextField(
-                value = intention,
-                onValueChange = { intention = it },
-                label = { Text("Intention") },
-                placeholder = { Text("Why are you having this session?") },
-                minLines = 2, maxLines = 4,
-                modifier = Modifier.fillMaxWidth()
+            SessionTextFieldsSection(
+                set = set, onSetChange = { set = it },
+                setting = setting, onSettingChange = { setting = it },
+                intention = intention, onIntentionChange = { intention = it },
+                outcome = outcome, onOutcomeChange = { outcome = it },
+                notes = notes, onNotesChange = { notes = it }
             )
         }
 
-        // Outcome
+        // Subject Profile (demographics) — expandable
         item {
-            OutlinedTextField(
-                value = outcome,
-                onValueChange = { outcome = it },
-                label = { Text("Outcome") },
-                placeholder = { Text("What happened? Insights, reflections...") },
-                minLines = 3, maxLines = 6,
-                modifier = Modifier.fillMaxWidth()
+            SessionDemographicsSection(
+                expanded = profileExpanded,
+                onToggle = { profileExpanded = !profileExpanded },
+                age = profileAge, onAgeChange = { profileAge = it },
+                gender = profileGender, onGenderChange = { profileGender = it },
+                heightCm = profileHeightCm, onHeightCmChange = { profileHeightCm = it },
+                weightKg = profileWeightKg, onWeightKgChange = { profileWeightKg = it }
             )
         }
 
-        // Notes
+        // Doses section
         item {
-            OutlinedTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text("Notes") },
-                placeholder = { Text("Freeform notes, observations...") },
-                minLines = 3, maxLines = 8,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        // Doses section header
-        item {
-            HorizontalDivider()
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Substances & Doses",
-                    style = MaterialTheme.typography.titleMedium)
-                AppTonalButton(onClick = {
+            SessionDoseSection(
+                sessionDoses = sessionDoses,
+                interactionCheckResult = interactionCheckResult,
+                substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: stripPrefix(id) },
+                onAddDose = {
                     editingDose = null
                     showDoseDialog = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Dose")
-                }
-            }
-        }
-
-        // Dose list — clickable to edit, delete button inline
-        items(sessionDoses, key = { it.id }) { dose ->
-            val substance = repo.getSubstance(dose.substanceId)
-            val roaColor = routeColor(dose.routeOfAdministration)
-            val doseLocal = remember(dose.timestamp) {
-                try {
-                    Instant.fromEpochMilliseconds(dose.timestamp).toLocalDateTime(TimeZone.currentSystemDefault())
-                } catch (_: Exception) { null }
-            }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
+                },
+                onEditDose = { dose ->
                     editingDose = dose
                     showDoseDialog = true
                 },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Route color indicator
-                    Surface(
-                        modifier = Modifier.size(4.dp, 40.dp),
-                        shape = RoundedCornerShape(2.dp),
-                        color = roaColor
-                    ) {}
-                    Spacer(Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = substance?.name ?: stripPrefix(dose.substanceId),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Surface(
-                                modifier = Modifier.size(6.dp),
-                                shape = CircleShape,
-                                color = roaColor
-                            ) {}
-                            Text(dose.routeOfAdministration,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = roaColor)
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = buildString {
-                                    append("${dose.amount} ${dose.unit}")
-                                    if (dose.redosing) append(" · redose")
-                                    if (dose.isDoseEstimate) append(" · est. ±${dose.estimatedDoseStandardDeviation}")
-                                    if (dose.stomachFullness != null) append(" · ${dose.stomachFullness.label}")
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (doseLocal != null) {
-                            Text(
-                                text = "${doseLocal.year}-${(doseLocal.month.ordinal + 1).toString().padStart(2,'0')}-${doseLocal.day.toString().padStart(2,'0')} " +
-                                       "${doseLocal.hour.toString().padStart(2,'0')}:${doseLocal.minute.toString().padStart(2,'0')}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                    IconButton(onClick = {
-                        sessionDoses = sessionDoses.filter { it.id != dose.id }
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Remove",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-        }
-
-        // Interaction warnings for combined substances
-        if (interactionCheckResult.hasIssues || interactionCheckResult.uncertain.isNotEmpty()) {
-            item {
-                InteractionWarnings(
-                    result = interactionCheckResult,
-                    substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: stripPrefix(id) },
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-        }
-
-        // ── Timeline Events section ──
-        item {
-            HorizontalDivider()
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Timeline Events",
-                    style = MaterialTheme.typography.titleMedium)
-                AppTonalButton(onClick = {
-                    val now = currentTimeMillis()
-                    val newEvent = TimelineEvent(
-                        id = "evt:${now}",
-                        sessionId = sessionToEdit?.id ?: "session:${now}",
-                        eventType = TimelineEventType.OBSERVATION,
-                        label = "Check-in",
-                        timestamp = now,
-                        body = "Quick event",
-                        createdAt = now, updatedAt = now,
-                        deviceOrigin = "desktop"
-                    )
-                    // Persist immediately so it appears with a real id
-                    repo.upsertTimelineEvent(newEvent)
-                    sessionEvents = sessionEvents + newEvent
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Event")
-                }
-            }
-        }
-
-        // Inline-editable event cards
-        items(sessionEvents.sortedBy { it.timestamp }, key = { it.id }) { event ->
-            EditorInlineEventCard(
-                event = event,
-                repo = repo,
-                onDelete = {
-                    repo.deleteTimelineEvent(event.id)
-                    sessionEvents = sessionEvents.filter { it.id != event.id }
+                onDeleteDose = { doseId ->
+                    sessionDoses = sessionDoses.filter { it.id != doseId }
                 }
             )
         }
-    }
-}
 
-@Composable
-private fun EditorInlineEventCard(
-    event: TimelineEvent,
-    repo: JournalRepository,
-    onDelete: () -> Unit
-) {
-    var editing by remember { mutableStateOf(false) }
-    var editLabel by remember { mutableStateOf(event.label) }
-    var editBody by remember { mutableStateOf(event.body ?: "") }
-    var editIntensity by remember { mutableFloatStateOf(event.intensity ?: 5f) }
-    var editType by remember { mutableStateOf(event.eventType) }
-    var useIntensity by remember { mutableStateOf(event.intensity != null) }
-
-    if (editing) {
-        // INLINE EDIT MODE
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Event type chips
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    val quickTypes = listOf(
-                        TimelineEventType.OBSERVATION to "Obs",
-                        TimelineEventType.NOTE to "Note",
-                        TimelineEventType.ONSET to "On",
-                        TimelineEventType.COMEUP to "Up",
-                        TimelineEventType.PEAK to "Peak",
-                        TimelineEventType.OFFSET to "Off",
-                        TimelineEventType.AFTERGLOW to "Glow",
-                        TimelineEventType.SIDE_EFFECT to "SE",
-                        TimelineEventType.EMERGENCY to "!"
-                    )
-                    quickTypes.forEach { (type, lbl) ->
-                        FilterChip(
-                            selected = editType == type,
-                            onClick = { editType = type },
-                            label = { Text(lbl, style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.height(26.dp)
-                        )
-                    }
+        // Timeline Events section
+        item {
+            SessionEventsSection(
+                sessionEvents = sessionEvents,
+                sessionId = sessionToEdit?.id ?: draftSessionId,
+                repo = repo,
+                onEventAdded = { event ->
+                    sessionEvents = sessionEvents + event
+                },
+                onEventDeleted = { eventId ->
+                    // Events are persisted on add, so deletion must hit the
+                    // repo too, otherwise the event reappears on reopen.
+                    repo.deleteTimelineEvent(eventId)
+                    sessionEvents = sessionEvents.filter { it.id != eventId }
                 }
-                OutlinedTextField(value = editLabel, onValueChange = { editLabel = it },
-                    label = { Text("Label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = editBody, onValueChange = { editBody = it },
-                    label = { Text("Notes") }, minLines = 2, maxLines = 4,
-                    modifier = Modifier.fillMaxWidth())
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = useIntensity, onClick = { useIntensity = !useIntensity },
-                        label = { Text("Intensity", style = MaterialTheme.typography.labelSmall) },
-                        modifier = Modifier.height(26.dp))
-                    if (useIntensity) {
-                        Text("${editIntensity.toInt()}/10", style = MaterialTheme.typography.labelSmall)
-                        Slider(value = editIntensity, onValueChange = { editIntensity = it },
-                            valueRange = 1f..10f, steps = 8, modifier = Modifier.weight(1f))
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppTextButton(onClick = { editing = false }) { Text("Cancel") }
-                    AppTextButton(onClick = {
-                        repo.upsertTimelineEvent(event.copy(
-                            eventType = editType,
-                            label = editLabel.ifBlank { event.label },
-                            body = editBody.ifBlank { null },
-                            intensity = if (useIntensity) editIntensity else null,
-                            updatedAt = currentTimeMillis()
-                        ))
-                        editing = false
-                    }) { Text("Save") }
-                }
-            }
-        }
-    } else {
-        // VIEW MODE
-        val icon = when (event.eventType) {
-            TimelineEventType.ONSET -> Icons.Default.ArrowForward
-            TimelineEventType.COMEUP -> Icons.Default.TrendingUp
-            TimelineEventType.PEAK -> Icons.Default.Star
-            TimelineEventType.OFFSET -> Icons.Default.TrendingDown
-            TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
-            TimelineEventType.END -> Icons.Default.Stop
-            TimelineEventType.OBSERVATION -> Icons.Default.Visibility
-            TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
-            TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
-            TimelineEventType.EMERGENCY -> Icons.Default.Error
-            TimelineEventType.NOTE -> Icons.Default.Notes
-            TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
-        }
-        val accent = when (event.eventType) {
-            TimelineEventType.EMERGENCY, TimelineEventType.SIDE_EFFECT -> MaterialTheme.colorScheme.error
-            else -> MaterialTheme.colorScheme.primary
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
-                    Column(Modifier.weight(1f)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(event.label, style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium)
-                        }
-                        if (!event.body.isNullOrBlank()) {
-                            Text(event.body, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (event.intensity != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Intensity:", style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Surface(shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer) {
-                                    Text("${event.intensity.toInt()}/10",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
+            )
         }
     }
 }

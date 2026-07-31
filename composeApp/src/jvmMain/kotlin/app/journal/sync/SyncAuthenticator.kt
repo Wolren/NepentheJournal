@@ -76,7 +76,7 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     fun verifyPairingToken(enteredToken: String): Boolean {
         val pending = pendingPairing
         if (pending == null || pending.isExpired) return false
-        val matched = pending.token == enteredToken.uppercase().trim()
+        val matched = constantTimeEquals(pending.token, enteredToken.uppercase().trim())
         if (matched) pendingPairing = null // single-use
         return matched
     }
@@ -145,6 +145,15 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         val signature = hmac(secret, "${deviceId}:$timestamp:$nonce:$body")
         return "$timestamp:$nonce:$signature"
     }
+
+    /**
+     * Sign a host-identity challenge: HMAC-SHA256 of
+     * "challenge:<deviceId>:<timestamp>:<challenge>" with the peer's secret.
+     * The client verifies this to prove the host knows the shared secret
+     * before re-using a stored secret on reconnect.
+     */
+    fun signChallenge(deviceId: String, timestamp: Long, challenge: String, secret: String): String =
+        hmac(secret, "challenge:$deviceId:$timestamp:$challenge")
 
     /** Verify a pairing response signing header. */
     fun verifyPairingResponse(deviceId: String, authHeader: String, secret: String): Boolean {

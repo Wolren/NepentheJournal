@@ -16,6 +16,11 @@ import kotlinx.serialization.encodeToString
  *
  * Wire format uses SyncBatch (push) and SyncResponse (pull response)
  * — both serializable types already in commonMain.
+ *
+ * Encryption: sync bodies are AES-256-GCM encrypted. The wire body is
+ * base64(encryptBody(json, aesKey)). HMAC is computed over the base64
+ * ciphertext (encrypt-then-MAC). See SyncCrypto (commonMain) for the
+ * expect/actual encryption primitives.
  */
 
 // ========== Endpoint paths ==========
@@ -49,11 +54,19 @@ fun buildAuthHeader(deviceId: String, body: String, secret: ByteArray, timestamp
     return "$timestamp:$nonce:$signature"
 }
 
-/** Generate a random 32-char hex nonce using kotlin.random (available on all KMP targets). */
+/**
+ * Generate a random 32-char hex nonce using the platform CSPRNG
+ * (SecureRandom on JVM, SecRandomCopyBytes on iOS). Nonces must not come
+ * from a plain PRNG (audit L2).
+ */
 fun generateNonce(): String {
     val chars = "0123456789abcdef"
+    val bytes = secureRandomBytes(16)
     val sb = StringBuilder(32)
-    repeat(32) { sb.append(chars[kotlin.random.Random.nextInt(chars.length)]) }
+    for (b in bytes) {
+        sb.append(chars[(b.toInt() ushr 4) and 0x0F])
+        sb.append(chars[b.toInt() and 0x0F])
+    }
     return sb.toString()
 }
 
@@ -103,17 +116,21 @@ fun buildSyncBatch(
 
 /**
  * Apply a SyncResponse to the local repository.
- * Merges all returned entities (upsert).
+ * Merges all returned entities (upsert) with last-writer-wins by updatedAt,
+ * so a replayed/stale response cannot roll back newer local data.
  */
 fun applySyncResponse(repo: JournalRepository, response: SyncResponse) {
-    for (s in response.sessions) repo.upsertSession(s)
-    for (d in response.doses) repo.upsertDose(d)
-    for (s in response.substances) repo.upsertSubstance(s)
-    for (e in response.effects) repo.upsertEffect(e)
-    for (i in response.interactions) repo.upsertInteraction(i)
-    for (n in response.notes) repo.upsertNote(n)
-    for (t in response.timelineEvents) repo.upsertTimelineEvent(t)
-    for (u in response.customUnits) repo.upsertCustomUnit(u)
+    repo.applyBatch(
+        sessions = response.sessions,
+        doses = response.doses,
+        substances = response.substances,
+        effects = response.effects,
+        interactions = response.interactions,
+        notes = response.notes,
+        timelineEvents = response.timelineEvents,
+        customUnits = response.customUnits,
+        lastWriterWins = true
+    )
 }
 
 /**

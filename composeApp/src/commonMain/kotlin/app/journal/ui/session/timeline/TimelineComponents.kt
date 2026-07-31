@@ -47,7 +47,7 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
             Column(Modifier.weight(1f)) {
                 Text(substance?.name ?: dose.substanceId,
                     style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Text(buildString { append("${dose.amount}"); if (dose.isDoseEstimate) append("\u00B1${dose.estimatedDoseStandardDeviation}"); append(" ${dose.unit} - ${dose.routeOfAdministration}"); if (dose.redosing) append(" (redose)") },
+                Text(buildString { val prefix = if (dose.isDoseEstimate) "~" else ""; append("$prefix${dose.amount}"); if (dose.isDoseEstimate) append(" ±${dose.estimatedDoseStandardDeviation}"); append(" ${dose.unit} - ${dose.routeOfAdministration}"); if (dose.redosing) append(" (redose)") },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (dose.stomachFullness != null) Text(dose.stomachFullness.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
@@ -76,7 +76,8 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.Journa
                         Text(substance?.name ?: substanceId, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                         substanceDoses.forEach { dose ->
                             val offsetMin = ((dose.timestamp - sessionStart) / 60000).toInt()
-                            Text("${dose.amount} ${dose.unit} ${dose.routeOfAdministration} @ +${offsetMin}m",
+                            val prefix = if (dose.isDoseEstimate) "~" else ""
+                            Text("$prefix${dose.amount} ${dose.unit} ${dose.routeOfAdministration} @ +${offsetMin}m",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -164,6 +165,57 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
             Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 val durHours = rangeMs / 3600000f
                 for (i in 0..4) { Text("${(durHours * i / 4).toInt()}h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PhaseCard(
+    phase: PhaseRange,
+    startTime: Long,
+    modifier: Modifier = Modifier
+) {
+    val phaseColor = phaseColors[phase.eventType] ?: MaterialTheme.colorScheme.primary
+    val startOffset = ((phase.startTime - startTime) / 60000).toInt()
+    val endOffset = ((phase.endTime - startTime) / 60000).toInt()
+    val durationMs = phase.endTime - phase.startTime
+
+    val timeRange = "${startOffset / 60}:${(startOffset % 60).toString().padStart(2, '0')} - ${endOffset / 60}:${(endOffset % 60).toString().padStart(2, '0')}"
+    val durationStr = formatDuration(durationMs)
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(Modifier.padding(12.dp)) {
+            Surface(
+                modifier = Modifier.width(4.dp).height(48.dp),
+                shape = RoundedCornerShape(2.dp),
+                color = phaseColor
+            ) {}
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    phase.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = phaseColor
+                )
+                Text(
+                    "$timeRange · $durationStr",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (phase.description != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        phase.description,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
     }

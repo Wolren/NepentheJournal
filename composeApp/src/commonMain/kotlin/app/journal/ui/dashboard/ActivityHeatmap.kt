@@ -165,13 +165,13 @@ fun ActivityHeatmap(
                     Text(
                         "${firstVisibleDate.month.name.lowercase().take(3)} ${firstVisibleDate.day}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                     Text(
                         "${today.month.name.lowercase().take(3)} ${today.day}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }

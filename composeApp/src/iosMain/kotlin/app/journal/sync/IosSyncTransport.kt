@@ -6,6 +6,12 @@ import app.journal.data.JournalSnapshot
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.util.currentTimeMillis
+// SyncCrypto imports: AES-256-GCM encrypt/decrypt + key derivation
+import app.journal.sync.aesEncryptionKey
+import app.journal.sync.encryptBody
+import app.journal.sync.decryptBody
+import app.journal.sync.base64Encode
+import app.journal.sync.base64Decode
 import io.ktor.client.*
 import io.ktor.client.engine.darwin.*
 import io.ktor.client.request.*
@@ -140,8 +146,19 @@ class IosSyncTransport(
                                     )
                                     return@post
                                 }
+                                val aesKey = aesEncryptionKey(String(secret))
+                                val batchJson = try {
+                                    val encryptedBytes = base64Decode(body)
+                                    decryptBody(encryptedBytes, aesKey)
+                                } catch (e: Exception) {
+                                    call.respondText(
+                                        json.encodeToString(SyncResponse(false, error = "Decryption failed: ${e.message}")),
+                                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                                    )
+                                    return@post
+                                }
                                 val batch = try {
-                                    json.decodeFromString<SyncBatch>(body)
+                                    json.decodeFromString<SyncBatch>(batchJson)
                                 } catch (e: Exception) {
                                     call.respondText(
                                         json.encodeToString(SyncResponse(false, error = "Invalid payload")),
@@ -159,7 +176,9 @@ class IosSyncTransport(
                                 }
                                 applySyncBatch(batch)
                                 val response = buildSyncResponse(batch.since)
-                                call.respondText(json.encodeToString(response), ContentType.Application.Json)
+                                val responseJson = json.encodeToString(response)
+                                val encryptedBody = encryptBody(responseJson, aesKey)
+                                call.respondText(base64Encode(encryptedBody), ContentType.Application.Json)
                             }
 
                             get(SyncEndpoints.SYNC_PULL) {
@@ -189,8 +208,11 @@ class IosSyncTransport(
                                     return@get
                                 }
                                 val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
+                                val aesKey = aesEncryptionKey(String(secret))
                                 val response = buildSyncResponse(since)
-                                call.respondText(json.encodeToString(response), ContentType.Application.Json)
+                                val responseJson = json.encodeToString(response)
+                                val encryptedBody = encryptBody(responseJson, aesKey)
+                                call.respondText(base64Encode(encryptedBody), ContentType.Application.Json)
                             }
                         }
                     }.start(wait = false)
@@ -216,19 +238,33 @@ class IosSyncTransport(
 
     override suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> {
         val secret = pairingSecret ?: return Result.failure(Exception("Not paired"))
+        val aesKey = aesEncryptionKey(String(secret))
         val client = HttpClient(Darwin)
         return try {
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), _status.value.lastSyncAt ?: 0L)
             if (batch != null) {
-                val pushReq = SyncPushRequest.fromBatch(batch, secret, deviceId)
+                val batchJson = json.encodeToString(batch)
+                val encrypted = encryptBody(batchJson, aesKey)
+                val bodyStr = base64Encode(encrypted)
+                val time = currentTimeMillis()
+                val nonce = generateNonce()
+                val auth = buildAuthHeader(deviceId, bodyStr, secret, time, nonce)
                 val pushResponse = client.post("http://${peer.host}:${peer.port}${SyncEndpoints.SYNC_PUSH}") {
                     contentType(ContentType.Application.Json)
-                    header(SyncAuth.DEVICE_ID_HEADER, pushReq.deviceId)
-                    header(SyncAuth.AUTH_HEADER, pushReq.authHeader)
-                    setBody(pushReq.body)
+                    header(SyncAuth.DEVICE_ID_HEADER, deviceId)
+                    header(SyncAuth.AUTH_HEADER, auth)
+                    setBody(bodyStr)
                 }
                 val pushBody = pushResponse.bodyAsText()
-                val syncResp = runCatching { json.decodeFromString<SyncResponse>(pushBody) }.getOrNull()
+                val syncResp = if (pushBody.isNotEmpty()) {
+                    try {
+                        val encryptedResp = base64Decode(pushBody)
+                        val respJson = decryptBody(encryptedResp, aesKey)
+                        runCatching { json.decodeFromString<SyncResponse>(respJson) }.getOrNull()
+                    } catch (e: Exception) {
+                        null
+                    }
+                } else null
                 if (syncResp != null) applySyncResponse(repo, syncResp)
             }
 
@@ -240,7 +276,15 @@ class IosSyncTransport(
                 parameter("since", _status.value.lastSyncAt?.toString() ?: "0")
             }
             val pullBody = pullResponse.bodyAsText()
-            val pullResp = runCatching { json.decodeFromString<SyncResponse>(pullBody) }.getOrNull()
+            val pullResp = if (pullBody.isNotEmpty()) {
+                try {
+                    val encryptedResp = base64Decode(pullBody)
+                    val respJson = decryptBody(encryptedResp, aesKey)
+                    runCatching { json.decodeFromString<SyncResponse>(respJson) }.getOrNull()
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
             if (pullResp?.success == true) applySyncResponse(repo, pullResp)
 
             _status.update { it.copy(lastSyncAt = currentTimeMillis()) }

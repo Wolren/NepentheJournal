@@ -23,6 +23,7 @@ FAST_TESTS=(
   app.journal.util.ExportImportTest
   app.journal.export.obsidian.ObsidianNoteRendererTest
   app.journal.ui.substances.SubstanceScreenViewModelTest
+  app.journal.ui.session.SessionListViewModelTest
   app.journal.sync.SyncContractTest
   app.journal.sync.SyncEngineTest
   app.journal.sync.SyncPayloadTest

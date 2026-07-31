@@ -131,7 +131,7 @@ internal fun LiveEventCard(
                     }
                     if (onDelete != null) {
                         IconButton(onClick = { onDelete(event) }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Close, "Delete", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 }

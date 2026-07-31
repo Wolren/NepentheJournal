@@ -27,6 +27,12 @@ object DataInitializer {
     private var initialized = false
     private var autoSaveJob: Job? = null
 
+    /** Reset internal state so the next [ensureInitialized] call re-runs initialization. */
+    internal fun reset() {
+        initialized = false
+        autoSaveJob = null
+    }
+
     private const val SEED_RESOURCE = "/psychonautwiki_seed.json"
 
     fun isTestDataEnabled(): Boolean {

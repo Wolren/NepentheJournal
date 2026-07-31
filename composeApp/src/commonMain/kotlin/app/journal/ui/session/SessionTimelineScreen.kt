@@ -16,6 +16,7 @@ import app.journal.data.JournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatDateShort
 import app.journal.ui.session.timeline.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -48,6 +49,10 @@ fun SessionTimelineScreen(
             items.add(TimelineItem.Event(event))
         }
         items
+    }
+    val phaseRanges = remember(sortedEvents, sessionDuration, session) {
+        if (session != null) computePhaseRanges(sortedEvents, session.startTime, sessionDuration)
+        else emptyList()
     }
 
     var showAddEventDialog by remember { mutableStateOf(false) }
@@ -84,15 +89,35 @@ fun SessionTimelineScreen(
                 Column {
                     val tz = TimeZone.currentSystemDefault()
                     val local = Instant.fromEpochMilliseconds(session.startTime).toLocalDateTime(tz)
-                    Text("${local.day.toString().padStart(2,'0')} ${local.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${local.year}",
+                    Text(formatDateShort(local.date),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!session.consumerName.isNullOrBlank()) {
+                        Text(session.consumerName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f))
+                    }
                 }
                 RatingBadge(session.rating, session.shulginRating)
             }
         }
 
         // Visual timeline bar
-        item { TimelineBar(startTime = session.startTime, endTime = session.endTime, events = events, checkins = session.checkins, doses = doses) }
+        item { TimelineBar(startTime = session.startTime, endTime = session.endTime, events = events, checkins = session.checkins, doses = doses, shulginRating = session.shulginRating) }
+
+        // Phase cards
+        if (phaseRanges.isNotEmpty()) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Text("Phases", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            phaseRanges.forEach { phase ->
+                item(key = "phase_card_${phase.label}") {
+                    PhaseCard(phase = phase, startTime = session.startTime)
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
 
         // Session intention/outcome
         if (!session.intention.isNullOrBlank() || !session.outcome.isNullOrBlank()) {
@@ -128,6 +153,26 @@ fun SessionTimelineScreen(
                             if (!session.set.isNullOrBlank()) Spacer(Modifier.height(8.dp))
                             Text("Setting (Environment)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(4.dp)); Text(session.setting, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Demographics / SessionProfile
+        val profile = session.profile
+        if (profile != null && (profile.age != null || profile.gender != null || profile.heightCm != null || profile.weightKg != null)) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Subject Profile", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            profile.age?.let { Column { Text("Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("$it", style = MaterialTheme.typography.bodySmall) } }
+                            profile.gender?.let { Column { Text("Gender", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(it, style = MaterialTheme.typography.bodySmall) } }
+                            profile.heightCm?.let { Column { Text("Height", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}cm", style = MaterialTheme.typography.bodySmall) } }
+                            profile.weightKg?.let { Column { Text("Weight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}kg", style = MaterialTheme.typography.bodySmall) } }
                         }
                     }
                 }

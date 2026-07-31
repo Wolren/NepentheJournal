@@ -56,6 +56,7 @@ internal fun SyncSettingsContent(
                     isHosting = status.isHosting,
                     hostAddress = status.hostAddress,
                     pairingToken = status.pairingToken,
+                    tokenExpiresAt = status.tokenExpiresAt,
                     isStarting = state.isStartingHost,
                     isStopping = state.isStoppingHost,
                     continuousSync = state.continuousSync,
@@ -65,7 +66,7 @@ internal fun SyncSettingsContent(
                             try {
                                 val cfg = SyncConfig(id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
                                     deviceId = "desktop-main", displayName = "Windows Desktop",
-                                    listenerPort = state.manualPort.toIntOrNull() ?: 4984, continuousSync = state.continuousSync, enableDeltaSync = true)
+                                    listenerPort = state.manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT, continuousSync = state.continuousSync, enableDeltaSync = true)
                                 syncEngine.startHosting(cfg).fold(
                                     onSuccess = { callbacks.onLogLine("+Hosting on port ${it.port}") },
                                     onFailure = { callbacks.onLogLine("!Host start failed: ${userMessage(it.message ?: "")}") })

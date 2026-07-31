@@ -40,7 +40,7 @@ fun ScreenScaffold(
     val keyHandler = if (onBack != null && isDesktopPlatform()) {
         Modifier.onPreviewKeyEvent { event ->
             if (event.key == Key.Escape) {
-                try { onBack() } catch (_: Exception) { }
+                try { onBack() } catch (_: Exception) { /* Guard: onBack may throw during navigation teardown — safe to ignore */ }
                 true
             } else false
         }
@@ -62,7 +62,7 @@ fun ScreenScaffold(
                     if (navigationIcon != null) {
                         navigationIcon()
                     } else if (onBack != null) {
-                        IconButton(onClick = { try { onBack() } catch (_: Exception) { } }) {
+                        IconButton(onClick = { try { onBack() } catch (_: Exception) { /* Guard: onBack may throw during navigation teardown — safe to ignore */ } }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back"

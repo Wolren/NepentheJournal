@@ -45,6 +45,7 @@ jobs:
             --tests "app.journal.util.ExportImportTest" \
             --tests "app.journal.export.obsidian.ObsidianNoteRendererTest" \
             --tests "app.journal.ui.substances.SubstanceScreenViewModelTest" \
+            --tests "app.journal.ui.session.SessionListViewModelTest" \
             --tests "app.journal.sync.SyncContractTest" \
             --tests "app.journal.sync.SyncEngineTest" \
             --tests "app.journal.sync.SyncPayloadTest" \

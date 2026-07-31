@@ -14,12 +14,14 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.TimeoutCancellationException
 
 /**
- * JVM implementation of SyncEngine using TLS + HMAC-authenticated HTTP transport
- * with WebSocket continuous sync and LAN discovery.
+ * JVM implementation of SyncEngine using HMAC-authenticated plain HTTP
+ * with AES-256-GCM body encryption and WebSocket continuous sync.
  *
- * On first run, generates a self-signed TLS identity.
+ * On first run, generates a self-signed identity (cert used for the
+ * fingerprint/device id only, NOT for TLS).
  * Sync with unknown peers triggers the pairing protocol (token exchange).
- * Subsequent syncs use HMAC-SHA256 signed requests over HTTPS with cert pinning.
+ * Subsequent syncs use HMAC-SHA256 signed requests over plain HTTP with
+ * AES-256-GCM encrypted bodies (LAN threat model; see SYNC-PAIRING-AUDIT).
  * Continuous sync uses WebSocket for low-latency mutation push.
  */
 class SyncTransport(
@@ -118,10 +120,12 @@ class SyncTransport(
                 server = srv
                 authenticator.generatePairingToken()
                 val token = authenticator.currentPairingToken()
+                val now = System.currentTimeMillis()
                 _status.value = _status.value.copy(
                     isHosting = true,
                     hostAddress = "${info.address}:${info.port}",
                     pairingToken = token,
+                    tokenExpiresAt = now + 120_000L,
                     pairedDeviceCount = trustStore.count()
                 )
                 appendDebug("Server started on ${info.address}:${info.port} (fp=$fp)")
@@ -130,8 +134,10 @@ class SyncTransport(
                     while (isActive) {
                         delay(60_000L)
                         authenticator.generatePairingToken()
+                        val now = System.currentTimeMillis()
                         _status.value = _status.value.copy(
-                            pairingToken = authenticator.currentPairingToken()
+                            pairingToken = authenticator.currentPairingToken(),
+                            tokenExpiresAt = now + 120_000L
                         )
                     }
                 }
@@ -262,18 +268,28 @@ class SyncTransport(
                                         appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
                                         val knownPeer = trustStore.getPeer(info.fingerprint)
                                         if (knownPeer != null) {
-                                            appendDebug("Already paired with ${knownPeer.displayName} — re-using stored secret")
-                                            val trustedPeer = DiscoveredPeer(
-                                                deviceId = knownPeer.deviceId,
-                                                displayName = knownPeer.displayName,
-                                                host = peer.host,
-                                                port = peer.port,
-                                                isTrusted = true,
-                                                fingerprint = knownPeer.fingerprint
+                                            // Challenge the host before re-using the stored secret:
+                                            // mDNS is unauthenticated and fingerprints are public,
+                                            // so a spoofed host must prove it knows the secret.
+                                            val hostProven = probeClient.verifyHostIdentity(
+                                                peer.host, peer.port, deviceId, knownPeer.sharedSecret
                                             )
-                                            return@withLock syncWith(trustedPeer, continuous)
+                                            if (hostProven) {
+                                                appendDebug("Host identity verified (challenge-response) — re-using stored secret for ${knownPeer.displayName}")
+                                                val trustedPeer = DiscoveredPeer(
+                                                    deviceId = knownPeer.deviceId,
+                                                    displayName = knownPeer.displayName,
+                                                    host = peer.host,
+                                                    port = peer.port,
+                                                    isTrusted = true,
+                                                    fingerprint = knownPeer.fingerprint
+                                                )
+                                                return@withLock syncWith(trustedPeer, continuous)
+                                            }
+                                            appendDebug("Host failed identity challenge — NOT re-using stored secret, needs re-pairing")
+                                        } else {
+                                            appendDebug("Host fingerprint not in trust store — needs pairing")
                                         }
-                                        appendDebug("Host fingerprint not in trust store — needs pairing")
                                     } else {
                                         appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
                                     }
@@ -539,11 +555,13 @@ class SyncTransport(
         }
 
     private fun updateStatus() {
+        val now = System.currentTimeMillis()
         _status.value = _status.value.copy(
             activeConnections = activePeers.toList(),
             lastSyncAt = lastSyncTime,
             pendingConflicts = repo.notes.value.count { it.conflictSiblings.isNotEmpty() },
             pairingToken = authenticator.currentPairingToken(),
+            tokenExpiresAt = if (authenticator.currentPairingToken() != null) now + 120_000L else null,
             pairedDeviceCount = trustStore.count(),
             continuousPeers = wsConnections.size
         )
@@ -748,7 +766,8 @@ class SyncTransport(
         repo.applyBatch(
             sessions = sessions, doses = doses, substances = substances,
             effects = effects, interactions = interactions, notes = notes,
-            timelineEvents = timelineEvents, customUnits = customUnits
+            timelineEvents = timelineEvents, customUnits = customUnits,
+            lastWriterWins = true
         )
         return skipped
     }

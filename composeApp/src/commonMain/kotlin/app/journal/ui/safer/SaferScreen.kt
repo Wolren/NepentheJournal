@@ -2,8 +2,10 @@ package app.journal.ui.safer
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import app.journal.ui.components.DesktopScrollbar
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,11 +19,14 @@ import app.journal.ui.components.*
 @Composable
 fun SaferScreen() {
     val uriHandler = LocalUriHandler.current
+    val scrollState = rememberLazyListState()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            state = scrollState
+        ) {
         item {
             Spacer(Modifier.height(4.dp))
             Text("Safer Use", style = MaterialTheme.typography.titleLarge,
@@ -198,6 +203,8 @@ fun SaferScreen() {
         }
 
         item { Spacer(Modifier.height(16.dp)) }
+        }
+        DesktopScrollbar(scrollState)
     }
 }
 

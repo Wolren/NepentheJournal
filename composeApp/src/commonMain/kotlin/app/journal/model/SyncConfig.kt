@@ -26,4 +26,8 @@ data class SyncConfig(
         "links", "persons", "attachments", "devices"
         // syncConfigs deliberately excluded
     )
-) : VaultDocument
+) : VaultDocument {
+    companion object {
+        const val DEFAULT_PORT = 4984
+    }
+}

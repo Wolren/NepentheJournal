@@ -20,12 +20,15 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
 import app.journal.model.Session
+import app.journal.ui.components.DesktopScrollbar
 import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
+import app.journal.util.TimeDisplayMode
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatRelativeTime
 import app.journal.util.isDesktopPlatform
+import app.journal.ui.session.SessionCard
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -40,8 +43,8 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
     onEditSession: (String) -> Unit = {},
     onSessionClick: (String) -> Unit = {},
     onLiveSession: () -> Unit = {},
-    useRelativeTime: Boolean = true,
-    onToggleTimeFormat: () -> Unit = {}
+    timeDisplayMode: TimeDisplayMode = TimeDisplayMode.RELATIVE,
+    onCycleTimeDisplay: () -> Unit = {}
 ) {
     val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
     val allSessions by viewModel.sessions.collectAsState(initial = emptyList())
@@ -100,7 +103,7 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                         leadingIcon = {
                             if (filterSubstanceIds.isEmpty()) {
                                 Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                    Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
                                 }
                             } else Box(Modifier.size(18.dp))
                         }
@@ -117,17 +120,24 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                             DropdownMenuItem(
                                 text = { Text(item.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
-                                    viewModel.toggleSubstance(item.id); substanceDropdownExpanded = false
+                                    // Keep the menu open so multiple substances can be toggled in one pass
+                                    viewModel.toggleSubstance(item.id)
                                 },
                                 leadingIcon = {
                                     if (isSelected) {
                                         Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
                                         }
                                     } else Box(Modifier.size(18.dp))
                                 }
                             )
                         }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Done", fontWeight = FontWeight.Bold) },
+                            onClick = { substanceDropdownExpanded = false },
+                            leadingIcon = { Box(Modifier.size(18.dp)) }
+                        )
                     }
                 }
             }
@@ -150,10 +160,10 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.MenuBook, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(40.dp))
+                            modifier = Modifier.size(48.dp))
                         Text(
                             text = when {
                                 searchQuery.isNotBlank() -> "No sessions match \"$searchQuery\""
@@ -164,6 +174,13 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (searchQuery.isBlank() && filterSubstanceIds.isEmpty() && !showFavs) {
+                            Text(
+                                text = "Tap + to create your first session",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 }
             } else {
@@ -176,7 +193,7 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                         AnimatedListItem {
                             SessionCard(
                                 session = session,
-                                useRelativeTime = useRelativeTime,
+                                timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
                                 onDelete = { showDeleteConfirm = session.id },
                                 onEdit = { onEditSession(session.id) }
@@ -285,8 +302,8 @@ object SessionListScreen {
         onToggleFavorites: () -> Unit,
         onToggleArchived: () -> Unit,
         onCalendarClick: () -> Unit,
-        useRelativeTime: Boolean,
-        onToggleTimeFormat: () -> Unit
+        timeDisplayMode: TimeDisplayMode,
+        onCycleTimeDisplay: () -> Unit
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             val tipState1 = rememberTooltipState()
@@ -325,11 +342,17 @@ object SessionListScreen {
                 }
             }
             val tipState4 = rememberTooltipState()
-            TooltipBox(state = tipState4, positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text("Toggle time format") } }) {
-                IconButton(onClick = onToggleTimeFormat, modifier = Modifier.size(36.dp)) {
+            val (timeIcon, timeLabel) = when (timeDisplayMode) {
+                TimeDisplayMode.RELATIVE -> Icons.Default.Timer to "Relative time"
+                TimeDisplayMode.CLOCK -> Icons.Default.Schedule to "Clock time"
+                TimeDisplayMode.ELAPSED -> Icons.Default.Timeline to "Elapsed"
+                TimeDisplayMode.DURATION -> Icons.Default.HourglassEmpty to "Duration"
+            }
+            TooltipBox(state = tipState4, positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text(timeLabel) } }) {
+                IconButton(onClick = onCycleTimeDisplay, modifier = Modifier.size(36.dp)) {
                     Icon(
-                        if (useRelativeTime) Icons.Default.Timer else Icons.Default.Schedule,
-                        contentDescription = if (useRelativeTime) "Relative time" else "Absolute time",
+                        timeIcon,
+                        contentDescription = timeLabel,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -337,179 +360,3 @@ object SessionListScreen {
         }
     }
 }
-
-@Composable
-private fun SessionCard(
-    session: Session,
-    useRelativeTime: Boolean,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onEdit: () -> Unit
-) {
-    val repo = remember { JournalRepository.instance }
-    val themeManager = remember { ThemeManager.instance }
-    val isDark = themeManager.isDarkTheme()
-    val doses = remember(session.id) { repo.dosesForSession(session.id) }
-    val subColor = remember(session.title) { AdaptiveColors.colorFor(session.title) }
-    val accent = subColor.getComposeColor(isDark)
-
-    // Pre-join substance names for O(1) lookup in the FlowRow below
-    val substanceNameMap = remember(doses) {
-        doses.associate { dose ->
-            dose.substanceId to (repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId)
-        }
-    }
-
-    HoverCard(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        useAnimations = isDesktopPlatform(),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)
-        ) {
-            // Accent bar colored by session title (substance identity)
-            Surface(
-                modifier = Modifier.fillMaxHeight().width(4.dp),
-                color = accent
-            ) {}
-            Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = session.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                        }
-
-                        Spacer(Modifier.height(2.dp))
-
-                        // Date/time
-                        val tz = TimeZone.currentSystemDefault()
-                        val instant = Instant.fromEpochMilliseconds(session.startTime)
-                        val local = instant.toLocalDateTime(tz)
-                        val dateText = if (useRelativeTime) relativeTime(session.startTime)
-                                                else "${local.day.toString().padStart(2,'0')} ${local.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${local.year} ${local.hour.toString().padStart(2,'0')}:${local.minute.toString().padStart(2,'0')}"
-                        Text(
-                            text = dateText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (session.rating != null || session.shulginRating != null) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text(
-                                    text = session.shulginRating ?: "${session.rating}/10",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                        // Edit button
-                        IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-
-                // Substances
-                if (doses.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        doses.forEach { dose ->
-                            val subName = substanceNameMap[dose.substanceId]
-                            if (subName != null) {
-                                val doseColor = app.journal.ui.theme.AdaptiveColors.colorFor(subName)
-                                val doseAccent = doseColor.getComposeColor(isDark)
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = doseAccent
-                                ) {
-                                    Text(
-                                        text = "$subName ${dose.amount} ${dose.unit}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Dose composition bar
-                if (doses.isNotEmpty()) {
-                    val totalAmount = doses.sumOf { it.amount }
-                    if (totalAmount > 0) {
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            doses.forEachIndexed { i, dose ->
-                                val subName = substanceNameMap[dose.substanceId]
-                                val fraction = (dose.amount / totalAmount).toFloat()
-                                if (fraction > 0.01f) {
-                                    val color = if (subName != null)
-                                        app.journal.ui.theme.AdaptiveColors.colorFor(subName).getComposeColor(isDark)
-                                    else MaterialTheme.colorScheme.primary
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .weight(fraction.coerceAtLeast(0.02f)),
-                                        color = color,
-                                        shape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
-                                                else if (i == doses.lastIndex) RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
-                                                else RoundedCornerShape(0.dp)
-                                    ) {}
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Favorite heart at bottom-right
-                if (session.isFavorite) {
-                    Spacer(Modifier.height(4.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        Icon(
-                            Icons.Default.Favorite,
-                            contentDescription = "Favorite",
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun relativeTime(epochMs: Long): String = formatRelativeTime(epochMs)

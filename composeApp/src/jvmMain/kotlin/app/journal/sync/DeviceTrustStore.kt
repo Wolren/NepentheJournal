@@ -59,6 +59,14 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     private val json get() = AppJson.json
     override fun toString(): String = json.encodeToString(this)
 
+    /**
+     * At-rest encryption key source. Prefers the random key file
+     * (dataDir/at-rest.key, user-only permissions); falls back to the
+     * legacy PBKDF2 constant-password derivation when the key file cannot
+     * be created (migration path; the store is re-encrypted on next save).
+     */
+    private val atRestKey = AtRestKey(dataDir)
+
     /** In-memory cache of the DECRYPTED store — loaded once, invalidated on writes. */
     @Volatile
     private var cachedStore: TrustStore? = null
@@ -196,7 +204,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     /** Encrypt every peer's sharedSecret using the store's salt. */
     private fun encryptStore(store: TrustStore): TrustStore {
         val salt = store.salt.ifBlank { currentSalt ?: generateSalt() }
-        val key = deriveKey(salt)
+        val key = encryptionKey(salt)
         return store.copy(
             salt = salt,
             peers = store.peers.map { it.copy(sharedSecret = encrypt(key, it.sharedSecret)) }
@@ -204,8 +212,24 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     }
 
     /**
-     * Try to decrypt a secret to plaintext. Attempts PBKDF2 first,
-     * falls back to legacy SHA-256, then falls back to treating it as
+     * The key used to encrypt the store on disk: the random at-rest key file
+     * when present (creating it on first use), legacy PBKDF2 otherwise.
+     */
+    private fun encryptionKey(salt: String): SecretKey {
+        atRestKey.loadOrNull()?.let { return SecretKeySpec(it, "AES") }
+        return try {
+            SecretKeySpec(atRestKey.create(), "AES")
+        } catch (e: Exception) {
+            Log.withTag("DeviceTrustStore").w {
+                "At-rest key file unavailable (${e.message}); falling back to legacy PBKDF2 derivation"
+            }
+            deriveKey(salt)
+        }
+    }
+
+    /**
+     * Try to decrypt a secret to plaintext. Attempts the at-rest key file
+     * first, then PBKDF2 (legacy), then falls back to treating it as
      * already plaintext (pre-encryption migration).
      *
      * @return decrypted plaintext, or null if already plaintext
@@ -215,7 +239,14 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         val raw = try { Base64.getDecoder().decode(encrypted) } catch (_: Exception) { return null }
         if (raw.size < 13) return null  // GCM IV (12) + tag (min 1) = at least 13 bytes
 
-        // Try PBKDF2-derived key first
+        // Try the at-rest key file first (current scheme)
+        atRestKey.loadOrNull()?.let { key ->
+            try {
+                return decrypt(SecretKeySpec(key, "AES"), encrypted)
+            } catch (_: Exception) { /* fall through */ }
+        }
+
+        // Try PBKDF2-derived key (legacy)
         if (storeSalt.isNotBlank()) {
             try {
                 return decrypt(deriveKey(storeSalt), encrypted)

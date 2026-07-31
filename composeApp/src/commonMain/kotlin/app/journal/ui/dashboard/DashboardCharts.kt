@@ -141,19 +141,7 @@ fun TopSubstancesChart(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val fraction = count.toFloat() / maxCount
-                    // Bar: weight-based fraction of row
-                    Box(
-                        modifier = Modifier
-                            .height(14.dp)
-                            .weight(fraction.coerceAtLeast(0.05f))
-                    ) {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = chartColors[index % chartColors.size],
-                            shape = RoundedCornerShape(3.dp)
-                        ) {}
-                    }
-                    // Name: takes remaining space
+                    // Name: takes the left column
                     Text(
                         text = name,
                         style = MaterialTheme.typography.bodySmall,
@@ -161,6 +149,20 @@ fun TopSubstancesChart(
                         maxLines = 1,
                         modifier = Modifier.weight(1f)
                     )
+                    // Bar: proportional to count, anchored left of its track
+                    Box(
+                        modifier = Modifier
+                            .weight(2f)
+                            .height(14.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction.coerceAtLeast(0.05f))
+                                .fillMaxHeight(),
+                            color = chartColors[index % chartColors.size],
+                            shape = RoundedCornerShape(3.dp)
+                        ) {}
+                    }
                     // Count: fixed width
                     Text(
                         text = count.toString(),

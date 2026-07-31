@@ -60,7 +60,7 @@ object ExportImport {
      * interactions, effects, custom units, and settings.
      */
     fun exportFullJournal(repo: JournalRepository): String {
-        val snapshot = AppJson.snapshot(repo)
+        val snapshot = repo.fullSnapshot()
         return json.encodeToString(snapshot)
     }
 

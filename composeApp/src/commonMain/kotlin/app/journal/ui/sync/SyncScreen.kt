@@ -78,6 +78,7 @@ fun SyncScreen(syncEngine: SyncEngine) {
                 isHosting = status.isHosting,
                 hostAddress = status.hostAddress,
                 pairingToken = status.pairingToken,
+                tokenExpiresAt = status.tokenExpiresAt,
                 isStarting = isStartingHost,
                 isStopping = isStoppingHost,
                 continuousSync = continuousSync,
@@ -91,7 +92,7 @@ fun SyncScreen(syncEngine: SyncEngine) {
                                 deviceOrigin = "desktop",
                                 deviceId = "desktop-main",
                                 displayName = "Windows Desktop",
-                                listenerPort = manualPort.toIntOrNull() ?: 4984,
+                                listenerPort = manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT,
                                 continuousSync = continuousSync,
                                 enableDeltaSync = true
                             )

@@ -44,17 +44,11 @@ class SessionListViewModel(
         consumerFilter, searchQuery
     ) { all: List<Session>, subIds: Set<String>, favsOnly: Boolean, archived: Boolean, consumer: String?, query: String ->
         val q = if (query.isNotBlank()) query.lowercase() else null
+
+        // Batch-resolve matching session IDs in a single lock acquire via the precomputed index
         val matchingSessionIds = if (subIds.isEmpty()) null
-            else buildSet<String> {
-                for (s in all) {
-                    for (d in repo.dosesForSession(s.id)) {
-                        if (d.substanceId in subIds) {
-                            add(s.id)
-                            break
-                        }
-                    }
-                }
-            }
+            else repo.sessionIdsForSubstances(subIds)
+
         all
             .filter { s ->
                 if (matchingSessionIds != null && s.id !in matchingSessionIds) return@filter false

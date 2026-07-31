@@ -2,6 +2,13 @@ package app.journal.ui.components
 
 import androidx.compose.ui.graphics.Color
 
+/**
+ * Shared semantic color for the MEDIUM tolerance level.
+ * Kept theme-independent (amber reads on both dark and light surfaces);
+ * HIGH/LOW stay tied to the Material error/tertiary tokens.
+ */
+val toleranceMediumColor = Color(0xFFFF9800)
+
 /** Color mapping for administration routes. Shared across all screens. */
 fun routeColor(route: String): Color {
     return when (route.lowercase()) {

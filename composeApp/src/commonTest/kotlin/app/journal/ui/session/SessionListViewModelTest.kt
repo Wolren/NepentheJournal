@@ -69,6 +69,15 @@ class SessionListViewModelTest {
             title = "Archived Session", startTime = 2000L,
             isArchived = true
         ))
+        // Cannabis substance must have a dose: allSessionSubstances derives
+        // from doses joined against substances, so a substance with no dose
+        // never appears (and a predicate waiting for it would hang forever).
+        repo.upsertDose(Dose(
+            id = "d:4", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", substanceId = "sub:weed",
+            routeOfAdministration = "Oral", amount = 0.3, unit = "g",
+            timestamp = 5000L
+        ))
         return repo
     }
 

@@ -58,3 +58,10 @@ object AdaptiveColors {
         return Color((r + m), (g + m), (b + m))
     }
 }
+
+/**
+ * Picks black or white for text on top of [color], whichever has better
+ * contrast. Hardcoding white text on adaptive substance colors fails WCAG
+ * in both themes because the light/dark variants sit at 25-60% lightness.
+ */
+fun foregroundFor(color: Color): Color = if (color.luminance() > 0.45f) Color.Black else Color.White

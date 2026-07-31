@@ -23,6 +23,7 @@ import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatDateShort
 import app.journal.ui.substances.detail.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -435,9 +436,7 @@ fun SubstanceDetailScreen(
         item {
             if (allDosesForSubstance.isNotEmpty()) {
                 SectionCard(title = "Ingestion History") {
-                    Text("${allDosesForSubstance.size} doses recorded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    DoseTimelineChart(doses = allDosesForSubstance, substanceName = substance.name)
                 }
             }
         }
@@ -486,7 +485,7 @@ fun SubstanceDetailScreen(
                         }
                         val tz = TimeZone.currentSystemDefault()
                         val dLocal = Instant.fromEpochMilliseconds(dose.timestamp).toLocalDateTime(tz)
-                        Text("${dLocal.month.ordinal + 1}/${dLocal.day}",
+                        Text(formatDateShort(dLocal.date),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

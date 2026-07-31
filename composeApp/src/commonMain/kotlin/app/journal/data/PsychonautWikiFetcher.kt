@@ -5,6 +5,7 @@ import app.journal.ingest.*
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
 import app.journal.util.currentTimeMillis
+import app.journal.log.Log
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -47,7 +48,7 @@ class PsychonautWikiFetcher(
         val seen = LinkedHashSet<String>()
         val queue = ArrayDeque<String>(); queue.addLast("")
         var chunksDone = 0; var chunksTotal = 1; var rateLimitStreak = 0; var totalChunks = 0
-        val MAX_CHUNKS = 5000
+        val MAX_CHUNKS = 1000
         try {
             while (queue.isNotEmpty()) {
                 if (totalChunks >= MAX_CHUNKS) break
@@ -63,7 +64,7 @@ class PsychonautWikiFetcher(
                 onProgress(seen.size, chunksDone, chunksTotal)
                 if (gapDelayMs > 0) delay(gapDelayMs)
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) { Log.withTag("PwikiFetcher").e(e) { "WalkAll failed" } }
         return if (seen.isEmpty()) -1 else seen.size
     }
 

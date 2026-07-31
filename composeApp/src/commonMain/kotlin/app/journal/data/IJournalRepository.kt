@@ -1,6 +1,5 @@
 package app.journal.data
 
-import app.journal.ingest.IngestRepository
 import app.journal.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
  * StateFlows emit fresh lists after every mutation.
  * Implementations must be thread-safe.
  */
-interface IJournalRepository : IngestRepository {
+interface IJournalRepository {
 
     // ---- StateFlows (read-only snapshots after each mutation) ----
     val sessions: StateFlow<List<Session>>
@@ -71,18 +70,18 @@ interface IJournalRepository : IngestRepository {
     fun dosesForSession(sessionId: String): List<Dose>
     fun deleteDose(id: String)
 
-    // ---- Substances (implements IngestRepository.upsertSubstance) ----
-    override fun upsertSubstance(substance: Substance)
+    // ---- Substances ----
+    fun upsertSubstance(substance: Substance)
     fun getSubstance(id: String): Substance?
     fun searchSubstances(query: String): List<Substance>
     fun deleteSubstance(id: String)
 
     // ---- Interactions ----
-    override fun upsertInteraction(interaction: Interaction)
+    fun upsertInteraction(interaction: Interaction)
     fun getInteraction(id: String): Interaction?
 
     // ---- Effects ----
-    override fun upsertEffect(effect: Effect)
+    fun upsertEffect(effect: Effect)
     fun getEffect(id: String): Effect?
     fun effectsForSubstance(substanceId: String): List<Effect>
 
@@ -116,6 +115,13 @@ interface IJournalRepository : IngestRepository {
     // ---- Query indices ----
     fun sessionIdsOnDateRange(fromDate: String? = null, toDate: String? = null): List<String>
     fun sessionIdsForSubstance(substanceId: String): List<String>
+
+    /**
+     * Batch version of [sessionIdsForSubstance] — returns the union of session IDs
+     * that contain doses of any of the given substance IDs, using a single lock acquire.
+     */
+    fun sessionIdsForSubstances(substanceIds: Set<String>): Set<String>
+
     fun rebuildIndices()
 
     /**

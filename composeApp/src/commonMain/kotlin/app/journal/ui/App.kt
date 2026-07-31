@@ -55,6 +55,7 @@ import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
+import app.journal.util.TimeDisplayMode
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
 import app.journal.ui.search.SearchOverlay
@@ -150,7 +151,7 @@ fun App(repo: JournalRepository = JournalRepository.instance) {
     var showSearch by remember { mutableStateOf(false) }
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
-    var useRelativeTime by remember { mutableStateOf(true) }
+    var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember { createSyncEngine(JournalRepository.instance) }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
@@ -371,14 +372,18 @@ fun App(repo: JournalRepository = JournalRepository.instance) {
                                                 actions = {
                                                     when (selectedScreen) {
                                                         Screen.SESSIONS -> SessionListScreen.TopActions(
-                                                            showFavoritesOnly = showFavs,
-                                                            showArchived = showArch,
-                                                            onToggleFavorites = { sessionListViewModel.showFavoritesOnly.value = !showFavs },
-                                                            onToggleArchived = { sessionListViewModel.showArchived.value = !showArch },
-                                                            onCalendarClick = { showCalendar = true },
-                                                            useRelativeTime = useRelativeTime,
-                                                            onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
-                                                        )
+                                                                showFavoritesOnly = showFavs,
+                                                                showArchived = showArch,
+                                                                onToggleFavorites = { sessionListViewModel.showFavoritesOnly.value = !showFavs },
+                                                                onToggleArchived = { sessionListViewModel.showArchived.value = !showArch },
+                                                                onCalendarClick = { showCalendar = true },
+                                                                timeDisplayMode = timeDisplayMode,
+                                                                onCycleTimeDisplay = {
+                                                                    timeDisplayMode = TimeDisplayMode.entries[
+                                                                        (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                                    ]
+                                                                }
+                                                            )
                                                         else -> Unit
                                                     }
                                                 },
@@ -423,8 +428,12 @@ fun App(repo: JournalRepository = JournalRepository.instance) {
                                                 onEditSession = { id -> editingSessionId = id },
                                                 onSessionClick = { id -> selectedTimelineSessionId = id },
                                                 onLiveSession = { liveSessionId = "__new__" },
-                                                useRelativeTime = useRelativeTime,
-                                                onToggleTimeFormat = { useRelativeTime = !useRelativeTime }
+                                                timeDisplayMode = timeDisplayMode,
+                                                onCycleTimeDisplay = {
+                                                    timeDisplayMode = TimeDisplayMode.entries[
+                                                        (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                    ]
+                                                }
                                             )
                                             Screen.SUBSTANCES -> SubstanceScreen(
                                                 onSubstanceClick = { id -> selectedSubstanceId = id },

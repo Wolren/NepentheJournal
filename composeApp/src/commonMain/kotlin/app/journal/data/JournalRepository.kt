@@ -135,7 +135,15 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Bulk apply (seed load)
     // ========================
 
-    /** Bulk-apply entities from a sync delta — single emissions per store, single mutation bump. */
+    /**
+     * Bulk-apply entities from a sync delta — single emissions per store, single mutation bump.
+     *
+     * @param lastWriterWins when true, incoming entities whose `updatedAt` is older than
+     * the existing record are skipped (last-writer-wins by timestamp). Sync paths MUST pass
+     * true: without it, a replayed response or a stale peer push silently rolls back newer
+     * local data (audit M3). Seed loading and backup restore keep the default false so
+     * "Reset to defaults" / restore remain authoritative.
+     */
     fun applyBatch(
         sessions: List<Session> = emptyList(),
         doses: List<Dose> = emptyList(),
@@ -144,24 +152,43 @@ class JournalRepository internal constructor() : IJournalRepository {
         interactions: List<Interaction> = emptyList(),
         notes: List<Note> = emptyList(),
         timelineEvents: List<TimelineEvent> = emptyList(),
-        customUnits: List<CustomUnit> = emptyList()
+        customUnits: List<CustomUnit> = emptyList(),
+        lastWriterWins: Boolean = false
     ) = lock.withLock {
-        if (sessions.isNotEmpty()) sessionsStore.putAll(sessions)
-        if (doses.isNotEmpty()) dosesStore.putAll(doses)
-        if (substances.isNotEmpty()) substancesStore.putAll(substances)
-        if (effects.isNotEmpty()) effectsStore.putAll(effects)
-        if (interactions.isNotEmpty()) interactionsStore.putAll(interactions)
-        if (notes.isNotEmpty()) notesStore.putAll(notes)
-        if (timelineEvents.isNotEmpty()) timelineEventsStore.putAll(timelineEvents)
-        if (customUnits.isNotEmpty()) customUnitsStore.putAll(customUnits)
+        fun <T> newer(list: List<T>, get: (String) -> T?, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
+            if (!lastWriterWins) list
+            else list.filter { incoming ->
+                val existing = get(id(incoming))
+                existing == null || updatedAt(incoming) >= updatedAt(existing)
+            }
+        val sessionsToPut = newer(sessions, sessionsStore::get, { it.id }, { it.updatedAt })
+        val dosesToPut = newer(doses, dosesStore::get, { it.id }, { it.updatedAt })
+        val substancesToPut = newer(substances, substancesStore::get, { it.id }, { it.updatedAt })
+        val effectsToPut = newer(effects, effectsStore::get, { it.id }, { it.updatedAt })
+        val interactionsToPut = newer(interactions, interactionsStore::get, { it.id }, { it.updatedAt })
+        val notesToPut = newer(notes, notesStore::get, { it.id }, { it.updatedAt })
+        val timelineEventsToPut = newer(timelineEvents, timelineEventsStore::get, { it.id }, { it.updatedAt })
+        val customUnitsToPut = newer(customUnits, customUnitsStore::get, { it.id }, { it.updatedAt })
+        if (sessionsToPut.isNotEmpty()) sessionsStore.putAll(sessionsToPut)
+        if (dosesToPut.isNotEmpty()) dosesStore.putAll(dosesToPut)
+        if (substancesToPut.isNotEmpty()) substancesStore.putAll(substancesToPut)
+        if (effectsToPut.isNotEmpty()) effectsStore.putAll(effectsToPut)
+        if (interactionsToPut.isNotEmpty()) interactionsStore.putAll(interactionsToPut)
+        if (notesToPut.isNotEmpty()) notesStore.putAll(notesToPut)
+        if (timelineEventsToPut.isNotEmpty()) timelineEventsStore.putAll(timelineEventsToPut)
+        if (customUnitsToPut.isNotEmpty()) customUnitsStore.putAll(customUnitsToPut)
         // Rebuild all indices after bulk upsert to handle updates to existing entities
         // where old index entries (dates, per-session children) need to be replaced.
-        if (sessions.isNotEmpty() || doses.isNotEmpty() || effects.isNotEmpty() ||
-            notes.isNotEmpty() || timelineEvents.isNotEmpty() || customUnits.isNotEmpty()
+        if (sessionsToPut.isNotEmpty() || dosesToPut.isNotEmpty() || effectsToPut.isNotEmpty() ||
+            notesToPut.isNotEmpty() || timelineEventsToPut.isNotEmpty() || customUnitsToPut.isNotEmpty()
         ) {
             rebuildAllIndices()
         }
         bumpMutationCount()
+    }
+
+    fun fullSnapshot(): JournalSnapshot = lock.withLock {
+        AppJson.snapshot(this)
     }
 
     override fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
@@ -582,6 +609,14 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun sessionIdsForSubstance(substanceId: String): List<String> =
         lock.withLock { _sessionsPerSubstance[substanceId]?.toList() ?: emptyList() }
+
+    override fun sessionIdsForSubstances(substanceIds: Set<String>): Set<String> = lock.withLock {
+        buildSet {
+            for (subId in substanceIds) {
+                _sessionsPerSubstance[subId]?.let { addAll(it) }
+            }
+        }
+    }
 
     override fun rebuildIndices() { rebuildAllIndices() }
 

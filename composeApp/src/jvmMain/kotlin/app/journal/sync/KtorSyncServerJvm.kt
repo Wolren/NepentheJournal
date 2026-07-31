@@ -19,6 +19,11 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import app.journal.sync.aesEncryptionKey
+import app.journal.sync.base64Decode
+import app.journal.sync.base64Encode
+import app.journal.sync.decryptBody
+import app.journal.sync.encryptBody
 import java.util.concurrent.ConcurrentHashMap
 
 class KtorSyncServer(
@@ -123,9 +128,43 @@ class SyncServerRouter(
                 )
             }
 
+            get("/auth/verify") {
+                val deviceIdParam = call.request.queryParameters["deviceId"]
+                val challenge = call.request.queryParameters["challenge"]
+                if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@get
+                }
+                val secret = trustStore.getSharedSecret(deviceIdParam)
+                if (secret == null) {
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
+                    )
+                    return@get
+                }
+                // Prove knowledge of the shared secret without revealing it.
+                // Bound to a fresh client-supplied challenge, so a captured
+                // response cannot be replayed against a different challenge.
+                val timestamp = System.currentTimeMillis()
+                val signature = authenticator.signChallenge(deviceIdParam, timestamp, challenge, secret)
+                call.respondText(
+                    json.encodeToString(HostChallengeResponse(timestamp, signature)),
+                    ContentType.Application.Json
+                )
+            }
+
             post("/pairing/verify") {
-                val clientIp = call.request.headers["X-Forwarded-For"]
-                    ?: call.request.local.remoteHost
+                // Socket-level remote address. X-Forwarded-For is deliberately
+                // NOT trusted: this server is directly reachable on the LAN with
+                // no proxy, so the header is client-controlled and would let an
+                // attacker rotate the rate-limit bucket per request.
+                // Verified empirically on Ktor 3.5.1 Netty: local.remoteHost
+                // carries the peer address (the 0.0.0.0 bind is NOT returned).
+                val clientIp = call.request.local.remoteHost
                 if (isRateLimited(clientIp)) {
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Too many attempts. Try again later.")),
@@ -148,6 +187,19 @@ class SyncServerRouter(
                 } catch (e: Exception) {
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Invalid request")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
+                // Cap identity fields so a client cannot register oversized
+                // display names / ids in the trust store (4KB body allows it).
+                if (verifyReq.clientDeviceId.length > 128 ||
+                    verifyReq.clientDeviceName.length > 200 ||
+                    verifyReq.clientFingerprint.length > 128
+                ) {
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Invalid client identity")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
                     )
                     return@post
@@ -202,12 +254,32 @@ class SyncServerRouter(
                     )
                     return@post
                 }
-                val (callerDeviceId, body) = auth
+                val (callerDeviceId, encryptedBody) = auth
 
-                if (body.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
+                if (encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
+                    )
+                    return@post
+                }
+
+                // Decrypt the encrypted body before processing
+                val callerSecret = trustStore.getSharedSecret(callerDeviceId)
+                if (callerSecret == null) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "No shared secret for device")),
+                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
+                    )
+                    return@post
+                }
+                val aesKey = aesEncryptionKey(callerSecret)
+                val body = try {
+                    decryptBody(base64Decode(encryptedBody), aesKey)
+                } catch (e: Exception) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Body decryption failed: ${e.message}")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
                     )
                     return@post
                 }
@@ -218,6 +290,17 @@ class SyncServerRouter(
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Invalid payload")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
+                // The batch must identify the authenticated caller. Otherwise a
+                // paired device could attribute writes / conflict notes to
+                // another device (audit L8).
+                if (batch.deviceId != callerDeviceId) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Device ID mismatch")),
+                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
                     )
                     return@post
                 }
@@ -234,10 +317,11 @@ class SyncServerRouter(
                 handlePush(batch)
                 trustStore.updateLastSeen(callerDeviceId)
                 val exchangeResponse = handlePull(batch.since)
-                call.respondText(
-                    json.encodeToString(exchangeResponse),
-                    ContentType.Application.Json
-                )
+                // Encrypt the response: encryptBody + base64Encode
+                val encryptedResponse = base64Encode(encryptBody(
+                    json.encodeToString(exchangeResponse), aesKey
+                ))
+                call.respondText(encryptedResponse, ContentType.Application.Json)
             }
 
             get("/sync/pull") {
@@ -261,9 +345,22 @@ class SyncServerRouter(
                     return@get
                 }
 
+                val callerSecret = trustStore.getSharedSecret(callerDeviceId)
+                if (callerSecret == null) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "No shared secret for device")),
+                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
+                    )
+                    return@get
+                }
+
                 val response = handlePull(since)
                 trustStore.updateLastSeen(callerDeviceId)
-                call.respondText(json.encodeToString(response), ContentType.Application.Json)
+                val aesKey = aesEncryptionKey(callerSecret)
+                val encryptedResponse = base64Encode(encryptBody(
+                    json.encodeToString(response), aesKey
+                ))
+                call.respondText(encryptedResponse, ContentType.Application.Json)
             }
 
             webSocket("/sync/ws") {
@@ -282,12 +379,24 @@ class SyncServerRouter(
                     return@webSocket
                 }
 
+                // Derive AES key for encrypting/decrypting WsDelta frames
+                val wsAesKey = trustStore.getSharedSecret(callerDeviceId)?.let { aesEncryptionKey(it) }
+
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
                         val text = frame.readText()
                         val msg = try {
                             wsJson.decodeFromString<WsMessage>(text)
                         } catch (_: Exception) {
+                            // Not a plain WsMessage — try encrypted WsDelta
+                            if (wsAesKey != null) {
+                                try {
+                                    val plaintext = decryptBody(base64Decode(text), wsAesKey)
+                                    wsJson.decodeFromString<WsMessage>(plaintext)
+                                } catch (_: Exception) { null }
+                            } else null
+                        }
+                        if (msg == null) {
                             outgoing.send(Frame.Text(
                                 wsJson.encodeToString(WsAck(0, error = "Malformed frame"))
                             ))
@@ -310,7 +419,8 @@ class SyncServerRouter(
                                     interactions = msg.interactions,
                                     notes = msg.notes,
                                     timelineEvents = msg.timelineEvents,
-                                    customUnits = msg.customUnits
+                                    customUnits = msg.customUnits,
+                                    lastWriterWins = true
                                 )
                                 outgoing.send(Frame.Text(
                                     wsJson.encodeToString(WsAck(seq = msg.seq))
@@ -365,7 +475,8 @@ class SyncServerRouter(
             interactions = batch.interactions,
             timelineEvents = batch.timelineEvents,
             effects = batch.effects,
-            customUnits = batch.customUnits
+            customUnits = batch.customUnits,
+            lastWriterWins = true
         )
         batch.sessions.forEach { session ->
             val existing = repo.getSession(session.id)
@@ -416,14 +527,3 @@ class SyncServerRouter(
             }
     }
 }
-
-@Serializable
-data class PairingStartResponse(
-    val token: String,
-    val hostFingerprint: String,
-    val hostDeviceId: String,
-    val hostDeviceName: String,
-    val hostAddress: String,
-    val listenerPort: Int,
-    val protocolVersion: Int = 2
-)

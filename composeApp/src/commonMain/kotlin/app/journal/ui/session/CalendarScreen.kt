@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatDateShort
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
@@ -266,7 +267,7 @@ fun CalendarScreen(
             // Sessions for selected date
             if (selectedDate != null) {
                 Text(
-                    "${sessionsForDate.size} session${if (sessionsForDate.size != 1) "s" else ""} on ${selectedDate}",
+                    "${sessionsForDate.size} session${if (sessionsForDate.size != 1) "s" else ""} on ${formatDateShort(selectedDate!!)}",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

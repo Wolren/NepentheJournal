@@ -2,6 +2,7 @@ package app.journal.ui.session.timeline
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -12,6 +13,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -22,9 +25,11 @@ import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.model.Dose
 import app.journal.model.TimelineEvent
+import app.journal.model.TimelineEventType
 import app.journal.model.CheckIn
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.foregroundFor
 import app.journal.util.currentTimeMillis
 import app.journal.ui.session.timeline.phaseColors
 
@@ -41,10 +46,12 @@ internal fun TimelineBar(
     endTime: Long?,
     events: List<TimelineEvent>,
     checkins: List<CheckIn>,
-    doses: List<Dose>
+    doses: List<Dose>,
+    shulginRating: String? = null
 ) {
     val repo = remember { JournalRepository.instance }
     val isDark = ThemeManager.instance.isDarkTheme()
+    val onSurface = MaterialTheme.colorScheme.onSurface
     val totalDuration = (endTime ?: currentTimeMillis()) - startTime
     val now = currentTimeMillis()
     val rangeMs = totalDuration.coerceAtLeast(1L)
@@ -101,7 +108,7 @@ internal fun TimelineBar(
                         val c = AdaptiveColors.colorFor(name).getComposeColor(isDark)
                         Surface(shape = RoundedCornerShape(6.dp), color = c) {
                             Text(name, style = MaterialTheme.typography.labelSmall,
-                                color = Color.White, fontWeight = FontWeight.SemiBold,
+                                color = foregroundFor(c), fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                         }
                     }
@@ -113,11 +120,34 @@ internal fun TimelineBar(
                 fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             val preMeasuredLabels = remember(rows, labelStyle) {
                 rows.map { row ->
-                    textMeasurer.measure(row.name.take(10), style = labelStyle)
+                    textMeasurer.measure(row.name.take(10),
+                        style = labelStyle.copy(color = foregroundFor(row.color)))
                 }
             }
             val canvasH = (displayNames.size * 26 + 4).dp
-            Box(modifier = Modifier.fillMaxWidth().height(canvasH)) {
+            var dragFraction by remember { mutableStateOf<Float?>(null) }
+            var boxWidthPx by remember { mutableFloatStateOf(0f) }
+            Box(modifier = Modifier.fillMaxWidth().height(canvasH)
+                .onGloballyPositioned { boxWidthPx = it.size.width.toFloat() }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            val barX = labelW.toPx() + 6.dp.toPx()
+                            val barW = (boxWidthPx - barX).coerceAtLeast(1f)
+                            if (offset.x >= barX) {
+                                dragFraction = ((offset.x - barX) / barW).coerceIn(0f, 1f)
+                            }
+                        },
+                        onDragEnd = { dragFraction = null },
+                        onDragCancel = { dragFraction = null },
+                        onHorizontalDrag = { change, _ ->
+                            val barX = labelW.toPx() + 6.dp.toPx()
+                            val barW = (boxWidthPx - barX).coerceAtLeast(1f)
+                            dragFraction = ((change.position.x - barX) / barW).coerceIn(0f, 1f)
+                        }
+                    )
+                }
+            ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width; val labelPx = labelW.toPx()
                     val barX = labelPx + 6.dp.toPx(); val barW = (w - barX).coerceAtLeast(1f)
@@ -151,7 +181,8 @@ internal fun TimelineBar(
 
                         if (endTime == null || now < endTime) {
                             val p = ((now - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
-                            drawLine(Color.White, Offset(barX + p * barW, y), Offset(barX + p * barW, y + rowPx), strokeWidth = 2.dp.toPx())
+                            drawLine(onSurface.copy(alpha = 0.9f),
+                                Offset(barX + p * barW, y), Offset(barX + p * barW, y + rowPx), strokeWidth = 2.dp.toPx())
                         }
                     }
 
@@ -160,6 +191,55 @@ internal fun TimelineBar(
                         drawText(textLayoutResult = measured,
                             topLeft = Offset(x = (labelPx - measured.size.width) / 2f,
                                 y = y + (rowPx - measured.size.height) / 2f))
+                    }
+
+                    // Drag-scrub indicator line and time label
+                    if (dragFraction != null) {
+                        val scrbX = barX + dragFraction!! * barW
+                        drawLine(onSurface.copy(alpha = 0.8f), Offset(scrbX, 0f),
+                            Offset(scrbX, size.height), strokeWidth = 1.5.dp.toPx())
+                        val elapsedMs = (dragFraction!! * rangeMs).toLong()
+                        val timeLabel = formatTimeOffset(elapsedMs)
+                        val measured = textMeasurer.measure(
+                            timeLabel,
+                            style = TextStyle(color = onSurface, fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold)
+                        )
+                        val labelX = (scrbX - measured.size.width / 2f)
+                            .coerceIn(measured.size.width / 2f, w - measured.size.width / 2f)
+                        drawText(textLayoutResult = measured,
+                            topLeft = Offset(labelX, 4.dp.toPx()))
+                        // Small circle at drag position on bar
+                        drawCircle(onSurface.copy(alpha = 0.8f), radius = 3.dp.toPx(),
+                            center = Offset(scrbX, size.height - 2.dp.toPx()))
+                    }
+
+                    // Shulgin rating marker near peak phase
+                    if (shulginRating != null && phaseEvents.size >= 2) {
+                        val peakEvents = phaseEvents.filter { it.eventType == TimelineEventType.PEAK }
+                        val peakTime = if (peakEvents.isNotEmpty()) {
+                            (peakEvents.first().timestamp + peakEvents.last().timestamp) / 2
+                        } else {
+                            val midIdx = phaseEvents.size / 2
+                            phaseEvents[midIdx].timestamp
+                        }
+                        val pct = ((peakTime - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                        val markerX = barX + pct * barW
+                        // Theme-aware gold: pale gold is invisible on light surfaces
+                        val markerColor = if (isDark) Color(0xFFFFD54F) else Color(0xFFB28704)
+                        val ratingStyle = TextStyle(color = markerColor, fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold)
+                        val ratingMeasured = textMeasurer.measure(shulginRating, style = ratingStyle)
+                        val diamondSize = 5.dp.toPx()
+                        // Draw diamond marker
+                        val cy = size.height - diamondSize - 4.dp.toPx()
+                        drawCircle(markerColor, radius = diamondSize, center = Offset(markerX, cy))
+                        drawCircle(Color.White.copy(alpha = 0.3f), radius = diamondSize,
+                            center = Offset(markerX, cy))
+                        // Rating label below diamond
+                        drawText(textLayoutResult = ratingMeasured,
+                            topLeft = Offset(markerX - ratingMeasured.size.width / 2f,
+                                cy + diamondSize + 2.dp.toPx()))
                     }
                 }
             }

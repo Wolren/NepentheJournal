@@ -2,6 +2,7 @@ package app.journal.data
 
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.KSerializer
@@ -10,6 +11,9 @@ import platform.Foundation.*
 
 @OptIn(ExperimentalForeignApi::class)
 actual class JournalStore actual constructor(private val repo: JournalRepository) {
+
+    /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
+    private val saveLock = PlatformLock()
 
     private val fileManager = NSFileManager.defaultManager
     private val baseDir: String
@@ -35,7 +39,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
     actual var lastLoadIssueSummary: String = ""
         private set
 
-    actual fun load() {
+    actual fun load() = saveLock.withLock {
         lastLoadHadIssues = false
         lastLoadIssueSummary = ""
 
@@ -44,18 +48,18 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             fileManager.removeItemAtPath(tempPath(), null)
         }
 
-        if (!fileManager.fileExistsAtPath(dataPath())) return
+        if (!fileManager.fileExistsAtPath(dataPath())) return@withLock
 
         // Size check via file attributes
         val attrs = fileManager.attributesOfItemAtPath(dataPath(), null)
         val fileSize = (attrs?.get(NSFileSize) as? NSNumber)?.longValue ?: 0
         if (fileSize > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${fileSize} bytes), refusing to load" }
-            return
+            return@withLock
         }
 
         try {
-            val text = NSString.stringWithContentsOfFile(dataPath(), encoding = NSUTF8StringEncoding, error = null) ?: return
+            val text = NSString.stringWithContentsOfFile(dataPath(), encoding = NSUTF8StringEncoding, error = null) ?: return@withLock
             val snapshot = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }
                 .getOrElse { e ->
                     Log.withTag("JournalStore").w { "Journal data failed full parse, attempting per-list recovery: ${e.message}" }
@@ -178,7 +182,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         )
     }
 
-    actual fun save() {
+    actual fun save() = saveLock.withLock {
         try {
             fileManager.createDirectoryAtPath(baseDir, withIntermediateDirectories = true, attributes = null, error = null)
 
@@ -187,14 +191,14 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
 
             if (text.length > 50_000_000) {
                 Log.withTag("JournalStore").e { "Serialized journal too large (${text.length} chars), refusing to save" }
-                return
+                return@withLock
             }
 
             // Write temp, then rename atomically
             val tmpWritten = (text as NSString).writeToFile(tempPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
             if (!tmpWritten) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tempPath()}" }
-                return
+                return@withLock
             }
 
             if (fileManager.fileExistsAtPath(dataPath())) {

@@ -10,8 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -92,7 +94,7 @@ fun SubstanceScreen(
                         leadingIcon = {
                             if (activeCategories.isEmpty()) {
                                 Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                    Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
                                 }
                             } else Box(Modifier.size(18.dp))
                         }
@@ -118,12 +120,18 @@ fun SubstanceScreen(
                                 leadingIcon = {
                                     if (isSelected) {
                                         Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                            Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
                                         }
                                     } else Box(Modifier.size(18.dp))
                                 }
                             )
                         }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Done", fontWeight = FontWeight.Bold) },
+                            onClick = { categoryDropdownExpanded = false },
+                            leadingIcon = { Box(Modifier.size(18.dp)) }
+                        )
                     }
                 }
             }
@@ -138,6 +146,9 @@ fun SubstanceScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Science, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp))
                         Text(
                             text = "No substances match \"$query\"",
                             style = MaterialTheme.typography.bodyLarge,
@@ -157,6 +168,9 @@ fun SubstanceScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Science, null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(48.dp))
                         Text("No substances in database",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -188,19 +202,7 @@ fun SubstanceScreen(
                         )
                         }
                     }
-                    // Add custom substance button at the bottom
-                    item {
-                        Spacer(Modifier.height(4.dp))
-                        AppOutlinedButton(
-                            onClick = onNewSubstance,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add custom substance")
-                        }
-                        Spacer(Modifier.height(72.dp))
-                    }
+                    item { Spacer(Modifier.height(72.dp)) }
                 }
             }
         }

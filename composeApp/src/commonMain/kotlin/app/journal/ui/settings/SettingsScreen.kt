@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.journal.ui.components.DesktopScrollbar
+import androidx.compose.foundation.lazy.rememberLazyListState
 import app.journal.data.JournalRepository
 import app.journal.sync.*
 import app.journal.ui.theme.*
@@ -57,7 +59,7 @@ fun SettingsScreen(
     var editBgColor by remember(themeConfig) { mutableStateOf<Long>(themeConfig.backgroundColor ?: 0xFF0E1511L) }
     var editSurfaceColor by remember(themeConfig) { mutableStateOf(themeConfig.surfaceColor ?: 0xFF16211AL) }
     var editBgImage by remember(themeConfig) { mutableStateOf(themeConfig.backgroundImagePath) }
-    var editBgOpacity by remember(themeConfig) { mutableStateOf(0.5f) }
+    var editBgOpacity by remember(themeConfig) { mutableStateOf(themeConfig.backgroundOpacity) }
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
     var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
@@ -110,11 +112,14 @@ fun SettingsScreen(
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var crashLogStatus by remember { mutableStateOf<String?>(null) }
+    val scrollState = rememberLazyListState()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            state = scrollState
+        ) {
         // ================ THEME ================
         item { ThemeContent(
             themeConfig = themeConfig, themeManager = themeManager,
@@ -252,10 +257,14 @@ fun SettingsScreen(
         }
 
         // ================ FOOTER ================
-        item { Text("No ads. No subscriptions. No tracking. Your data is yours.",
+        item {
+            Text("No ads. No subscriptions. No tracking. Your data is yours.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        }
         item { Spacer(Modifier.height(16.dp)) }
+        }
+        DesktopScrollbar(scrollState)
     }
 }

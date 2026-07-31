@@ -74,6 +74,8 @@ data class SyncStatusSnapshot(
     val pendingConflicts: Int,
     val lastError: String?,
     val pairingToken: String? = null,
+    /** Epoch milliseconds when [pairingToken] expires. Null if no token is active. */
+    val tokenExpiresAt: Long? = null,
     val pairedDeviceCount: Int = 0,
     val continuousPeers: Int = 0
 )
