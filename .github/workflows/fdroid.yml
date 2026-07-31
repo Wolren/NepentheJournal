@@ -1,0 +1,90 @@
+name: fdroid
+
+# F-Droid readiness: the release APK must build reproducibly.
+# Two independent clean builds of the same commit must produce byte-identical
+# APKs. F-Droid builds the app itself from source (never trusts uploaded
+# binaries), so a nondeterministic build blocks inclusion.
+#
+# Runs on every push/PR; the real F-Droid gate happens in the fdroiddata repo
+# (see docs/FDROID.md) with fdroidserver build.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-a:
+    name: Build APK (A)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v7
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Build release APK
+        run: |
+          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
+      - name: Hash the APK
+        run: |
+          sha256sum composeApp/build/outputs/apk/release/*.apk > apk-a.sha256
+          cat apk-a.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-a
+          path: apk-a.sha256
+          retention-days: 7
+
+  build-b:
+    name: Build APK (B)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v7
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Build release APK
+        run: |
+          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
+      - name: Hash the APK
+        run: |
+          sha256sum composeApp/build/outputs/apk/release/*.apk > apk-b.sha256
+          cat apk-b.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-b
+          path: apk-b.sha256
+          retention-days: 7
+
+  compare:
+    name: Verify reproducible build
+    runs-on: ubuntu-latest
+    needs: [build-a, build-b]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-a
+          path: a
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-b
+          path: b
+      - name: Compare hashes
+        run: |
+          echo "--- build A ---"; cat a/apk-a.sha256
+          echo "--- build B ---"; cat b/apk-b.sha256
+          if ! diff -q a/apk-a.sha256 b/apk-b.sha256; then
+            echo "::error::APK builds are NOT reproducible. Investigate build-time"
+            echo "::error::timestamps, ordering, or toolchain drift before submitting to F-Droid."
+            exit 1
+          fi
+          echo "REPRODUCIBLE: both builds produced byte-identical APKs."

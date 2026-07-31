@@ -41,8 +41,16 @@ data class JournalSnapshot(
  * Platform-specific path resolution via expect/actual.
  */
 expect class JournalStore(repo: JournalRepository) {
+    /**
+     * Persist the repository to disk (atomic tmp + rename).
+     *
+     * @param fullBackup when true (default), rotate the versioned .bak.N chain
+     * and refresh the immediate .bak. For high-frequency sync persists this is
+     * expensive (6 file copies of the journal); pass false to only update the
+     * main file; the debounced autosave performs the full backup shortly after.
+     */
+    fun save(fullBackup: Boolean = true)
     fun load()
-    fun save()
     fun dataPath(): String
 
     /** Whether the most recent [load] encountered parse issues that required recovery. */

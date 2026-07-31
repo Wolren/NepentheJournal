@@ -9,15 +9,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.journal.sync.DiscoveredPeer
-import app.journal.sync.DiscoveryMode
-import app.journal.sync.SyncEngine
+import app.journal.sync.*
 import app.journal.ui.components.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Connect-to-device card with IP/port/token fields, LAN scan,
@@ -46,6 +46,7 @@ fun SyncConnectCard(
 ) {
     val discoveredPeers by syncEngine.observeDiscoveredPeers().collectAsState(initial = emptyList())
     var isScanning by remember { mutableStateOf(false) }
+    var scanJob by remember { mutableStateOf<Job?>(null) }
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp)
@@ -129,23 +130,39 @@ fun SyncConnectCard(
                 }
                 if (isScanning) {
                     Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                scanJob?.cancel()
+                                scope.launch { syncEngine.stopDiscovery() }
+                                isScanning = false
+                            }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text("Scanning",
+                        Text("Scanning · tap to stop",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     AppTonalButton(
                         onClick = {
-                            scope.launch {
+                            scanJob = scope.launch {
                                 isScanning = true
                                 try {
-                                    syncEngine.startDiscovery(DiscoveryMode.HYBRID).collect { }
+                                    // The discovery flow is infinite (callbackFlow);
+                                    // time-box the scan so the button state and
+                                    // discovery lifecycle can actually end.
+                                    withTimeoutOrNull(8_000) {
+                                        syncEngine.startDiscovery(DiscoveryMode.HYBRID).collect { }
+                                    }
+                                } finally {
+                                    syncEngine.stopDiscovery()
+                                    isScanning = false
                                     onScanEnd()
-                                } finally { isScanning = false }
+                                }
                             }
                         },
                         colors = ButtonDefaults.filledTonalButtonColors(

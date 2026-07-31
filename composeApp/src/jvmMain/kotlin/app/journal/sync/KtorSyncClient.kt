@@ -45,7 +45,8 @@ class KtorSyncClient(
     private val deviceFingerprint: String? = null,
     private val deviceName: String = "Desktop (Windows)",
     private val sharedSecret: String? = null,
-    trustedFingerprint: String? = null
+    trustedFingerprint: String? = null,
+    private val persistAfterApply: (() -> Unit)? = null
 ) {
     private val json = AppJson.json
     private val canSign: Boolean get() = sharedSecret != null
@@ -246,6 +247,10 @@ class KtorSyncClient(
             customUnits = response.customUnits,
             lastWriterWins = true
         )
+        // Persist pulled data immediately (audit D1): the pull cursor advances
+        // after this response, so a crash before the debounced autosave would
+        // skip re-fetching this data on the next sync.
+        persistAfterApply?.invoke()
     }
 
     private fun authenticateRequest(deviceId: String, body: String): String {
@@ -291,7 +296,10 @@ class KtorSyncClient(
     }
 
     suspend fun sendDelta(session: WebSocketSession, delta: WsDelta) {
-        val text = wsJson.encodeToString(delta)
+        // Encode polymorphically: the server decodes frames as WsMessage and
+        // needs the #type discriminator (concrete encoding silently failed
+        // server-side decode; WS protocol bug fixed 2026-07-31).
+        val text = wsJson.encodeToString(WsMessage.serializer(), delta)
         if (sharedSecret != null) {
             val aesKey = aesEncryptionKey(sharedSecret)
             val encrypted = base64Encode(encryptBody(text, aesKey))

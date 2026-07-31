@@ -26,7 +26,8 @@ import kotlinx.coroutines.TimeoutCancellationException
  */
 class SyncTransport(
     private val repo: JournalRepository,
-    private val dataDir: String = platformSyncDataDir()
+    private val dataDir: String = platformSyncDataDir(),
+    private val persistAfterApply: (() -> Unit)? = null
 ) : SyncEngine {
 
     // Persistent infrastructure
@@ -113,7 +114,8 @@ class SyncTransport(
                     onConnection = { msg ->
                         updateStatus()
                         _status.value = _status.value.copy(lastError = msg)
-                    }
+                    },
+                    persistAfterApply = persistAfterApply
                 )
 
                 val info = srv.start() // throws on failure
@@ -217,7 +219,8 @@ class SyncTransport(
                             deviceFingerprint = deviceFingerprint,
                             deviceName = deviceDisplayName,
                             sharedSecret = secret,
-                            trustedFingerprint = existingPeer.fingerprint
+                            trustedFingerprint = existingPeer.fingerprint,
+                            persistAfterApply = persistAfterApply
                         )
                         try {
                             val since = lastSyncTime ?: 0L
@@ -259,7 +262,8 @@ class SyncTransport(
                                 val probeClient = KtorSyncClient(
                                     repo = repo,
                                     tlsIdentity = tlsIdentity,
-                                    trustedFingerprint = null
+                                    trustedFingerprint = null,
+                                    persistAfterApply = persistAfterApply
                                 )
                                 try {
                                     val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
@@ -422,8 +426,9 @@ class SyncTransport(
                 deviceFingerprint = deviceFingerprint,
                 deviceName = deviceDisplayName,
                 sharedSecret = secret,
-                trustedFingerprint = existingPeer.fingerprint
-            )
+                trustedFingerprint = existingPeer.fingerprint,
+                persistAfterApply = persistAfterApply
+                )
 
             val session = client.connectWs(peer.host, peer.port) { /* incoming frames handled by launchIncomingReader */ }
 
@@ -499,9 +504,15 @@ class SyncTransport(
         return rawFlow.onEach { event ->
             when (event) {
                 is LanDiscoveryEvent.PeerFound -> {
+                    // isTrusted must reflect the trust store, not mDNS metadata:
+                    // every host publishes a fingerprint, so the presence of one
+                    // says nothing about pairing state.
+                    val trusted = event.peer.deviceId != null &&
+                        trustStore.isTrustedDeviceId(event.peer.deviceId)
+                    val enriched = event.peer.copy(isTrusted = trusted)
                     _discoveredPeers.value = _discoveredPeers.value
-                        .filter { it.deviceId != event.peer.deviceId }
-                        .plus(event.peer)
+                        .filter { it.deviceId != enriched.deviceId }
+                        .plus(enriched)
                 }
                 is LanDiscoveryEvent.PeerLost -> {
                     _discoveredPeers.value = _discoveredPeers.value
@@ -613,10 +624,15 @@ class SyncTransport(
                             }
                             is WsAck -> { /* server acknowledged our delta — nothing to do */ }
                             is WsPing -> {
-                                session.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
+                                session.send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), WsPong(msg.seq))))
                             }
                         }
-                    } catch (_: Exception) { /* malformed frame — skip */ }
+                    } catch (e: Exception) {
+                        // Decode failures must be visible: a protocol mismatch
+                        // (e.g. missing discriminator) silently killed the whole
+                        // WS channel before 2026-07-31. Log, never crash.
+                        appendDebug("WS frame decode failed: ${e.message ?: e::class.simpleName}")
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -638,7 +654,7 @@ class SyncTransport(
             try {
                 seq++
                 wsConnection.lastPongSeq = -1L
-                session.send(Frame.Text(wsJson.encodeToString(WsPing(seq = seq))))
+                session.send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), WsPing(seq = seq))))
 
                 // Wait up to 10 seconds for a matching WsPong
                 var waited = 0L
@@ -769,6 +785,8 @@ class SyncTransport(
             timelineEvents = timelineEvents, customUnits = customUnits,
             lastWriterWins = true
         )
+        // Durability: persist what we just applied (audit D1).
+        persistAfterApply?.invoke()
         return skipped
     }
 

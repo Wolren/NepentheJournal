@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -7,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.android.application)
+    alias(libs.plugins.play.publisher)
 }
 
 // Force latest stable Netty to fix Dependabot vulnerabilities
@@ -135,6 +137,12 @@ kotlin {
 // it waited for 3 substances while the fixture had no dose for Cannabis.
 // Fixed 2026-07-31; the class now runs in the suite.
 
+// Google Play upload signing: applied ONLY when keystore.properties exists
+// (local dev or Play CI). F-Droid builds from source without secrets and must
+// stay unsigned here; they sign with their own key. See docs/GOOGLE-PLAY.md.
+val uploadKeystoreFile = rootProject.file("keystore.properties")
+val hasUploadKeystore = uploadKeystoreFile.exists()
+
 android {
     namespace = "app.journal"
     compileSdk = 36
@@ -149,11 +157,42 @@ android {
         versionName = "0.1.0"
     }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,LICENSE.md,LICENSE.txt,NOTICE.md,*.properties}" } }
-    buildTypes { getByName("release") { isMinifyEnabled = false } }
+    signingConfigs {
+        if (hasUploadKeystore) {
+            create("release") {
+                val props = Properties().apply {
+                    uploadKeystoreFile.inputStream().use { load(it) }
+                }
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            // No signingConfig when the keystore is absent: F-Droid signs the
+            // unsigned build with its own key.
+            if (hasUploadKeystore) signingConfig = signingConfigs.getByName("release")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+// Gradle Play Publisher: uploads AABs + fastlane metadata to Google Play.
+// Credentials are only set when the service account file exists, so plain
+// builds (and F-Droid) never touch them.
+play {
+    if (rootProject.file("play-service-account.json").exists()) {
+        serviceAccountCredentials.set(rootProject.file("play-service-account.json"))
+    }
+    track.set("internal")
+    defaultToAppBundles.set(true)
 }
 
 compose.desktop {

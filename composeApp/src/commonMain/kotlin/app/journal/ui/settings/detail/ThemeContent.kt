@@ -2,6 +2,8 @@ package app.journal.ui.settings.detail
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
@@ -28,6 +33,7 @@ internal fun ThemeContent(
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
+    onPresetSelect: (ThemePreset) -> Unit,
     applyTheme: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -62,6 +68,30 @@ internal fun ThemeContent(
                     FilterChip(selected = editBaseTheme == BaseTheme.CUSTOM,
                         onClick = { onBaseThemeChange(BaseTheme.CUSTOM) },
                         label = { Text("Custom") }, modifier = Modifier.weight(1f))
+                }
+
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+                Text("Presets", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(6.dp))
+                val isDark = themeManager.isDarkTheme()
+                ThemePresets.all.chunked(2).forEach { rowPresets ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowPresets.forEach { preset ->
+                            PresetCard(
+                                preset = preset,
+                                selected = preset.matches(
+                                    editPrimary, editSecondary, editTertiary,
+                                    editBgColor, editSurfaceColor, isDark
+                                ),
+                                onClick = { onPresetSelect(preset) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowPresets.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
 
                 if (editBaseTheme == BaseTheme.CUSTOM) {
@@ -129,6 +159,52 @@ internal fun ThemeContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * A preset picker card: name + a swatch strip of the palette (primary,
+ * secondary, tertiary, background, surface). Active presets get a primary
+ * border. Clicking applies the variant matching the current dark/light mode.
+ */
+@Composable
+private fun PresetCard(
+    preset: ThemePreset,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val v = preset.variant(ThemeManager.instance.isDarkTheme())
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)) else Modifier),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(v.primary, v.secondary, v.tertiary, v.background ?: Color.Transparent, v.surface ?: Color.Transparent)
+                    .forEach { c ->
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(c)
+                                .border(1.dp, Color.Black.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        )
+                    }
+                Spacer(Modifier.weight(1f))
+                if (selected) Icon(Icons.Default.Check, null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(preset.name, style = MaterialTheme.typography.labelMedium,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
 }

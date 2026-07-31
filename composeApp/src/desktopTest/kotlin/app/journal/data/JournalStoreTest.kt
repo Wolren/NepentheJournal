@@ -145,6 +145,38 @@ class JournalStoreTest {
     }
 
     @Test
+    fun lightSaveSkipsBackupRotation() = withTempHome { _ ->
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        val path = store.dataPath()
+
+        repo.upsertSession(Session(
+            id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Baseline", startTime = 1000L
+        ))
+        store.save()
+        // Second full save so the .bak.1 chain actually exists
+        repo.upsertSession(Session(
+            id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Baseline 2", startTime = 1000L
+        ))
+        store.save()
+        val bak1Before = File("$path.bak.1").readText()
+
+        // A light save (sync persist path) must update the main file...
+        repo.upsertSession(Session(
+            id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Synced", startTime = 2000L
+        ))
+        store.save(fullBackup = false)
+        assertTrue(File(path).readText().contains("Synced"), "main file must contain light-saved data")
+        // ...but must NOT rotate the backup chain (that is the autosave's job)
+        assertEquals(bak1Before, File("$path.bak.1").readText(), "light save must not touch .bak.1")
+        // After two full saves only .bak.1 exists; a light save must not advance the chain
+        assertFalse(File("$path.bak.2").exists(), "light save must not create new backup slots")
+    }
+
+    @Test
     fun lastLoadHadIssuesIsFalseOnCleanLoad() = withTempHome { _ ->
         val repo = JournalRepository()
         repo.upsertSubstance(Substance(
@@ -323,6 +355,59 @@ class JournalStoreTest {
             "Main file should not contain corrupted data after restore")
         assertTrue(dataFile.readText().contains("Original Data"),
             "Main file should contain original data after restore")
+    }
+
+    @Test
+    fun orphanTmpFileIsCleanedOnLoad() = withTempHome { _ ->
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        val path = store.dataPath()
+
+        // Save once, then plant a stale tmp as if the process died mid-save
+        repo.upsertSession(Session(
+            id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Survivor", startTime = 1000L
+        ))
+        store.save()
+        val tmp = File("$path.tmp")
+        tmp.writeText("{stale partial json}")
+
+        store.load()
+        assertFalse(tmp.exists(), "load() must clean orphaned tmp files from crashed saves")
+        assertTrue(repo.sessions.value.any { it.title == "Survivor" },
+            "data from the intact main file must survive the cleanup")
+    }
+
+    @Test
+    fun truncatedJsonSetsIssuesFlagAndKeepsUsableStore() = withTempHome { _ ->
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        val path = store.dataPath()
+
+        // Write a file that is valid JSON at the start but cut mid-structure,
+        // simulating a torn write that the atomic rename failed to prevent
+        File(path).parentFile.mkdirs()
+        val full = """{"schemaVersion":2,"sessions":[{"id":"s:1","title":"Torn","startTime":1000}"""
+        File(path).writeText(full)
+
+        store.load()
+        assertTrue(store.lastLoadHadIssues,
+            "lastLoadHadIssues should be true after loading truncated JSON")
+        // The store must remain fully usable after recovery: no crash on save
+        repo.upsertSession(Session(
+            id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "PostRecovery", startTime = 2000L
+        ))
+        store.save()
+        assertTrue(File(path).readText().contains("PostRecovery"),
+            "store must be writable after a torn-load recovery")
+    }
+
+    @Test
+    fun restoreFromBackupReturnsFalseWhenNoBackupExists() = withTempHome { _ ->
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        assertFalse(store.restoreFromBackup(), "restore with no backup should fail cleanly")
     }
 
     @Test

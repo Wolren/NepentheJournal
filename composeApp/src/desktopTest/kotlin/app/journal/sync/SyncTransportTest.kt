@@ -157,11 +157,10 @@ class SyncTransportTest {
         assertTrue(pongDecoded is WsPong, "Decoded pong should be WsPong")
         assertEquals(43L, (pongDecoded as WsPong).seq, "WsPong seq should match")
 
-        // Verify the discriminator is present
-        assertTrue(pingJson.contains("\"#type\"") || pingJson.contains("\"ws:ping\""),
-            "WsPing JSON should contain the polymorphic discriminator")
-        assertTrue(pongJson.contains("\"#type\"") || pongJson.contains("\"ws:pong\""),
-            "WsPong JSON should contain the polymorphic discriminator")
+        // Verify the discriminator value is exact (a #type key with the wrong
+        // value would pass a contains-only check)
+        assertTrue(pingJson.contains("\"#type\":\"ws:ping\""), "WsPing JSON should carry the ws:ping discriminator")
+        assertTrue(pongJson.contains("\"#type\":\"ws:pong\""), "WsPong JSON should carry the ws:pong discriminator")
     }
 
     @Test

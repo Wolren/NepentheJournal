@@ -259,6 +259,50 @@ fun SubstanceDetailScreen(
             }
         }
 
+        // Drug testing (class-based reagent suggestions, general principles only)
+        item {
+            val reagents = reagentSuggestions(substance)
+            if (reagents.isNotEmpty()) {
+                SectionCard(title = "Drug Testing") {
+                    Text(
+                        "Reagent testing can identify a substance and reveal adulterants. " +
+                        "Suggested reagents for this substance class:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        reagents.forEach { reagent ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            ) {
+                                Text(
+                                    reagent,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "No single reagent is definitive: use several and compare against a " +
+                        "reference color chart. Test the full amount you are about to take. " +
+                        "Where opioids may be involved, fentanyl test strips are strongly recommended.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         // Effects
         item { EffectsSection(substance = substance) }
 
@@ -512,5 +556,27 @@ fun SubstanceDetailScreen(
                 AppTextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+/**
+ * Class-based reagent suggestions for the Drug Testing card.
+ * General principles only: reagent names are informational, no medical claims.
+ * Empty for classes where reagent testing is not applicable (e.g. cannabis).
+ */
+private fun reagentSuggestions(substance: app.journal.model.Substance): List<String> {
+    val cls = substance.substanceClass.joinToString(" ").lowercase()
+    return when {
+        cls.contains("tryptamine") || cls.contains("lysergamide") -> listOf("Ehrlich", "Marquis", "Mecke")
+        cls.contains("phenethylamine") -> listOf("Marquis", "Mecke", "Froehde", "Simon's")
+        cls.contains("psychedelic") || cls.contains("hallucinogen") -> listOf("Ehrlich", "Marquis", "Mecke")
+        cls.contains("empathogen") || cls.contains("entactogen") -> listOf("Marquis", "Simon's", "Mecke", "Froehde")
+        cls.contains("stimulant") -> listOf("Marquis", "Mecke", "Simon's")
+        cls.contains("opioid") || cls.contains("opiate") -> listOf("Marquis", "Mecke")
+        cls.contains("dissociative") -> listOf("Mecke", "Marquis")
+        cls.contains("benzodiazepine") || cls.contains("z-drug") -> listOf("Marquis")
+        cls.contains("cathinone") -> listOf("Marquis", "Mecke", "Simon's")
+        cls.contains("cannabinoid") || cls.contains("cannabis") -> emptyList()
+        else -> listOf("Marquis", "Mecke", "Froehde")
     }
 }

@@ -32,7 +32,8 @@ class KtorSyncServer(
     private val tlsIdentity: TlsIdentityManager,
     private val trustStore: DeviceTrustStore,
     private val authenticator: SyncAuthenticator,
-    private val onConnection: (String) -> Unit
+    private val onConnection: (String) -> Unit,
+    private val persistAfterApply: (() -> Unit)? = null
 ) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
 
@@ -55,7 +56,8 @@ class KtorSyncServer(
                 onConnection = onConnection,
                 deviceId = deviceId,
                 deviceName = name,
-                fingerprint = fp
+                fingerprint = fp,
+                persistAfterApply = persistAfterApply
             )
 
             server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
@@ -91,7 +93,8 @@ class SyncServerRouter(
     private val onConnection: (String) -> Unit,
     private val deviceId: String,
     private val deviceName: String,
-    private val fingerprint: String
+    private val fingerprint: String,
+    private val persistAfterApply: (() -> Unit)? = null
 ) {
     private val json = AppJson.json
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
@@ -316,6 +319,11 @@ class SyncServerRouter(
 
                 handlePush(batch)
                 trustStore.updateLastSeen(callerDeviceId)
+                // Durability: persist before acknowledging, so a crash after the
+                // response cannot lose data the client believes was accepted.
+                // The client advances its sync cursor on a successful response,
+                // so an unpersisted ack would lose the pushed data forever.
+                persistAfterApply?.invoke()
                 val exchangeResponse = handlePull(batch.since)
                 // Encrypt the response: encryptBody + base64Encode
                 val encryptedResponse = base64Encode(encryptBody(
@@ -398,7 +406,7 @@ class SyncServerRouter(
                         }
                         if (msg == null) {
                             outgoing.send(Frame.Text(
-                                wsJson.encodeToString(WsAck(0, error = "Malformed frame"))
+                                wsJson.encodeToString(WsMessage.serializer(), WsAck(0, error = "Malformed frame"))
                             ))
                             continue
                         }
@@ -407,7 +415,7 @@ class SyncServerRouter(
                                 val validationError = validateWsDelta(msg)
                                 if (validationError != null) {
                                     outgoing.send(Frame.Text(
-                                        wsJson.encodeToString(WsAck(seq = msg.seq, error = validationError))
+                                        wsJson.encodeToString(WsMessage.serializer(), WsAck(seq = msg.seq, error = validationError))
                                     ))
                                     continue
                                 }
@@ -422,13 +430,16 @@ class SyncServerRouter(
                                     customUnits = msg.customUnits,
                                     lastWriterWins = true
                                 )
+                                // Persist before acking the delta (same rule as
+                                // the push route; see audit D1).
+                                persistAfterApply?.invoke()
                                 outgoing.send(Frame.Text(
-                                    wsJson.encodeToString(WsAck(seq = msg.seq))
+                                    wsJson.encodeToString(WsMessage.serializer(), WsAck(seq = msg.seq))
                                 ))
                                 trustStore.updateLastSeen(callerDeviceId)
                             }
                             is WsPing -> {
-                                outgoing.send(Frame.Text(wsJson.encodeToString(WsPong(msg.seq))))
+                                outgoing.send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), WsPong(msg.seq))))
                             }
                             is WsPong -> { /* ignore */ }
                             is WsAck -> { /* ignore */ }

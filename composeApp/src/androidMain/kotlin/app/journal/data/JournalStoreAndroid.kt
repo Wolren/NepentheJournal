@@ -93,7 +93,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         )
     }
 
-    actual fun save() = saveLock.withLock {
+    actual fun save(fullBackup: Boolean) = saveLock.withLock {
         val target = File(dataPath())
         val tmp = File(tempPath())
         val backup = File(backupPath())
@@ -101,7 +101,8 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         try {
             baseDir.mkdirs()
 
-            val snapshot = AppJson.snapshot(repo)
+            // Locked snapshot — see JournalStoreDesktop.save() (audit S1).
+            val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
             if (text.length > 50_000_000) {
@@ -115,13 +116,14 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
                 return@withLock
             }
 
-            if (target.exists()) {
+            if (fullBackup && target.exists()) {
                 target.copyTo(backup, overwrite = true)
             }
 
             if (!tmp.renameTo(target)) {
                 Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
                 target.writeText(text)
+                tmp.delete() // stale temp from the failed rename must not linger
             }
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to save journal data: ${e.message}" }

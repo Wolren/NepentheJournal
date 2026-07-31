@@ -28,6 +28,7 @@ import app.journal.ui.dashboard.SessionsTrendChart
 import app.journal.ui.dashboard.TopSubstancesChart
 import kotlinx.datetime.*
 import app.journal.ui.components.*
+import app.journal.ui.theme.ThemeManager
 
 @Composable
 fun DashboardScreen(
@@ -237,9 +238,12 @@ private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vect
 
 @Composable
 private fun ToleranceCard(info: ToleranceInfo) {
+    val isDark = ThemeManager.instance.isDarkTheme()
     val levelColor = when (info.level) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.error
-        ToleranceLevel.MEDIUM -> toleranceMediumColor
+        // Bright amber only reads on dark; light mode needs a deep amber
+        // (0xFF9A6700 ~ 4.6:1 on white) to stay legible.
+        ToleranceLevel.MEDIUM -> if (isDark) toleranceMediumColor else Color(0xFF9A6700)
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiary
         ToleranceLevel.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     }

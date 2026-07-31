@@ -27,6 +27,18 @@ class SyncAuthenticatorTest {
     }
 
     @Test
+    fun pairingTokensUseSafeAlphabetAndDoNotCollide() {
+        val allowed = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+        val tokens = List(200) { authenticator.generatePairingToken() }
+        tokens.forEach { t ->
+            assertEquals(6, t.length, "token must be exactly 6 chars")
+            assertTrue(t.all { it in allowed }, "token char outside safe alphabet: $t")
+        }
+        assertEquals(tokens.size, tokens.distinct().size,
+            "200 token draws must not collide (alphabet 32^6 ~ 1.07e9, collision chance is negligible)")
+    }
+
+    @Test
     fun verifyPairingTokenSucceedsForValidToken() {
         val token = authenticator.generatePairingToken(60L)
         assertTrue(authenticator.verifyPairingToken(token))

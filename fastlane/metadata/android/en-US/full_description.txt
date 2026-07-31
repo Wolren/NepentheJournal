@@ -1,0 +1,16 @@
+Nepenthe Journal is a private, offline-first journal for tracking substance sessions with a strong harm reduction focus. No accounts, no cloud, no ads, no telemetry: your data never leaves your devices.
+
+Features:
+
+- Session journal with doses, routes, timeline events, check-ins, and effect ratings (numeric and Shulgin scales)
+- Built-in substance library: 325+ substances with dosages (DoseWiki), durations, effects, interactions, and pharmacology data (PubChem, ChEMBL, IUPHAR, PDSP, BindingDB)
+- Tolerance tracking per substance with 30-day dose history
+- Substance interaction checker with severity warnings
+- Safer use guide: reagent testing, dosing protocol, recovery position, and external harm reduction resources
+- Per-substance drug testing card with class-based reagent suggestions
+- Optional end-to-end encrypted P2P sync between your own devices over LAN (pairing tokens, AES-256-GCM, HMAC authentication). No servers involved
+- Export to Markdown for Obsidian, CSV export, and automatic local backups
+
+Important: this app is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Information is provided for harm reduction and educational purposes only. Always consult a qualified healthcare professional for medical advice.
+
+License: GPL-3.0

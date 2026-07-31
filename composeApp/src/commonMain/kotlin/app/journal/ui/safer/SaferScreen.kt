@@ -72,7 +72,22 @@ fun SaferScreen() {
                 body = "Reagent testing helps identify substances and detect adulterants. " +
                        "Common reagents: Marquis, Mandelin, Mecke, Ehrlich, Froehde. " +
                        "Use multiple reagents to cross-check results, as no single reagent is definitive. " +
+                       "Test the full amount you are about to consume, not just a sample from the batch. " +
+                       "Fentanyl test strips are recommended wherever opioids are involved. " +
                        "Dancesafe provides testing resources and harm reduction education."
+            )
+        }
+
+        item {
+            SaferSection(
+                title = "Dosing Protocol",
+                icon = Icons.Default.Speed,
+                body = "Every substance is dose-response: more is not better, it is riskier. " +
+                       "Start with a low dose and wait for the full onset before deciding whether to take more. " +
+                       "Onset can take longer than expected, especially orally, so waiting is part of the protocol. " +
+                       "Redosing too early or too often is a common cause of overdose. " +
+                       "Check the Dosage section of each substance in this app for typical ranges, " +
+                       "and never mix substances when trying something for the first time."
             )
         }
 

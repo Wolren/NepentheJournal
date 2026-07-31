@@ -51,6 +51,9 @@ fun SettingsScreen(
 
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
+    // Captured at composition: ThemeManager.isDarkTheme is @Composable and
+    // cannot be called from click lambdas.
+    val isDarkNow = themeManager.isDarkTheme()
     var themeExpanded by remember { mutableStateOf(false) }
     var editBaseTheme by remember(themeConfig) { mutableStateOf(themeConfig.baseTheme) }
     var editPrimary by remember(themeConfig) { mutableStateOf(themeConfig.primaryColor) }
@@ -133,7 +136,19 @@ fun SettingsScreen(
             onSurfaceColorChange = { editSurfaceColor = it }, onBgImageChange = { editBgImage = it },
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
-            onAnimationScaleChange = { editAnimationScale = it }, applyTheme = { applyTheme() }
+            onAnimationScaleChange = { editAnimationScale = it },
+            onPresetSelect = { preset ->
+                // Apply the preset variant matching the current dark/light mode,
+                // keeping the user's base theme choice (Dark/Light/System).
+                val v = preset.variant(isDarkNow)
+                editPrimary = v.primaryColor
+                editSecondary = v.secondaryColor
+                editTertiary = v.tertiaryColor
+                editBgColor = v.backgroundColor ?: editBgColor
+                editSurfaceColor = v.surfaceColor ?: editSurfaceColor
+                applyTheme()
+            },
+            applyTheme = { applyTheme() }
         ) }
 
         // ================ PREFERENCES ================

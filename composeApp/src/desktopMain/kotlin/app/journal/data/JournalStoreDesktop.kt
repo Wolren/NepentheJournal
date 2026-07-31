@@ -106,7 +106,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         )
     }
 
-    actual fun save() = saveLock.withLock {
+    actual fun save(fullBackup: Boolean) = saveLock.withLock {
         val target = File(dataPath())
         val tmp = File(tempPath())
         val backup = File(backupPath())
@@ -114,7 +114,11 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         try {
             target.parentFile.mkdirs()
 
-            val snapshot = AppJson.snapshot(repo)
+            // repo.fullSnapshot() holds the repository lock so the multi-store
+            // snapshot cannot tear (a mutation between store reads would persist
+            // e.g. a session without its doses). AppJson.snapshot(repo) directly
+            // is NOT safe here (audit S1).
+            val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
             if (text.length > 50_000_000) {
@@ -128,7 +132,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
                 return@withLock
             }
 
-            if (target.exists()) {
+            if (fullBackup && target.exists()) {
                 // Rotate versioned backups: .bak.4 → .bak.5, .bak.3 → .bak.4, .bak.2 → .bak.3, .bak.1 → .bak.2
                 for (i in 4 downTo 1) {
                     val from = File(versionedBackupPath(i))
@@ -158,7 +162,9 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
                         Log.withTag("JournalStore").w { "Direct write attempt $attempt failed: ${e.message}" }
                     }
                 }
-                if (!success) {
+                if (success) {
+                    tmp.delete() // stale temp from the failed rename must not linger
+                } else {
                     Log.withTag("JournalStore").e { "Failed to write journal data after 3 attempts" }
                 }
             }
@@ -172,12 +178,12 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
      * named YYYYMMDD_HHmmss.json. Intended to be called on app close from the UI layer.
      * After creating the new backup, rotates old backups keeping only the 10 most recent.
      */
-    actual fun triggerAutoBackup() {
+    actual fun triggerAutoBackup() = saveLock.withLock {
         try {
             val target = File(dataPath())
             if (!target.exists()) {
                 Log.withTag("JournalStore").w { "Cannot auto-backup: no journal file exists" }
-                return
+                return@withLock
             }
             val autoDir = File(target.parentFile, ".auto")
             autoDir.mkdirs()
@@ -210,22 +216,22 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
      * Replaces the main journal file from the .bak backup and reloads.
      * Returns true if restore succeeded, false if no .bak was available.
      */
-    actual fun restoreFromBackup(): Boolean {
+    actual fun restoreFromBackup(): Boolean = saveLock.withLock {
         try {
             val target = File(dataPath())
             val backup = File(backupPath())
             if (!backup.exists()) {
                 Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
-                return false
+                return@withLock false
             }
             backup.copyTo(target, overwrite = true)
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
             // Reload the restored data
             load()
-            return true
+            return@withLock true
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to restore from backup: ${e.message}" }
-            return false
+            return@withLock false
         }
     }
 }

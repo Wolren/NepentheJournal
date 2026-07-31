@@ -108,9 +108,13 @@ fun App(repo: JournalRepository = JournalRepository.instance) {
         }
     }
 
-    // ── Data integrity: auto-backup on close ──
+    // ── Data integrity: save + auto-backup on close ──
     DisposableEffect(Unit) {
         onDispose {
+            // Save in-memory changes FIRST, then back up the fresh file.
+            // Backing up without saving would copy a file up to 2s stale
+            // (autosave debounce) and silently drop the last edits (audit S2).
+            journalStore.save()
             journalStore.triggerAutoBackup()
         }
     }

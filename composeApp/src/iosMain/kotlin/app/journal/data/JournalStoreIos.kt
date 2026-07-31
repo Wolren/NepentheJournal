@@ -74,11 +74,11 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         }
     }
 
-    actual fun triggerAutoBackup() {
+    actual fun triggerAutoBackup() = saveLock.withLock {
         try {
             if (!fileManager.fileExistsAtPath(dataPath())) {
                 Log.withTag("JournalStore").w { "Cannot auto-backup: no journal file exists" }
-                return
+                return@withLock
             }
             val autoDir = "$baseDir/.auto"
             fileManager.createDirectoryAtPath(autoDir, withIntermediateDirectories = true, attributes = null, error = null)
@@ -118,12 +118,12 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         }
     }
 
-    actual fun restoreFromBackup(): Boolean {
-        return try {
+    actual fun restoreFromBackup(): Boolean = saveLock.withLock {
+        try {
             val backup = backupPath()
             if (!fileManager.fileExistsAtPath(backup)) {
                 Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
-                return false
+                return@withLock false
             }
             // Remove current file if exists
             if (fileManager.fileExistsAtPath(dataPath())) {
@@ -182,11 +182,12 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         )
     }
 
-    actual fun save() = saveLock.withLock {
+    actual fun save(fullBackup: Boolean) = saveLock.withLock {
         try {
             fileManager.createDirectoryAtPath(baseDir, withIntermediateDirectories = true, attributes = null, error = null)
 
-            val snapshot = AppJson.snapshot(repo)
+            // Locked snapshot — see JournalStoreDesktop.save() (audit S1).
+            val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
             if (text.length > 50_000_000) {
@@ -201,7 +202,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
                 return@withLock
             }
 
-            if (fileManager.fileExistsAtPath(dataPath())) {
+            if (fullBackup && fileManager.fileExistsAtPath(dataPath())) {
                 // Remove existing backup, copy current to backup, remove current
                 if (fileManager.fileExistsAtPath(backupPath())) {
                     fileManager.removeItemAtPath(backupPath(), null)
@@ -213,6 +214,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             if (!fileManager.moveItemAtPath(tempPath(), toPath = dataPath(), error = null)) {
                 Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
                 (text as NSString).writeToFile(dataPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
+                fileManager.removeItemAtPath(tempPath(), null)
             }
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to save journal data: ${e.message}" }

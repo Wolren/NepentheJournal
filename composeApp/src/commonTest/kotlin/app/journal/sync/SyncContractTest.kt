@@ -122,10 +122,12 @@ class SyncContractTest {
 
         val request = SyncPushRequest.fromBatch(batch!!, testSecret, testDeviceId)
         assertTrue(request.body.length > 0)
-        assertTrue(request.authHeader.contains(":"))
 
+        // Full format check: timestamp:nonce:signature (see format test above)
         val parts = request.authHeader.split(":", limit = 3)
         assertEquals(3, parts.size)
+        assertTrue(parts[0].toLongOrNull() != null, "timestamp must be numeric")
+        assertEquals(32, parts[1].length, "nonce must be 32 hex chars")
         assertEquals(64, parts[2].length)
 
         val payload = "${request.deviceId}:${parts[0]}:${parts[1]}:${request.body}"

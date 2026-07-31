@@ -64,3 +64,9 @@ scripts/pdsp_ki_database.csv
 
 # Hermes
 .hermes/
+
+# Google Play signing + service account (never commit)
+keystore.properties
+*.jks
+*.keystore
+play-service-account.json

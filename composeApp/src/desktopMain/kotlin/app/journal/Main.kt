@@ -45,6 +45,20 @@ fun main() {
         app.journal.log.Log.withTag("JVM").e(throwable) { "Uncaught exception on ${thread.name}" }
     }
 
+    // Flush in-memory data on JVM shutdown (Ctrl+C, taskkill, kill).
+    // The Compose onDispose path covers clean window close; this covers
+    // everything else so at most the 2s autosave debounce window is lost.
+    // Best effort: logging may be mid-flush during shutdown (audit S2).
+    Runtime.getRuntime().addShutdownHook(Thread {
+        try {
+            app.journal.data.JournalStore(JournalRepository.instance).save()
+        } catch (e: Exception) {
+            try {
+                app.journal.log.Log.withTag("JVM").e(e) { "Shutdown save failed" }
+            } catch (_: Exception) { /* logging unavailable during shutdown */ }
+        }
+    })
+
     // Scope for debounced auto-save (lives as long as the app)
     val autoSaveScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     application {
