@@ -1,15 +1,23 @@
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)]()
-[![Compose Multiplatform](https://img.shields.io/badge/Compose-1.11.1-3794EF?logo=jetpackcompose&logoColor=white)]()
-[![Desktop](https://img.shields.io/badge/Target-Desktop-6DB33F?logo=openjdk&logoColor=white)]()
-[![Android](https://img.shields.io/badge/Target-Android-3DDC84?logo=android&logoColor=white)]()
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)]()
+<div align="center">
+
+![Nepenthe Journal](composeApp/src/desktopMain/resources/icon.png)
 
 # Nepenthe Journal
 
 Offline-first journal for tracking psychoactive substance sessions, monitoring tolerance, and browsing reference data. Built with Compose Multiplatform.
 
 No cloud, no accounts, no surveillance. Data lives on your device. Optional P2P sync between your own devices over LAN.
+
+[![License: GPL v3](https://img.shields.io/github/license/Wolren/NepentheJournal)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/commits)
+[![Issues](https://img.shields.io/github/issues/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/issues)
+[![Code size](https://img.shields.io/github/languages/code-size/Wolren/NepentheJournal)]()
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)](gradle/libs.versions.toml)
+[![Desktop](https://img.shields.io/badge/Target-Desktop-6DB33F?logo=openjdk&logoColor=white)]()
+[![Android](https://img.shields.io/badge/Target-Android-3DDC84?logo=android&logoColor=white)]()
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows)
+
+</div>
 
 ---
 
@@ -131,7 +139,7 @@ Desktop (primary target), Android, and iOS share the same `commonMain` code. Pla
 ### Prerequisites
 
 - JDK 21+ (Temurin recommended)
-- Android SDK at `D:\Android\sdk` (for Android builds)
+- Android SDK (for Android builds)
 - Gradle wrapper included
 
 ### Desktop (primary)
@@ -218,6 +226,12 @@ Enable test data via any of:
 
 ---
 
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+---
+
 ## License
 
 GNU General Public License v3.0. See [LICENSE](LICENSE).
@@ -229,4 +243,3 @@ GNU General Public License v3.0. See [LICENSE](LICENSE).
 - **IUPHAR/BPS Guide to Pharmacology**: ligand-target interaction data.
 - **PDSP Ki Database** (NIMH Psychoactive Drug Screening Program): Ki binding data.
 - **BindingDB**: public affinity measurements.
-
