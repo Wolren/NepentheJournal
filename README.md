@@ -1,6 +1,6 @@
 <div align="center">
 
-![Nepenthe Journal](composeApp/src/desktopMain/resources/icon.png)
+![Nepenthe Journal](docs/logo.png)
 
 # Nepenthe Journal
 
