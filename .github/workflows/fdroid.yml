@@ -28,7 +28,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
@@ -51,7 +51,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
