@@ -16,6 +16,7 @@ No cloud, no accounts, no surveillance. Data lives on your device. Optional P2P 
 [![Desktop](https://img.shields.io/badge/Target-Desktop-6DB33F?logo=openjdk&logoColor=white)]()
 [![Android](https://img.shields.io/badge/Target-Android-3DDC84?logo=android&logoColor=white)]()
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Wolren-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/wolren)
 
 </div>
 
