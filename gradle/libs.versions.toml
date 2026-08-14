@@ -51,4 +51,4 @@ kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization",ver
 kotlin-compose          = { id = "org.jetbrains.kotlin.plugin.compose",      version.ref = "kotlin" }
 compose-multiplatform   = { id = "org.jetbrains.compose",                    version = "1.11.1" }
 android-application     = { id = "com.android.application",                  version.ref = "agp" }
-play-publisher          = { id = "com.github.triplet.play",                  version = "4.0.0" }
+play-publisher          = { id = "com.github.triplet.play",                  version = "4.1.1" }
