@@ -18,7 +18,7 @@ import io.ktor.client.*
 import kotlinx.coroutines.launch
 
 /**
- * Parsed FDA interaction entry — a drug class/name followed by its interaction description.
+ * Parsed FDA interaction entry - a drug class/name followed by its interaction description.
  */
 private data class FdaInteractionEntry(
     val drugClass: String,
@@ -41,7 +41,7 @@ private fun parseInteractionText(raw: String): List<FdaInteractionEntry> {
     val parts = regex.split(text)
 
     if (parts.size < 2) {
-        // No parseable structure — return whole text as one entry
+        // No parseable structure - return whole text as one entry
         return listOf(FdaInteractionEntry("Overview", text.take(500)))
     }
 
@@ -121,7 +121,7 @@ fun OpenFdaInteractionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            // Header — clickable to expand/collapse
+            // Header - clickable to expand/collapse
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -195,7 +195,7 @@ fun OpenFdaInteractionCard(
                 )
             }
 
-            // Parsed interaction entries — collapsed by default
+            // Parsed interaction entries - collapsed by default
             if (expanded) {
                 Column(Modifier.padding(top = 8.dp)) {
                     interactionEntries.forEach { entry ->

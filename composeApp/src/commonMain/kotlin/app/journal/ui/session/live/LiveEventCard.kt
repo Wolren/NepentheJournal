@@ -29,7 +29,7 @@ sealed class LiveTimelineItem {
 internal fun LiveEventCard(
     event: TimelineEvent,
     sessionStart: Long,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     onDelete: ((TimelineEvent) -> Unit)? = null
 ) {
     var editing by remember { mutableStateOf(false) }

@@ -29,7 +29,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionTimelineScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     sessionId: String,
     onBack: () -> Unit,
 ) {

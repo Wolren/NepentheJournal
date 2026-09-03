@@ -13,6 +13,10 @@ import app.journal.model.*
  *
  * Each entity type gets its own CSV. Filtered subset and zip bundle
  * supported via [CsvExportFilter].
+ *
+ * Formula safety: every field is prefixed with a single quote when it starts
+ * with = + - or @ (after stripping leading spaces), so spreadsheet apps
+ * never evaluate exported journal text as a formula.
  */
 object CsvExporter {
 

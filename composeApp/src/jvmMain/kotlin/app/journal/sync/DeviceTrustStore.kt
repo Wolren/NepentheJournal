@@ -55,6 +55,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     )
 
     private val file: File get() = File(dataDir, "trusted-devices.json")
+    private val backupFile: File get() = File(dataDir, "trusted-devices.json.bak")
     private val tmpFile: File get() = File(dataDir, "trusted-devices.json.tmp")
     private val json get() = AppJson.json
     override fun toString(): String = json.encodeToString(this)
@@ -129,8 +130,14 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     // ---- Private ----
 
     /**
-     * Load the trust store from disk (or cache), transparently migrating
-     * from legacy encryption (SHA-256) and pre-encryption (plaintext).
+     * Load the trust store from disk (or cache).
+     *
+     * Fail-closed contract: a corrupt or unreadable file NEVER resets to an
+     * empty store (that would silently unpair every device and let a fresh
+     * pairing overwrite existing trust). Instead the loader retries once,
+     * then falls back to the backup copy, and only throws when neither is
+     * usable. The in-memory cache is left untouched on failure so the last
+     * known trust set keeps working for the rest of the session.
      *
      * Always returns a store with plaintext sharedSecrets.
      * The underlying file stores encrypted secrets; the plaintext versions
@@ -146,6 +153,18 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         }
 
         if (!file.exists()) {
+            if (backupFile.exists()) {
+                Log.withTag("DeviceTrustStore").w { "Primary trust store missing; restoring from backup" }
+                return try {
+                    val restored = readAndDecrypt(backupFile)
+                    cachedStore = restored
+                    currentSalt = restored.salt
+                    restored
+                } catch (e: Exception) {
+                    Log.withTag("DeviceTrustStore").e(e) { "Backup trust store unreadable" }
+                    throw IllegalStateException("Trust store missing and backup unreadable", e)
+                }
+            }
             val salt = generateSalt()
             currentSalt = salt
             val store = TrustStore(salt = salt)
@@ -153,52 +172,93 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
             return store
         }
         return try {
-            val raw = json.decodeFromString<TrustStore>(file.readText())
-            val storeSalt = raw.salt.ifBlank { generateSalt() }
-
-            // Decrypt each peer's sharedSecret to plaintext in memory
-            val decryptedPeers = raw.peers.map { peer ->
-                val secret = peer.sharedSecret
-                if (secret.isEmpty()) return@map peer
-                decryptToPlaintext(secret, storeSalt)?.let { peer.copy(sharedSecret = it) } ?: peer
-            }
-            val decrypted = raw.copy(salt = storeSalt, peers = decryptedPeers)
-
+            val decrypted = readAndDecrypt(file)
             // If the store was pre-PBKDF2 (empty salt), upgrade immediately
-            if (raw.salt.isBlank()) {
-                Log.withTag("DeviceTrustStore").i { "Upgrading trust store to PBKDF2 encryption" }
-                currentSalt = storeSalt
-                cachedStore = decrypted
-                // Write encrypted version with the new salt before returning
-                file.writeText(json.encodeToString(encryptStore(decrypted)))
-                return decrypted
+            if (decrypted.salt.isBlank()) {
+                Log.withTag("DeviceTrustStore").i { "Upgrading trust store to key-file encryption" }
+                val upgraded = decrypted.copy(salt = generateSalt())
+                currentSalt = upgraded.salt
+                cachedStore = upgraded
+                writeEncrypted(upgraded)
+                return upgraded
             }
-
-            currentSalt = storeSalt
+            currentSalt = decrypted.salt
             cachedStore = decrypted
             decrypted
         } catch (e: Exception) {
-            Log.withTag("DeviceTrustStore").e(e) { "Corrupt trust store at ${file.absolutePath}, resetting: ${e.message}" }
-            val salt = generateSalt()
-            currentSalt = salt
-            val store = TrustStore(salt = salt)
-            cachedStore = store
-            store
+            // Retry once (transient IO), then try the backup. Never reset.
+            Log.withTag("DeviceTrustStore").w { "Trust store read failed (${e.message}); retrying" }
+            try {
+                Thread.sleep(100)
+            } catch (_: InterruptedException) { }
+            try {
+                val decrypted = readAndDecrypt(file)
+                currentSalt = decrypted.salt
+                cachedStore = decrypted
+                return decrypted
+            } catch (retry: Exception) {
+                Log.withTag("DeviceTrustStore").e(retry) { "Trust store retry failed; trying backup" }
+            }
+            if (backupFile.exists()) {
+                try {
+                    val restored = readAndDecrypt(backupFile)
+                    Log.withTag("DeviceTrustStore").w { "Restored trust store from backup copy" }
+                    cachedStore = restored
+                    currentSalt = restored.salt
+                    return restored
+                } catch (backupErr: Exception) {
+                    Log.withTag("DeviceTrustStore").e(backupErr) { "Backup trust store unreadable; failing closed" }
+                }
+            } else {
+                Log.withTag("DeviceTrustStore").e(e) { "Corrupt trust store at ${file.absolutePath}; failing closed (no backup)" }
+            }
+            cachedStore?.let { return it }
+            throw IllegalStateException("Trust store unreadable and no cached copy available", e)
         }
     }
 
-    private fun saveStore(store: TrustStore) {
-        cachedStore = store
-        currentSalt = store.salt.ifBlank { generateSalt() }
+    /**
+     * Read [source] with a file-length precheck, decode it, and decrypt each
+     * peer secret to plaintext. Throws on any failure.
+     */
+    private fun readAndDecrypt(source: File): TrustStore {
+        if (source.length() > MAX_TRUST_FILE_BYTES) {
+            throw IllegalStateException("Trust store file too large (${source.length()} bytes)")
+        }
+        val raw = json.decodeFromString<TrustStore>(source.readText())
+        val storeSalt = raw.salt.ifBlank { generateSalt() }
+        val decryptedPeers = raw.peers.map { peer ->
+            val secret = peer.sharedSecret
+            if (secret.isEmpty()) return@map peer
+            decryptToPlaintext(secret, storeSalt)?.let { peer.copy(sharedSecret = it) } ?: peer
+        }
+        return raw.copy(salt = storeSalt, peers = decryptedPeers)
+    }
+
+    /** Encrypt [store] and write it atomically, keeping the prior file as backup. */
+    private fun writeEncrypted(store: TrustStore) {
         file.parentFile.mkdirs()
-        val encrypted = encryptStore(store.copy(salt = currentSalt!!))
-        // Atomic write: write to .tmp, then rename
+        val encrypted = encryptStore(store)
         val text = json.encodeToString(encrypted)
         tmpFile.writeText(text)
+        if (file.exists()) {
+            try {
+                file.copyTo(backupFile, overwrite = true)
+            } catch (e: Exception) {
+                Log.withTag("DeviceTrustStore").w { "Cannot write trust store backup (${e.message})" }
+            }
+        }
         if (!tmpFile.renameTo(file)) {
             // renameTo can fail on Windows if target exists and is locked
             file.writeText(text)
         }
+    }
+
+    private fun saveStore(store: TrustStore) {
+        val salted = store.copy(salt = store.salt.ifBlank { currentSalt ?: generateSalt() })
+        cachedStore = salted
+        currentSalt = salted.salt
+        writeEncrypted(salted)
     }
 
     /** Encrypt every peer's sharedSecret using the store's salt. */
@@ -212,19 +272,17 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     }
 
     /**
-     * The key used to encrypt the store on disk: the random at-rest key file
-     * when present (creating it on first use), legacy PBKDF2 otherwise.
+     * The key used to encrypt the store on disk: the random at-rest key file.
+     * Key-file-only writer: when the key file cannot be created (ACL cannot
+     * be hardened), creation fails closed instead of silently falling back to
+     * a derivable constant password. Reads still accept legacy PBKDF2 and
+     * SHA-256 ciphertext for migration, and re-encrypt with the key file on
+     * the next save.
      */
     private fun encryptionKey(salt: String): SecretKey {
         atRestKey.loadOrNull()?.let { return SecretKeySpec(it, "AES") }
-        return try {
-            SecretKeySpec(atRestKey.create(), "AES")
-        } catch (e: Exception) {
-            Log.withTag("DeviceTrustStore").w {
-                "At-rest key file unavailable (${e.message}); falling back to legacy PBKDF2 derivation"
-            }
-            deriveKey(salt)
-        }
+        // create() throws when the key file cannot be stored securely.
+        return SecretKeySpec(atRestKey.create(), "AES")
     }
 
     /**
@@ -265,6 +323,9 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     // ---- PBKDF2 key derivation ----
 
     companion object {
+        /** Cap on the trust-store file so a corrupt file can never OOM the reader. */
+        const val MAX_TRUST_FILE_BYTES = 10L * 1024 * 1024
+
         /**
          * PBKDF2 iterations for key derivation.
          * Production: 100,000  (strong, takes ~10ms per operation).

@@ -36,7 +36,7 @@ private val chartCardShape = RoundedCornerShape(10.dp)
 
 /**
  * Single card wrapper every chart in the app goes through.
- * 10 dp / surfaceVariant / hairline outline — same as StatCard, ToleranceCard, SectionCard.
+ * 10 dp / surfaceVariant / hairline outline - same as StatCard, ToleranceCard, SectionCard.
  */
 @Composable
 fun ChartCard(
@@ -77,7 +77,7 @@ fun ChartCard(
     }
 }
 
-/** Shared palette — every Canvas / Vico chart reads from here so grid, axes, and labels match. */
+/** Shared palette - every Canvas / Vico chart reads from here so grid, axes, and labels match. */
 object ChartTheme {
     @Composable
     fun gridColor(): Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f)
@@ -99,7 +99,7 @@ object ChartTheme {
 
 // ── Vico helpers ──────────────────────────────────────────────────────────────
 
-/** Muted axis label style — 10sp, matches Duration section y-labels (alpha 0.4). */
+/** Muted axis label style - 10sp, matches Duration section y-labels (alpha 0.4). */
 @Composable
 fun chartLabelComponent(color: Color = ChartTheme.labelColor()): TextComponent =
     rememberAxisLabelComponent(
@@ -122,7 +122,7 @@ fun chartGuideline(color: Color = ChartTheme.gridColor()): LineComponent =
         shape = DashedShape(dashLength = 4.dp, gapLength = 4.dp),
     )
 
-/** Forest primary line with soft fill + cubic smoothing — mirrors Duration intensity curve. */
+/** Forest primary line with soft fill + cubic smoothing - mirrors Duration intensity curve. */
 @Composable
 fun forestLine(
     color: Color = MaterialTheme.colorScheme.primary,
@@ -142,7 +142,7 @@ fun forestLine(
     ),
 )
 
-/** Integer-only y formatter — no "1.0" noise. */
+/** Integer-only y formatter - no "1.0" noise. */
 val integerFormatter: CartesianValueFormatter = CartesianValueFormatter { _, v, _ ->
     v.toInt().toString()
 }
@@ -162,7 +162,7 @@ fun themedStartAxis(
         itemPlacer = VerticalAxis.ItemPlacer.count(count = { 4 }),
     )
 
-/** Themed bottom axis — caller supplies label formatter (week names, dates...). */
+/** Themed bottom axis - caller supplies label formatter (week names, dates...). */
 @Composable
 fun themedBottomAxis(
     formatter: CartesianValueFormatter,

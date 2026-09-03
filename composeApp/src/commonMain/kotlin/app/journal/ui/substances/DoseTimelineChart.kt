@@ -30,7 +30,7 @@ import kotlinx.datetime.*
 
 /**
  * Compact dose-timeline column chart for a substance's dose history.
- * Daily totals over the last 60 days — forest column + muted axes
+ * Daily totals over the last 60 days - forest column + muted axes
  * matching SessionsTrendChart and the Duration intensity curve.
  */
 @Composable

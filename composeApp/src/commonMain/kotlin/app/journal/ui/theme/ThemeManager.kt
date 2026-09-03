@@ -56,14 +56,14 @@ class ThemeManager private constructor() {
         val bg = cfg.background ?: if (isDark) Color(0xFF0F1410) else Color(0xFFF3F8EF)
         val surf = cfg.surface ?: if (isDark) Color(0xFF1D2620) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
-        // Containers whisper rather than shout purple — muted blend keeps forest calm
+        // Containers whisper rather than shout purple - muted blend keeps forest calm
         val d = if (isDark) 0.18f else 0.10f
 
         fun container(accent: Color): Color = blend(bg, accent, d)
         // surfaceVariant is a near-neutral tint, not a purple wash
         fun surfaceVariant(accent: Color, factor: Float = if (isDark) 0.07f else 0.04f): Color =
             blend(surf, accent, factor)
-        // Outlines are warm neutral, not purple — purple outline on every card was the taste fail
+        // Outlines are warm neutral, not purple - purple outline on every card was the taste fail
         fun neutralOutline(alpha: Float): Color = blend(
             surf,
             if (isDark) Color(0xFFA8B5A0) else Color(0xFF3A3D2F),

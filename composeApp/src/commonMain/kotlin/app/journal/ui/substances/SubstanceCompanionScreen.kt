@@ -31,7 +31,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceCompanionScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     substanceId: String,
     onBack: () -> Unit,
     onSessionClick: (String) -> Unit,

@@ -66,7 +66,7 @@ private fun InteractionSubgroup(
     label: String,
     interactions: List<Interaction>,
     substanceId: String,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     color: Color,
     icon: ImageVector
 ) {
@@ -101,7 +101,7 @@ private fun InteractionSubgroup(
     }
 }
 
-internal fun interactionSubstanceName(repo: JournalRepository, id: String): String {
+internal fun interactionSubstanceName(repo: IJournalRepository, id: String): String {
     val sub = repo.getSubstance(id)
     if (sub != null) return sub.name
     if (id.startsWith("pwiki:")) {

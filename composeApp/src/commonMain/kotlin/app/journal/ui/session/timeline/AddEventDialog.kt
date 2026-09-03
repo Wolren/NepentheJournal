@@ -18,7 +18,7 @@ import app.journal.util.currentTimeMillis
 @Composable
 internal fun AddEventDialog(
     session: Session,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     editEvent: TimelineEvent? = null,
     onDismiss: () -> Unit
 ) {

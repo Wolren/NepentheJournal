@@ -22,7 +22,7 @@ import app.journal.util.currentTimeMillis
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceEditorScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     substanceToEdit: Substance? = null,
     onBack: () -> Unit
 ) {

@@ -24,7 +24,7 @@ data class SubstanceColor(
 
 object AdaptiveColors {
 
-    // Curated forest-mauve palette — deterministic per substance, harmonious together.
+    // Curated forest-mauve palette - deterministic per substance, harmonious together.
     // Full 360 deg hue + 55-85% sat was confetti on a muted forest. 8 tones, 38-52% sat.
     private val curatedLight = listOf(
         Color(0xFF8BA888), Color(0xFF9E8AC7), Color(0xFFC19AA6), Color(0xFF7BAFAF),

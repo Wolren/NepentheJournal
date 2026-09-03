@@ -5,10 +5,6 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.*
 import java.security.cert.X509Certificate
-import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
-import java.security.spec.KeySpec
 
 /**
  * Generates and manages a unique device identity for the sync server.
@@ -19,7 +15,7 @@ import java.security.spec.KeySpec
  * The fingerprint (SHA-256 of the DER-encoded cert) is used as the device ID
  * and for certificate pinning during pairing.
  *
- * NOTE: TLS encryption (SSLContext) is NOT wired into the sync server —
+ * NOTE: TLS encryption (SSLContext) is NOT wired into the sync server  - 
  * it uses HMAC auth over plain HTTP. The cert is kept for identity/fingerprint
  * generation only.
  */
@@ -28,7 +24,7 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
     private val storeFile: File get() = File(dataDir, "identity.p12")
     val alias: String = "nepenthe"
 
-    /** Keystore password derived from the at-rest key file, not machine properties. */
+    /** Keystore password from the at-rest key file only, never machine properties. */
     val password: CharArray by lazy {
         val envPw = System.getenv("NEPENTHE_TLS_PASSWORD")
         if (envPw != null && envPw.length >= 8) {
@@ -39,30 +35,18 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
             when {
                 // Key file present: use it (current scheme)
                 existing != null -> atRest.toHex(existing).toCharArray()
-                // Legacy keystore without a key file: keep the old derivation
-                // so existing installs do NOT rotate identity on upgrade
-                storeFile.exists() -> derivePassword()
+                // Legacy keystore without a key file: fail closed instead of
+                // deriving a weak password from public machine properties.
+                // The old user.home + os.name derivation is retired: anyone
+                // with file access could reproduce it (audit H2/Pitfall 12).
+                storeFile.exists() -> throw IllegalStateException(
+                    "Legacy identity keystore has no at-rest key file; refusing weak fallback. " +
+                    "Back up data, delete identity.p12, and re-pair devices."
+                )
                 // Fresh install: create the key file now
                 else -> atRest.toHex(atRest.create()).toCharArray()
             }
         }
-    }
-
-    private fun derivePassword(): CharArray {
-        val seed = System.getProperty("user.home", "unknown") +
-                    System.getProperty("os.name", "unknown")
-        // PBKDF2 key stretching — 100k iterations matches DeviceTrustStore
-        val spec: KeySpec = PBEKeySpec(
-            seed.toCharArray(),
-            "nepenthe-tls-v1".toByteArray(Charsets.UTF_8),
-            100_000,
-            256
-        )
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val hash = factory.generateSecret(spec).encoded
-        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
-        return (0 until 32).map { chars[(hash[it % hash.size].toInt() and 0xFF) % chars.length] }
-            .joinToString("").toCharArray()
     }
 
     /** Ensure identity exists, generating it if needed. Returns the fingerprint. */
@@ -80,7 +64,7 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
         } catch (e: Exception) {
             // Regenerate ONLY when the store is unusable: empty file, tampered
             // file, or password mismatch (e.g. NEPENTHE_TLS_PASSWORD changed).
-            // Any other failure must propagate — silently deleting the keystore
+            // Any other failure must propagate  -  silently deleting the keystore
             // on transient IO errors rotates the device identity and forces
             // every paired client to re-pair.
             val unusable = storeFile.length() == 0L ||

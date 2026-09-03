@@ -36,7 +36,7 @@ import app.journal.ui.theme.ThemeManager
 
 @Composable
 fun DashboardScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     onSearchClick: () -> Unit = {},
 ) {
     val sessions by repo.sessions.collectAsState()
@@ -239,7 +239,7 @@ private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vect
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.padding(14.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Quiet editorial accent — thin rule, not a circled badge
+            // Quiet editorial accent - thin rule, not a circled badge
             Box(Modifier.width(24.dp).height(1.5.dp).background(accent.copy(alpha = 0.55f), RoundedCornerShape(1.dp)))
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.01).sp)

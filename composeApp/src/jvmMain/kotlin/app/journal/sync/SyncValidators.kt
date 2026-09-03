@@ -16,11 +16,12 @@ import kotlinx.serialization.json.Json
 
 private val json = AppJson.json
 
-private const val MAX_ITEMS_DEFAULT = 500
-private const val MAX_SUBSTANCES = 100
-private const val MAX_EFFECTS = 100
-private const val MAX_INTERACTIONS = 100
-private const val MAX_CUSTOM_UNITS = 100
+/** Count caps shared with the pull handler so push and pull enforce the same limits. */
+const val MAX_ITEMS_DEFAULT = 500
+const val MAX_SUBSTANCES = 100
+const val MAX_EFFECTS = 100
+const val MAX_INTERACTIONS = 100
+const val MAX_CUSTOM_UNITS = 100
 private const val MAX_FIELD_LEN = 65536
 private const val MAX_ID_LEN = 128
 private const val MAX_NAME_LEN = 200
@@ -28,6 +29,15 @@ private const val MAX_TITLE_LEN = 500
 private const val MAX_UNIT_LEN = 20
 private const val MAX_ROA_LEN = 50
 private const val MAX_LABEL_LEN = 200
+
+/** Earliest accepted entity timestamp: 2000-01-01T00:00:00Z. */
+const val MIN_ENTITY_TIMESTAMP = 946684800000L
+/** Entity timestamps may be at most 1 day in the future (clock skew allowance). */
+private const val FUTURE_SLACK_MS = 86_400_000L
+
+/** Entity timestamps must fall between 2000-01-01 and now plus 1 day. */
+private fun isReasonableEntityTime(ts: Long): Boolean =
+    ts in MIN_ENTITY_TIMESTAMP..(System.currentTimeMillis() + FUTURE_SLACK_MS)
 
 /**
  * Validate a SyncBatch (HTTP push). Returns an error message or null.
@@ -82,7 +92,11 @@ fun validateWsDelta(delta: WsDelta): String? {
 
 private fun validateSessions(sessions: List<Session>): String? {
     for (s in sessions) {
-        if (s.id.length > MAX_ID_LEN) return "Session ID too long"
+        if (s.id.isBlank() || s.id.length > MAX_ID_LEN) return "Invalid session ID"
+        if (!isReasonableEntityTime(s.createdAt)) return "Session createdAt out of range"
+        if (!isReasonableEntityTime(s.updatedAt)) return "Session updatedAt out of range"
+        if (!isReasonableEntityTime(s.startTime)) return "Session startTime out of range"
+        if (s.endTime != null && !isReasonableEntityTime(s.endTime)) return "Session endTime out of range"
         if (s.title.length > MAX_TITLE_LEN) return "Session title too long"
         if ((s.set?.length ?: 0) > MAX_FIELD_LEN) return "Session set too long"
         if ((s.setting?.length ?: 0) > MAX_FIELD_LEN) return "Session setting too long"
@@ -95,11 +109,15 @@ private fun validateSessions(sessions: List<Session>): String? {
 
 private fun validateDoses(doses: List<Dose>): String? {
     for (d in doses) {
-        if (d.id.length > MAX_ID_LEN) return "Dose ID too long"
-        if (d.sessionId.length > MAX_ID_LEN) return "Dose sessionId too long"
-        if (d.substanceId.length > MAX_ID_LEN) return "Dose substanceId too long"
+        if (d.id.isBlank() || d.id.length > MAX_ID_LEN) return "Invalid dose ID"
+        if (!isReasonableEntityTime(d.createdAt)) return "Dose createdAt out of range"
+        if (!isReasonableEntityTime(d.updatedAt)) return "Dose updatedAt out of range"
+        if (!isReasonableEntityTime(d.timestamp)) return "Dose timestamp out of range"
+        if (d.sessionId.isBlank() || d.sessionId.length > MAX_ID_LEN) return "Invalid dose sessionId"
+        if (d.substanceId.isBlank() || d.substanceId.length > MAX_ID_LEN) return "Invalid dose substanceId"
         if (d.routeOfAdministration.length > MAX_ROA_LEN) return "Invalid ROA length"
         if (d.unit.length > MAX_UNIT_LEN) return "Invalid unit length"
+        if (!d.amount.isFinite()) return "Dose amount must be finite"
         if (d.amount < 0 || d.amount > 1_000_000) return "Invalid dose amount"
         if (d.notes?.length ?: 0 > MAX_FIELD_LEN) return "Dose notes too long"
     }
@@ -108,7 +126,9 @@ private fun validateDoses(doses: List<Dose>): String? {
 
 private fun validateNotes(notes: List<Note>): String? {
     for (n in notes) {
-        if (n.id.length > MAX_ID_LEN) return "Note ID too long"
+        if (n.id.isBlank() || n.id.length > MAX_ID_LEN) return "Invalid note ID"
+        if (!isReasonableEntityTime(n.createdAt)) return "Note createdAt out of range"
+        if (!isReasonableEntityTime(n.updatedAt)) return "Note updatedAt out of range"
         if (n.body.length > MAX_FIELD_LEN) return "Note body too long"
         if (n.title?.length ?: 0 > MAX_TITLE_LEN) return "Note title too long"
     }
@@ -117,8 +137,11 @@ private fun validateNotes(notes: List<Note>): String? {
 
 private fun validateSubstances(substances: List<Substance>): String? {
     for (s in substances) {
-        if (s.id.length > MAX_ID_LEN) return "Substance ID too long"
-        if (s.name.length > MAX_NAME_LEN) return "Substance name too long"
+        if (s.id.isBlank() || s.id.length > MAX_ID_LEN) return "Invalid substance ID"
+        if (!isReasonableEntityTime(s.createdAt)) return "Substance createdAt out of range"
+        if (!isReasonableEntityTime(s.updatedAt)) return "Substance updatedAt out of range"
+        if (s.name.isBlank() || s.name.length > MAX_NAME_LEN) return "Invalid substance name"
+        if (s.aliases.size > 100) return "Too many substance aliases"
         if (s.aliases.any { it.length > MAX_NAME_LEN }) return "Substance alias too long"
         if ((s.summary?.length ?: 0) > MAX_FIELD_LEN) return "Substance summary too long"
     }
@@ -126,18 +149,29 @@ private fun validateSubstances(substances: List<Substance>): String? {
 }
 
 private fun validateInteractions(interactions: List<Interaction>): String? {
+    val knownRisk = setOf("DANGEROUS", "UNSAFE", "UNCERTAIN", "LOW", "UNKNOWN")
     for (i in interactions) {
-        if (i.id.length > MAX_ID_LEN) return "Interaction ID too long"
-        if (i.substanceAId.length > MAX_ID_LEN) return "Interaction substanceAId too long"
-        if (i.substanceBId.length > MAX_ID_LEN) return "Interaction substanceBId too long"
+        if (i.id.isBlank() || i.id.length > MAX_ID_LEN) return "Invalid interaction ID"
+        if (!isReasonableEntityTime(i.createdAt)) return "Interaction createdAt out of range"
+        if (!isReasonableEntityTime(i.updatedAt)) return "Interaction updatedAt out of range"
+        if (i.substanceAId.isBlank() || i.substanceAId.length > MAX_ID_LEN) return "Invalid interaction substanceAId"
+        if (i.substanceBId.isBlank() || i.substanceBId.length > MAX_ID_LEN) return "Invalid interaction substanceBId"
+        if (i.riskLevel.name !in knownRisk) return "Invalid interaction risk"
+        // Never auto downgrade risk: rejecting unknown risk values keeps the
+        // receiver's stored severity intact instead of mapping it to LOW.
         if (i.description?.length ?: 0 > MAX_FIELD_LEN) return "Interaction description too long"
+        if (i.sources.size > 50) return "Too many interaction sources"
+        if (i.sources.any { it.length > 500 }) return "Interaction source too long"
     }
     return null
 }
 
 private fun validateTimelineEvents(events: List<TimelineEvent>): String? {
     for (t in events) {
-        if (t.id.length > MAX_ID_LEN) return "TimelineEvent ID too long"
+        if (t.id.isBlank() || t.id.length > MAX_ID_LEN) return "Invalid event ID"
+        if (!isReasonableEntityTime(t.createdAt)) return "Event createdAt out of range"
+        if (!isReasonableEntityTime(t.updatedAt)) return "Event updatedAt out of range"
+        if (!isReasonableEntityTime(t.timestamp)) return "Event timestamp out of range"
         if (t.label.length > MAX_LABEL_LEN) return "TimelineEvent label too long"
         if (t.body?.length ?: 0 > MAX_FIELD_LEN) return "TimelineEvent body too long"
     }
@@ -146,18 +180,23 @@ private fun validateTimelineEvents(events: List<TimelineEvent>): String? {
 
 private fun validateEffects(effects: List<Effect>): String? {
     for (e in effects) {
-        if (e.id.length > MAX_ID_LEN) return "Effect ID too long"
-        if (e.name.length > MAX_NAME_LEN) return "Effect name too long"
-        if (e.substanceIds.any { it.length > MAX_ID_LEN }) return "Effect substanceId too long"
+        if (e.id.isBlank() || e.id.length > MAX_ID_LEN) return "Invalid effect ID"
+        if (!isReasonableEntityTime(e.createdAt)) return "Effect createdAt out of range"
+        if (!isReasonableEntityTime(e.updatedAt)) return "Effect updatedAt out of range"
+        if (e.name.isBlank() || e.name.length > MAX_NAME_LEN) return "Invalid effect name"
+        if (e.substanceIds.size > 500) return "Too many effect substance IDs"
+        if (e.substanceIds.any { it.isBlank() || it.length > MAX_ID_LEN }) return "Invalid effect substanceId"
     }
     return null
 }
 
 private fun validateCustomUnits(units: List<CustomUnit>): String? {
     for (u in units) {
-        if (u.id.length > MAX_ID_LEN) return "Unit ID too long"
-        if (u.name.length > 100) return "Unit name too long"
-        if (u.substanceId.length > MAX_ID_LEN) return "Unit substanceId too long"
+        if (u.id.isBlank() || u.id.length > MAX_ID_LEN) return "Invalid unit ID"
+        if (!isReasonableEntityTime(u.createdAt)) return "Unit createdAt out of range"
+        if (!isReasonableEntityTime(u.updatedAt)) return "Unit updatedAt out of range"
+        if (u.name.isBlank() || u.name.length > 100) return "Invalid unit name"
+        if (u.substanceId.isBlank() || u.substanceId.length > MAX_ID_LEN) return "Invalid unit substanceId"
     }
     return null
 }

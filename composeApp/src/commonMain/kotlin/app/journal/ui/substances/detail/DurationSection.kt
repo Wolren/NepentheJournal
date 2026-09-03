@@ -384,7 +384,7 @@ internal fun DurationTimelineSection(
                 }
             }
 
-            // Total — visual bar
+            // Total - visual bar
             if (totalRaw != null) {
                 Spacer(Modifier.height(8.dp))
 

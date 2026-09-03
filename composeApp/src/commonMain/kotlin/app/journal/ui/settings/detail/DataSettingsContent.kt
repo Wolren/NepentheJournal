@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun DataSettingsContent(
-    repo: JournalRepository,
+    repo: IJournalRepository,
     sessionCount: Int,
     substanceCount: Int,
     statusText: String?,

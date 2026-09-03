@@ -69,7 +69,9 @@ actual fun generateSelfSignedP12(
     val dn = X500Name("CN=Nepenthe Journal, OU=Self-Hosted, O=User, L=Home, ST=Local, C=XX")
     val serial = BigInteger(64, SecureRandom())
     val notBefore = Date(System.currentTimeMillis() - 86400000L) // 1 day in past
-    val notAfter = Date(System.currentTimeMillis() + 3650L * 86400000L) // 10 years
+    // 825 days keeps the identity inside the 398-day public-trust ceiling for
+    // each validity period plus renewal margin; fingerprints stay stable.
+    val notAfter = Date(System.currentTimeMillis() + 825L * 86400000L)
 
     val certBuilder = JcaX509v3CertificateBuilder(
         dn,

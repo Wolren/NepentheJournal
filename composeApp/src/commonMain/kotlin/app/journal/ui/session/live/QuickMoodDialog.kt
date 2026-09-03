@@ -17,7 +17,7 @@ import app.journal.util.currentTimeMillis
 @Composable
 internal fun QuickMoodDialog(
     session: Session,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     substances: List<app.journal.model.Substance> = emptyList(),
     onDismiss: () -> Unit,
 ) {

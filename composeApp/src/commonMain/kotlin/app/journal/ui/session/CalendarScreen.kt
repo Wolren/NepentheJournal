@@ -71,7 +71,7 @@ private data class CalendarCellData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     onBack: () -> Unit,
     onSessionTap: (String) -> Unit,
 ) {
@@ -155,7 +155,7 @@ fun CalendarScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Calendar grid — Canvas for perf (single composable instead of ~42 Boxes)
+            // Calendar grid - Canvas for perf (single composable instead of ~42 Boxes)
             val daysInMonth = currentMonth.daysInMonth()
             val firstDayOfWeek = currentMonth.firstDayOfWeek() // 0=Mon, 6=Sun
             val totalCells = firstDayOfWeek + daysInMonth

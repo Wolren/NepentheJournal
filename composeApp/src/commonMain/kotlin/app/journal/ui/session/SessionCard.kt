@@ -64,7 +64,7 @@ fun SessionCard(
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
         ) {
-            // Quiet 4dp accent bar — solid, not gradient soup
+            // Quiet 4dp accent bar - solid, not gradient soup
             Box(
                 Modifier.fillMaxHeight().width(4.dp)
                     .clip(RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
