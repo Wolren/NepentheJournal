@@ -258,7 +258,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         customUnitsStore.forEachValue { unit ->
             _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         }
-        rebuildSearchIndex()
+        rebuildSearchIndexLocked()
     }
 
     /** Incrementally update precomputed dose stats for a substance — counts distinct sessions only. */
@@ -627,7 +627,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun sessionsDataFrame(): List<SessionDataRow> = lock.withLock {
         val subNameCache = substancesStore.all.associate { it.id to it.name }
         sessionsStore.all.map { session ->
-            val sessionDoses = dosesForSession(session.id)
+            val sessionDoses = _dosesBySession[session.id]?.toList() ?: emptyList()
             val subNames = sessionDoses.mapNotNull { subNameCache[it.substanceId] }.distinct()
             val dt = Instant.fromEpochMilliseconds(session.startTime)
                 .toLocalDateTime(TimeZone.currentSystemDefault())
@@ -690,7 +690,7 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun exportSessionBundles(): List<SessionBundle> = lock.withLock {
         sessionsStore.all.sortedByDescending { it.startTime }.map { session ->
-            SessionBundle(session, dosesForSession(session.id))
+            SessionBundle(session, _dosesBySession[session.id]?.toList() ?: emptyList())
         }
     }
 
@@ -772,9 +772,19 @@ class JournalRepository internal constructor() : IJournalRepository {
         searchIndex.search(query)
     }
 
-    override fun rebuildSearchIndex() {
-        searchIndex.rebuild(this)
+    private fun rebuildSearchIndexLocked() {
+        searchIndex.rebuild(
+            sessions = sessionsStore.all.toList(),
+            substances = substancesStore.all.toList(),
+            notes = notesStore.all.toList(),
+            doses = dosesStore.all.toList(),
+            timelineEvents = timelineEventsStore.all.toList(),
+            effects = effectsStore.all.toList(),
+            substanceNames = substancesStore.all.associate { it.id to it.name }
+        )
     }
+
+    override fun rebuildSearchIndex() = lock.withLock { rebuildSearchIndexLocked() }
 
     companion object {
         val instance: JournalRepository by lazy { JournalRepository() }

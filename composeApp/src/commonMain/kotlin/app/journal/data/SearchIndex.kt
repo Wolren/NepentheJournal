@@ -34,11 +34,19 @@ class SearchIndex {
 
     val isEmpty: Boolean get() = !isBuilt
 
-    fun rebuild(repo: JournalRepository) = lock.withLock {
+    fun rebuild(
+        sessions: List<Session>,
+        substances: List<Substance>,
+        notes: List<Note>,
+        doses: List<Dose>,
+        timelineEvents: List<TimelineEvent>,
+        effects: List<Effect>,
+        substanceNames: Map<String, String>
+    ) = lock.withLock {
         index.clear()
         isBuilt = false
 
-        for (session in repo.sessions.value) {
+        for (session in sessions) {
             val dt = Instant.fromEpochMilliseconds(session.startTime)
                 .toLocalDateTime(TimeZone.currentSystemDefault())
             indexEntity(
@@ -53,7 +61,7 @@ class SearchIndex {
             )
         }
 
-        for (sub in repo.substances.value) {
+        for (sub in substances) {
             indexEntity(
                 "substance", sub.id,
                 title = sub.name,
@@ -67,7 +75,7 @@ class SearchIndex {
             )
         }
 
-        for (note in repo.notes.value) {
+        for (note in notes) {
             indexEntity(
                 "note", note.id,
                 title = note.title ?: "Untitled note",
@@ -76,8 +84,8 @@ class SearchIndex {
             )
         }
 
-        for (dose in repo.doses.value) {
-            val subName = repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId
+        for (dose in doses) {
+            val subName = substanceNames[dose.substanceId] ?: dose.substanceId
             indexEntity(
                 "dose", dose.id,
                 title = "$subName (${dose.amount} ${dose.unit})",
@@ -89,16 +97,16 @@ class SearchIndex {
             )
         }
 
-        for (event in repo.timelineEvents.value) {
+        for (event in timelineEvents) {
             indexEntity(
                 "event", event.id,
-                title = event.label ?: "Timeline event",
+                title = event.label,
                 score = 3,
                 texts = listOfNotNull(event.label, event.body)
             )
         }
 
-        for (effect in repo.effects.value) {
+        for (effect in effects) {
             indexEntity(
                 "effect", effect.id,
                 title = effect.name,
