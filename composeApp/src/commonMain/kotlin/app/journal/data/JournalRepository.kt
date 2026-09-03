@@ -393,11 +393,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (oldSession != null) removeSessionFromIndices(oldSession)
         addSessionToIndices(session)
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
 
-    override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id) }
+    override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteSessionLocked(id: String) {
         val session = sessionsStore.get(id) ?: return
@@ -473,12 +474,13 @@ class JournalRepository internal constructor() : IJournalRepository {
 
         bumpToleranceVersion()
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun dosesForSession(sessionId: String): List<Dose> =
         lock.withLock { _dosesBySession[sessionId]?.toList() ?: emptyList() }
 
-    override fun deleteDose(id: String) = lock.withLock { deleteDoseLocked(id) }
+    override fun deleteDose(id: String) = lock.withLock { deleteDoseLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteDoseLocked(id: String) {
         val removed = dosesStore.remove(id) ?: return
@@ -492,7 +494,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteNote(id: String) = lock.withLock { deleteNoteLocked(id) }
+    override fun deleteNote(id: String) = lock.withLock { deleteNoteLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteNoteLocked(id: String) {
         val removed = notesStore.remove(id) ?: return
@@ -501,7 +503,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteTimelineEvent(id: String) = lock.withLock { deleteTimelineEventLocked(id) }
+    override fun deleteTimelineEvent(id: String) = lock.withLock { deleteTimelineEventLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteTimelineEventLocked(id: String) {
         val removed = timelineEventsStore.remove(id) ?: return
@@ -518,6 +520,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         substancesStore.put(substance)
         bumpToleranceVersion()
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun getSubstance(id: String): Substance? = lock.withLock { substancesStore.get(id) }
@@ -530,7 +533,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun deleteSubstance(id: String) = lock.withLock { deleteSubstanceLocked(id) }
+    override fun deleteSubstance(id: String) = lock.withLock { deleteSubstanceLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteSubstanceLocked(id: String) {
         substancesStore.remove(id)
@@ -575,6 +578,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun upsertInteraction(interaction: Interaction) = lock.withLock {
         interactionsStore.put(interaction)
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun getInteraction(id: String): Interaction? = lock.withLock { interactionsStore.get(id) }
@@ -596,6 +600,7 @@ class JournalRepository internal constructor() : IJournalRepository {
             _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
         }
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun getEffect(id: String): Effect? = lock.withLock { effectsStore.get(id) }
@@ -617,9 +622,10 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
-    override fun deleteCustomUnit(id: String) = lock.withLock { deleteCustomUnitLocked(id) }
+    override fun deleteCustomUnit(id: String) = lock.withLock { deleteCustomUnitLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteCustomUnitLocked(id: String) {
         val removed = customUnitsStore.remove(id) ?: return
@@ -634,7 +640,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         _customUnitsBySubstance[substanceId]?.toList() ?: emptyList()
     }
 
-    override fun deleteEffect(id: String) = lock.withLock { deleteEffectLocked(id) }
+    override fun deleteEffect(id: String) = lock.withLock { deleteEffectLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteEffectLocked(id: String) {
         val removed = effectsStore.remove(id) ?: return
@@ -647,7 +653,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteInteraction(id: String) = lock.withLock { deleteInteractionLocked(id) }
+    override fun deleteInteraction(id: String) = lock.withLock { deleteInteractionLocked(id); rebuildSearchIndexLocked() }
 
     private fun deleteInteractionLocked(id: String) {
         interactionsStore.remove(id) ?: return
@@ -708,6 +714,7 @@ class JournalRepository internal constructor() : IJournalRepository {
             _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
         }
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = lock.withLock {
@@ -726,6 +733,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(resolved)
         bumpMutationCount()
+        rebuildSearchIndexLocked()
         resolved
     }
 
@@ -745,6 +753,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
         bumpMutationCount()
+        rebuildSearchIndexLocked()
     }
 
     override fun eventsForSession(sessionId: String): List<TimelineEvent> =
@@ -917,6 +926,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         _sessionsPerSubstance.clear()
         _substanceDoseStats.clear()
         _doseStatsSessionIds.clear()
+        rebuildSearchIndexLocked()
         _useShulginRating.value = false
         _useSubstanceColors.value = true
         bumpToleranceVersion()

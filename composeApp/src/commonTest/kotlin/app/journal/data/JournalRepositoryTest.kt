@@ -706,4 +706,25 @@ class JournalRepositoryTest {
         assertTrue(repo.notesForSession("s:1").isEmpty())
         assertEquals(1, repo.notesForSession("s:2").size)
     }
+
+    @Test
+    fun searchFindsSingleUpsertWithoutManualRebuild() {
+        val repo = JournalRepository()
+        repo.upsertSession(Session(id = "s:1", title = "Zebra migration notes", createdAt = 1L,
+            updatedAt = 1L, deviceOrigin = "test", startTime = 1L))
+
+        val hits = repo.search("zebra")
+        assertTrue(hits.any { it.entityId == "s:1" }, "fresh upsert must be searchable")
+    }
+
+    @Test
+    fun searchDropsDeletedSession() {
+        val repo = JournalRepository()
+        repo.upsertSession(Session(id = "s:1", title = "Zebra migration notes", createdAt = 1L,
+            updatedAt = 1L, deviceOrigin = "test", startTime = 1L))
+        repo.deleteSession("s:1")
+
+        val hits = repo.search("zebra")
+        assertTrue(hits.none { it.entityId == "s:1" }, "deleted session must vanish from search")
+    }
 }
