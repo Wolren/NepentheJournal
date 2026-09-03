@@ -580,7 +580,9 @@ class SyncTransport(
 
     // ---- Helpers ----
 
-    private fun buildDelta(since: Long) = WsDelta(
+    private fun buildDelta(since: Long): WsDelta {
+        val deleted = repo.deletedIdsSince(since)
+        return WsDelta(
         seq = System.nanoTime(),
         sessions = repo.sessions.value.filter { it.updatedAt > since },
         doses = repo.doses.value.filter { it.updatedAt > since },
@@ -589,13 +591,26 @@ class SyncTransport(
         interactions = repo.interactions.value.filter { it.updatedAt > since },
         notes = repo.notes.value.filter { it.updatedAt > since },
         timelineEvents = repo.timelineEvents.value.filter { it.updatedAt > since },
-        customUnits = repo.customUnits.value.filter { it.updatedAt > since }
-    )
+        customUnits = repo.customUnits.value.filter { it.updatedAt > since },
+        deletedSessionIds = deleted.deletedSessionIds,
+        deletedDoseIds = deleted.deletedDoseIds,
+        deletedNoteIds = deleted.deletedNoteIds,
+        deletedSubstanceIds = deleted.deletedSubstanceIds,
+        deletedEffectIds = deleted.deletedEffectIds,
+        deletedInteractionIds = deleted.deletedInteractionIds,
+        deletedTimelineEventIds = deleted.deletedTimelineEventIds,
+        deletedCustomUnitIds = deleted.deletedCustomUnitIds
+        )
+    }
 
     private fun isEmptyDelta(d: WsDelta): Boolean =
         d.sessions.isEmpty() && d.doses.isEmpty() && d.substances.isEmpty() &&
         d.effects.isEmpty() && d.interactions.isEmpty() && d.notes.isEmpty() &&
-        d.timelineEvents.isEmpty() && d.customUnits.isEmpty()
+        d.timelineEvents.isEmpty() && d.customUnits.isEmpty() &&
+        d.deletedSessionIds.isEmpty() && d.deletedDoseIds.isEmpty() &&
+        d.deletedNoteIds.isEmpty() && d.deletedSubstanceIds.isEmpty() &&
+        d.deletedEffectIds.isEmpty() && d.deletedInteractionIds.isEmpty() &&
+        d.deletedTimelineEventIds.isEmpty() && d.deletedCustomUnitIds.isEmpty()
 
     // ===== WS Heartbeat & Incoming Reader =====
 
@@ -779,11 +794,25 @@ class SyncTransport(
             Log.withTag("SyncTransport").w { "Data validation: skipped $skipped invalid items in WS delta" }
         }
 
+        fun ids(ids: List<String>): List<String> {
+            val ok = ids.filter { id -> id.isNotBlank() && id.length <= 128 }
+            skipped += ids.size - ok.size
+            return ok
+        }
         repo.applyBatch(
             sessions = sessions, doses = doses, substances = substances,
             effects = effects, interactions = interactions, notes = notes,
             timelineEvents = timelineEvents, customUnits = customUnits,
-            lastWriterWins = true
+            lastWriterWins = true,
+            deletedSessionIds = ids(delta.deletedSessionIds),
+            deletedDoseIds = ids(delta.deletedDoseIds),
+            deletedNoteIds = ids(delta.deletedNoteIds),
+            deletedSubstanceIds = ids(delta.deletedSubstanceIds),
+            deletedEffectIds = ids(delta.deletedEffectIds),
+            deletedInteractionIds = ids(delta.deletedInteractionIds),
+            deletedTimelineEventIds = ids(delta.deletedTimelineEventIds),
+            deletedCustomUnitIds = ids(delta.deletedCustomUnitIds),
+            tombstoneCutoff = 0L
         )
         // Durability: persist what we just applied (audit D1).
         persistAfterApply?.invoke()

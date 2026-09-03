@@ -492,7 +492,16 @@ class SyncServerRouter(
                                     notes = msg.notes,
                                     timelineEvents = msg.timelineEvents,
                                     customUnits = msg.customUnits,
-                                    lastWriterWins = true
+                                    lastWriterWins = true,
+                                    deletedSessionIds = msg.deletedSessionIds,
+                                    deletedDoseIds = msg.deletedDoseIds,
+                                    deletedNoteIds = msg.deletedNoteIds,
+                                    deletedSubstanceIds = msg.deletedSubstanceIds,
+                                    deletedEffectIds = msg.deletedEffectIds,
+                                    deletedInteractionIds = msg.deletedInteractionIds,
+                                    deletedTimelineEventIds = msg.deletedTimelineEventIds,
+                                    deletedCustomUnitIds = msg.deletedCustomUnitIds,
+                                    tombstoneCutoff = 0L
                                 )
                                 // Persist before acking the delta (same rule as
                                 // the push route; see audit D1).
@@ -578,9 +587,19 @@ class SyncServerRouter(
             timelineEvents = tagged.timelineEvents,
             effects = tagged.effects,
             customUnits = tagged.customUnits,
-            lastWriterWins = true
+            lastWriterWins = true,
+            deletedSessionIds = tagged.deletedSessionIds,
+            deletedDoseIds = tagged.deletedDoseIds,
+            deletedNoteIds = tagged.deletedNoteIds,
+            deletedSubstanceIds = tagged.deletedSubstanceIds,
+            deletedEffectIds = tagged.deletedEffectIds,
+            deletedInteractionIds = tagged.deletedInteractionIds,
+            deletedTimelineEventIds = tagged.deletedTimelineEventIds,
+            deletedCustomUnitIds = tagged.deletedCustomUnitIds,
+            tombstoneCutoff = batch.since
         )
         tagged.sessions.forEach { session ->
+            if (session.id in tagged.deletedSessionIds) return@forEach
             val existing = repo.getSession(session.id)
             if (existing != null && existing.updatedAt > session.updatedAt) {
                 repo.upsertNote(Note(
@@ -598,6 +617,7 @@ class SyncServerRouter(
             } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:${tagged.deviceId}" }))
         }
         tagged.notes.forEach { note ->
+            if (note.id in tagged.deletedNoteIds) return@forEach
             val resolved = repo.upsertNoteWithConflict(note, tagged.deviceId)
             if (resolved != null && resolved.conflictSiblings.isNotEmpty()) conflicts++
         }
@@ -659,7 +679,9 @@ class SyncServerRouter(
         }
     }
 
-    private fun handlePull(since: Long) = SyncResponse(
+    private fun handlePull(since: Long): SyncResponse {
+        val deleted = repo.deletedIdsSince(since)
+        return SyncResponse(
         success = true,
         sessions = capped(repo.sessions.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
         doses = capped(repo.doses.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
@@ -669,8 +691,17 @@ class SyncServerRouter(
         timelineEvents = capped(repo.timelineEvents.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
         effects = capped(repo.effects.value.filter { it.updatedAt > since }, MAX_EFFECTS),
         customUnits = capped(repo.customUnits.value.filter { it.updatedAt > since }, MAX_CUSTOM_UNITS),
+        deletedSessionIds = deleted.deletedSessionIds,
+        deletedDoseIds = deleted.deletedDoseIds,
+        deletedNoteIds = deleted.deletedNoteIds,
+        deletedSubstanceIds = deleted.deletedSubstanceIds,
+        deletedEffectIds = deleted.deletedEffectIds,
+        deletedInteractionIds = deleted.deletedInteractionIds,
+        deletedTimelineEventIds = deleted.deletedTimelineEventIds,
+        deletedCustomUnitIds = deleted.deletedCustomUnitIds,
         conflictsCreated = repo.notes.value.count { it.conflictSiblings.isNotEmpty() }
     )
+    }
 
     /** Enforce the same MAX caps on pull responses as push validation (paging by recency). */
     private fun <T> capped(items: List<T>, max: Int): List<T> =

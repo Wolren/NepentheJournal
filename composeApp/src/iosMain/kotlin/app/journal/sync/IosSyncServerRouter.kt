@@ -317,6 +317,7 @@ class IosSyncServerRouter(
     private fun buildSyncResponse(since: Long): SyncResponse {
         fun <T> changed(list: List<T>, since: Long, updatedAt: (T) -> Long): List<T> =
             list.filter { updatedAt(it) > since }
+        val deleted = repo.deletedIdsSince(since)
         return SyncResponse(
             success = true,
             sessions = changed(repo.sessions.value, since) { it.updatedAt },
@@ -326,7 +327,15 @@ class IosSyncServerRouter(
             interactions = changed(repo.interactions.value, since) { it.updatedAt },
             notes = changed(repo.notes.value, since) { it.updatedAt },
             timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
-            customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
+            customUnits = changed(repo.customUnits.value, since) { it.updatedAt },
+            deletedSessionIds = deleted.deletedSessionIds,
+            deletedDoseIds = deleted.deletedDoseIds,
+            deletedNoteIds = deleted.deletedNoteIds,
+            deletedSubstanceIds = deleted.deletedSubstanceIds,
+            deletedEffectIds = deleted.deletedEffectIds,
+            deletedInteractionIds = deleted.deletedInteractionIds,
+            deletedTimelineEventIds = deleted.deletedTimelineEventIds,
+            deletedCustomUnitIds = deleted.deletedCustomUnitIds
         )
     }
 
@@ -342,7 +351,16 @@ class IosSyncServerRouter(
             notes = batch.notes,
             timelineEvents = batch.timelineEvents,
             customUnits = batch.customUnits,
-            lastWriterWins = true
+            lastWriterWins = true,
+            deletedSessionIds = batch.deletedSessionIds,
+            deletedDoseIds = batch.deletedDoseIds,
+            deletedNoteIds = batch.deletedNoteIds,
+            deletedSubstanceIds = batch.deletedSubstanceIds,
+            deletedEffectIds = batch.deletedEffectIds,
+            deletedInteractionIds = batch.deletedInteractionIds,
+            deletedTimelineEventIds = batch.deletedTimelineEventIds,
+            deletedCustomUnitIds = batch.deletedCustomUnitIds,
+            tombstoneCutoff = batch.since
         )
     }
 

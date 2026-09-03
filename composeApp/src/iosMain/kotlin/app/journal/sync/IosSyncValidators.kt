@@ -22,7 +22,8 @@ import app.journal.util.currentTimeMillis
 object IosSyncValidators {
 
     const val MAX_ITEMS_DEFAULT = 500
-    const val MAX_SUBSTANCES = 100
+    // Measured seed max is 325 substances; headroom for user customs.
+    const val MAX_SUBSTANCES = 1000
     const val MAX_EFFECTS = 100
     const val MAX_INTERACTIONS = 100
     const val MAX_CUSTOM_UNITS = 100
@@ -48,6 +49,11 @@ object IosSyncValidators {
         if (batch.interactions.size > MAX_INTERACTIONS) return "Too many interactions (max $MAX_INTERACTIONS)"
         if (batch.effects.size > MAX_EFFECTS) return "Too many effects (max $MAX_EFFECTS)"
         if (batch.customUnits.size > MAX_CUSTOM_UNITS) return "Too many custom units (max $MAX_CUSTOM_UNITS)"
+        validateDeletedIds(
+            batch.deletedSessionIds, batch.deletedDoseIds, batch.deletedSubstanceIds,
+            batch.deletedEffectIds, batch.deletedInteractionIds, batch.deletedNoteIds,
+            batch.deletedTimelineEventIds, batch.deletedCustomUnitIds
+        )?.let { return it }
 
         validateSessions(batch.sessions)?.let { return it }
         validateDoses(batch.doses)?.let { return it }
@@ -57,6 +63,31 @@ object IosSyncValidators {
         validateTimelineEvents(batch.timelineEvents)?.let { return it }
         validateEffects(batch.effects)?.let { return it }
         validateCustomUnits(batch.customUnits)?.let { return it }
+        return null
+    }
+
+    /** Tombstone ID validation: per-type count caps plus ID shape. */
+    private fun validateDeletedIds(
+        sessions: List<String>,
+        doses: List<String>,
+        substances: List<String>,
+        effects: List<String>,
+        interactions: List<String>,
+        notes: List<String>,
+        timelineEvents: List<String>,
+        customUnits: List<String>
+    ): String? {
+        if (sessions.size > MAX_ITEMS_DEFAULT) return "Too many deleted sessions (max $MAX_ITEMS_DEFAULT)"
+        if (doses.size > MAX_ITEMS_DEFAULT) return "Too many deleted doses (max $MAX_ITEMS_DEFAULT)"
+        if (substances.size > MAX_SUBSTANCES) return "Too many deleted substances (max $MAX_SUBSTANCES)"
+        if (notes.size > MAX_ITEMS_DEFAULT) return "Too many deleted notes (max $MAX_ITEMS_DEFAULT)"
+        if (timelineEvents.size > MAX_ITEMS_DEFAULT) return "Too many deleted events (max $MAX_ITEMS_DEFAULT)"
+        if (interactions.size > MAX_INTERACTIONS) return "Too many deleted interactions (max $MAX_INTERACTIONS)"
+        if (effects.size > MAX_EFFECTS) return "Too many deleted effects (max $MAX_EFFECTS)"
+        if (customUnits.size > MAX_CUSTOM_UNITS) return "Too many deleted custom units (max $MAX_CUSTOM_UNITS)"
+        for (id in sessions + doses + substances + effects + interactions + notes + timelineEvents + customUnits) {
+            if (id.isBlank() || id.length > MAX_ID_LEN) return "Invalid deleted ID"
+        }
         return null
     }
 

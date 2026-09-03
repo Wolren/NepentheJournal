@@ -145,7 +145,8 @@ class IosSyncTransport(
         val aesKey = aesEncryptionKey(secretStr)
         val client = HttpClient(Darwin)
         return try {
-            val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), _status.value.lastSyncAt ?: 0L)
+            val pushSince = _status.value.lastSyncAt ?: 0L
+            val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), pushSince)
             if (batch != null) {
                 val batchJson = json.encodeToString(batch)
                 val encrypted = encryptBody(batchJson, aesKey)
@@ -169,7 +170,7 @@ class IosSyncTransport(
                         null
                     }
                 } else null
-                if (syncResp != null) applySyncResponse(repo, syncResp)
+                if (syncResp != null) applySyncResponse(repo, syncResp, pushSince)
             }
 
             // Pull: sign the exact target including the since param, same as JVM.
@@ -190,7 +191,7 @@ class IosSyncTransport(
                     null
                 }
             } else null
-            if (pullResp?.success == true) applySyncResponse(repo, pullResp)
+            if (pullResp?.success == true) applySyncResponse(repo, pullResp, sinceValue)
 
             _status.update { it.copy(lastSyncAt = currentTimeMillis()) }
             Log.withTag("IosSync").i { "Sync with ${peer.displayName} completed" }

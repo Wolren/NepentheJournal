@@ -80,11 +80,13 @@ interface IJournalRepository {
     // ---- Interactions ----
     fun upsertInteraction(interaction: Interaction)
     fun getInteraction(id: String): Interaction?
+    fun deleteInteraction(id: String)
 
     // ---- Effects ----
     fun upsertEffect(effect: Effect)
     fun getEffect(id: String): Effect?
     fun effectsForSubstance(substanceId: String): List<Effect>
+    fun deleteEffect(id: String)
 
     // ---- Custom Units ----
     fun upsertCustomUnit(unit: CustomUnit)
@@ -160,12 +162,27 @@ interface IJournalRepository {
         notes: List<Note> = emptyList(),
         timelineEvents: List<TimelineEvent> = emptyList(),
         customUnits: List<CustomUnit> = emptyList(),
-        lastWriterWins: Boolean = false
+        lastWriterWins: Boolean = false,
+        deletedSessionIds: List<String> = emptyList(),
+        deletedDoseIds: List<String> = emptyList(),
+        deletedNoteIds: List<String> = emptyList(),
+        deletedSubstanceIds: List<String> = emptyList(),
+        deletedEffectIds: List<String> = emptyList(),
+        deletedInteractionIds: List<String> = emptyList(),
+        deletedTimelineEventIds: List<String> = emptyList(),
+        deletedCustomUnitIds: List<String> = emptyList(),
+        tombstoneCutoff: Long = 0L
     )
 
     // ---- Full-text search ----
     fun search(query: String): List<SearchResult>
     fun rebuildSearchIndex()
+    /** Deleted IDs newer than [since], grouped by entity type. */
+    fun deletedIdsSince(since: Long): DeletedIds
+    /** All live tombstones as storage keys to deletion timestamps. */
+    fun exportTombstones(): Map<String, Long>
+    /** Replace the tombstone journal (snapshot restore). */
+    fun importTombstones(tombstones: Map<String, Long>)
 
     // ---- Lifecycle ----
     fun autoSave(store: JournalStore, scope: CoroutineScope): Job

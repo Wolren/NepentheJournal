@@ -254,4 +254,54 @@ class SyncContractTest {
         val decoded = json.decodeFromString<SyncBatch>(jsonStr)
         assertEquals(0, decoded.sessions.size)
     }
+
+    @Test
+    fun `buildSyncBatch excludes entity at exact since boundary`() {
+        repo.upsertSession(Session(
+            id = "sb", title = "Boundary", createdAt = now, updatedAt = 500L,
+            deviceOrigin = "test", startTime = now
+        ))
+
+        val batch = buildSyncBatch(repo, testDeviceId, "TestDevice", 500L)
+        assertNull(batch, "updatedAt == since must be excluded by the strict greater-than cursor")
+    }
+
+    @Test
+    fun `deleted IDs propagate through batch`() {
+        repo.upsertSession(Session(
+            id = "s9", title = "Gone", createdAt = now, updatedAt = now,
+            deviceOrigin = "test", startTime = now
+        ))
+        repo.upsertNote(Note(
+            id = "n9", createdAt = now, updatedAt = now, deviceOrigin = "test",
+            sessionId = "s9", body = "child"
+        ))
+        repo.deleteSession("s9")
+
+        val batch = buildSyncBatch(repo, testDeviceId, "TestDevice", 0L)
+        assertNotNull(batch, "tombstones alone must produce a batch")
+        assertTrue(batch!!.deletedSessionIds.contains("s9"))
+        assertTrue(batch.deletedNoteIds.contains("n9"))
+    }
+
+    @Test
+    fun `applySyncResponse applies tombstones with cutoff`() {
+        val peer = JournalRepository()
+        peer.upsertSession(Session(
+            id = "s9", title = "Stale", createdAt = now, updatedAt = 100L,
+            deviceOrigin = "peer", startTime = now
+        ))
+        peer.upsertSession(Session(
+            id = "s10", title = "Fresh", createdAt = now, updatedAt = 900L,
+            deviceOrigin = "peer", startTime = now
+        ))
+
+        applySyncResponse(peer, SyncResponse(
+            success = true,
+            deletedSessionIds = listOf("s9", "s10")
+        ), since = 500L)
+
+        assertNull(peer.getSession("s9"), "stale copy loses to the delete")
+        assertNotNull(peer.getSession("s10"), "concurrent update newer than cursor survives")
+    }
 }

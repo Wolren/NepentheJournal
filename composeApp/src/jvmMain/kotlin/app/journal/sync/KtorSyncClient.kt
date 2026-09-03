@@ -119,6 +119,7 @@ class KtorSyncClient(
     ): Result<SyncResponse> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
 
+        val deleted = repo.deletedIdsSince(since)
         val batch = SyncBatch(
             deviceId = deviceId,
             deviceName = deviceName,
@@ -130,7 +131,15 @@ class KtorSyncClient(
             interactions = changed(repo.interactions.value, since) { it.updatedAt },
             notes = changed(repo.notes.value, since) { it.updatedAt },
             timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
-            customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
+            customUnits = changed(repo.customUnits.value, since) { it.updatedAt },
+            deletedSessionIds = deleted.deletedSessionIds,
+            deletedDoseIds = deleted.deletedDoseIds,
+            deletedNoteIds = deleted.deletedNoteIds,
+            deletedSubstanceIds = deleted.deletedSubstanceIds,
+            deletedEffectIds = deleted.deletedEffectIds,
+            deletedInteractionIds = deleted.deletedInteractionIds,
+            deletedTimelineEventIds = deleted.deletedTimelineEventIds,
+            deletedCustomUnitIds = deleted.deletedCustomUnitIds
         )
 
         val bodyText = json.encodeToString(batch)
@@ -155,7 +164,7 @@ class KtorSyncClient(
         response.fold(
             onSuccess = { syncResponse ->
                 try {
-                    applyPull(syncResponse)
+                    applyPull(syncResponse, since)
                 } catch (e: Exception) {
                     Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
                     return@withContext Result.failure(e)
@@ -190,7 +199,7 @@ class KtorSyncClient(
         response.fold(
             onSuccess = { syncResponse ->
                 try {
-                    applyPull(syncResponse)
+                    applyPull(syncResponse, since)
                 } catch (e: Exception) {
                     Log.withTag("SyncClient").e(e) { "applyPull failed after successful pull" }
                     return@withContext Result.failure(e)
@@ -248,7 +257,7 @@ class KtorSyncClient(
         return constantTimeEquals(data.signature, expected)
     }
 
-    private suspend fun applyPull(response: SyncResponse) {
+    private suspend fun applyPull(response: SyncResponse, since: Long) {
         repo.applyBatch(
             sessions = response.sessions,
             doses = response.doses,
@@ -258,7 +267,16 @@ class KtorSyncClient(
             notes = response.notes,
             timelineEvents = response.timelineEvents,
             customUnits = response.customUnits,
-            lastWriterWins = true
+            lastWriterWins = true,
+            deletedSessionIds = response.deletedSessionIds,
+            deletedDoseIds = response.deletedDoseIds,
+            deletedNoteIds = response.deletedNoteIds,
+            deletedSubstanceIds = response.deletedSubstanceIds,
+            deletedEffectIds = response.deletedEffectIds,
+            deletedInteractionIds = response.deletedInteractionIds,
+            deletedTimelineEventIds = response.deletedTimelineEventIds,
+            deletedCustomUnitIds = response.deletedCustomUnitIds,
+            tombstoneCutoff = since
         )
         // Persist pulled data immediately (audit D1): the pull cursor advances
         // after this response, so a crash before the debounced autosave would

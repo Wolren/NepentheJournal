@@ -23,6 +23,7 @@ data class JournalSnapshot(
     val interactions: List<Interaction> = emptyList(),
     val effects: List<Effect> = emptyList(),
     val customUnits: List<CustomUnit> = emptyList(),
+    val tombstones: Map<String, Long> = emptyMap(),
     val useShulginRating: Boolean = false,
     val useSubstanceColors: Boolean = true,
     val obsidianVaultPath: String = "",
@@ -32,7 +33,7 @@ data class JournalSnapshot(
     val showSessionsTrendChart: Boolean = false
 ) {
     companion object {
-        const val CURRENT_VERSION = 5
+        const val CURRENT_VERSION = 6
     }
 }
 
@@ -106,6 +107,7 @@ object AppJson {
             interactions = repo.interactions.value,
             effects = repo.effects.value,
             customUnits = repo.customUnits.value,
+            tombstones = repo.exportTombstones(),
             useShulginRating = repo.useShulginRating.value,
             useSubstanceColors = repo.useSubstanceColors.value,
             obsidianVaultPath = repo.obsidianVaultPath.value,
@@ -130,6 +132,7 @@ object AppJson {
             effects = snapshot.effects,
             customUnits = snapshot.customUnits
         )
+        repo.importTombstones(snapshot.tombstones)
         repo.setShulginRating(snapshot.useShulginRating)
         repo.setSubstanceColors(snapshot.useSubstanceColors)
         repo.setObsidianVaultPath(snapshot.obsidianVaultPath)

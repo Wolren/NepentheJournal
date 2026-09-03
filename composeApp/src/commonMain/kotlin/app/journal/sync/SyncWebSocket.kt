@@ -37,7 +37,15 @@ data class WsDelta(
     val interactions: List<Interaction> = emptyList(),
     val notes: List<Note> = emptyList(),
     val timelineEvents: List<TimelineEvent> = emptyList(),
-    val customUnits: List<CustomUnit> = emptyList()
+    val customUnits: List<CustomUnit> = emptyList(),
+    val deletedSessionIds: List<String> = emptyList(),
+    val deletedDoseIds: List<String> = emptyList(),
+    val deletedNoteIds: List<String> = emptyList(),
+    val deletedSubstanceIds: List<String> = emptyList(),
+    val deletedEffectIds: List<String> = emptyList(),
+    val deletedInteractionIds: List<String> = emptyList(),
+    val deletedTimelineEventIds: List<String> = emptyList(),
+    val deletedCustomUnitIds: List<String> = emptyList()
 ) : WsMessage
 
 @Serializable

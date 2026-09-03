@@ -23,6 +23,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import app.journal.util.PlatformLock
+import app.journal.util.currentTimeMillis
 import kotlinx.datetime.toLocalDateTime
 
 /**
@@ -113,6 +114,96 @@ class JournalRepository internal constructor() : IJournalRepository {
     // ---- Full-text search index ----
     val searchIndex = SearchIndex()
 
+    // ========================
+    //  Tombstones (deleted IDs pending propagation to peers)
+    // ========================
+
+    /** Tombstone retention: deletes older than 30 days stop propagating. */
+    private val tombstoneRetentionMs = 30L * 86_400_000L
+
+    /** Deleted entity tombstones: "type:id" to deletion timestamp. Guarded by [lock]. */
+    private val _tombstones = mutableMapOf<String, Long>()
+
+    private fun tombKey(type: String, id: String) = "$type:$id"
+
+    /** Record a deletion for propagation. Callers must hold [lock]. */
+    private fun recordTombstone(type: String, id: String) {
+        pruneTombstonesLocked()
+        _tombstones[tombKey(type, id)] = currentTimeMillis()
+    }
+
+    private fun pruneTombstonesLocked() {
+        val cutoff = currentTimeMillis() - tombstoneRetentionMs
+        val stale = _tombstones.filterValues { it < cutoff }.keys.toList()
+        for (key in stale) _tombstones.remove(key)
+    }
+
+    override fun deletedIdsSince(since: Long): DeletedIds {
+        val sessions = mutableListOf<String>()
+        val doses = mutableListOf<String>()
+        val notes = mutableListOf<String>()
+        val substances = mutableListOf<String>()
+        val effects = mutableListOf<String>()
+        val interactions = mutableListOf<String>()
+        val timelineEvents = mutableListOf<String>()
+        val customUnits = mutableListOf<String>()
+        lock.withLock {
+            for ((key, deletedAt) in _tombstones) {
+                if (deletedAt <= since) continue
+                val id = key.substringAfter(":")
+                when (key.substringBefore(":")) {
+                    "session" -> sessions.add(id)
+                    "dose" -> doses.add(id)
+                    "note" -> notes.add(id)
+                    "substance" -> substances.add(id)
+                    "effect" -> effects.add(id)
+                    "interaction" -> interactions.add(id)
+                    "timelineEvent" -> timelineEvents.add(id)
+                    "customUnit" -> customUnits.add(id)
+                }
+            }
+        }
+        return DeletedIds(sessions, doses, notes, substances, effects, interactions, timelineEvents, customUnits)
+    }
+
+    override fun exportTombstones(): Map<String, Long> = lock.withLock { _tombstones.toMap() }
+
+    override fun importTombstones(tombstones: Map<String, Long>) = lock.withLock {
+        _tombstones.clear()
+        val cutoff = currentTimeMillis() - tombstoneRetentionMs
+        for ((key, deletedAt) in tombstones) {
+            if (deletedAt >= cutoff) _tombstones[key] = deletedAt
+        }
+    }
+
+    /**
+     * Apply incoming tombstones. Deletes each listed local entity unless the
+     * local copy is newer than [cutoff] (a concurrent update wins; pass 0 to
+     * delete unconditionally for live deltas). Returns true if anything was
+     * deleted. Callers must hold [lock].
+     */
+    private fun applyTombstonesLocked(deleted: DeletedIds, cutoff: Long): Boolean {
+        var changed = false
+        fun <T> applyIds(ids: List<String>, get: (String) -> T?, updatedAt: (T) -> Long, delete: (String) -> Unit) {
+            for (id in ids) {
+                val existing = get(id) ?: continue
+                if (cutoff == 0L || updatedAt(existing) <= cutoff) {
+                    delete(id)
+                    changed = true
+                }
+            }
+        }
+        applyIds(deleted.deletedSessionIds, sessionsStore::get, { it.updatedAt }, ::deleteSessionLocked)
+        applyIds(deleted.deletedDoseIds, dosesStore::get, { it.updatedAt }, ::deleteDoseLocked)
+        applyIds(deleted.deletedNoteIds, notesStore::get, { it.updatedAt }, ::deleteNoteLocked)
+        applyIds(deleted.deletedSubstanceIds, substancesStore::get, { it.updatedAt }, ::deleteSubstanceLocked)
+        applyIds(deleted.deletedEffectIds, effectsStore::get, { it.updatedAt }, ::deleteEffectLocked)
+        applyIds(deleted.deletedInteractionIds, interactionsStore::get, { it.updatedAt }, ::deleteInteractionLocked)
+        applyIds(deleted.deletedTimelineEventIds, timelineEventsStore::get, { it.updatedAt }, ::deleteTimelineEventLocked)
+        applyIds(deleted.deletedCustomUnitIds, customUnitsStore::get, { it.updatedAt }, ::deleteCustomUnitLocked)
+        return changed
+    }
+
     // ---- Precomputed query indices ----
     private val _sessionsByDate = mutableMapOf<LocalDate, MutableList<String>>()
     private val _sessionsPerSubstance = mutableMapOf<String, MutableSet<String>>()
@@ -153,7 +244,16 @@ class JournalRepository internal constructor() : IJournalRepository {
         notes: List<Note>,
         timelineEvents: List<TimelineEvent>,
         customUnits: List<CustomUnit>,
-        lastWriterWins: Boolean
+        lastWriterWins: Boolean,
+        deletedSessionIds: List<String>,
+        deletedDoseIds: List<String>,
+        deletedNoteIds: List<String>,
+        deletedSubstanceIds: List<String>,
+        deletedEffectIds: List<String>,
+        deletedInteractionIds: List<String>,
+        deletedTimelineEventIds: List<String>,
+        deletedCustomUnitIds: List<String>,
+        tombstoneCutoff: Long
     ) = lock.withLock {
         fun <T> newer(list: List<T>, get: (String) -> T?, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
             if (!lastWriterWins) list
@@ -177,10 +277,18 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (notesToPut.isNotEmpty()) notesStore.putAll(notesToPut)
         if (timelineEventsToPut.isNotEmpty()) timelineEventsStore.putAll(timelineEventsToPut)
         if (customUnitsToPut.isNotEmpty()) customUnitsStore.putAll(customUnitsToPut)
+        val tombstonesChanged = applyTombstonesLocked(
+            DeletedIds(
+                deletedSessionIds, deletedDoseIds, deletedNoteIds, deletedSubstanceIds,
+                deletedEffectIds, deletedInteractionIds, deletedTimelineEventIds, deletedCustomUnitIds
+            ),
+            tombstoneCutoff
+        )
         // Rebuild all indices after bulk upsert to handle updates to existing entities
         // where old index entries (dates, per-session children) need to be replaced.
         if (sessionsToPut.isNotEmpty() || dosesToPut.isNotEmpty() || effectsToPut.isNotEmpty() ||
-            notesToPut.isNotEmpty() || timelineEventsToPut.isNotEmpty() || customUnitsToPut.isNotEmpty()
+            notesToPut.isNotEmpty() || timelineEventsToPut.isNotEmpty() || customUnitsToPut.isNotEmpty() ||
+            tombstonesChanged
         ) {
             rebuildAllIndices()
         }
@@ -192,6 +300,11 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
+        _tombstones.clear()
+        val tombCutoff = currentTimeMillis() - tombstoneRetentionMs
+        for ((key, deletedAt) in snapshot.tombstones) {
+            if (deletedAt >= tombCutoff) _tombstones[key] = deletedAt
+        }
         sessionsStore.putAll(snapshot.sessions)
         substancesStore.putAll(snapshot.substances)
         dosesStore.putAll(snapshot.doses)
@@ -284,21 +397,27 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
 
-    override fun deleteSession(id: String) = lock.withLock {
-        val session = sessionsStore.get(id) ?: return@withLock
+    override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id) }
+
+    private fun deleteSessionLocked(id: String) {
+        val session = sessionsStore.get(id) ?: return
         sessionsStore.remove(id)
         removeSessionFromIndices(session)
+        recordTombstone("session", id)
 
         // Batch-remove child entities with single emissions per store
         val removedDoses = dosesStore.removeWhere { it.sessionId == id }
+        for (dose in removedDoses) recordTombstone("dose", dose.id)
         val removedSubstances = removedDoses.map { it.substanceId }.toSet()
 
         _dosesBySession.remove(id)
         _notesBySession.remove(id)
         _eventsBySession.remove(id)
 
-        notesStore.removeWhere { it.sessionId == id }
-        timelineEventsStore.removeWhere { it.sessionId == id }
+        val removedNotes = notesStore.removeWhere { it.sessionId == id }
+        for (note in removedNotes) recordTombstone("note", note.id)
+        val removedEvents = timelineEventsStore.removeWhere { it.sessionId == id }
+        for (event in removedEvents) recordTombstone("timelineEvent", event.id)
 
         // Rebuild dose stats for affected substances
         for (subId in removedSubstances) {
@@ -359,8 +478,11 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun dosesForSession(sessionId: String): List<Dose> =
         lock.withLock { _dosesBySession[sessionId]?.toList() ?: emptyList() }
 
-    override fun deleteDose(id: String) = lock.withLock {
-        val removed = dosesStore.remove(id) ?: return@withLock
+    override fun deleteDose(id: String) = lock.withLock { deleteDoseLocked(id) }
+
+    private fun deleteDoseLocked(id: String) {
+        val removed = dosesStore.remove(id) ?: return
+        recordTombstone("dose", id)
         _dosesBySession[removed.sessionId]?.removeAll { it.id == id }
         _sessionsPerSubstance[removed.substanceId]?.remove(removed.sessionId)
         if (_sessionsPerSubstance[removed.substanceId]?.isEmpty() == true)
@@ -370,14 +492,20 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteNote(id: String) = lock.withLock {
-        val removed = notesStore.remove(id) ?: return@withLock
+    override fun deleteNote(id: String) = lock.withLock { deleteNoteLocked(id) }
+
+    private fun deleteNoteLocked(id: String) {
+        val removed = notesStore.remove(id) ?: return
+        recordTombstone("note", id)
         removed.sessionId?.let { _notesBySession[it]?.removeAll { n -> n.id == id } }
         bumpMutationCount()
     }
 
-    override fun deleteTimelineEvent(id: String) = lock.withLock {
-        val removed = timelineEventsStore.remove(id) ?: return@withLock
+    override fun deleteTimelineEvent(id: String) = lock.withLock { deleteTimelineEventLocked(id) }
+
+    private fun deleteTimelineEventLocked(id: String) {
+        val removed = timelineEventsStore.remove(id) ?: return
+        recordTombstone("timelineEvent", id)
         _eventsBySession[removed.sessionId]?.removeAll { e -> e.id == id }
         bumpMutationCount()
     }
@@ -402,11 +530,15 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun deleteSubstance(id: String) = lock.withLock {
+    override fun deleteSubstance(id: String) = lock.withLock { deleteSubstanceLocked(id) }
+
+    private fun deleteSubstanceLocked(id: String) {
         substancesStore.remove(id)
+        recordTombstone("substance", id)
 
         // Cascade: remove all child entities for this substance
-        customUnitsStore.removeWhere { it.substanceId == id }
+        val removedUnits = customUnitsStore.removeWhere { it.substanceId == id }
+        for (unit in removedUnits) recordTombstone("customUnit", unit.id)
         _customUnitsBySubstance.remove(id)
 
         // Clean up effect index entries referencing this substance
@@ -418,12 +550,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         _effectsBySubstance.remove(id)
 
         // Clean up interactions referencing this substance
-        interactionsStore.removeWhere {
+        val removedInteractions = interactionsStore.removeWhere {
             id in listOf(it.substanceAId, it.substanceBId)
         }
+        for (interaction in removedInteractions) recordTombstone("interaction", interaction.id)
 
-        val affectedSessionIds = dosesStore.removeWhere { it.substanceId == id }
-            .map { it.sessionId }.toSet()
+        val removedSubstanceDoses = dosesStore.removeWhere { it.substanceId == id }
+        for (dose in removedSubstanceDoses) recordTombstone("dose", dose.id)
+        val affectedSessionIds = removedSubstanceDoses.map { it.sessionId }.toSet()
         for (sessionId in affectedSessionIds) {
             _dosesBySession[sessionId]?.removeAll { it.substanceId == id }
         }
@@ -485,8 +619,11 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteCustomUnit(id: String) = lock.withLock {
-        val removed = customUnitsStore.remove(id) ?: return@withLock
+    override fun deleteCustomUnit(id: String) = lock.withLock { deleteCustomUnitLocked(id) }
+
+    private fun deleteCustomUnitLocked(id: String) {
+        val removed = customUnitsStore.remove(id) ?: return
+        recordTombstone("customUnit", id)
         _customUnitsBySubstance[removed.substanceId]?.removeAll { it.id == id }
         if (_customUnitsBySubstance[removed.substanceId]?.isEmpty() == true)
             _customUnitsBySubstance.remove(removed.substanceId)
@@ -495,6 +632,27 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun customUnitsForSubstance(substanceId: String): List<CustomUnit> = lock.withLock {
         _customUnitsBySubstance[substanceId]?.toList() ?: emptyList()
+    }
+
+    override fun deleteEffect(id: String) = lock.withLock { deleteEffectLocked(id) }
+
+    private fun deleteEffectLocked(id: String) {
+        val removed = effectsStore.remove(id) ?: return
+        for (subId in removed.substanceIds) {
+            _effectsBySubstance[subId]?.removeAll { it.id == id }
+            if (_effectsBySubstance[subId]?.isEmpty() == true)
+                _effectsBySubstance.remove(subId)
+        }
+        recordTombstone("effect", id)
+        bumpMutationCount()
+    }
+
+    override fun deleteInteraction(id: String) = lock.withLock { deleteInteractionLocked(id) }
+
+    private fun deleteInteractionLocked(id: String) {
+        interactionsStore.remove(id) ?: return
+        recordTombstone("interaction", id)
+        bumpMutationCount()
     }
 
     // ========================
@@ -751,6 +909,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         _effectsBySubstance.clear()
         customUnitsStore.clear()
         _customUnitsBySubstance.clear()
+        _tombstones.clear()
         _dosesBySession.clear()
         _notesBySession.clear()
         _eventsBySession.clear()

@@ -2,6 +2,7 @@ package app.journal.sync
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
@@ -77,13 +78,13 @@ fun generateNonce(): String {
  * Returns null if nothing changed (skip the sync round-trip).
  */
 fun buildSyncBatch(
-    repo: JournalRepository,
+    repo: IJournalRepository,
     deviceId: String,
     deviceName: String,
     since: Long
 ): SyncBatch? {
     fun <T> changed(list: List<T>, since: Long, updatedAt: (T) -> Long): List<T> =
-        list.filter { updatedAt(it) >= since }
+        list.filter { updatedAt(it) > since }
 
     val sessions = changed(repo.sessions.value, since) { it.updatedAt }
     val doses = changed(repo.doses.value, since) { it.updatedAt }
@@ -94,9 +95,15 @@ fun buildSyncBatch(
     val timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt }
     val customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
 
+    val deleted = repo.deletedIdsSince(since)
+
     val total =
         sessions.size + doses.size + substances.size + effects.size +
-        interactions.size + notes.size + timelineEvents.size + customUnits.size
+        interactions.size + notes.size + timelineEvents.size + customUnits.size +
+        deleted.deletedSessionIds.size + deleted.deletedDoseIds.size +
+        deleted.deletedNoteIds.size + deleted.deletedSubstanceIds.size +
+        deleted.deletedEffectIds.size + deleted.deletedInteractionIds.size +
+        deleted.deletedTimelineEventIds.size + deleted.deletedCustomUnitIds.size
     if (total == 0) return null
 
     return SyncBatch(
@@ -110,7 +117,15 @@ fun buildSyncBatch(
         interactions = interactions,
         notes = notes,
         timelineEvents = timelineEvents,
-        customUnits = customUnits
+        customUnits = customUnits,
+        deletedSessionIds = deleted.deletedSessionIds,
+        deletedDoseIds = deleted.deletedDoseIds,
+        deletedNoteIds = deleted.deletedNoteIds,
+        deletedSubstanceIds = deleted.deletedSubstanceIds,
+        deletedEffectIds = deleted.deletedEffectIds,
+        deletedInteractionIds = deleted.deletedInteractionIds,
+        deletedTimelineEventIds = deleted.deletedTimelineEventIds,
+        deletedCustomUnitIds = deleted.deletedCustomUnitIds
     )
 }
 
@@ -119,7 +134,7 @@ fun buildSyncBatch(
  * Merges all returned entities (upsert) with last-writer-wins by updatedAt,
  * so a replayed/stale response cannot roll back newer local data.
  */
-fun applySyncResponse(repo: JournalRepository, response: SyncResponse) {
+fun applySyncResponse(repo: IJournalRepository, response: SyncResponse, since: Long = 0L) {
     repo.applyBatch(
         sessions = response.sessions,
         doses = response.doses,
@@ -129,7 +144,16 @@ fun applySyncResponse(repo: JournalRepository, response: SyncResponse) {
         notes = response.notes,
         timelineEvents = response.timelineEvents,
         customUnits = response.customUnits,
-        lastWriterWins = true
+        lastWriterWins = true,
+        deletedSessionIds = response.deletedSessionIds,
+        deletedDoseIds = response.deletedDoseIds,
+        deletedNoteIds = response.deletedNoteIds,
+        deletedSubstanceIds = response.deletedSubstanceIds,
+        deletedEffectIds = response.deletedEffectIds,
+        deletedInteractionIds = response.deletedInteractionIds,
+        deletedTimelineEventIds = response.deletedTimelineEventIds,
+        deletedCustomUnitIds = response.deletedCustomUnitIds,
+        tombstoneCutoff = since
     )
 }
 
