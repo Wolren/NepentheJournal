@@ -1,5 +1,7 @@
 package app.journal.ui.session
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,17 +57,19 @@ fun SessionCard(
     HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         useAnimations = isDesktopPlatform(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
         ) {
-            // Accent bar colored by session title (substance identity)
-            Surface(
-                modifier = Modifier.fillMaxHeight().width(4.dp),
-                color = accent
-            ) {}
+            // Quiet 4dp accent bar — solid, not gradient soup
+            Box(
+                Modifier.fillMaxHeight().width(4.dp)
+                    .clip(RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
+                    .background(accent.copy(alpha = 0.85f))
+            )
             Column(modifier = Modifier.padding(14.dp).fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -111,15 +117,23 @@ fun SessionCard(
                         if (session.rating != null || session.shulginRating != null) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.height(28.dp)
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                border = BorderStroke(
+                                    1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                ),
                             ) {
-                                Text(
-                                    text = session.shulginRating ?: "${session.rating}/10",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.height(28.dp)
+                                ) {
+                                    Text(
+                                        text = session.shulginRating ?: "${session.rating}/10",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+                                }
                             }
                         }
                         IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
@@ -138,8 +152,8 @@ fun SessionCard(
                 if (doses.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         doses.forEach { dose ->
@@ -149,7 +163,7 @@ fun SessionCard(
                                 val doseAccent = doseColor.getComposeColor(isDark)
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = doseAccent
+                                    color = doseAccent.copy(alpha = 0.88f)
                                 ) {
                                     val prefix = if (dose.isDoseEstimate) "~" else ""
                                     Text(
@@ -172,10 +186,11 @@ fun SessionCard(
                 if (doses.isNotEmpty()) {
                     val totalAmount = doses.sumOf { it.amount }
                     if (totalAmount > 0) {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(1.dp)
                         ) {
                             doses.forEachIndexed { i, dose ->
                                 val subName = substanceNameMap[dose.substanceId]
@@ -188,10 +203,10 @@ fun SessionCard(
                                         modifier = Modifier
                                             .fillMaxHeight()
                                             .weight(fraction.coerceAtLeast(0.02f)),
-                                        color = color,
+                                        color = color.copy(alpha = 0.85f),
                                         shape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
                                                 else if (i == doses.lastIndex) RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
-                                                else RoundedCornerShape(0.dp)
+                                                else RoundedCornerShape(3.dp)
                                     ) {}
                                 }
                             }

@@ -1,7 +1,9 @@
 package app.journal.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -22,10 +24,11 @@ fun HoverCard(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     useAnimations: Boolean = true,
-    restingElevation: Dp = 1.dp,
-    hoverElevation: Dp = 4.dp,
+    restingElevation: Dp = 0.dp,
+    hoverElevation: Dp = 1.5.dp,
     pressedElevation: Dp = 0.dp,
     shape: Shape = MaterialTheme.shapes.medium,
+    border: BorderStroke? = null,
     content: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -42,12 +45,23 @@ fun HoverCard(
     if (useAnimations) {
         val anim by animateDpAsState(
             targetValue = targetElevation,
-            animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 500f),
             label = "cardElevation"
         )
         elevation = anim
     } else {
         elevation = targetElevation
+    }
+
+    // Subtle hover border brightening — elevation is invisible on dark, border does the work
+    val hoverBoost by animateFloatAsState(
+        targetValue = if (isHovered && !isPressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 500f),
+        label = "hoverBoost"
+    )
+    val resolvedBorder = border?.let { b ->
+        // Lift alpha a touch on hover so dark cards still feel interactive without shadow
+        if (hoverBoost > 0.01f) BorderStroke(b.width, b.brush) else b
     }
 
     Card(
@@ -59,6 +73,7 @@ fun HoverCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
+        border = resolvedBorder,
         elevation = CardDefaults.cardElevation(
             defaultElevation = elevation
         )

@@ -1,6 +1,9 @@
 package app.journal.ui.session.timeline
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -76,15 +79,43 @@ internal fun EventCard(
             }
         }
     } else {
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(Modifier.fillMaxWidth()) {
-                Surface(modifier = Modifier.fillMaxHeight().width(4.dp), color = accent) {}
+                // Accent capsule with halo
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)) {
+                    Box(
+                        Modifier.size(26.dp).background(accent.copy(alpha = 0.14f), CircleShape)
+                    )
+                    Surface(
+                        modifier = Modifier.size(30.dp),
+                        shape = CircleShape,
+                        color = accent.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(icon, null, tint = accent, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
                 Row(Modifier.padding(12.dp).weight(1f), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
                     Column(Modifier.weight(1f)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text(event.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent)
+                            Surface(
+                                shape = RoundedCornerShape(5.dp),
+                                color = accent.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+                            ) {
+                                Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
                         }
                         if (!event.body.isNullOrBlank()) { Spacer(Modifier.height(2.dp)); Text(event.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (event.intensity != null) {

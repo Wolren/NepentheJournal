@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
+import app.journal.ui.charts.ChartTheme
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
@@ -43,12 +44,16 @@ internal fun ToleranceTimelineSection(doses: List<Dose>, substanceName: String, 
 
     SectionCard(title = "Tolerance Timeline (90 days)") {
         val lineColor = AdaptiveColors.colorFor(substanceName).getComposeColor(isDark)
+        val axisLine = ChartTheme.axisLineColor()
+        val grid = ChartTheme.gridColorFaint()
         Canvas(modifier = Modifier.fillMaxWidth().height(60.dp)) {
             val w = size.width
             val h = size.height
             val start = now - lookbackDays * dayMs
 
-            drawLine(Color.Gray.copy(alpha = 0.2f), Offset(0f, h), Offset(w, h), strokeWidth = 2f)
+            // baseline + hairline grid
+            drawLine(axisLine, Offset(0f, h), Offset(w, h), strokeWidth = 1.5f)
+            drawLine(grid, Offset(0f, h * 0.5f), Offset(w, h * 0.5f), strokeWidth = 0.5f)
 
             sorted.forEach { dose ->
                 if (dose.timestamp > start) {

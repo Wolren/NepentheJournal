@@ -2,9 +2,12 @@ package app.journal.ui.session.timeline
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -14,12 +17,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
 import app.journal.model.Substance
 import app.journal.model.TimelineEvent
 import app.journal.util.currentTimeMillis
+import app.journal.ui.charts.ChartTheme
 import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
@@ -28,9 +33,16 @@ import app.journal.ui.theme.ThemeManager
 internal fun RatingBadge(rating: Int?, shulginRating: String?) {
     if (rating != null || shulginRating != null) {
         val displayText = shulginRating ?: "${rating}/10"
-        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        val accent = MaterialTheme.colorScheme.primary
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = accent.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp, accent.copy(alpha = 0.35f)
+            )
+        ) {
             Text(displayText, style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = accent, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
         }
     }
@@ -62,16 +74,29 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
 internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.JournalRepository, sessionStart: Long) {
     val isDark = ThemeManager.instance.isDarkTheme()
     val grouped = doses.groupBy { it.substanceId }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp)) {
             grouped.entries.forEachIndexed { idx, (substanceId, substanceDoses) ->
                 val substance = repo.getSubstance(substanceId)
                 val color = AdaptiveColors.colorFor(substance?.name ?: substanceId).getComposeColor(isDark)
                 if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(modifier = Modifier.size(4.dp, 40.dp), shape = RoundedCornerShape(2.dp), color = color) {}
-                    Spacer(Modifier.width(10.dp))
+                    // Accent capsule with halo
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier.size(22.dp).background(color.copy(alpha = 0.18f), CircleShape)
+                        )
+                        Box(
+                            Modifier.size(4.dp, 40.dp).clip(RoundedCornerShape(2.dp)).background(color)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(substance?.name ?: substanceId, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                         substanceDoses.forEach { dose ->
@@ -98,18 +123,33 @@ internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journa
 
     val isDark = ThemeManager.instance.isDarkTheme()
     Column {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text("Effects Experienced", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             allScores.forEach { (effect, avgScore) ->
                 val label = effect.replace("_", " ").replaceFirstChar { it.uppercase() }
                 val chipColor = when { avgScore >= 7f -> MaterialTheme.colorScheme.tertiary; avgScore >= 4f -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.secondary }
-                Surface(shape = RoundedCornerShape(8.dp), color = chipColor.copy(alpha = 0.12f)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = chipColor, fontWeight = FontWeight.Medium)
-                        Text("${avgScore.toInt()}/10", style = MaterialTheme.typography.labelSmall, color = chipColor.copy(alpha = 0.7f))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = chipColor.copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, chipColor.copy(alpha = 0.30f))
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, style = MaterialTheme.typography.labelSmall, color = chipColor, fontWeight = FontWeight.Medium)
+                            Text("${avgScore.toInt()}/10", style = MaterialTheme.typography.labelSmall, color = chipColor.copy(alpha = 0.7f))
+                        }
+                        // 10-segment score bar
+                        Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp), modifier = Modifier.padding(top = 3.dp)) {
+                            repeat(10) { idx ->
+                                val filled = idx < avgScore.toInt()
+                                Box(
+                                    Modifier.width(5.dp).height(3.dp).clip(RoundedCornerShape(1.dp))
+                                        .background(if (filled) chipColor.copy(alpha = 0.85f) else chipColor.copy(alpha = 0.12f))
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -134,10 +174,10 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
             Spacer(Modifier.height(8.dp))
             Box(modifier = Modifier.fillMaxWidth().height(80.dp)) {
                 val primaryColor = MaterialTheme.colorScheme.primary
+                val gridColor = ChartTheme.gridColor()
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width; val h = size.height; val padL = 24.dp.toPx(); val padB = 16.dp.toPx()
                     val drawW = w - padL; val drawH = h - padB
-                    val gridColor = Color.Gray.copy(alpha = 0.15f)
                     for (i in 0..4) { val y = drawH * i / 4; drawLine(gridColor, Offset(padL, y), Offset(w, y), strokeWidth = 0.5.dp.toPx()) }
                     if (intensityEvents.size >= 2) {
                         val path = Path()
@@ -176,7 +216,9 @@ internal fun PhaseCard(
     startTime: Long,
     modifier: Modifier = Modifier
 ) {
-    val phaseColor = phaseColors[phase.eventType] ?: MaterialTheme.colorScheme.primary
+    val phaseColor = phaseColorForLabel(phase.label)
+        ?: phaseColors[phase.eventType]
+        ?: MaterialTheme.colorScheme.primary
     val startOffset = ((phase.startTime - startTime) / 60000).toInt()
     val endOffset = ((phase.endTime - startTime) / 60000).toInt()
     val durationMs = phase.endTime - phase.startTime
@@ -186,15 +228,22 @@ internal fun PhaseCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp)) {
-            Surface(
-                modifier = Modifier.width(4.dp).height(48.dp),
-                shape = RoundedCornerShape(2.dp),
-                color = phaseColor
-            ) {}
+            // Gradient accent capsule with halo
+            Box(contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.size(24.dp).background(phaseColor.copy(alpha = 0.16f), CircleShape)
+                )
+                Box(
+                    Modifier.size(4.dp, 44.dp).clip(RoundedCornerShape(2.dp))
+                        .background(Brush.verticalGradient(listOf(phaseColor, phaseColor.copy(alpha = 0.5f))))
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(

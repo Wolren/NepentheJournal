@@ -1,7 +1,10 @@
 package app.journal.ui.session
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -11,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
 import app.journal.model.*
@@ -122,16 +126,21 @@ fun SessionTimelineScreen(
         // Session intention/outcome
         if (!session.intention.isNullOrBlank() || !session.outcome.isNullOrBlank()) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Column(Modifier.padding(14.dp)) {
                         if (!session.intention.isNullOrBlank()) {
-                            Text("Intention", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Intention", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(4.dp)); Text(session.intention, style = MaterialTheme.typography.bodySmall)
                         }
                         if (!session.outcome.isNullOrBlank()) {
                             if (!session.intention.isNullOrBlank()) Spacer(Modifier.height(8.dp))
-                            Text("Outcome", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Outcome", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(4.dp)); Text(session.outcome, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -142,16 +151,21 @@ fun SessionTimelineScreen(
         // Set & Setting
         if (!session.set.isNullOrBlank() || !session.setting.isNullOrBlank()) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Column(Modifier.padding(14.dp)) {
                         if (!session.set.isNullOrBlank()) {
-                            Text("Set (Mindset)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Set (Mindset)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(4.dp)); Text(session.set, style = MaterialTheme.typography.bodySmall)
                         }
                         if (!session.setting.isNullOrBlank()) {
                             if (!session.set.isNullOrBlank()) Spacer(Modifier.height(8.dp))
-                            Text("Setting (Environment)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                            Text("Setting (Environment)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.height(4.dp)); Text(session.setting, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -163,10 +177,15 @@ fun SessionTimelineScreen(
         val profile = session.profile
         if (profile != null && (profile.age != null || profile.gender != null || profile.heightCm != null || profile.weightKg != null)) {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Column(Modifier.padding(14.dp)) {
-                        Text("Subject Profile", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Text("Subject Profile", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             profile.age?.let { Column { Text("Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("$it", style = MaterialTheme.typography.bodySmall) } }
@@ -196,32 +215,48 @@ fun SessionTimelineScreen(
                 when (item) {
                     is TimelineItem.Event -> EventCard(item.event, session.startTime, repo = repo, onDelete = { deletingEvent = it })
                     is TimelineItem.PhaseHeader -> {
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                                Text(item.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                            }
+                            val phaseType = phaseColors.entries.firstOrNull { phaseLabelForEntry(it.key) == item.label }?.key
+                            val phaseCol = phaseType?.let { phaseColors[it] } ?: MaterialTheme.colorScheme.primary
+                            Box(Modifier.size(8.dp).background(phaseCol.copy(alpha = 0.85f), CircleShape))
+                            Text(item.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            HorizontalDivider(Modifier.weight(1f).padding(start = 4.dp), thickness = 1.dp,
+                                color = phaseCol.copy(alpha = 0.25f))
                         }
                     }
                 }
             }
         } else {
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                        Text("No timeline events recorded. Add check-ins during a session to build a timeline.",
-                            style = MaterialTheme.typography.bodySmall)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            modifier = Modifier.size(44.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text("No timeline events recorded", style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(3.dp))
+                        Text("Add check-ins during a session to build a timeline.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center)
                     }
                 }
             }
         }
-
-        // Intensity curve
-        item { IntensityCurveOverlay(events = sortedEvents, startTime = session.startTime) }
 
         // Substances / Dosage Table
         if (doses.isNotEmpty()) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
 import app.journal.model.*
+import app.journal.ui.charts.ChartTheme
 import app.journal.ui.components.*
 import app.journal.ui.substances.detail.SectionCard
 import kotlin.math.roundToInt
@@ -183,12 +184,12 @@ fun SubstanceCompanionScreen(
                     val unitColors = remember(lastDoses) {
                         val units = lastDoses.map { it.unit }.distinct()
                         val palette = listOf(
-                            Color(0xFF42A5F5),
-                            Color(0xFF66BB6A),
-                            Color(0xFFEF5350),
-                            Color(0xFFFFA726),
-                            Color(0xFFAB47BC),
-                            Color(0xFF26C6DA),
+                            Color(0xFF8BA888),
+                            Color(0xFF9E8AC7),
+                            Color(0xFF7BAFAF),
+                            Color(0xFFC4A46A),
+                            Color(0xFFB5876A),
+                            Color(0xFFA8B5A0),
                         )
                         units.mapIndexed { i, u -> u to palette[i % palette.size] }.toMap()
                     }

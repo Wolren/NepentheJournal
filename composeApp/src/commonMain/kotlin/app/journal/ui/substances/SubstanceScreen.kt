@@ -1,5 +1,6 @@
 package app.journal.ui.substances
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -232,16 +233,16 @@ private fun SubstanceCard(
     HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         useAnimations = isDesktopPlatform(),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
     ) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
-            // Color indicator bar
             Surface(
-                modifier = Modifier.width(4.dp).height(48.dp),
-                shape = RoundedCornerShape(2.dp),
-                color = color.getComposeColor(isDark)
+                modifier = Modifier.width(3.dp).height(42.dp),
+                shape = RoundedCornerShape(1.5.dp),
+                color = color.getComposeColor(isDark).copy(alpha = 0.85f)
             ) {}
             Spacer(Modifier.width(12.dp))
 

@@ -26,6 +26,27 @@ val phases = listOf(
     TimelineEventType.AFTERGLOW to "Afterglow"
 )
 
+internal fun phaseLabelForEntry(type: TimelineEventType): String = when (type) {
+    TimelineEventType.ONSET -> "Onset"
+    TimelineEventType.COMEUP -> "Comeup"
+    TimelineEventType.PEAK -> "Peak"
+    TimelineEventType.PLATEAU -> "Plateau"
+    TimelineEventType.OFFSET -> "Offset"
+    TimelineEventType.AFTERGLOW -> "Afterglow"
+    else -> "Event"
+}
+
+/** Canonical phase color for a display label (e.g. "Offset" always yellow). */
+internal fun phaseColorForLabel(label: String): Color? = when (label) {
+    "Onset" -> phaseColors[TimelineEventType.ONSET]
+    "Comeup" -> phaseColors[TimelineEventType.COMEUP]
+    "Peak" -> phaseColors[TimelineEventType.PEAK]
+    "Plateau" -> phaseColors[TimelineEventType.PLATEAU]
+    "Offset" -> phaseColors[TimelineEventType.OFFSET]
+    "Afterglow" -> phaseColors[TimelineEventType.AFTERGLOW]
+    else -> null
+}
+
 internal fun phaseLabel(elapsedMs: Long, totalMs: Long): String? {
     if (totalMs <= 0) return null
     val fraction = elapsedMs.toFloat() / totalMs
@@ -81,9 +102,20 @@ internal fun computePhaseRanges(
             phaseEnd = event.timestamp
         }
     }
+
     if (currentPhase != null && phaseType != null) {
         result.add(PhaseRange(currentPhase, phaseType, phaseStart, phaseEnd))
     }
+
+    // Extend each range's end to the next range's start (or session end),
+    // so phase cards show the real span instead of zero-width ranges.
+    for (i in result.indices) {
+        val nextStart = if (i + 1 < result.size) result[i + 1].startTime else startTime + totalDuration
+        if (result[i].endTime < nextStart) {
+            result[i] = result[i].copy(endTime = nextStart)
+        }
+    }
+
     return result
 }
 

@@ -24,22 +24,23 @@ data class SubstanceColor(
 
 object AdaptiveColors {
 
+    // Curated forest-mauve palette — deterministic per substance, harmonious together.
+    // Full 360 deg hue + 55-85% sat was confetti on a muted forest. 8 tones, 38-52% sat.
+    private val curatedLight = listOf(
+        Color(0xFF8BA888), Color(0xFF9E8AC7), Color(0xFFC19AA6), Color(0xFF7BAFAF),
+        Color(0xFFC4A46A), Color(0xFFB5876A), Color(0xFFA8B5A0), Color(0xFF7A9A7D)
+    )
+    private val curatedDark = listOf(
+        Color(0xFF6B8A6E), Color(0xFF7D6BA8), Color(0xFF9A7A86), Color(0xFF5E8E8E),
+        Color(0xFF9E8548), Color(0xFF8F6B4E), Color(0xFF8A9A85), Color(0xFF5C7A5E)
+    )
+
     private val colorCache = mutableMapOf<String, SubstanceColor>()
 
     fun colorFor(name: String): SubstanceColor {
         return colorCache.getOrPut(name.lowercase()) {
-            val hash = abs(name.hashCode())
-            val hue = (hash % 360).toFloat()
-            // Vary saturation between 55-85% based on hash
-            val sat = 55f + (hash / 360) % 31
-            // Light: medium lightness (40-60%) for dark text on light bg
-            val lightL = 40f + (hash / 7) % 21
-            // Dark: lower lightness (25-45%) for light text on dark bg
-            val darkL = 25f + (hash / 11) % 21
-            SubstanceColor(
-                light = hslToColor(hue, sat / 100f, lightL / 100f),
-                dark = hslToColor(hue, sat / 100f, darkL / 100f)
-            )
+            val idx = abs(name.hashCode()) % curatedLight.size
+            SubstanceColor(light = curatedLight[idx], dark = curatedDark[idx])
         }
     }
 

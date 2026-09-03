@@ -36,18 +36,18 @@ data class ThemeConfig(
     val shapes: Shapes get() = when (cornerRadius) {
         CornerRadius.SMALL -> Shapes(
             extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(6.dp),
-            medium = RoundedCornerShape(8.dp), large = RoundedCornerShape(12.dp),
-            extraLarge = RoundedCornerShape(16.dp)
+            medium = RoundedCornerShape(8.dp), large = RoundedCornerShape(10.dp),
+            extraLarge = RoundedCornerShape(14.dp)
         )
         CornerRadius.MEDIUM -> Shapes(
             extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(8.dp),
-            medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(16.dp),
-            extraLarge = RoundedCornerShape(24.dp)
+            medium = RoundedCornerShape(10.dp), large = RoundedCornerShape(14.dp),
+            extraLarge = RoundedCornerShape(18.dp)
         )
         CornerRadius.LARGE -> Shapes(
-            extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
-            medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(24.dp),
-            extraLarge = RoundedCornerShape(32.dp)
+            extraSmall = RoundedCornerShape(6.dp), small = RoundedCornerShape(10.dp),
+            medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp),
+            extraLarge = RoundedCornerShape(24.dp)
         )
     }
 }
@@ -59,18 +59,18 @@ enum class CornerRadius { SMALL, MEDIUM, LARGE }
 object ThemeDefaults {
     val Dark = ThemeConfig(
         baseTheme = BaseTheme.DARK,
-        primaryColor = 0xFFDCA2F4,
-        secondaryColor = 0xFFAD89D6,
-        tertiaryColor = 0xFF8100F5,
+        primaryColor = 0xFFC9A8E0,
+        secondaryColor = 0xFF9A85C2,
+        tertiaryColor = 0xFF7A6BA6,
         errorColor = 0xFFEF9A9A,
-        backgroundColor = 0xFF0E1511,
-        surfaceColor = 0xFF16211A
+        backgroundColor = 0xFF0F1410,
+        surfaceColor = 0xFF1D2620
     )
     val Light = ThemeConfig(
         baseTheme = BaseTheme.LIGHT,
-        primaryColor = 0xFFDCA2F4,
-        secondaryColor = 0xFFAD89D6,
-        tertiaryColor = 0xFF8100F5,
+        primaryColor = 0xFF7B1FA2,
+        secondaryColor = 0xFF5E35B1,
+        tertiaryColor = 0xFF7A6BA6,
         errorColor = 0xFFD32F2F,
         backgroundColor = 0xFFF3F8EF,
         surfaceColor = 0xFFFFFFFF
@@ -102,12 +102,12 @@ object ThemePresets {
         name = "Forest",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFDCA2F4, secondaryColor = 0xFFAD89D6, tertiaryColor = 0xFF8100F5,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0E1511, surfaceColor = 0xFF16211A
+            primaryColor = 0xFFC9A8E0, secondaryColor = 0xFF9A85C2, tertiaryColor = 0xFF7A6BA6,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0F1410, surfaceColor = 0xFF1D2620
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF7B1FA2, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF8100F5,
+            primaryColor = 0xFF7B1FA2, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF7A6BA6,
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFF3F8EF, surfaceColor = 0xFFFFFFFF
         )
     )

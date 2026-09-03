@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -84,7 +85,7 @@ enum class Screen(
     DASHBOARD("Board", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
     SESSIONS("Sessions", Icons.AutoMirrored.Filled.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
     SUBSTANCES("Drugs", Icons.Filled.Science, Icons.Outlined.Science),
-    SAFER("Safe", Icons.Default.Warning, Icons.Default.Warning),
+    SAFER("Safe", Icons.Filled.Warning, Icons.Outlined.Warning),
     SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 

@@ -1,11 +1,14 @@
 package app.journal.ui.dashboard
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
 import app.journal.model.ToleranceCalculator
 import app.journal.model.ToleranceInfo
@@ -89,26 +93,29 @@ fun DashboardScreen(
                     in 12..17 -> "Good afternoon"
                     else -> "Good evening"
                 }
-                Text(greeting, style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(greeting.uppercase(), style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    letterSpacing = 0.08.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Nepenthe Journal", style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
+                        letterSpacing = (-0.01).sp,
                         modifier = Modifier.weight(1f))
                     Icon(
                         Icons.Default.Search, contentDescription = "Search",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
                         modifier = Modifier.size(22.dp).clickable(onClick = onSearchClick)
                     )
                 }
                 Text(
                     formatDateShort(today),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 0.06.sp
                 )
             }
 
@@ -127,11 +134,12 @@ fun DashboardScreen(
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        Column(Modifier.padding(16.dp).fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp).fillMaxWidth()) {
                             val sessionDates = remember(sessions) {
                                 sessions.map { it.startTime }
                             }
@@ -225,13 +233,19 @@ private data class DaySubstanceInfo(val date: LocalDate, val count: Int, val sub
 
 @Composable
 private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
-    Card(modifier = modifier, shape = RoundedCornerShape(12.dp),
+    val accent = MaterialTheme.colorScheme.primary
+    Card(modifier = modifier, shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
-        Column(Modifier.padding(12.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.padding(14.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Quiet editorial accent — thin rule, not a circled badge
+            Box(Modifier.width(24.dp).height(1.5.dp).background(accent.copy(alpha = 0.55f), RoundedCornerShape(1.dp)))
+            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.01).sp)
+            Text(label.uppercase(), style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                letterSpacing = 0.07.sp)
         }
     }
 }
@@ -241,23 +255,25 @@ private fun ToleranceCard(info: ToleranceInfo) {
     val isDark = ThemeManager.instance.isDarkTheme()
     val levelColor = when (info.level) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.error
-        // Bright amber only reads on dark; light mode needs a deep amber
-        // (0xFF9A6700 ~ 4.6:1 on white) to stay legible.
         ToleranceLevel.MEDIUM -> if (isDark) toleranceMediumColor else Color(0xFF9A6700)
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiary
         ToleranceLevel.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     }
     val levelBg = when (info.level) {
-        ToleranceLevel.HIGH -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-        ToleranceLevel.MEDIUM -> toleranceMediumColor.copy(alpha = 0.15f)
-        ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+        ToleranceLevel.HIGH -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+        ToleranceLevel.MEDIUM -> toleranceMediumColor.copy(alpha = 0.08f)
+        ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.18f)
         ToleranceLevel.NONE -> Color.Transparent
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Surface(modifier = Modifier.width(4.dp).height(48.dp), shape = RoundedCornerShape(2.dp), color = levelColor) {}
+            Box(contentAlignment = Alignment.Center) {
+                Box(Modifier.size(26.dp).background(levelColor.copy(alpha = 0.10f), CircleShape))
+                Surface(modifier = Modifier.width(3.dp).height(36.dp), shape = RoundedCornerShape(1.5.dp), color = levelColor.copy(alpha = 0.85f)) {}
+            }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -269,9 +285,9 @@ private fun ToleranceCard(info: ToleranceInfo) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(timeSinceLabel(info.hoursSinceLastDose, info.daysSinceLastDose),
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
                     if (info.totalDosesLast30Days > 0) Text("${info.totalDosesLast30Days}x in 30d",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
                 }
             }
         }
