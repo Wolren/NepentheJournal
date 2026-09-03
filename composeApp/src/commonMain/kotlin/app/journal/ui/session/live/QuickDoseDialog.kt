@@ -21,7 +21,7 @@ import app.journal.util.currentTimeMillis
 internal fun QuickDoseDialog(
     substances: List<Substance>,
     session: Session,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     onDismiss: () -> Unit,
 ) {
     val now = currentTimeMillis()

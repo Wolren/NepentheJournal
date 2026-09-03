@@ -29,7 +29,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionEditorScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     sessionToEdit: Session? = null,
     onBack: () -> Unit
 ) {
@@ -37,7 +37,7 @@ fun SessionEditorScreen(
     val useShulgin by repo.useShulginRating.collectAsState()
     val isEditing = sessionToEdit != null
 
-    // Snapshot interactions once — doesn't cause recomposition on every
+    // Snapshot interactions once - doesn't cause recomposition on every
     // change at runtime. The InteractionChecker caches its index by
     // content hash, so rebuild is skipped even on sessionDoses change.
     val allInteractions = remember { repo.interactions.value }
@@ -346,7 +346,7 @@ fun SessionEditorScreen(
             )
         }
 
-        // Subject Profile (demographics) — expandable
+        // Subject Profile (demographics) - expandable
         item {
             SessionDemographicsSection(
                 expanded = profileExpanded,

@@ -11,7 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 /**
  * Wraps a single [Text] in a [SelectionContainer] so the user can
  * copy text on desktop. Safe to use on individual [Text] composables
- * — do NOT wrap LazyColumn, Box, or other layout containers (crashes
+ * - do NOT wrap LazyColumn, Box, or other layout containers (crashes
  * Skia software renderer on this machine).
  */
 @Composable

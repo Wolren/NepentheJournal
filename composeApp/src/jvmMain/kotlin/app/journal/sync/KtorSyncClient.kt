@@ -216,24 +216,37 @@ class KtorSyncClient(
      * Sends a fresh random challenge to /auth/verify and checks the HMAC
      * response. A fingerprint-spoofed host (fake mDNS service) cannot answer
      * correctly, so a stored secret is never handed to an impostor.
+     * Auth travels in headers; the query form is kept for older hosts.
      */
     suspend fun verifyHostIdentity(host: String, port: Int, callerDeviceId: String, secret: String): Boolean =
         withContext(Dispatchers.IO) {
             try {
-                val challenge = generateNonce()
-                val resp = client.get("http://$host:$port/auth/verify?deviceId=$callerDeviceId&challenge=$challenge")
-                if (resp.status != HttpStatusCode.OK) return@withContext false
-                val data = json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
-                if (data.signature.isBlank()) return@withContext false
-                if (kotlin.math.abs(System.currentTimeMillis() - data.timestamp) > SyncAuth.TIMESTAMP_WINDOW_MS) {
-                    return@withContext false
+                val rawChallenge = generateNonce()
+                val challenge = rawChallenge.take(128)
+                val resp = client.get("http://$host:$port/auth/verify") {
+                    header(SyncAuthenticator.DEVICE_ID_HEADER, callerDeviceId)
+                    header("X-Sync-Challenge", challenge)
                 }
-                val expected = hmac(secret, "challenge:$callerDeviceId:${data.timestamp}:$challenge")
-                constantTimeEquals(data.signature, expected)
+                if (resp.status != HttpStatusCode.OK) {
+                    val legacy = client.get("http://$host:$port/auth/verify?deviceId=$callerDeviceId&challenge=$challenge")
+                    if (legacy.status != HttpStatusCode.OK) return@withContext false
+                    return@withContext checkChallenge(legacy.bodyAsText(), callerDeviceId, challenge, secret)
+                }
+                checkChallenge(resp.bodyAsText(), callerDeviceId, challenge, secret)
             } catch (e: Exception) {
                 false
             }
         }
+
+    private fun checkChallenge(body: String, callerDeviceId: String, challenge: String, secret: String): Boolean {
+        val data = json.decodeFromString<HostChallengeResponse>(body)
+        if (data.signature.isBlank()) return false
+        if (kotlin.math.abs(System.currentTimeMillis() - data.timestamp) > SyncAuth.TIMESTAMP_WINDOW_MS) {
+            return false
+        }
+        val expected = hmac(secret, "challenge:$callerDeviceId:${data.timestamp}:$challenge")
+        return constantTimeEquals(data.signature, expected)
+    }
 
     private suspend fun applyPull(response: SyncResponse) {
         repo.applyBatch(
@@ -291,6 +304,9 @@ class KtorSyncClient(
         if (!canSign) throw IllegalStateException("No shared secret — pair this device first")
 
         val authHeader = authenticateRequest(callerDeviceId, "ws")
+        // Header auth is preferred long term, but Ktor 3.5.1 webSocketSession
+        // has no request lambda, so ship the query form (server reads headers
+        // first, query as fallback).
         val wsUrl = "ws://$host:$port/sync/ws?deviceId=$callerDeviceId&auth=$authHeader"
         return client.webSocketSession(wsUrl)
     }

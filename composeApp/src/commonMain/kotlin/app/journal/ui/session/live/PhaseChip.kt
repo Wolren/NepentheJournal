@@ -17,7 +17,7 @@ import app.journal.model.TimelineEventType
 import app.journal.util.currentTimeMillis
 
 @Composable
-internal fun PhaseChip(label: String, eventType: TimelineEventType, session: Session, repo: JournalRepository) {
+internal fun PhaseChip(label: String, eventType: TimelineEventType, session: Session, repo: IJournalRepository) {
     val phaseColor = when (eventType) {
         TimelineEventType.ONSET -> Color(0xFF80CBC4)
         TimelineEventType.COMEUP -> Color(0xFFA5D6A7)

@@ -27,7 +27,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveSessionScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     session: Session, onBack: () -> Unit
 ) {
     val listState = rememberLazyListState()

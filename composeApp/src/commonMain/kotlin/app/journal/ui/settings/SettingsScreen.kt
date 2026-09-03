@@ -43,7 +43,7 @@ import app.journal.ui.settings.detail.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     syncEngine: SyncEngine,
 ) {
     val sessionCount by repo.totalSessionCount.collectAsState(initial = 0)

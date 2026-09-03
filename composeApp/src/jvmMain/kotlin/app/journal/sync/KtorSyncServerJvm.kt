@@ -96,8 +96,22 @@ class SyncServerRouter(
     private val fingerprint: String,
     private val persistAfterApply: (() -> Unit)? = null
 ) {
+    private val MAX_BODY_BYTES = 10L * 1024 * 1024 // 10 MB sync ceiling
+    private val MAX_PAIRING_BODY_BYTES = 4096L // 4 KB pairing ceiling
+    private val WS_MAX_FRAME_BYTES = 10L * 1024 * 1024
+    private val WS_REORDER_WINDOW = 16L
+    private val MAX_CHALLENGE_LEN = 128
+
     private val json = AppJson.json
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
+
+    /** Per-connection WS sequence state: highest accepted seq plus a small reorder buffer. */
+    private val wsSeqState = ConcurrentHashMap<String, WsSeqState>()
+
+    private class WsSeqState {
+        var highestSeq: Long = -1L
+        val recent: java.util.LinkedHashSet<Long> = java.util.LinkedHashSet()
+    }
 
     fun installRouting(app: Application) {
         app.install(WebSockets) {
@@ -132,9 +146,21 @@ class SyncServerRouter(
             }
 
             get("/auth/verify") {
-                val deviceIdParam = call.request.queryParameters["deviceId"]
-                val challenge = call.request.queryParameters["challenge"]
+                val deviceIdParam = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
+                    ?: call.request.queryParameters["deviceId"]
+                val challengeRaw = call.request.headers["X-Sync-Challenge"]
+                    ?: call.request.queryParameters["challenge"]
+                val challenge = challengeRaw?.take(MAX_CHALLENGE_LEN)
                 if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
+                    warnAuth(call, deviceIdParam, "/auth/verify", "missing device or challenge")
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@get
+                }
+                if (challengeRaw != null && challengeRaw.length > MAX_CHALLENGE_LEN) {
+                    warnAuth(call, deviceIdParam, "/auth/verify", "challenge over 128 chars")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
@@ -143,6 +169,7 @@ class SyncServerRouter(
                 }
                 val secret = trustStore.getSharedSecret(deviceIdParam)
                 if (secret == null) {
+                    warnAuth(call, deviceIdParam, "/auth/verify", "unknown device")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -168,7 +195,9 @@ class SyncServerRouter(
                 // Verified empirically on Ktor 3.5.1 Netty: local.remoteHost
                 // carries the peer address (the 0.0.0.0 bind is NOT returned).
                 val clientIp = call.request.local.remoteHost
+                evictStaleBuckets()
                 if (isRateLimited(clientIp)) {
+                    warnAuth(call, null, "/pairing/verify", "rate limited")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Too many attempts. Try again later.")),
                         ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
@@ -176,6 +205,14 @@ class SyncServerRouter(
                     return@post
                 }
 
+                if (!checkContentLength(call, MAX_PAIRING_BODY_BYTES)) {
+                    warnAuth(call, null, "/pairing/verify", "pairing body over 4KB")
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Body too large")),
+                        ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
+                    )
+                    return@post
+                }
                 val bodyText = call.receiveText()
                 if (bodyText.length > 4096) {
                     call.respondText(
@@ -209,6 +246,7 @@ class SyncServerRouter(
                 }
 
                 if (!authenticator.verifyPairingToken(verifyReq.token)) {
+                    warnAuth(call, verifyReq.clientDeviceId, "/pairing/verify", "invalid or expired token")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Invalid or expired token")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -251,6 +289,7 @@ class SyncServerRouter(
             post("/sync/push") {
                 val auth = verifyRequest(call)
                 if (auth == null) {
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/push", "authentication failed")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Authentication failed")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -259,7 +298,10 @@ class SyncServerRouter(
                 }
                 val (callerDeviceId, encryptedBody) = auth
 
-                if (encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
+                if (!checkContentLength(call, MAX_BODY_BYTES) ||
+                    encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES
+                ) {
+                    warnAuth(call, callerDeviceId, "/sync/push", "payload too large")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
@@ -270,8 +312,9 @@ class SyncServerRouter(
                 // Decrypt the encrypted body before processing
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
+                    warnAuth(call, callerDeviceId, "/sync/push", "unknown device")
                     call.respondText(
-                        json.encodeToString(SyncResponse(false, error = "No shared secret for device")),
+                        json.encodeToString(SyncResponse(false, error = "Unknown device; re-pair required")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
                     )
                     return@post
@@ -301,6 +344,7 @@ class SyncServerRouter(
                 // paired device could attribute writes / conflict notes to
                 // another device (audit L8).
                 if (batch.deviceId != callerDeviceId) {
+                    warnAuth(call, callerDeviceId, "/sync/push", "device ID mismatch")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Device ID mismatch")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -335,6 +379,7 @@ class SyncServerRouter(
             get("/sync/pull") {
                 val auth = verifyRequest(call)
                 if (auth == null) {
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/pull", "authentication failed")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Authentication failed")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -345,7 +390,7 @@ class SyncServerRouter(
 
                 val sinceStr = call.request.queryParameters["since"]
                 val since = sinceStr?.toLongOrNull() ?: 0L
-                if (since < 0) {
+                if (since < 0 || since > System.currentTimeMillis() + 86_400_000L) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Invalid since")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
@@ -355,8 +400,9 @@ class SyncServerRouter(
 
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
+                    warnAuth(call, callerDeviceId, "/sync/pull", "unknown device")
                     call.respondText(
-                        json.encodeToString(SyncResponse(false, error = "No shared secret for device")),
+                        json.encodeToString(SyncResponse(false, error = "Unknown device; re-pair required")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
                     )
                     return@get
@@ -372,46 +418,64 @@ class SyncServerRouter(
             }
 
             webSocket("/sync/ws") {
-                val callerDeviceId = call.request.queryParameters["deviceId"]
-                val authHeader = call.request.queryParameters["auth"]
+                // Handshake auth travels in headers (query strings leak into
+                // logs and caches); query params stay accepted for one release
+                // so already-paired older clients keep connecting.
+                val headerDevice = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
+                val headerAuth = call.request.headers[SyncAuthenticator.AUTH_HEADER]
+                val callerDeviceId = headerDevice ?: call.request.queryParameters["deviceId"]
+                val authHeader = headerAuth ?: call.request.queryParameters["auth"]
                 if (callerDeviceId == null || authHeader == null) {
                     close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing deviceId or auth"))
                     return@webSocket
                 }
                 if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
-                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Untrusted device"))
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Unknown device"))
                     return@webSocket
                 }
                 if (!authenticator.verifyRequest(callerDeviceId, "ws", authHeader)) {
+                    Log.withTag("KtorSyncServer").w { "WS auth failed peer=$callerDeviceId endpoint=/sync/ws" }
                     close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Authentication failed"))
                     return@webSocket
                 }
 
-                // Derive AES key for encrypting/decrypting WsDelta frames
+                // Derive AES key for decrypting WsDelta frames. Once keyed,
+                // plaintext deltas are refused: every WsDelta frame must be
+                // AES-GCM ciphertext (base64 of encryptBody output).
                 val wsAesKey = trustStore.getSharedSecret(callerDeviceId)?.let { aesEncryptionKey(it) }
+                if (wsAesKey == null) {
+                    Log.withTag("KtorSyncServer").w { "WS keyed check failed peer=$callerDeviceId endpoint=/sync/ws" }
+                    close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Unknown device"))
+                    return@webSocket
+                }
 
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
                         val text = frame.readText()
-                        val msg = try {
-                            wsJson.decodeFromString<WsMessage>(text)
-                        } catch (_: Exception) {
-                            // Not a plain WsMessage — try encrypted WsDelta
-                            if (wsAesKey != null) {
-                                try {
-                                    val plaintext = decryptBody(base64Decode(text), wsAesKey)
-                                    wsJson.decodeFromString<WsMessage>(plaintext)
-                                } catch (_: Exception) { null }
-                            } else null
+                        if (text.length > WS_MAX_FRAME_BYTES) {
+                            outgoing.send(Frame.Text(
+                                wsJson.encodeToString(WsMessage.serializer(), WsAck(0, error = "Frame too large"))
+                            ))
+                            continue
                         }
+                        val msg = tryDecryptWsMessage(text, wsAesKey)
                         if (msg == null) {
                             outgoing.send(Frame.Text(
                                 wsJson.encodeToString(WsMessage.serializer(), WsAck(0, error = "Malformed frame"))
                             ))
                             continue
                         }
+                        // WsDelta frames must arrive encrypted. tryDecryptWsMessage
+                        // only returns a delta when AES-GCM decryption succeeded;
+                        // plaintext on a keyed connection yields null above.
                         when (msg) {
                             is WsDelta -> {
+                                if (!checkWsSeq(callerDeviceId, msg.seq)) {
+                                    outgoing.send(Frame.Text(
+                                        wsJson.encodeToString(WsMessage.serializer(), WsAck(seq = msg.seq, error = "Stale or replayed seq"))
+                                    ))
+                                    continue
+                                }
                                 val validationError = validateWsDelta(msg)
                                 if (validationError != null) {
                                     outgoing.send(Frame.Text(
@@ -462,6 +526,32 @@ class SyncServerRouter(
         return state.first > 5
     }
 
+    /** Drop rate-limit buckets whose window expired so idle IPs never accumulate. */
+    private fun evictStaleBuckets() {
+        val now = System.currentTimeMillis()
+        pairingAttempts.entries.removeIf { now - it.value.second > 120_000 }
+    }
+
+    /**
+     * Pre-check Content-Length before reading the body: Ktor receiveText has
+     * no default size limit, so refuse oversized requests early instead of
+     * buffering them. Returns false when the request must be rejected.
+     */
+    private fun checkContentLength(call: ApplicationCall, maxBytes: Long): Boolean {
+        val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: return true
+        return declared <= maxBytes
+    }
+
+    /**
+     * Warn log for auth failures. Includes peer IP, device ID, endpoint, and
+     * reason. Never logs secrets, tokens, auth headers, or bodies.
+     */
+    private fun warnAuth(call: ApplicationCall, deviceId: String?, endpoint: String, reason: String) {
+        val peer = try { call.request.local.remoteHost } catch (_: Exception) { "unknown" }
+        val safeDevice = deviceId?.take(64) ?: "unknown"
+        Log.withTag("KtorSyncServer").w { "auth denied peer=$peer device=$safeDevice endpoint=$endpoint reason=$reason" }
+    }
+
     private suspend fun verifyRequest(call: ApplicationCall): Pair<String, String>? {
         val callerDeviceId = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER] ?: return null
         val authHeader = call.request.headers[SyncAuthenticator.AUTH_HEADER] ?: return null
@@ -480,49 +570,111 @@ class SyncServerRouter(
 
     private fun handlePush(batch: SyncBatch) {
         var conflicts = 0
+        val tagged = batch.copy(deviceName = batch.deviceName.take(200))
         repo.applyBatch(
-            substances = batch.substances,
-            doses = batch.doses,
-            interactions = batch.interactions,
-            timelineEvents = batch.timelineEvents,
-            effects = batch.effects,
-            customUnits = batch.customUnits,
+            substances = tagged.substances,
+            doses = tagged.doses,
+            interactions = tagged.interactions,
+            timelineEvents = tagged.timelineEvents,
+            effects = tagged.effects,
+            customUnits = tagged.customUnits,
             lastWriterWins = true
         )
-        batch.sessions.forEach { session ->
+        tagged.sessions.forEach { session ->
             val existing = repo.getSession(session.id)
             if (existing != null && existing.updatedAt > session.updatedAt) {
                 repo.upsertNote(Note(
-                    id = "conflict:${session.id}:${batch.deviceId}",
+                    id = "conflict:${session.id}:${tagged.deviceId}",
                     sessionId = session.id,
                     title = "Sync conflict — ${session.title}",
                     body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
                     createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                     updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                    deviceOrigin = batch.deviceId
+                    // Tag interaction provenance: conflict notes always carry
+                    // the pushing device so the origin is never ambiguous.
+                    deviceOrigin = "sync:${tagged.deviceId}"
                 ))
                 conflicts++
-            } else repo.upsertSession(session)
+            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:${tagged.deviceId}" }))
         }
-        batch.notes.forEach { note ->
-            val resolved = repo.upsertNoteWithConflict(note, batch.deviceId)
+        tagged.notes.forEach { note ->
+            val resolved = repo.upsertNoteWithConflict(note, tagged.deviceId)
             if (resolved != null && resolved.conflictSiblings.isNotEmpty()) conflicts++
         }
-        onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${batch.deviceName}")
+        onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${tagged.deviceName}")
+    }
+
+    /**
+     * Decode one WS frame. Ping/pong/ack frames are accepted in the clear
+     * (they carry no entity data); WsDelta frames are ONLY accepted as
+     * AES-GCM ciphertext, never as plaintext, once the connection is keyed.
+     */
+    private fun tryDecryptWsMessage(text: String, key: ByteArray): WsMessage? {
+        // Encrypted path first: base64 AES-GCM of the polymorphic JSON.
+        try {
+            val plaintext = decryptBody(base64Decode(text), key)
+            val msg = wsJson.decodeFromString<WsMessage>(plaintext)
+            return msg
+        } catch (_: Exception) { }
+        // Cleartext fallback for control frames only. A plaintext WsDelta is
+        // refused (returns null): on a keyed connection every delta must be
+        // encrypted, otherwise a LAN observer could inject unsigned batches.
+        return try {
+            when (val msg = wsJson.decodeFromString<WsMessage>(text)) {
+                is WsPing, is WsPong, is WsAck -> msg
+                is WsDelta -> null
+            }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Enforce a strictly rising sequence per device with a small reorder
+     * window: accepts seq values above the highest seen, plus up to
+     * WS_REORDER_WINDOW recent lower values once each (covers reordered
+     * delivery); rejects replays and stale frames.
+     */
+    private fun checkWsSeq(deviceId: String, seq: Long): Boolean {
+        if (seq < 0) return false
+        val state = wsSeqState.computeIfAbsent(deviceId) { WsSeqState() }
+        synchronized(state) {
+            if (seq > state.highestSeq) {
+                // Slide the window forward, remembering skipped values.
+                var s = state.highestSeq + 1
+                while (s < seq) {
+                    state.recent.add(s)
+                    s++
+                    while (state.recent.size > WS_REORDER_WINDOW.toInt()) {
+                        state.recent.remove(state.recent.iterator().next())
+                    }
+                }
+                state.highestSeq = seq
+                state.recent.remove(seq)
+                return true
+            }
+            // Within the reorder window and not seen before: accept once.
+            if (seq > state.highestSeq - WS_REORDER_WINDOW && state.recent.remove(seq)) {
+                return true
+            }
+            return false
+        }
     }
 
     private fun handlePull(since: Long) = SyncResponse(
         success = true,
-        sessions = repo.sessions.value.filter { it.updatedAt > since },
-        doses = repo.doses.value.filter { it.updatedAt > since },
-        substances = repo.substances.value.filter { it.updatedAt > since },
-        interactions = repo.interactions.value.filter { it.updatedAt > since },
-        notes = repo.notes.value.filter { it.updatedAt > since },
-        timelineEvents = repo.timelineEvents.value.filter { it.updatedAt > since },
-        effects = repo.effects.value.filter { it.updatedAt > since },
-        customUnits = repo.customUnits.value.filter { it.updatedAt > since },
+        sessions = capped(repo.sessions.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
+        doses = capped(repo.doses.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
+        substances = capped(repo.substances.value.filter { it.updatedAt > since }, MAX_SUBSTANCES),
+        interactions = capped(repo.interactions.value.filter { it.updatedAt > since }, MAX_INTERACTIONS),
+        notes = capped(repo.notes.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
+        timelineEvents = capped(repo.timelineEvents.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
+        effects = capped(repo.effects.value.filter { it.updatedAt > since }, MAX_EFFECTS),
+        customUnits = capped(repo.customUnits.value.filter { it.updatedAt > since }, MAX_CUSTOM_UNITS),
         conflictsCreated = repo.notes.value.count { it.conflictSiblings.isNotEmpty() }
     )
+
+    /** Enforce the same MAX caps on pull responses as push validation (paging by recency). */
+    private fun <T> capped(items: List<T>, max: Int): List<T> =
+        if (items.size <= max) items else items.takeLast(max)
 
     /** Ensure the host's own peer record exists in the trust store. */
     private fun hostSecret(): String {

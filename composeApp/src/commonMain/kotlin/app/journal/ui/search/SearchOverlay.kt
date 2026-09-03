@@ -25,7 +25,7 @@ import app.journal.ui.components.DesktopScrollbar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchOverlay(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     onBack: () -> Unit,
     onSessionClick: (String) -> Unit,
     onSubstanceClick: (String) -> Unit,

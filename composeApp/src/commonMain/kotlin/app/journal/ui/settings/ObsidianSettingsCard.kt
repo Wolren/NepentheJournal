@@ -19,14 +19,14 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ObsidianSettingsCard(
-    repo: JournalRepository = JournalRepository.instance
+    repo: IJournalRepository = JournalRepository.instance
 ) {
 
     val scope = rememberCoroutineScope()
 
     var obsidianExpanded by remember { mutableStateOf(false) }
 
-    // Reload from repo when expanded — values may have changed since last view
+    // Reload from repo when expanded - values may have changed since last view
     var vaultPath by remember { mutableStateOf("") }
     var subfolder by remember { mutableStateOf("Nepenthe") }
     var autoExport by remember { mutableStateOf(false) }

@@ -35,7 +35,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceDetailScreen(
-    repo: JournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = JournalRepository.instance,
     substanceId: String,
     onBack: () -> Unit,
     onEdit: (String) -> Unit = {},

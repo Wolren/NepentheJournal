@@ -109,7 +109,7 @@ fun SyncHostingCard(
                         onCopyToken = onCopyToken
                     )
                 } else {
-                    // Placeholder — token will appear shortly
+                    // Placeholder - token will appear shortly
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

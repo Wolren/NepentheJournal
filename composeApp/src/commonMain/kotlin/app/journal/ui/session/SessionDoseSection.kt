@@ -64,7 +64,7 @@ fun SessionDoseSection(
         }
     }
 
-    // Dose list — clickable to edit, delete button inline
+    // Dose list - clickable to edit, delete button inline
     Column {
         sessionDoses.forEach { dose ->
             key(dose.id) {

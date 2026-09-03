@@ -85,7 +85,7 @@ internal fun ThemeSettingsCard(
                 }
                 AppTonalButton(onClick = { onApply() }) { Text("Manage") }
             }
-            if (true) { // expanded — always shown when this composable is called
+            if (true) { // expanded - always shown when this composable is called
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(8.dp))

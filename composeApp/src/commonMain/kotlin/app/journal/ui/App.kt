@@ -1,5 +1,5 @@
 /*
- * Nepenthe Journal — GPLv3
+ * Nepenthe Journal - GPLv3
  * Copyright (C) 2026 Wolren
  *
  * Derived from PsychonautWiki Journal (GPL-3.0-or-later)
@@ -91,7 +91,7 @@ enum class Screen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun App(repo: JournalRepository = JournalRepository.instance) {
+fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 

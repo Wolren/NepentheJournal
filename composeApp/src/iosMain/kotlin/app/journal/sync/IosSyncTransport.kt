@@ -2,11 +2,10 @@ package app.journal.sync
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
-import app.journal.data.JournalSnapshot
 import app.journal.log.Log
 import app.journal.model.SyncConfig
+import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
-// SyncCrypto imports: AES-256-GCM encrypt/decrypt + key derivation
 import app.journal.sync.aesEncryptionKey
 import app.journal.sync.encryptBody
 import app.journal.sync.decryptBody
@@ -17,6 +16,7 @@ import io.ktor.client.engine.darwin.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.routing.*
@@ -25,15 +25,22 @@ import io.ktor.server.request.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * iOS implementation of SyncEngine that speaks the standard Nepenthe sync protocol.
  *
  * Wire format: SyncBatch (push) / SyncResponse (pull/push response)
  * Auth: HMAC-SHA256 via "X-Sync-Auth" header (timestamp:nonce:hex-signature)
- * Transport: plain HTTP (no TLS on LAN — ATS handles app-to-internet)
+ * Bodies: AES-256-GCM encrypted, base64 wrapped (encrypt-then-MAC)
+ * Transport: plain HTTP (no TLS on LAN, HMAC plus encryption secures data)
  * Discovery: Bonjour via NSNetServiceBrowser
+ *
+ * Security model (mirrors the JVM transport):
+ * Pairing verifies a single use 6 char token with a 120s TTL before any
+ * secret is minted. Secrets are stored per device in a sandboxed trust
+ * store, requests look up the caller deviceId, unknown callers are
+ * rejected, and the push batch deviceId must equal the caller. Nonces are
+ * replay protected with a 45s window and oldest first eviction.
  *
  * Compatible with desktop and Android hosts using the same protocol.
  */
@@ -53,168 +60,49 @@ class IosSyncTransport(
     ))
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Derived identity — on iOS, fingerprint is a hash of device name (no TLS cert)
-    private val deviceId: String by lazy { "ios-${platformDeviceName().hashCode().toUShort()}" }
-    private val deviceFingerprint: String by lazy {
-        hmacSha256Hex(deviceId.encodeToByteArray(), platformDeviceName().encodeToByteArray())
-    }
-    // No persistent secret store on iOS — generate on each pairing response
-    private var pairingSecret: ByteArray? = null
+    internal val identityStore = IosDeviceIdentityStore(dataDir)
+    internal val trustStore = IosDeviceTrustStore(dataDir)
+    internal val pairingManager = IosPairingManager()
+    internal val nonceCache = IosNonceReplayCache()
+
+    /** Stable random device id persisted in the app sandbox. */
+    internal val deviceId: String by lazy { identityStore.deviceId() }
+    /** Public fingerprint: SHA-256 hex of the secret identity bytes. */
+    internal val deviceFingerprint: String by lazy { identityStore.fingerprint() }
+
+    private val pairingAttempts = mutableMapOf<String, Pair<Int, Long>>()
+    private val pairingAttemptsLock = PlatformLock()
 
     override suspend fun startHosting(config: SyncConfig): Result<HostingInfo> {
         return try {
             val port = config.listenerPort
+            val router = IosSyncServerRouter(
+                repo = repo,
+                trustStore = trustStore,
+                pairingManager = pairingManager,
+                nonceCache = nonceCache,
+                deviceId = deviceId,
+                deviceName = platformDeviceName(),
+                fingerprint = deviceFingerprint,
+                onConnection = { msg ->
+                    _status.update { it.copy(lastError = msg) }
+                },
+                isRateLimited = ::isPairingRateLimited
+            )
+            pairingManager.generatePairingToken()
+            val now = currentTimeMillis()
+            _status.update {
+                it.copy(
+                    pairingToken = pairingManager.currentPairingToken(),
+                    tokenExpiresAt = now + PAIRING_TOKEN_TTL_MS,
+                    pairedDeviceCount = trustStore.count()
+                )
+            }
             hostingJob = scope.launch {
                 Log.withTag("IosSync").i { "Starting iOS sync server on port $port" }
                 try {
                     embeddedServer(CIO, port = port) {
-                        routing {
-                            get(SyncEndpoints.INFO) {
-                                call.respondText(
-                                    json.encodeToString(HostInfo(
-                                        deviceId = deviceId,
-                                        deviceName = platformDeviceName(),
-                                        fingerprint = deviceFingerprint,
-                                        protocolVersion = 2
-                                    )),
-                                    ContentType.Application.Json
-                                )
-                            }
-
-                            get(SyncEndpoints.PAIRING_START) {
-                                call.respondText(
-                                    json.encodeToString(HostInfo(
-                                        deviceId = deviceId,
-                                        deviceName = platformDeviceName(),
-                                        fingerprint = deviceFingerprint,
-                                        protocolVersion = 2
-                                    )),
-                                    ContentType.Application.Json
-                                )
-                            }
-
-                            post(SyncEndpoints.PAIRING_VERIFY) {
-                                val bodyText = call.receiveText()
-                                val req = runCatching {
-                                    json.decodeFromString<PairingVerifyRequest>(bodyText)
-                                }.getOrNull()
-                                if (req == null) {
-                                    call.respondText(
-                                        json.encodeToString(PairingResultResponse(false, error = "Invalid request")),
-                                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
-                                    )
-                                    return@post
-                                }
-                                val secret = generateNonce() + generateNonce() // 64-char hex
-                                pairingSecret = secret.encodeToByteArray()
-                                call.respondText(
-                                    json.encodeToString(PairingResultResponse(
-                                        success = true,
-                                        deviceId = "${req.clientFingerprint.take(8)}",
-                                        sharedSecret = secret,
-                                        hostDeviceId = deviceId,
-                                        hostDeviceName = platformDeviceName(),
-                                        hostFingerprint = deviceFingerprint
-                                    )),
-                                    ContentType.Application.Json
-                                )
-                            }
-
-                            post(SyncEndpoints.SYNC_PUSH) {
-                                val deviceHeader = call.request.headers[SyncAuth.DEVICE_ID_HEADER]
-                                val authHeader = call.request.headers[SyncAuth.AUTH_HEADER]
-                                if (deviceHeader == null || authHeader == null) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "Authentication missing")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
-                                    )
-                                    return@post
-                                }
-                                val secret = pairingSecret ?: run {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "No shared secret")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
-                                    )
-                                    return@post
-                                }
-                                val body = call.receiveText()
-                                val verified = verifyAuth(deviceHeader, body, authHeader, secret)
-                                if (!verified) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "HMAC verification failed")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
-                                    )
-                                    return@post
-                                }
-                                val aesKey = aesEncryptionKey(String(secret))
-                                val batchJson = try {
-                                    val encryptedBytes = base64Decode(body)
-                                    decryptBody(encryptedBytes, aesKey)
-                                } catch (e: Exception) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "Decryption failed: ${e.message}")),
-                                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
-                                    )
-                                    return@post
-                                }
-                                val batch = try {
-                                    json.decodeFromString<SyncBatch>(batchJson)
-                                } catch (e: Exception) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "Invalid payload")),
-                                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
-                                    )
-                                    return@post
-                                }
-                                val validationError = validateSyncBatch(batch)
-                                if (validationError != null) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = validationError)),
-                                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
-                                    )
-                                    return@post
-                                }
-                                applySyncBatch(batch)
-                                val response = buildSyncResponse(batch.since)
-                                val responseJson = json.encodeToString(response)
-                                val encryptedBody = encryptBody(responseJson, aesKey)
-                                call.respondText(base64Encode(encryptedBody), ContentType.Application.Json)
-                            }
-
-                            get(SyncEndpoints.SYNC_PULL) {
-                                val deviceHeader = call.request.headers[SyncAuth.DEVICE_ID_HEADER]
-                                val authHeader = call.request.headers[SyncAuth.AUTH_HEADER]
-                                if (deviceHeader == null || authHeader == null) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "Authentication missing")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
-                                    )
-                                    return@get
-                                }
-                                val secret = pairingSecret ?: run {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "No shared secret")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
-                                    )
-                                    return@get
-                                }
-                                val body = ""
-                                val verified = verifyAuth(deviceHeader, body, authHeader, secret)
-                                if (!verified) {
-                                    call.respondText(
-                                        json.encodeToString(SyncResponse(false, error = "HMAC verification failed")),
-                                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
-                                    )
-                                    return@get
-                                }
-                                val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
-                                val aesKey = aesEncryptionKey(String(secret))
-                                val response = buildSyncResponse(since)
-                                val responseJson = json.encodeToString(response)
-                                val encryptedBody = encryptBody(responseJson, aesKey)
-                                call.respondText(base64Encode(encryptedBody), ContentType.Application.Json)
-                            }
-                        }
+                        router.installRouting(this)
                     }.start(wait = false)
                     Log.withTag("IosSync").i { "iOS sync server started on :$port" }
                 } catch (e: Exception) {
@@ -233,12 +121,28 @@ class IosSyncTransport(
     override suspend fun stopHosting() {
         hostingJob?.cancel()
         hostingJob = null
-        _status.update { it.copy(isHosting = false, hostAddress = null) }
+        pairingManager.clearPendingPairing()
+        _status.update { it.copy(isHosting = false, hostAddress = null, pairingToken = null) }
+    }
+
+    /** Pairing rate limiter keyed on socket level identity, 5 attempts per 120s window. */
+    internal fun isPairingRateLimited(clientKey: String): Boolean = pairingAttemptsLock.withLock {
+        val now = currentTimeMillis()
+        val (count, windowStart) = pairingAttempts[clientKey] ?: Pair(0, now)
+        val next = if (now - windowStart > PAIRING_RATE_WINDOW_MS) Pair(1, now) else Pair(count + 1, windowStart)
+        pairingAttempts[clientKey] = next
+        next.first > MAX_PAIRING_ATTEMPTS
     }
 
     override suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> {
-        val secret = pairingSecret ?: return Result.failure(Exception("Not paired"))
-        val aesKey = aesEncryptionKey(String(secret))
+        val peerDeviceId = peer.deviceId
+        if (peerDeviceId == null) {
+            return Result.failure(Exception("Unknown peer device: pairing required"))
+        }
+        val secretStr = trustStore.getSharedSecret(peerDeviceId)
+            ?: return Result.failure(Exception("Not paired"))
+        val secret = secretStr.encodeToByteArray()
+        val aesKey = aesEncryptionKey(secretStr)
         val client = HttpClient(Darwin)
         return try {
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), _status.value.lastSyncAt ?: 0L)
@@ -268,12 +172,13 @@ class IosSyncTransport(
                 if (syncResp != null) applySyncResponse(repo, syncResp)
             }
 
-            // Always pull
-            val pullAuth = buildAuthHeader(deviceId, "", secret, currentTimeMillis(), generateNonce())
-            val pullResponse = client.get("http://${peer.host}:${peer.port}${SyncEndpoints.SYNC_PULL}") {
+            // Pull: sign the exact target including the since param, same as JVM.
+            val sinceValue = _status.value.lastSyncAt ?: 0L
+            val pullTarget = "${SyncEndpoints.SYNC_PULL}?since=$sinceValue"
+            val pullAuth = buildAuthHeader(deviceId, pullTarget, secret, currentTimeMillis(), generateNonce())
+            val pullResponse = client.get("http://${peer.host}:${peer.port}$pullTarget") {
                 header(SyncAuth.DEVICE_ID_HEADER, deviceId)
                 header(SyncAuth.AUTH_HEADER, pullAuth)
-                parameter("since", _status.value.lastSyncAt?.toString() ?: "0")
             }
             val pullBody = pullResponse.bodyAsText()
             val pullResp = if (pullBody.isNotEmpty()) {
@@ -316,7 +221,22 @@ class IosSyncTransport(
     }
 
     override suspend fun disconnectFrom(deviceId: String) = stopContinuousSync(deviceId)
-    override suspend fun revokeTrustedDevice(deviceId: String) = disconnectFrom(deviceId)
+
+    override suspend fun revokeTrustedDevice(deviceId: String) {
+        trustStore.revokeDevice(deviceId)
+        disconnectFrom(deviceId)
+    }
+
+    override fun trustedDevices(): List<TrustedDeviceInfo> =
+        trustStore.listPeers().map { peer ->
+            TrustedDeviceInfo(
+                deviceId = peer.deviceId,
+                displayName = peer.displayName,
+                fingerprint = peer.fingerprint,
+                pairedAt = peer.pairedAt,
+                lastSeenAt = peer.lastSeenAt
+            )
+        }
 
     override fun startDiscovery(mode: DiscoveryMode): Flow<LanDiscoveryEvent> =
         LanDiscovery().startDiscovery()
@@ -344,9 +264,28 @@ class IosSyncTransport(
             val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
             if (!result.success) return Result.failure(Exception(result.error ?: "Pairing failed"))
 
-            pairingSecret = (result.sharedSecret ?: return Result.failure(Exception("No secret returned"))).encodeToByteArray()
+            val sharedSecret = result.sharedSecret ?: return Result.failure(Exception("No secret returned"))
+            val hostId = result.hostDeviceId ?: return Result.failure(Exception("No host id returned"))
+            trustStore.addPeer(
+                IosDeviceTrustStore.IosTrustedPeer(
+                    deviceId = hostId,
+                    displayName = result.hostDeviceName ?: info.deviceName,
+                    fingerprint = result.hostFingerprint ?: info.fingerprint,
+                    sharedSecret = sharedSecret,
+                    pairedAt = currentTimeMillis()
+                )
+            )
+
+            // Prove the host knows the secret before syncing against it.
+            // A fingerprint spoofed host cannot answer the challenge.
+            val hostProven = verifyHostIdentity(host, port, deviceId, sharedSecret)
+            if (!hostProven) {
+                trustStore.revokeDevice(hostId)
+                return Result.failure(Exception("Host identity challenge failed"))
+            }
+
             return syncWith(DiscoveredPeer(
-                deviceId = result.hostDeviceId,
+                deviceId = hostId,
                 displayName = result.hostDeviceName ?: info.deviceName,
                 host = host, port = port,
                 isTrusted = true,
@@ -356,6 +295,32 @@ class IosSyncTransport(
             return Result.failure(e)
         } finally {
             pairingClient.close()
+        }
+    }
+
+    /**
+     * Challenge the host at [host]:[port] to prove it knows [secret].
+     * Sends a fresh random challenge to /auth/verify and checks the HMAC
+     * response, same contract as the JVM client verifyHostIdentity.
+     */
+    suspend fun verifyHostIdentity(host: String, port: Int, callerDeviceId: String, secret: String): Boolean {
+        val client = HttpClient(Darwin)
+        return try {
+            val challenge = generateNonce()
+            val resp = client.get("http://$host:$port/auth/verify?deviceId=$callerDeviceId&challenge=$challenge")
+            if (resp.status != HttpStatusCode.OK) return false
+            val data = json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
+            if (data.signature.isBlank()) return false
+            if (kotlin.math.abs(currentTimeMillis() - data.timestamp) > SyncAuth.TIMESTAMP_WINDOW_MS) return false
+            val expected = hmacSha256Hex(
+                secret.encodeToByteArray(),
+                "challenge:$callerDeviceId:${data.timestamp}:$challenge".encodeToByteArray()
+            )
+            constantTimeEquals(data.signature, expected)
+        } catch (e: Exception) {
+            false
+        } finally {
+            client.close()
         }
     }
 
@@ -370,70 +335,16 @@ class IosSyncTransport(
 
     // ==========  Private helpers  ==========
 
-    /**
-     * Validate a SyncBatch from an incoming push request.
-     * Enforces field-length and item-count limits to prevent injection
-     * of malformed data from untrusted peers.
-     */
-    private fun validateSyncBatch(batch: SyncBatch): String? {
-        if (batch.sessions.size > MAX_ITEMS) return "Too many sessions"
-        if (batch.doses.size > MAX_ITEMS) return "Too many doses"
-        if (batch.substances.size > 100) return "Too many substances"
-        if (batch.notes.size > MAX_ITEMS) return "Too many notes"
-        if (batch.timelineEvents.size > MAX_ITEMS) return "Too many events"
-        if (batch.interactions.size > 100) return "Too many interactions"
-        if (batch.effects.size > 100) return "Too many effects"
-        if (batch.customUnits.size > 100) return "Too many custom units"
-        return null
-    }
-
-    private companion object {
-        private const val MAX_ITEMS = 500
-    }
-
-    private fun verifyAuth(deviceId: String, body: String, authHeader: String, secret: ByteArray): Boolean {
-        val parts = authHeader.split(":", limit = 3)
-        if (parts.size != 3) return false
-        val (timestampStr, nonce, signature) = parts
-        val timestamp = timestampStr.toLongOrNull() ?: return false
-        val now = currentTimeMillis()
-        if (kotlin.math.abs(now - timestamp) > SyncAuth.TIMESTAMP_WINDOW_MS) return false
-        val payload = "$deviceId:$timestamp:$nonce:$body"
-        val expected = hmacSha256Hex(secret, payload.encodeToByteArray())
-        return constantTimeEquals(signature, expected)
-    }
-
-    private fun buildSyncResponse(since: Long): SyncResponse {
-        fun <T> changed(list: List<T>, since: Long, updatedAt: (T) -> Long): List<T> =
-            list.filter { updatedAt(it) >= since }
-        return SyncResponse(
-            success = true,
-            sessions = changed(repo.sessions.value, since) { it.updatedAt },
-            doses = changed(repo.doses.value, since) { it.updatedAt },
-            substances = changed(repo.substances.value, since) { it.updatedAt },
-            effects = changed(repo.effects.value, since) { it.updatedAt },
-            interactions = changed(repo.interactions.value, since) { it.updatedAt },
-            notes = changed(repo.notes.value, since) { it.updatedAt },
-            timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
-            customUnits = changed(repo.customUnits.value, since) { it.updatedAt }
-        )
-    }
-
-    private fun applySyncBatch(batch: SyncBatch) {
-        for (s in batch.sessions) repo.upsertSession(s)
-        for (d in batch.doses) repo.upsertDose(d)
-        for (s in batch.substances) repo.upsertSubstance(s)
-        for (e in batch.effects) repo.upsertEffect(e)
-        for (i in batch.interactions) repo.upsertInteraction(i)
-        for (n in batch.notes) repo.upsertNote(n)
-        for (t in batch.timelineEvents) repo.upsertTimelineEvent(t)
-        for (u in batch.customUnits) repo.upsertCustomUnit(u)
-    }
-
     private fun constantTimeEquals(a: String, b: String): Boolean {
         if (a.length != b.length) return false
         var result = 0
         for (i in a.indices) result = result or (a[i].code xor b[i].code)
         return result == 0
+    }
+
+    internal companion object {
+        internal const val MAX_PAIRING_ATTEMPTS = 5
+        internal const val PAIRING_RATE_WINDOW_MS = 120_000L
+        internal const val PAIRING_TOKEN_TTL_MS = 120_000L
     }
 }

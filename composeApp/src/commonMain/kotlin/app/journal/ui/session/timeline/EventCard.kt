@@ -25,7 +25,7 @@ import app.journal.ui.session.timeline.phaseColors
 internal fun EventCard(
     event: TimelineEvent,
     sessionStart: Long,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     onDelete: ((TimelineEvent) -> Unit)? = null
 ) {
     var editing by remember { mutableStateOf(false) }

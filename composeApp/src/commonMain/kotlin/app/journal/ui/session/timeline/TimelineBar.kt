@@ -356,7 +356,7 @@ internal fun TimelineBar(
                             }
                         }
 
-                        // Dose markers with halo — one per dose (redoses included)
+                        // Dose markers with halo - one per dose (redoses included)
                         row.doses.sortedBy { it.timestamp }.forEach { dose ->
                             val pct = ((dose.timestamp - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
                             val mx = barX + pct * barW

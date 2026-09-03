@@ -26,7 +26,7 @@ import kotlinx.datetime.*
 
 /**
  * Line chart showing sessions per week for the last 12 weeks.
- * Forest line, cubic smoothing, soft fill — same language as the
+ * Forest line, cubic smoothing, soft fill - same language as the
  * Duration intensity curve (ggplot-grade polish, not Vico defaults).
  */
 @Composable
@@ -124,7 +124,7 @@ fun SessionsTrendChart(
 
 /**
  * Bar chart for top substances by session count.
- * Manual rows — horizontal Vico bars are unreliable on CMP and the
+ * Manual rows - horizontal Vico bars are unreliable on CMP and the
  * hand-built version already matches the DoseTimeline polish.
  * Now wrapped in ChartCard for consistent card shape / header.
  */
@@ -143,7 +143,7 @@ fun TopSubstancesChart(
     if (ranked.isEmpty()) return
     val maxCount = ranked.firstOrNull()?.value?.toFloat() ?: 1f
 
-    // Muted forest palette — same family as AdaptiveColors curated set
+    // Muted forest palette - same family as AdaptiveColors curated set
     val chartColors = listOf(
         androidx.compose.ui.graphics.Color(0xFF8BA888),
         androidx.compose.ui.graphics.Color(0xFF9E8AC7),

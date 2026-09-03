@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 @Composable
 fun EditorInlineEventCard(
     event: TimelineEvent,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     onDelete: () -> Unit
 ) {
     var editing by remember { mutableStateOf(false) }

@@ -37,7 +37,13 @@ actual object ObsidianVaultOps {
 
     actual fun readFile(path: String): String {
         return try {
-            File(path).readText()
+            val f = File(path)
+            // File-length precheck: never readText an unbounded vault file.
+            if (f.length() > maxVaultFileBytes) {
+                Log.withTag("Obsidian").w { "Refusing oversized vault file ($path, ${f.length()} bytes)" }
+                throw IllegalStateException("Vault file too large: $path")
+            }
+            f.readText()
         } catch (e: Exception) {
             Log.withTag("Obsidian").e(e) { "Error reading file: $path" }
             throw e
@@ -93,4 +99,7 @@ actual object ObsidianVaultOps {
             path // return original on error
         }
     }
+
+    /** Cap on a single vault file read so one corrupt file cannot OOM the import. */
+    private val maxVaultFileBytes = 50L * 1024 * 1024
 }

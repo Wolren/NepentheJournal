@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Pure color math: HSV <-> ARGB conversion, hex formatting, hex parsing.
- * No Compose UI dependencies — usable anywhere color values are needed.
+ * No Compose UI dependencies - usable anywhere color values are needed.
  */
 object ColorUtils {
 

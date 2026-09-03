@@ -19,7 +19,7 @@ import app.journal.util.currentTimeMillis
 fun SessionEventsSection(
     sessionEvents: List<TimelineEvent>,
     sessionId: String,
-    repo: JournalRepository,
+    repo: IJournalRepository,
     onEventAdded: (TimelineEvent) -> Unit,
     onEventDeleted: (String) -> Unit
 ) {

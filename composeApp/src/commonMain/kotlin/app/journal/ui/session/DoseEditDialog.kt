@@ -178,7 +178,7 @@ fun DoseEditDialog(
                         singleLine = true
                     )
                 }
-                // Search results — inline, same window, no popup
+                // Search results - inline, same window, no popup
                 val filtered = if (substanceSearch.isBlank()) emptyList()
                 else substances.filter {
                     it.name.contains(substanceSearch, ignoreCase = true) ||
@@ -304,7 +304,7 @@ fun DoseEditDialog(
                                         }
                                     } else {
                                         DropdownMenuItem(
-                                            text = { Text("No custom units — add in Settings", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                            text = { Text("No custom units - add in Settings", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                                             onClick = { expandedUnit = false },
                                             enabled = false,
                                         )
