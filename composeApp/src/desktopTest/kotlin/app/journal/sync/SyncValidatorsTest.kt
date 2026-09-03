@@ -160,7 +160,7 @@ class SyncValidatorsTest {
 
     @Test
     fun tooManySubstancesRejected() {
-        val substances = (1..101).map { substance("cid:$it", "Sub-$it") }
+        val substances = (1..1001).map { substance("cid:$it", "Sub-$it") }
         assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L, substances = substances)))
     }
 
@@ -280,6 +280,6 @@ class SyncValidatorsTest {
     }
 
     companion object {
-        private const val now = 1_000_000L
+        private const val now = 1_700_000_000_000L
     }
 }

@@ -681,16 +681,29 @@ class SyncServerRouter(
 
     private fun handlePull(since: Long): SyncResponse {
         val deleted = repo.deletedIdsSince(since)
+        // Oldest-first pages with a low-water nextSince: dropping the newest
+        // (takeLast) would skip the dropped entities forever once the client
+        // advances its cursor past them.
+        val lowWater = mutableListOf<Long>()
+        var truncated = false
+        fun <T> page(items: List<T>, max: Int, updatedAt: (T) -> Long): List<T> {
+            val fresh = items.filter { updatedAt(it) > since }.sortedBy(updatedAt)
+            if (fresh.size <= max) return fresh
+            truncated = true
+            val cut = fresh.take(max)
+            lowWater.add(cut.maxOf(updatedAt))
+            return cut
+        }
         return SyncResponse(
         success = true,
-        sessions = capped(repo.sessions.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
-        doses = capped(repo.doses.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
-        substances = capped(repo.substances.value.filter { it.updatedAt > since }, MAX_SUBSTANCES),
-        interactions = capped(repo.interactions.value.filter { it.updatedAt > since }, MAX_INTERACTIONS),
-        notes = capped(repo.notes.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
-        timelineEvents = capped(repo.timelineEvents.value.filter { it.updatedAt > since }, MAX_ITEMS_DEFAULT),
-        effects = capped(repo.effects.value.filter { it.updatedAt > since }, MAX_EFFECTS),
-        customUnits = capped(repo.customUnits.value.filter { it.updatedAt > since }, MAX_CUSTOM_UNITS),
+        sessions = page(repo.sessions.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
+        doses = page(repo.doses.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
+        substances = page(repo.substances.value, MAX_SUBSTANCES) { it.updatedAt },
+        interactions = page(repo.interactions.value, MAX_INTERACTIONS) { it.updatedAt },
+        notes = page(repo.notes.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
+        timelineEvents = page(repo.timelineEvents.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
+        effects = page(repo.effects.value, MAX_EFFECTS) { it.updatedAt },
+        customUnits = page(repo.customUnits.value, MAX_CUSTOM_UNITS) { it.updatedAt },
         deletedSessionIds = deleted.deletedSessionIds,
         deletedDoseIds = deleted.deletedDoseIds,
         deletedNoteIds = deleted.deletedNoteIds,
@@ -699,13 +712,11 @@ class SyncServerRouter(
         deletedInteractionIds = deleted.deletedInteractionIds,
         deletedTimelineEventIds = deleted.deletedTimelineEventIds,
         deletedCustomUnitIds = deleted.deletedCustomUnitIds,
-        conflictsCreated = repo.notes.value.count { it.conflictSiblings.isNotEmpty() }
+        conflictsCreated = repo.notes.value.count { it.conflictSiblings.isNotEmpty() },
+        truncated = truncated,
+        nextSince = if (truncated) lowWater.min() else 0L
     )
     }
-
-    /** Enforce the same MAX caps on pull responses as push validation (paging by recency). */
-    private fun <T> capped(items: List<T>, max: Int): List<T> =
-        if (items.size <= max) items else items.takeLast(max)
 
     /** Ensure the host's own peer record exists in the trust store. */
     private fun hostSecret(): String {

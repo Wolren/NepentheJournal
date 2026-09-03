@@ -7,14 +7,14 @@ import kotlin.test.*
 class ExportImportTest {
 
     private fun sampleSession(id: String) = Session(
-        id = id, createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test",
-        title = "Session $id", startTime = 2000L
+        id = id, createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
+        title = "Session $id", startTime = 1_700_000_000_000L
     )
 
     private fun sampleDose(id: String, sessionId: String) = Dose(
-        id = id, createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test",
+        id = id, createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
         sessionId = sessionId, substanceId = "sub:1",
-        routeOfAdministration = "Oral", amount = 100.0, unit = "mg", timestamp = 2000L
+        routeOfAdministration = "Oral", amount = 100.0, unit = "mg", timestamp = 1_700_000_000_000L
     )
 
     @Test
@@ -113,7 +113,7 @@ class ExportImportTest {
         val bundleJson = """{
             "version": 1,
             "exportedAt": 1000,
-            "sessions": [{"session": {"id":"s:1","docType":"session","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","title":"S1","startTime":2000},"doses":[{"id":"d:1","docType":"dose","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","sessionId":"s:wrong","substanceId":"sub:1","routeOfAdministration":"Oral","amount":100.0,"unit":"mg","timestamp":2000}]}],
+            "sessions": [{"session": {"id":"s:1","docType":"session","createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test","title":"S1","startTime":1700000000000},"doses":[{"id":"d:1","docType":"dose","createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test","sessionId":"s:wrong","substanceId":"sub:1","routeOfAdministration":"Oral","amount":100.0,"unit":"mg","timestamp":1700000000000}]}],
             "source": "Nepenthe Journal"
         }"""
         repo.upsertSubstance(Substance(
@@ -150,7 +150,7 @@ class ExportImportTest {
         repo.upsertSubstance(Substance(id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
             deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"), cachedAt = 0L, sourceVersion = "test"))
         repo.upsertSession(sampleSession("s:1"))
-        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:1","docType":"session","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","title":"NaN Dose","startTime":2000},"doses":[{"id":"d:1","docType":"dose","createdAt":1000,"updatedAt":1000,"deviceOrigin":"test","sessionId":"s:1","substanceId":"sub:1","routeOfAdministration":"Oral","amount":NaN,"unit":"mg","timestamp":2000}]}]}"""
+        val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:1","docType":"session","createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test","title":"NaN Dose","startTime":1700000000000},"doses":[{"id":"d:1","docType":"dose","createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test","sessionId":"s:1","substanceId":"sub:1","routeOfAdministration":"Oral","amount":NaN,"unit":"mg","timestamp":1700000000000}]}]}"""
         val count = ExportImport.importSessions(repo, bundleJson)
         assertEquals(0, count, "session with NaN dose should be skipped")
     }

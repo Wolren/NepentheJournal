@@ -160,24 +160,29 @@ class DeviceTrustStoreTest {
     // ==================== Corruption ====================
 
     @Test
-    fun corruptJsonResetsStore() {
+    fun corruptJsonFailsClosed() {
         testDir.mkdirs()
         File(testDir, "trusted-devices.json").writeText("this is not json{{{")
-        // Creating a new store should catch the parse error and return empty
+        // Fail-closed contract: a corrupt store with no backup and no cache
+        // throws instead of resetting to empty (resetting would silently
+        // unpair every device).
         val store2 = DeviceTrustStore(testDir.absolutePath)
-        assertEquals(0, store2.count())
+        assertFailsWith<IllegalStateException> { store2.count() }
     }
 
     @Test
-    fun partiallyCorruptJsonRecoversPeers() {
+    fun corruptPrimaryRestoresFromBackup() {
         testDir.mkdirs()
-        // Add a valid peer first via the store
+        // Two writes so the first state lands in the .bak backup copy
         store.addPeer(samplePeer("dev-1", "fp-1"))
-        // Corrupt the file
+        store.addPeer(samplePeer("dev-2", "fp-2"))
+        // Corrupt the primary file
         File(testDir, "trusted-devices.json").appendText("\ncorruption")
         val store2 = DeviceTrustStore(testDir.absolutePath)
-        // Should safely reset to empty
-        assertEquals(0, store2.count())
+        // Backup holds the first write: dev-1 survives, nothing is lost silently
+        assertEquals(1, store2.count())
+        assertTrue(store2.isTrusted("fp-1"))
+        assertEquals("secret-dev-1", store2.getSharedSecret("dev-1"))
     }
 
     // ==================== Fingerprint lookup ====================

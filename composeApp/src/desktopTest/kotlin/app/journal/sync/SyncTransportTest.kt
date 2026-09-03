@@ -76,16 +76,16 @@ class SyncTransportTest {
         val batch = SyncBatch(
             deviceId = "device-abc", deviceName = "TestDevice", since = 1000L,
             sessions = listOf(Session(
-                id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-                title = "Valid Session", startTime = 1000L
+                id = "s:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
+                title = "Valid Session", startTime = 1_700_000_000_000L
             )),
             doses = listOf(Dose(
-                id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                id = "d:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
                 sessionId = "s:1", substanceId = "cid:1",
-                routeOfAdministration = "Oral", amount = 100.0, unit = "mg", timestamp = 1000L
+                routeOfAdministration = "Oral", amount = 100.0, unit = "mg", timestamp = 1_700_000_000_000L
             )),
             substances = listOf(Substance(
-                id = "cid:1", name = "LSD", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                id = "cid:1", name = "LSD", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
                 substanceClass = listOf("Classical Psychedelic"), routesOfAdministration = listOf("Oral"),
                 effects = listOf("Visual"), dosageBands = emptyMap(),
                 cachedAt = 0L, sourceVersion = "test"
@@ -99,17 +99,17 @@ class SyncTransportTest {
         // Session with blank ID
         val blankIdSession = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
-                id = "", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-                title = "Blank ID", startTime = 1000L
+                id = "", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
+                title = "Blank ID", startTime = 1_700_000_000_000L
             ))
         )
         // Blank ID (empty string) is length 0 which is <= 128, so it passes id check
         // Test with negative dose amount
         val negativeDose = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(Dose(
-                id = "d:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                id = "d:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
                 sessionId = "s:1", substanceId = "cid:1",
-                routeOfAdministration = "Oral", amount = -50.0, unit = "mg", timestamp = 1000L
+                routeOfAdministration = "Oral", amount = -50.0, unit = "mg", timestamp = 1_700_000_000_000L
             ))
         )
         // Test with far-future timestamp (not directly validated in validateSyncBatch,
@@ -121,8 +121,8 @@ class SyncTransportTest {
         // Session with rating out of range
         val invalidRating = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
-                id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-                title = "Test", startTime = 1000L, rating = 0
+                id = "s:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
+                title = "Test", startTime = 1_700_000_000_000L, rating = 0
             ))
         )
         assertNotNull(validateSyncBatch(invalidRating),
@@ -131,8 +131,8 @@ class SyncTransportTest {
         // ID exceeding max length
         val longId = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
-                id = "x".repeat(129), createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-                title = "Long ID", startTime = 1000L
+                id = "x".repeat(129), createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
+                title = "Long ID", startTime = 1_700_000_000_000L
             ))
         )
         assertNotNull(validateSyncBatch(longId),
@@ -165,7 +165,7 @@ class SyncTransportTest {
 
     @Test
     fun wsDeltaSerializationRoundtrip() {
-        val now = 1_000_000L
+        val now = 1_700_000_000_000L
         val delta: WsMessage = WsDelta(
             seq = 1L,
             sessions = listOf(Session(

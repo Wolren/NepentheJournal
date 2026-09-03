@@ -112,6 +112,45 @@ class KtorSyncClient(
 
     // ---- Authenticated sync endpoints ----
 
+    /** Max pull pages per sync. Guards against a peer that reports truncated forever. */
+    private val maxPullPages = 20
+
+    private suspend fun fetchPullPage(host: String, port: Int, cursor: Long): SyncResponse {
+        val uri = "/sync/pull?since=$cursor"
+        val authHeader = authenticateRequest(deviceId, uri)
+        val httpResponse = client.get("http://$host:$port$uri") {
+            header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
+            header(SyncAuthenticator.AUTH_HEADER, authHeader)
+        }
+        val rawBody = httpResponse.bodyAsText()
+        val aesKey = aesEncryptionKey(sharedSecret!!)
+        val decrypted = decryptBody(base64Decode(rawBody), aesKey)
+        return json.decodeFromString<SyncResponse>(decrypted)
+    }
+
+    /** Apply the first page, then keep pulling while truncated. Follows nextSince. */
+    private suspend fun applyAndDrain(host: String, port: Int, first: SyncResponse, firstSince: Long): SyncResponse {
+        var page = first
+        var cursor = firstSince
+        applyPull(page, cursor)
+        var pages = 1
+        while (page.truncated && pages < maxPullPages) {
+            val next = if (page.nextSince > 0L) page.nextSince else maxOf(page.maxUpdatedAt(), cursor)
+            if (next <= cursor) {
+                Log.withTag("SyncClient").w { "pull cursor stalled, stopping drain" }
+                break
+            }
+            cursor = next
+            val r = retryWithBackoff { fetchPullPage(host, port, cursor) }
+            if (r.isFailure) break
+            page = r.getOrThrow()
+            if (!page.success) break
+            applyPull(page, cursor)
+            pages++
+        }
+        return page
+    }
+
     suspend fun pushChanges(
         host: String, port: Int,
         deviceId: String, deviceName: String,
@@ -164,13 +203,13 @@ class KtorSyncClient(
         response.fold(
             onSuccess = { syncResponse ->
                 try {
-                    applyPull(syncResponse, since)
+                    val last = applyAndDrain(host, port, syncResponse, since)
+                    if (last.success) return@withContext Result.success(last)
+                    return@withContext Result.failure(Exception(last.error ?: "Push failed"))
                 } catch (e: Exception) {
                     Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
                     return@withContext Result.failure(e)
                 }
-                if (syncResponse.success) Result.success(syncResponse)
-                else Result.failure(Exception(syncResponse.error ?: "Push failed"))
             },
             onFailure = { Result.failure(it) }
         )
@@ -199,13 +238,13 @@ class KtorSyncClient(
         response.fold(
             onSuccess = { syncResponse ->
                 try {
-                    applyPull(syncResponse, since)
+                    val last = applyAndDrain(host, port, syncResponse, since)
+                    if (last.success) return@withContext Result.success(last)
+                    return@withContext Result.failure(Exception(last.error ?: "Pull failed"))
                 } catch (e: Exception) {
                     Log.withTag("SyncClient").e(e) { "applyPull failed after successful pull" }
                     return@withContext Result.failure(e)
                 }
-                if (syncResponse.success) Result.success(syncResponse)
-                else Result.failure(Exception(syncResponse.error ?: "Pull failed"))
             },
             onFailure = { Result.failure(it) }
         )

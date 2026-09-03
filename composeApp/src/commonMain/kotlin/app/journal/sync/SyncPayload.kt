@@ -50,7 +50,11 @@ data class SyncResponse(
     val deletedInteractionIds: List<String> = emptyList(),
     val deletedTimelineEventIds: List<String> = emptyList(),
     val deletedCustomUnitIds: List<String> = emptyList(),
-    val conflictsCreated: Int = 0
+    val conflictsCreated: Int = 0,
+    /** True when per-type caps cut this page; the client must keep pulling. */
+    val truncated: Boolean = false,
+    /** Low-water cursor for the next page. Valid only when [truncated]. */
+    val nextSince: Long = 0L
 )
 
 @Serializable

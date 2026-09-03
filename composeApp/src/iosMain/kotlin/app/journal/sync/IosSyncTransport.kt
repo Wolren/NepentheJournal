@@ -147,6 +147,7 @@ class IosSyncTransport(
         return try {
             val pushSince = _status.value.lastSyncAt ?: 0L
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), pushSince)
+            var pushResp: SyncResponse? = null
             if (batch != null) {
                 val batchJson = json.encodeToString(batch)
                 val encrypted = encryptBody(batchJson, aesKey)
@@ -170,28 +171,26 @@ class IosSyncTransport(
                         null
                     }
                 } else null
+                pushResp = syncResp
                 if (syncResp != null) applySyncResponse(repo, syncResp, pushSince)
             }
 
             // Pull: sign the exact target including the since param, same as JVM.
-            val sinceValue = _status.value.lastSyncAt ?: 0L
-            val pullTarget = "${SyncEndpoints.SYNC_PULL}?since=$sinceValue"
-            val pullAuth = buildAuthHeader(deviceId, pullTarget, secret, currentTimeMillis(), generateNonce())
-            val pullResponse = client.get("http://${peer.host}:${peer.port}$pullTarget") {
-                header(SyncAuth.DEVICE_ID_HEADER, deviceId)
-                header(SyncAuth.AUTH_HEADER, pullAuth)
+            // Drain while truncated, following the low-water nextSince cursor.
+            var pullCursor = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
+                pushResp.nextSince else (_status.value.lastSyncAt ?: 0L)
+            var pullPages = 0
+            while (pullPages < 20) {
+                val pullResp = fetchPullPage(client, peer, deviceId, secret, aesKey, pullCursor)
+                if (pullResp == null) break
+                if (pullResp.success) applySyncResponse(repo, pullResp, pullCursor)
+                if (!pullResp.truncated) break
+                val next = if (pullResp.nextSince > 0L) pullResp.nextSince
+                    else maxOf(pullResp.maxUpdatedAt(), pullCursor)
+                if (next <= pullCursor) break
+                pullCursor = next
+                pullPages++
             }
-            val pullBody = pullResponse.bodyAsText()
-            val pullResp = if (pullBody.isNotEmpty()) {
-                try {
-                    val encryptedResp = base64Decode(pullBody)
-                    val respJson = decryptBody(encryptedResp, aesKey)
-                    runCatching { json.decodeFromString<SyncResponse>(respJson) }.getOrNull()
-                } catch (e: Exception) {
-                    null
-                }
-            } else null
-            if (pullResp?.success == true) applySyncResponse(repo, pullResp, sinceValue)
 
             _status.update { it.copy(lastSyncAt = currentTimeMillis()) }
             Log.withTag("IosSync").i { "Sync with ${peer.displayName} completed" }
@@ -202,6 +201,31 @@ class IosSyncTransport(
             Result.failure(e)
         } finally {
             client.close()
+        }
+    }
+
+    private suspend fun fetchPullPage(
+        client: HttpClient,
+        peer: DiscoveredPeer,
+        deviceId: String,
+        secret: ByteArray,
+        aesKey: ByteArray,
+        cursor: Long
+    ): SyncResponse? {
+        val target = "${SyncEndpoints.SYNC_PULL}?since=$cursor"
+        val auth = buildAuthHeader(deviceId, target, secret, currentTimeMillis(), generateNonce())
+        val pullResponse = client.get("http://${peer.host}:${peer.port}$target") {
+            header(SyncAuth.DEVICE_ID_HEADER, deviceId)
+            header(SyncAuth.AUTH_HEADER, auth)
+        }
+        val pullBody = pullResponse.bodyAsText()
+        if (pullBody.isEmpty()) return null
+        return try {
+            val encryptedResp = base64Decode(pullBody)
+            val respJson = decryptBody(encryptedResp, aesKey)
+            runCatching { json.decodeFromString<SyncResponse>(respJson) }.getOrNull()
+        } catch (e: Exception) {
+            null
         }
     }
 

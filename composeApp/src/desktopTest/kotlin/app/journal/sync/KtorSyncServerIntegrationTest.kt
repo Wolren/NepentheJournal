@@ -256,7 +256,7 @@ class KtorSyncServerIntegrationTest {
             }
             val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
 
-            val plainBody = """{"deviceId":"persist-client","deviceName":"Client","since":0,"sessions":[{"id":"s:p1","title":"Pushed","startTime":1000,"createdAt":1000,"updatedAt":1000,"deviceOrigin":"test"}]}"""
+            val plainBody = """{"deviceId":"persist-client","deviceName":"Client","since":0,"sessions":[{"id":"s:p1","title":"Pushed","startTime":1700000000000,"createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test"}]}"""
             val aesKey = aesEncryptionKey(secret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
             val authValue = authenticator.signRequest("persist-client", encryptedBody, secret)
@@ -292,12 +292,15 @@ class KtorSyncServerIntegrationTest {
                 val delta = WsDelta(
                     seq = 7L,
                     sessions = listOf(Session(
-                        id = "s:ws1", title = "WSPushed", startTime = 1000L,
-                        createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test"
+                        id = "s:ws1", title = "WSPushed", startTime = 1_700_000_000_000L,
+                        createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test"
                     ))
                 )
+                // Keyed connections only accept encrypted deltas: encode,
+                // AES-GCM encrypt, then base64, same as the real client.
                 val encoded = wsJson.encodeToString(WsMessage.serializer(), delta)
-                send(Frame.Text(encoded))
+                val wsAesKey = aesEncryptionKey(secret)
+                send(Frame.Text(base64Encode(encryptBody(encoded, wsAesKey))))
                 val ackFrame = incoming.receive() as Frame.Text
                 val ack = wsJson.decodeFromString<WsMessage>(ackFrame.readText()) as WsAck
                 assertEquals(7L, ack.seq, "ack must echo the delta seq")
@@ -306,6 +309,38 @@ class KtorSyncServerIntegrationTest {
                     "delta must be applied to the repo before the ack")
                 assertEquals(1, persistCount,
                     "persistAfterApply must fire before the ack is sent")
+            }
+        }
+    }
+
+    @Test
+    fun `ws plaintext delta refused on keyed connection`() {
+        testApplication {
+            application { installRouter() }
+            val token = authenticator.generatePairingToken()
+            val pair = client.post("/pairing/verify") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"token":"$token","clientDeviceId":"ws-plain-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
+            }
+            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+
+            val authValue = authenticator.signRequest("ws-plain-client", "ws", secret)
+            val wsClient = createClient { install(WebSockets) }
+
+            wsClient.webSocket("/sync/ws?deviceId=ws-plain-client&auth=$authValue") {
+                val delta = WsDelta(
+                    seq = 11L,
+                    sessions = listOf(Session(
+                        id = "s:ws2", title = "Plaintext", startTime = 1700000000000L,
+                        createdAt = 1700000000000L, updatedAt = 1700000000000L, deviceOrigin = "test"
+                    ))
+                )
+                send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), delta)))
+                val ackFrame = incoming.receive() as Frame.Text
+                val ack = wsJson.decodeFromString<WsMessage>(ackFrame.readText()) as WsAck
+                assertNotNull(ack.error, "plaintext delta on a keyed connection must be refused")
+                assertTrue(repo.sessions.value.none { it.id == "s:ws2" },
+                    "refused delta must not reach the repo")
             }
         }
     }
@@ -331,7 +366,7 @@ class KtorSyncServerIntegrationTest {
                     doses = listOf(Dose(
                         id = "d:ws1", sessionId = "s:enc", substanceId = "sub:1",
                         amount = 100.0, unit = "ug", routeOfAdministration = "oral",
-                        timestamp = 1000L, createdAt = 1000L, updatedAt = 1000L,
+                        timestamp = 1_700_000_000_000L, createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
                         deviceOrigin = "test"
                     ))
                 )

@@ -235,8 +235,8 @@ class IosSyncServerRouter(
                 trustStore.updateLastSeen(callerDeviceId)
                 val response = buildSyncResponse(batch.since)
                 val responseJson = json.encodeToString(response)
-                val encryptedBody = encryptBody(responseJson, aesKey)
-                call.respondText(base64Encode(encryptedBody), ContentType.Application.Json)
+                val encryptedResp = encryptBody(responseJson, aesKey)
+                call.respondText(base64Encode(encryptedResp), ContentType.Application.Json)
             }
 
             get(SyncEndpoints.SYNC_PULL) {
@@ -315,19 +315,29 @@ class IosSyncServerRouter(
     }
 
     private fun buildSyncResponse(since: Long): SyncResponse {
-        fun <T> changed(list: List<T>, since: Long, updatedAt: (T) -> Long): List<T> =
-            list.filter { updatedAt(it) > since }
         val deleted = repo.deletedIdsSince(since)
+        // Oldest-first pages with a low-water nextSince, same contract as
+        // the JVM pull handler: the client drains while truncated is set.
+        val lowWater = mutableListOf<Long>()
+        var truncated = false
+        fun <T> page(list: List<T>, max: Int, updatedAt: (T) -> Long): List<T> {
+            val fresh = list.filter { updatedAt(it) > since }.sortedBy(updatedAt)
+            if (fresh.size <= max) return fresh
+            truncated = true
+            val cut = fresh.take(max)
+            lowWater.add(cut.maxOf(updatedAt))
+            return cut
+        }
         return SyncResponse(
             success = true,
-            sessions = changed(repo.sessions.value, since) { it.updatedAt },
-            doses = changed(repo.doses.value, since) { it.updatedAt },
-            substances = changed(repo.substances.value, since) { it.updatedAt },
-            effects = changed(repo.effects.value, since) { it.updatedAt },
-            interactions = changed(repo.interactions.value, since) { it.updatedAt },
-            notes = changed(repo.notes.value, since) { it.updatedAt },
-            timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
-            customUnits = changed(repo.customUnits.value, since) { it.updatedAt },
+            sessions = page(repo.sessions.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            doses = page(repo.doses.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            substances = page(repo.substances.value, IosSyncValidators.MAX_SUBSTANCES) { it.updatedAt },
+            effects = page(repo.effects.value, IosSyncValidators.MAX_EFFECTS) { it.updatedAt },
+            interactions = page(repo.interactions.value, IosSyncValidators.MAX_INTERACTIONS) { it.updatedAt },
+            notes = page(repo.notes.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            timelineEvents = page(repo.timelineEvents.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            customUnits = page(repo.customUnits.value, IosSyncValidators.MAX_CUSTOM_UNITS) { it.updatedAt },
             deletedSessionIds = deleted.deletedSessionIds,
             deletedDoseIds = deleted.deletedDoseIds,
             deletedNoteIds = deleted.deletedNoteIds,
@@ -335,7 +345,9 @@ class IosSyncServerRouter(
             deletedEffectIds = deleted.deletedEffectIds,
             deletedInteractionIds = deleted.deletedInteractionIds,
             deletedTimelineEventIds = deleted.deletedTimelineEventIds,
-            deletedCustomUnitIds = deleted.deletedCustomUnitIds
+            deletedCustomUnitIds = deleted.deletedCustomUnitIds,
+            truncated = truncated,
+            nextSince = if (truncated) lowWater.min() else 0L
         )
     }
 

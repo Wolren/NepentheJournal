@@ -158,6 +158,26 @@ fun applySyncResponse(repo: IJournalRepository, response: SyncResponse, since: L
 }
 
 /**
+ * Highest updatedAt across every entity list in a sync response.
+ * Used to advance pull cursors. Tombstones carry no wire timestamps, so
+ * they never move the cursor on their own (their deletion timestamps live
+ * only in the sender tombstone journal).
+ */
+fun SyncResponse.maxUpdatedAt(): Long {
+    var max = 0L
+    fun consider(ts: Long) { if (ts > max) max = ts }
+    sessions.forEach { consider(it.updatedAt) }
+    doses.forEach { consider(it.updatedAt) }
+    substances.forEach { consider(it.updatedAt) }
+    effects.forEach { consider(it.updatedAt) }
+    interactions.forEach { consider(it.updatedAt) }
+    notes.forEach { consider(it.updatedAt) }
+    timelineEvents.forEach { consider(it.updatedAt) }
+    customUnits.forEach { consider(it.updatedAt) }
+    return max
+}
+
+/**
  * Serialized form of a sync push request: the body bytes and auth header.
  */
 data class SyncPushRequest(
