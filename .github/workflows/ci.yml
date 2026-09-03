@@ -1,4 +1,7 @@
 name: CI
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: [master]
@@ -7,7 +10,7 @@ on:
 
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx2g
-  GRADLE_CACHE_KEY: kotlin-2.4-gradle-9.5
+  GRADLE_CACHE_KEY: kotlin-2.4-gradle-9.6
 
 jobs:
   check:
@@ -25,13 +28,37 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
+      - name: Verify bundled seed copies are identical
+        run: |
+          sha256sum scripts/seed.json \
+            composeApp/src/desktopMain/resources/psychonautwiki_seed.json \
+            composeApp/src/jvmMain/resources/psychonautwiki_seed.json \
+            composeApp/src/iosMain/resources/psychonautwiki_seed.json \
+            composeApp/src/androidMain/assets/psychonautwiki_seed.json
+          test "$(sha256sum < scripts/seed.json)" = "$(sha256sum < composeApp/src/desktopMain/resources/psychonautwiki_seed.json)"
+          test "$(sha256sum < scripts/seed.json)" = "$(sha256sum < composeApp/src/jvmMain/resources/psychonautwiki_seed.json)"
+          test "$(sha256sum < scripts/seed.json)" = "$(sha256sum < composeApp/src/iosMain/resources/psychonautwiki_seed.json)"
+          test "$(sha256sum < scripts/seed.json)" = "$(sha256sum < composeApp/src/androidMain/assets/psychonautwiki_seed.json)"
+          echo "SEEDS IDENTICAL: scripts/seed.json matches all four bundled copies."
+          sha256sum composeApp/src/desktopMain/resources/dosewiki_slim.json \
+            composeApp/src/jvmMain/resources/dosewiki_slim.json \
+            composeApp/src/iosMain/resources/dosewiki_slim.json \
+            composeApp/src/androidMain/assets/dosewiki_slim.json
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_slim.json)" = "$(sha256sum < composeApp/src/jvmMain/resources/dosewiki_slim.json)"
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_slim.json)" = "$(sha256sum < composeApp/src/iosMain/resources/dosewiki_slim.json)"
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_slim.json)" = "$(sha256sum < composeApp/src/androidMain/assets/dosewiki_slim.json)"
+          echo "DOSEWIKI IDENTICAL: all four dosewiki_slim.json copies match."
+
       - name: Compile common + desktop sources
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
 
+      # Fast suite: mirrors scripts/run-tests.sh FAST_TESTS (21 classes incl
+      # EntityStoreTest). Keep both lists in sync when adding test classes.
       - name: Run unit tests (excludes integration tests)
         run: |
           ./gradlew composeApp:desktopTest --no-daemon \
             --tests "app.journal.data.JournalRepositoryTest" \
+            --tests "app.journal.data.EntityStoreTest" \
             --tests "app.journal.data.AppJsonTest" \
             --tests "app.journal.data.FuzzSeedTest" \
             --tests "app.journal.data.DataMigrationTest" \
@@ -50,8 +77,7 @@ jobs:
             --tests "app.journal.sync.SyncEngineTest" \
             --tests "app.journal.sync.SyncPayloadTest" \
             --tests "app.journal.sync.SyncWebSocketTest" \
-            --tests "app.journal.data.JournalStoreTest" \
-            --tests "app.journal.sync.SyncTransportTest"
+            --tests "app.journal.data.JournalStoreTest"
 
       - name: Compile Android sources
         run: |
@@ -81,7 +107,7 @@ jobs:
             --no-daemon
 
       - name: Upload APK
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: nepenthe-debug-apk
           path: composeApp/build/outputs/apk/debug/*.apk

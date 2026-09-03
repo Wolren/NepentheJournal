@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-Release packaging for Nepenthe Journal — data artifacts.
+Release packaging for Nepenthe Journal - data artifacts.
 
 Builds a release tarball containing:
   - schemas/journal-snapshot-v5.json    (JSON Schema)
   - scripts/seed.json                   (latest substance database)
   - docs/journal-snapshot-spec.md        (field dictionary)
-  - scripts/pharmacology_*.csv           (pharmacology matrix, 5 files)
-  - scripts/dosewiki_slim.json           (CC0 public domain dose data)
+  - scripts/cache/pharmacology_*.csv     (pharmacology matrix, 5 files, regenerable)
+  - composeApp dosewiki_slim.json copies (CC0 public domain dose data, 4 targets)
 
 Usage:
     python scripts/release.py [--version v1.0.0] [--output-dir ./dist]
 
 Output:
     dist/nepenthe-data-v1.0.0.tar.gz     (the release artifact)
-    dist/                                 (verzeichnis with individual copies)
+    dist/                                 (directory with individual copies)
 
 The script is designed to be run from a GitHub Action or locally.
-It does NOT push tags or create GitHub releases — those are manual/CI steps.
+It does NOT push tags or create GitHub releases - those are manual/CI steps.
 """
 
 import argparse
@@ -36,13 +36,15 @@ RELEASE_ASSETS = [
     ("schemas/journal-snapshot-v5.json", "JSON Schema"),
     ("scripts/seed.json", "Substance database (JournalSnapshot v3)"),
     ("docs/journal-snapshot-spec.md", "Field dictionary"),
-    ("scripts/pharmacology_all.csv", "Pharmacology matrix (all sources)"),
-    ("scripts/pharmacology_pdsp.csv", "PDSP Ki binding data"),
-    ("scripts/pharmacology_iuphar.csv", "IUPHAR ligand-target interactions"),
-    ("scripts/pharmacology_chembl.csv", "ChEMBL bioactivity measurements"),
-    ("scripts/pharmacology_bindingdb.csv", "BindingDB affinity records"),
-    ("composeApp/src/jvmMain/resources/dosewiki_slim.json", "DoseWiki slim (CC0)"),
-    ("composeApp/src/desktopMain/resources/dosewiki_slim.json", "DoseWiki slim copy (CC0)"),
+    ("scripts/cache/pharmacology_all.csv", "Pharmacology matrix (all sources)"),
+    ("scripts/cache/pharmacology_pdsp.csv", "PDSP Ki binding data"),
+    ("scripts/cache/pharmacology_iuphar.csv", "IUPHAR ligand-target interactions"),
+    ("scripts/cache/pharmacology_chembl.csv", "ChEMBL bioactivity measurements"),
+    ("scripts/cache/pharmacology_bindingdb.csv", "BindingDB affinity records"),
+    ("composeApp/src/desktopMain/resources/dosewiki_slim.json", "DoseWiki slim (CC0)"),
+    ("composeApp/src/jvmMain/resources/dosewiki_slim.json", "DoseWiki slim copy (CC0)"),
+    ("composeApp/src/iosMain/resources/dosewiki_slim.json", "DoseWiki slim copy (CC0)"),
+    ("composeApp/src/androidMain/assets/dosewiki_slim.json", "DoseWiki slim copy (CC0)"),
 ]
 
 
@@ -149,7 +151,8 @@ def main():
     if not args.skip_export:
         print("Regenerating pharmacology CSVs...")
         subprocess.run(
-            [sys.executable, "scripts/pharmacology_export.py", "--output", "scripts/"],
+            [sys.executable, "scripts/pharmacology_export.py", "--input", "scripts/seed.json",
+             "--output-dir", "scripts/cache"],
             cwd=ROOT, check=True
         )
         print()
@@ -178,7 +181,7 @@ def main():
     for rel_path, label in RELEASE_ASSETS:
         full = os.path.join(ROOT, rel_path)
         size = os.path.getsize(full)
-        print(f"  {rel_path}  ({size:,} bytes)  — {label}")
+        print(f"  {rel_path}  ({size:,} bytes)  - {label}")
     print()
     print(f"  tarball: {tarball}")
     print()

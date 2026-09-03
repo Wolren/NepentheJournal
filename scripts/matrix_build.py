@@ -32,13 +32,21 @@ Pipeline stages:
 
 Usage:
     # Full rebuild (downloads everything)
-    python scripts/matrix_build.py --input seed.json --output final.json --verbose
+    python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --verbose
 
     # Incremental update (uses cached API results)
-    python scripts/matrix_build.py --input seed.json --output final.json --verbose
+    python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --verbose
 
     # Full refresh (delete caches, re-download)
-    python scripts/matrix_build.py --input seed.json --output final.json --refresh --verbose
+    python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --refresh --verbose
+
+Seed pipeline notes: the canonical release seed is scripts/seed.json
+(JournalSnapshot v3, 325 substances). The four bundled copies
+(desktopMain, jvmMain, iosMain resources plus androidMain assets
+psychonautwiki_seed.json) are byte-identical copies of scripts/seed.json.
+Regenerate from the pipeline output, then copy the result over
+scripts/seed.json and all four targets in one run so SHA-256 hashes stay
+equal. CI asserts this with a hash-equality check step.
 
 Cache files (*_cache.json) persist between runs so only new/missing data
 is fetched. Delete them to force a full re-download.

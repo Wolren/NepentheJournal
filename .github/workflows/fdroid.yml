@@ -1,5 +1,9 @@
 name: fdroid
 
+concurrency:
+  group: fdroid-${{ github.ref }}
+  cancel-in-progress: true
+
 # F-Droid readiness: the release APK must build reproducibly.
 # Two independent clean builds of the same commit must produce byte-identical
 # APKs. F-Droid builds the app itself from source (never trusts uploaded
@@ -7,6 +11,9 @@ name: fdroid
 #
 # Runs on every push/PR; the real F-Droid gate happens in the fdroiddata repo
 # (see docs/FDROID.md) with fdroidserver build.
+
+# NOTE: fdroid/play pin Java 17 for the Android toolchain while CI and
+# CodeQL run Java 21 for the desktop/KMP build. This split is deliberate.
 
 on:
   push:

@@ -1,4 +1,4 @@
-# Nepenthe Journal — Token Pairing Security & Robustness Audit
+# Nepenthe Journal - Token Pairing Security & Robustness Audit
 
 Date: 2026-07-31
 Scope: pairing protocol end-to-end (token lifecycle, /pairing/start, /pairing/verify, HMAC auth, nonce replay, rate limiting, trust store, secret handling, WS continuous sync, iOS parity, test coverage)
@@ -20,17 +20,17 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 
 **Files:** `KtorSyncServerJvm.kt:132-133` (`X-Forwarded-For` ?: `local.remoteHost`), `:383-393` (`isRateLimited`)
 
-**Detail:** `/pairing/verify` rate limiting keys on `call.request.headers["X-Forwarded-For"]` first. The server is directly reachable on the LAN with no proxy, so this header is entirely attacker-supplied. Rotating `X-Forwarded-For` values resets the bucket per request: the 5-attempts-per-120s cap is trivially bypassed. The fallback `call.request.local.remoteHost` is the server's own address in Ktor 3 (verified in a prior session), which makes every client on the network share ONE global bucket of 5 attempts per 120s — blocking legitimate second devices while protecting nothing.
+**Detail:** `/pairing/verify` rate limiting keys on `call.request.headers["X-Forwarded-For"]` first. The server is directly reachable on the LAN with no proxy, so this header is entirely attacker-supplied. Rotating `X-Forwarded-For` values resets the bucket per request: the 5-attempts-per-120s cap is trivially bypassed. The fallback `call.request.local.remoteHost` is the server's own address in Ktor 3 (verified in a prior session), which makes every client on the network share ONE global bucket of 5 attempts per 120s - blocking legitimate second devices while protecting nothing.
 
-**Exploit scenario:** an attacker sprays token guesses with a random `X-Forwarded-For` per request. The limiter never trips. The only thing that saves the token is its 2^29.7 entropy against the 120s TTL: a full brute force needs ~7.4M attempts/sec, which is not feasible over LAN HTTP. So the bypass does not produce a practical brute-force today — it removes the only throttle, so any future weakening of entropy or TTL (or a longer-lived token) becomes instantly brute-forceable.
+**Exploit scenario:** an attacker sprays token guesses with a random `X-Forwarded-For` per request. The limiter never trips. The only thing that saves the token is its 2^29.7 entropy against the 120s TTL: a full brute force needs ~7.4M attempts/sec, which is not feasible over LAN HTTP. So the bypass does not produce a practical brute-force today - it removes the only throttle, so any future weakening of entropy or TTL (or a longer-lived token) becomes instantly brute-forceable.
 
-**Remediation:** key the limiter on the socket-level remote address, never on a client-supplied header unless the server sits behind a configured trusted proxy. On Ktor 3 Netty, log `call.request.local.remoteHost` and `call.request.origin` once to see which actually carries the peer address, and use the one that does. If a proxy is ever introduced, install the `ForwardedHeaders` plugin and only then trust `X-Forwarded-For`. The `ConcurrentHashMap.compute` logic itself (atomic read-modify-write, 5 then block, no off-by-one) is correct — the key is the only problem.
+**Remediation:** key the limiter on the socket-level remote address, never on a client-supplied header unless the server sits behind a configured trusted proxy. On Ktor 3 Netty, log `call.request.local.remoteHost` and `call.request.origin` once to see which actually carries the peer address, and use the one that does. If a proxy is ever introduced, install the `ForwardedHeaders` plugin and only then trust `X-Forwarded-For`. The `ConcurrentHashMap.compute` logic itself (atomic read-modify-write, 5 then block, no off-by-one) is correct - the key is the only problem.
 
 ### H2. Secrets at rest are derivable by anyone who can read the file
 
 **Files:** `DeviceTrustStore.kt:253-262` (deriveKey), `TlsIdentityManager.kt:42-57` (derivePassword)
 
-**Detail:** the trust store encrypts shared secrets with AES-256-GCM, but the key is `PBKDF2(password = "nepenthe-truststore-v2" (hardcoded constant), salt = random, 100k)`. The salt is stored in the file next to the ciphertext, and the password is a public constant in the source. Anyone with file read access derives the key in ~10ms and decrypts every shared secret. Same class on the TLS identity: `PBKDF2(user.home + os.name, salt = "nepenthe-tls-v1" (constant), 100k)` — both inputs are guessable from public knowledge of the OS and username.
+**Detail:** the trust store encrypts shared secrets with AES-256-GCM, but the key is `PBKDF2(password = "nepenthe-truststore-v2" (hardcoded constant), salt = random, 100k)`. The salt is stored in the file next to the ciphertext, and the password is a public constant in the source. Anyone with file read access derives the key in ~10ms and decrypts every shared secret. Same class on the TLS identity: `PBKDF2(user.home + os.name, salt = "nepenthe-tls-v1" (constant), 100k)` - both inputs are guessable from public knowledge of the OS and username.
 
 **Exploit scenario:** a second local user (or a backup/cloud-sync leak of the data dir) reads `trusted-devices.json`, derives the key from the known constant + embedded salt, decrypts all shared secrets, and can impersonate every paired device on the LAN.
 
@@ -44,7 +44,7 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 
 **Files:** `KtorSyncServerJvm.kt:186-196` (response with sharedSecret), `KtorSyncClient.kt:95-103` (reads it)
 
-**Detail:** the pairing response carries the 256-bit shared secret as plain JSON over HTTP. A passive LAN attacker (ARP spoofing) who captures the pairing exchange obtains the secret and can thereafter decrypt every sync body and sign every request. The `signPairingResponse` / `verifyPairingResponse` functions in `SyncAuthenticator.kt:141-162` look like a mitigation but are logically impossible in this design — the client has no secret yet at pairing time to verify a signature with. They are used only by tests.
+**Detail:** the pairing response carries the 256-bit shared secret as plain JSON over HTTP. A passive LAN attacker (ARP spoofing) who captures the pairing exchange obtains the secret and can thereafter decrypt every sync body and sign every request. The `signPairingResponse` / `verifyPairingResponse` functions in `SyncAuthenticator.kt:141-162` look like a mitigation but are logically impossible in this design - the client has no secret yet at pairing time to verify a signature with. They are used only by tests.
 
 **Exploit scenario:** attacker ARP-spoofs the host, passively captures the pairing POST/response, extracts the secret, then impersonates the client for all future syncs (or decrypts all traffic). One capture, permanent compromise of that pair.
 
@@ -58,7 +58,7 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 
 **Impact:** data stays confidential (AES-GCM) and unmodifiable (attacker lacks the secret), so this is not data theft. It is sync redirection: the attacker learns *when* data changes (mutation pushes) and can disrupt syncing. The client never proves the host knows the secret.
 
-**Remediation:** challenge-response on reconnect. Client sends a random challenge; host replies with `HMAC(secret, challenge)`; client verifies against the stored secret. The existing `signPairingResponse`/`verifyPairingResponse` machinery is the right shape — wire it as a host-challenge endpoint instead of deleting it.
+**Remediation:** challenge-response on reconnect. Client sends a random challenge; host replies with `HMAC(secret, challenge)`; client verifies against the stored secret. The existing `signPairingResponse`/`verifyPairingResponse` machinery is the right shape - wire it as a host-challenge endpoint instead of deleting it.
 
 ### M3. Sync responses and WS deltas are not freshness-bound: replay rolls back data
 
@@ -66,15 +66,15 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 
 **Detail:** push/pull responses and WS deltas are AES-GCM authenticated (cannot be modified) but carry no binding to the request (no response nonce, no timestamp check on the client). A MITM can capture a response ciphertext and replay the exact bytes later. Because `applyBatch` is a blind upsert with no `updatedAt` comparison, re-applying an older response overwrites newer local data with stale server data.
 
-**Exploit scenario:** attacker captures a push response (plaintext bytes on the wire — the ciphertext IS the wire body), replays it to the client after the user has made newer local edits; the client re-applies the old server state for the affected entities. Data loss by replay, no key required.
+**Exploit scenario:** attacker captures a push response (plaintext bytes on the wire - the ciphertext IS the wire body), replays it to the client after the user has made newer local edits; the client re-applies the old server state for the affected entities. Data loss by replay, no key required.
 
-**Remediation (two cheap fixes):** (a) make `applyBatch` LWW-aware — skip entities whose `updatedAt` is older than the existing record (same rule the server already applies in `handlePush` for sessions); (b) bind responses to requests: server includes the request's nonce (from the auth header) in the response plaintext, client rejects mismatches. (a) alone closes the rollback window.
+**Remediation (two cheap fixes):** (a) make `applyBatch` LWW-aware - skip entities whose `updatedAt` is older than the existing record (same rule the server already applies in `handlePush` for sessions); (b) bind responses to requests: server includes the request's nonce (from the auth header) in the response plaintext, client rejects mismatches. (a) alone closes the rollback window.
 
 ### M4. Token comparison is not constant-time
 
 **Files:** `SyncAuthenticator.kt:79`
 
-**Detail:** `pending.token == enteredToken.uppercase().trim()` — a standard equality comparison. Timing attack on a 6-char token over LAN HTTP is impractical (network jitter dwarfs per-char comparison time), and the token is single-use on success, so this is defense-in-depth. Cheap to fix: constant-time compare like the HMAC path already uses.
+**Detail:** `pending.token == enteredToken.uppercase().trim()` - a standard equality comparison. Timing attack on a 6-char token over LAN HTTP is impractical (network jitter dwarfs per-char comparison time), and the token is single-use on success, so this is defense-in-depth. Cheap to fix: constant-time compare like the HMAC path already uses.
 
 ---
 
@@ -93,13 +93,13 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 `KtorSyncServerJvm.kt:171-181`: `clientDeviceId`, `clientDeviceName`, `clientFingerprint` are stored as-is (body capped at 4KB, but no per-field length cap). A paired client can register a 4KB display name, polluting the trusted-devices UI. Add the same MAX_ID_LEN-style caps used in SyncValidators.
 
 ### L5. Identity keystore silently regenerates on any load error
-`TlsIdentityManager.kt:69-81`: any exception while loading the keystore (e.g. transient IO error, env-var password disappearing) deletes `identity.p12` and regenerates it — rotating the device fingerprint and forcing every paired client to re-pair. Also: if `NEPENTHE_TLS_PASSWORD` is set for first run and unset later, the same rotation happens. Fix: distinguish "password mismatch" (regenerate) from other IO failures (keep file, report error).
+`TlsIdentityManager.kt:69-81`: any exception while loading the keystore (e.g. transient IO error, env-var password disappearing) deletes `identity.p12` and regenerates it - rotating the device fingerprint and forcing every paired client to re-pair. Also: if `NEPENTHE_TLS_PASSWORD` is set for first run and unset later, the same rotation happens. Fix: distinguish "password mismatch" (regenerate) from other IO failures (keep file, report error).
 
 ### L6. iOS has no persistent secret store
 `IosSyncTransport.kt:61-62`: `pairingSecret` is in-memory only. Every app restart forgets the pairing and requires a full re-pair. Known TODO; robustness gap, not a security hole. Persist via NSUserDefaults/Keychain with the same PBKDF2-GCM scheme.
 
 ### L7. Sync payload timestamps not validated
-`SyncValidators.kt`: no sanity bounds on `updatedAt`/`createdAt`/`timestamp` in any entity. A trusted-but-buggy (or compromised) peer can push `updatedAt = year 9999`, after which `since`-based syncs never return that entity again — silent sync stall. Add `0 < ts < now + 1 year` bounds. Also `Note.sessionId` length is unchecked in `validateNotes`.
+`SyncValidators.kt`: no sanity bounds on `updatedAt`/`createdAt`/`timestamp` in any entity. A trusted-but-buggy (or compromised) peer can push `updatedAt = year 9999`, after which `since`-based syncs never return that entity again - silent sync stall. Add `0 < ts < now + 1 year` bounds. Also `Note.sessionId` length is unchecked in `validateNotes`.
 
 ### L8. Batch deviceId not cross-checked against the authenticated caller
 `KtorSyncServerJvm.kt:411-441`: `handlePush` trusts `batch.deviceId` for conflict-note attribution and deviceOrigin without comparing it to the `X-Sync-Device` header. A paired device can attribute its writes to another device. Trusted-peer confusion only; one-line check fixes it.
@@ -115,24 +115,24 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 | Token refresh while hosting | regenerated every 60s, expiry surfaced in status (`SyncTransportJvm.kt:131-141`) |
 | Failed guesses don't consume the token | invalidation only on match (`SyncAuthenticator.kt:79-81`) |
 | Rate limiter arithmetic | `compute` atomic; 5 allowed, 6th blocked; no off-by-one (key is the problem, see H1) |
-| Shared secret | 32 random bytes, hex, 256 bits; one secret, correctly returned to client and stored under the client's id — the old two-secret bug is gone (`KtorSyncServerJvm.kt:170-181`) |
+| Shared secret | 32 random bytes, hex, 256 bits; one secret, correctly returned to client and stored under the client's id - the old two-secret bug is gone (`KtorSyncServerJvm.kt:170-181`) |
 | HMAC | SHA-256, constant-time compare, 45s window, nonce replay blocked via `putIfAbsent` with oldest-eviction (no `clear()` wipe) (`SyncAuthenticator.kt:33-49, 181-186`) |
 | Encrypt-then-MAC | AES-256-GCM, random 12-byte IV per message, HMAC over the base64 ciphertext (`SyncCryptoJvm.kt:37-58`, `KtorSyncClient.kt:135-139`) |
 | Wire key derivation | PBKDF2 600k iterations; fixed salt acceptable because key material is high-entropy random (`SyncCryptoJvm.kt:29-34`) |
 | Size limits | 10MB sync body, 4KB pairing body, 10MB WS frames, entity caps 500/100, field caps 128-65536 (`SyncValidators.kt`, server routes) |
 | Trust store hygiene | PBKDF2-100k + GCM + random salt, atomic tmp+rename writes, orphan-tmp cleanup, corrupt-file reset (password issue per H2) |
 | Client robustness | 30s/10s/15s timeouts, 3x exponential-backoff retry, sync mutex, `client.close()` in finally (`KtorSyncClient.kt:57-61, 273-294`) |
-| Test coverage of pairing | integration test exercises the REAL `/pairing/verify` (token generated, posted, secret stored, pushed with it) — no test bypass (`KtorSyncServerIntegrationTest.kt:50-123`); rate limit 5-then-block tested; nonce replay, wrong secret, malformed headers, single-use, expiry, wrong device all unit-tested (`SyncAuthenticatorTest.kt`) |
+| Test coverage of pairing | integration test exercises the REAL `/pairing/verify` (token generated, posted, secret stored, pushed with it) - no test bypass (`KtorSyncServerIntegrationTest.kt:50-123`); rate limit 5-then-block tested; nonce replay, wrong secret, malformed headers, single-use, expiry, wrong device all unit-tested (`SyncAuthenticatorTest.kt`) |
 
 ---
 
 ## Suggested fix order
 
-1. H1 — rate limiter key (socket remote address; log-first to confirm the API)
-2. M3a — LWW-aware applyBatch (also fixes local multi-device staleness)
-3. M2 — host challenge-response on fingerprint reconnect (reuse signPairingResponse machinery)
-4. H2 — real secret source for at-rest encryption (OS keychain first)
-5. M1, M4, L1-L8 — as time permits; L1/L3/L5 are 10-minute deletions/doc fixes
+1. H1 - rate limiter key (socket remote address; log-first to confirm the API)
+2. M3a - LWW-aware applyBatch (also fixes local multi-device staleness)
+3. M2 - host challenge-response on fingerprint reconnect (reuse signPairingResponse machinery)
+4. H2 - real secret source for at-rest encryption (OS keychain first)
+5. M1, M4, L1-L8 - as time permits; L1/L3/L5 are 10-minute deletions/doc fixes
 
 ## Fix status (2026-07-31, same day)
 
@@ -144,7 +144,7 @@ Findings: 2 HIGH, 4 MEDIUM, 8 LOW. Exploitability on a residential LAN is low ac
 | M3 replay rollback | FIXED | `JournalRepository.applyBatch(..., lastWriterWins=true)` skips entities whose updatedAt is older than the existing record. All sync paths pass true: KtorSyncClient.applyPull, server handlePush + WS delta, SyncTransportJvm WS delta, SyncContract.applySyncResponse (iOS). Seed load and backup restore keep the default false so Reset/restore stay authoritative. |
 | M4 token compare | FIXED | `verifyPairingToken` uses constant-time comparison. |
 | L1 dead token-bearing DTOs | FIXED | `PairingStartResponse` (server) and `PairingStartResponseRaw` (client) deleted. |
-| L2 nonce RNG | FIXED | `expect fun secureRandomBytes(size)` — SecureRandom (JVM) / SecRandomCopyBytes (iOS). Common `generateNonce()` now uses it (proper nibble hex, 32 chars). |
+| L2 nonce RNG | FIXED | `expect fun secureRandomBytes(size)` - SecureRandom (JVM) / SecRandomCopyBytes (iOS). Common `generateNonce()` now uses it (proper nibble hex, 32 chars). |
 | L3 stale docstring | FIXED | SyncTransportJvm class doc now states plain HTTP + HMAC + AES-256-GCM LAN threat model. |
 | L4 pairing field caps | FIXED | deviceId ≤ 128, deviceName ≤ 200, fingerprint ≤ 128 → 400 otherwise. |
 | L5 keystore regeneration | FIXED | `ensureIdentity` regenerates only on empty/tampered/password-mismatch (IOException, UnrecoverableKeyException); other failures propagate instead of silently rotating identity. |
@@ -159,7 +159,7 @@ New tests: auth/verify proves-host-knows-secret (real endpoint, recomputed signa
 
 | Severity | Count | IDs |
 |----------|-------|-----|
-| CRITICAL | 0 | — |
+| CRITICAL | 0 | - |
 | HIGH | 2 | H1, H2 |
 | MEDIUM | 4 | M1, M2, M3, M4 |
 | LOW | 8 | L1-L8 |

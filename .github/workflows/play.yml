@@ -1,7 +1,13 @@
 name: google-play
 
+concurrency:
+  group: play-${{ github.ref }}
+  cancel-in-progress: true
+
 # Builds the signed release AAB and uploads it (plus fastlane metadata) to
 # Google Play's internal testing track via Gradle Play Publisher.
+#
+# NOTE: pins Java 17 for the Android toolchain; CI/CodeQL use Java 21.
 #
 # Prerequisites (one-time, see docs/GOOGLE-PLAY.md):
 #   - Play Console app created (app.journal.nepenthe)

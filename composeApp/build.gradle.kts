@@ -124,8 +124,9 @@ kotlin {
 // is done in scripts/run-tests.sh via --tests filters.
 //
 // Usage:
-//   ./scripts/run-tests.sh           -- 21 fast unit tests (~11s warm)
-//   ./scripts/run-tests.sh --all     -- 31 tests incl integration (~11s warm)
+//   ./scripts/run-tests.sh           -- 21 fast test classes (424 tests: 31 files
+//     total, 10 are integration-only; fast list mirrors ci.yml incl EntityStoreTest)
+//   ./scripts/run-tests.sh --all     -- 31 test classes incl integration (~11s warm)
 //   ./gradlew composeApp:desktopTest --no-daemon --tests "app.journal.data.JournalRepositoryTest"
 //
 // Prerequisites:

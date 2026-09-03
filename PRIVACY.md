@@ -1,4 +1,4 @@
-# Nepenthe Journal — Privacy Policy
+# Nepenthe Journal - Privacy Policy
 
 **Last updated:** 2026-07-10
 
@@ -8,17 +8,17 @@ Nepenthe Journal is an offline-first journal app. Your data stays on your device
 
 ## What data the app stores
 
-- **Journal entries** — session logs you create, including substance names, doses, routes of administration, timestamps, notes, and ratings
-- **Substance reference data** — public data fetched from PsychonautWiki (cached locally)
-- **Custom substances** — any substances you create and add to your personal library
-- **Theme preferences** — your color scheme and display settings
-- **Sync configuration** — network settings for optional P2P sync (see below)
+- **Journal entries** - session logs you create, including substance names, doses, routes of administration, timestamps, notes, and ratings
+- **Substance reference data** - bundled seed files built from public sources (PsychonautWiki via Semantic MediaWiki `action=ask`, DoseWiki CC0 slim pack, PDSP/BindingDB/ChEMBL/IUPHAR pharmacology data), cached locally
+- **Custom substances** - any substances you create and add to your personal library
+- **Theme preferences** - your color scheme and display settings
+- **Sync configuration** - network settings for optional P2P sync (see below)
 
 ## Where data is stored
 
-All journal data is stored **locally on your device** in the app's private data directory. There is no connected server — nothing is uploaded, synced, or sent without your explicit action.
+All journal data is stored **locally on your device** in the app's private data directory. There is no connected server - nothing is uploaded, synced, or sent without your explicit action.
 
-You can manually export your full journal data at any time via **Settings > Data** (JSON, CSV, or ZIP). Sharing those exports is entirely at your discretion — nothing leaves your device until you explicitly choose to export and share it.
+You can manually export your full journal data at any time via **Settings > Data** (JSON, CSV, or ZIP). Sharing those exports is entirely at your discretion - nothing leaves your device until you explicitly choose to export and share it.
 
 ## P2P sync (optional)
 
@@ -56,7 +56,7 @@ This app is not intended for users under 18 years of age. The app references psy
 
 ## Medical disclaimer
 
-**This app is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** The substance reference data is sourced from PsychonautWiki and is provided for harm reduction and informational purposes only. Always consult a qualified healthcare professional for medical advice.
+**This app is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.** The bundled substance reference data (see above) is provided for harm reduction and informational purposes only. The optional FDA drug-label card fetches live data from api.fda.gov when opened and needs network access. Always consult a qualified healthcare professional for medical advice.
 
 ## Changes to this policy
 

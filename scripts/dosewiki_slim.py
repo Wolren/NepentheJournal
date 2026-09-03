@@ -10,8 +10,16 @@ a slimmed JSON to be bundled as an app resource.
 Usage:
     python3 scripts/dosewiki_slim.py
 
-Output: composeApp/src/jvmMain/resources/dosewiki_slim.json
-        composeApp/src/desktopMain/resources/dosewiki_slim.json
+Output (all four copies are written with identical bytes):
+    composeApp/src/desktopMain/resources/dosewiki_slim.json
+    composeApp/src/jvmMain/resources/dosewiki_slim.json
+    composeApp/src/iosMain/resources/dosewiki_slim.json
+    composeApp/src/androidMain/assets/dosewiki_slim.json
+
+The raw DoseWiki SubstanceIndex.json download is cached at
+scripts/cache/SubstanceIndex.json (gitignored regenerable). Test
+fixtures under commonTest/desktopTest resources are small hand-written
+fixtures and are NOT overwritten by this pipeline.
 
 DoseWiki content: CC0 (public domain). See https://dose.wiki
 """
@@ -25,8 +33,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, ".."))
 
 OUTPUT_PATHS = [
-    os.path.join(PROJECT, "composeApp", "src", "jvmMain", "resources", "dosewiki_slim.json"),
     os.path.join(PROJECT, "composeApp", "src", "desktopMain", "resources", "dosewiki_slim.json"),
+    os.path.join(PROJECT, "composeApp", "src", "jvmMain", "resources", "dosewiki_slim.json"),
+    os.path.join(PROJECT, "composeApp", "src", "iosMain", "resources", "dosewiki_slim.json"),
+    os.path.join(PROJECT, "composeApp", "src", "androidMain", "assets", "dosewiki_slim.json"),
 ]
 
 # Fields from the raw SubstanceIndex.json that we keep
@@ -61,8 +71,8 @@ def slim_substance(raw: dict) -> dict:
 
 
 def download_source() -> list:
-    """Download or read cached SubstanceIndex.json."""
-    cache_path = os.path.join(HERE, "SubstanceIndex.json")
+    """Download or read cached SubstanceIndex.json (cache lives in scripts/cache/)."""
+    cache_path = os.path.join(HERE, "cache", "SubstanceIndex.json")
 
     if os.path.exists(cache_path):
         print(f"Using cached {cache_path}")
@@ -78,6 +88,7 @@ def download_source() -> list:
         data = json.load(resp)
 
     # Cache the raw download
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     print(f"Downloaded {len(data)} substances, cached to {cache_path}")

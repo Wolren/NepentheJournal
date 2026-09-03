@@ -70,7 +70,7 @@ def _urllib_api_call(params: dict[str, str]) -> dict | None:
             return data
     except urllib.error.HTTPError as e:
         if e.code == 429:
-            # Rate limited — raise so caller can back off
+            # Rate limited - raise so caller can back off
             raise e
         return None
     except (urllib.error.URLError, json.JSONDecodeError, OSError, TimeoutError):
@@ -668,7 +668,7 @@ def batch_resolve_by_cid(cids: list[int], batch_size: int = 300) -> dict[int, st
     """Resolve PubChem CIDs to Wikipedia page titles via Wikidata SPARQL.
 
     Batched to avoid URL/query size limits. Returns {cid: wikipedia_title_or_None}.
-    Rate-limit conscious — Wikidata SPARQL enforces ~10 req/min for user agents.
+    Rate-limit conscious - Wikidata SPARQL enforces ~10 req/min for user agents.
     """
     if not cids:
         return {}
@@ -678,7 +678,7 @@ def batch_resolve_by_cid(cids: list[int], batch_size: int = 300) -> dict[int, st
         batch = cids[i:i + batch_size]
         cid_values = " ".join(f'"{c}"' for c in batch)
 
-        # Wikidata has strict rate limits — wait generously
+        # Wikidata has strict rate limits - wait generously
         if i > 0:
             time.sleep(15.0)
 
@@ -704,7 +704,7 @@ def batch_resolve_by_cid(cids: list[int], batch_size: int = 300) -> dict[int, st
                     title = item["page"]["value"]
                     title = urllib.parse.unquote(title.replace("_", " "))
                     result[cid] = title
-                break  # Success — exit retry loop
+                break  # Success - exit retry loop
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     wait = int(e.headers.get("Retry-After", "30")) * (attempt + 1)
@@ -800,7 +800,7 @@ def main() -> None:
     for sub in substances:
         cid = sub.get("cid")
         if cid is not None and cid in cid_to_title and cid_to_title[cid]:
-            # CID resolved — store under name key for lookup
+            # CID resolved - store under name key for lookup
             name = sub.get("name", "")
             if name:
                 title_map[name] = cid_to_title[cid]
@@ -814,7 +814,7 @@ def main() -> None:
         if candidate:
             # Resolve via Wikipedia query (batch)
             title_map[candidate] = None  # Will be batch-resolved below
-        # If not found, title_map won't have it — treated as no page
+        # If not found, title_map won't have it - treated as no page
 
     # Batch-resolve name-based candidates via Wikipedia API
     name_candidates = [k for k, v in title_map.items() if v is None]
@@ -846,7 +846,7 @@ def main() -> None:
             stats["skipped"] += 1
             continue
 
-        # Look up resolved title — prefer CID-based resolution
+        # Look up resolved title - prefer CID-based resolution
         cid = sub.get("cid")
         resolved_title = None
         if cid is not None and cid in cid_to_title and cid_to_title[cid]:

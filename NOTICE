@@ -30,5 +30,6 @@ Modifications and additions by Wolren include:
   editor, custom substance editor, timeline visualization
 
 The PsychonautWiki substance reference data (dosage, duration,
-interaction data) is sourced from the public PsychonautWiki GraphQL
-API and is used under fair use / public data principles.
+interaction data) is sourced from the public PsychonautWiki Semantic
+MediaWiki API (`action=ask` via `scripts/smw_dump.py`) and the CC0
+DoseWiki pack (`scripts/dosewiki_slim.py`), and is used under fair use / public data principles.

@@ -15,6 +15,7 @@ falls through to the live SMW API as a backup.
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.parse
@@ -31,6 +32,10 @@ SMW_API = "https://psychonautwiki.org/w/api.php"
 USER_AGENT = "NepentheJournal/1.0 (+https://github.com/Wolren/psychonaut-journal) dump script"
 REQUEST_DELAY = 0.15  # seconds between smwbrowse calls (polite)
 HTTP_TIMEOUT = 30.0
+
+# Default output lives under scripts/cache/ so the repo root stays clean.
+HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_OUTPUT = os.path.join(HERE, "cache", "psychonautwiki_dump.json")
 
 # Properties we skip (internal SMW metadata)
 SKIP_PROPS = {"_INST", "_ASK", "_MDAT", "_SKEY", "_TYPE", "_ERRC", "_REDI"}
@@ -340,8 +345,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Dump PsychonautWiki SMW data to JSON")
     parser.add_argument(
         "--output", "-o",
-        default="psychonautwiki_dump.json",
-        help="Output JSON file path (default: psychonautwiki_dump.json)",
+        default=DEFAULT_OUTPUT,
+        help="Output JSON file path (default: scripts/cache/psychonautwiki_dump.json)",
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -418,6 +423,9 @@ def main() -> None:
     }
 
     # Step 5: write output
+    parent = os.path.dirname(os.path.abspath(args.output))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, indent=2, ensure_ascii=False)
 

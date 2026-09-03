@@ -3,15 +3,15 @@
 Pharmacology matrix export for Nepenthe Journal.
 
 Extracts all pharmacology binding data from the seed.json JournalSnapshot
-into four standalone CSV files — one per source (PDSP, IUPHAR, ChEMBL,
-BindingDB) — plus a merged all-sources CSV.
+into four standalone CSV files - one per source (PDSP, IUPHAR, ChEMBL,
+BindingDB) - plus a merged all-sources CSV.
 
 Each row is one measurement: a substance-target affinity pair with provenance.
 
 Usage:
-    python scripts/pharmacology_export.py [--input seed.json] [--output-dir .]
+    python scripts/pharmacology_export.py [--input scripts/seed.json] [--output-dir scripts/cache]
 
-Output:
+Output (written into --output-dir, default scripts/cache):
     pharmacology_pdsp.csv       (5,005 records)
     pharmacology_iuphar.csv     (406 records)
     pharmacology_chembl.csv     (3,127 records)
@@ -233,9 +233,9 @@ def write_csv(path: str, columns: list[str], rows: list[dict]):
 def main():
     parser = argparse.ArgumentParser(description="Export pharmacology data matrix from JournalSnapshot")
     parser.add_argument("--input", default="scripts/seed.json", help="Path to JournalSnapshot JSON")
-    parser.add_argument("--output-dir", 
-        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "."),
-        help="Output directory for CSV files")
+    parser.add_argument("--output-dir",
+        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache"),
+        help="Output directory for CSV files (default: scripts/cache)")
     args = parser.parse_args()
 
     with open(args.input) as f:
@@ -261,6 +261,7 @@ def main():
     print("---")
 
     out = args.output_dir
+    os.makedirs(out, exist_ok=True)
     write_csv(os.path.join(out, "pharmacology_pdsp.csv"), PDSP_COLUMNS, pdsp_rows)
     write_csv(os.path.join(out, "pharmacology_iuphar.csv"), IUPHAR_COLUMNS, iuphar_rows)
     write_csv(os.path.join(out, "pharmacology_chembl.csv"), CHEMBL_COLUMNS, chembl_rows)

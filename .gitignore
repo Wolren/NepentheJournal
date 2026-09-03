@@ -62,6 +62,14 @@ scripts/__pycache__/
 # Large external data files
 scripts/pdsp_ki_database.csv
 
+# Regenerable ETL artifacts (never commit: rebuilt by scripts/* pipeline)
+scripts/seed.json.bak
+scripts/SubstanceIndex.json
+scripts/cache/SubstanceIndex.json
+scripts/pharmacology_*.csv
+scripts/cache/pharmacology_*.csv
+*.bak
+
 # Hermes
 .hermes/
 

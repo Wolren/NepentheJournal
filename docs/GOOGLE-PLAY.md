@@ -26,7 +26,7 @@ without secrets and signs with its own key.
 
 1. **Create the app** in Play Console with package name `app.journal.nepenthe`.
 2. **Generate the upload keystore** (keep it safe; it is the key to your
-   app identity for uploads — Play App Signing then manages the actual
+   app identity for uploads - Play App Signing then manages the actual
    signing key):
 
 ```bash
@@ -93,7 +93,7 @@ rejection is a data point, not a blocker: the pipeline costs nothing to keep.
 ## Versioning
 
 - Bump `versionCode` (monotonic) + `versionName` in `composeApp/build.gradle.kts`
-- Tag `v<versionName>` — the workflow runs on tag push
+- Tag `v<versionName>` - the workflow runs on tag push
 - Keep the same tag for F-Droid (`docs/FDROID.md` AutoUpdateMode: Version)
 
 ## Decision log

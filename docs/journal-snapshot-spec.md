@@ -13,10 +13,10 @@ JournalSnapshot is the interchange format for Nepenthe Journal's data. It is a s
 
 The format is designed to be:
 
-- **Self-contained** — one file holds every entity. No external references.
-- **Append-only friendly** — new entities are additive. Existing entities are replaced by ID. Deletes happen separately (via tombstone or file rewrite).
-- **Sync-compatible** — every entity carries a `deviceOrigin` and timestamps for conflict resolution.
-- **Typeable** — the JSON Schema generates Kotlin data classes, TypeScript interfaces, and Rust structs automatically.
+- **Self-contained** - one file holds every entity. No external references.
+- **Append-only friendly** - new entities are additive. Existing entities are replaced by ID. Deletes happen separately (via tombstone or file rewrite).
+- **Sync-compatible** - every entity carries a `deviceOrigin` and timestamps for conflict resolution.
+- **Typeable** - the JSON Schema generates Kotlin data classes, TypeScript interfaces, and Rust structs automatically.
 
 ---
 
@@ -34,7 +34,7 @@ The format is designed to be:
 - The app loads any version >= 1 with `ignoreUnknownKeys = true`.
 - On write, the app always writes `CURRENT_VERSION` (currently 5).
 - Unknown fields are preserved during load-write cycles when using JournalJson.
-- There is no automated data migration between versions — each version adds fields that are optional (`null` or `default` values are acceptable).
+- There is no automated data migration between versions - each version adds fields that are optional (`null` or `default` values are acceptable).
 
 ---
 
@@ -104,10 +104,10 @@ A substance in the library. Pure compounds are keyed by PubChem CID. Plants and 
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `name` | `string` | — | Display name. Usually the common English name. |
+| `name` | `string` | - | Display name. Usually the common English name. |
 | `aliases` | `string[]` | `[]` | Alternative names, street names, abbreviations from PsychonautWiki, TripSit, PubChem, Wikidata. |
 | `summary` | `string` | `null` | Paragraph-length substance description from PsychonautWiki SMW. |
-| `substanceClass` | `string[]` | `[]` | Chemical families (e.g. `Lysergamides`) and effect categories (e.g. `Psychedelic`). Not normalized across sources — expect duplicates. |
+| `substanceClass` | `string[]` | `[]` | Chemical families (e.g. `Lysergamides`) and effect categories (e.g. `Psychedelic`). Not normalized across sources - expect duplicates. |
 | `routesOfAdministration` | `string[]` | `[]` | Valid administration routes. Values: `Oral`, `Sublingual`, `Insufflated`, `Inhalation`, `Smoked`, `Intravenous`, `Intramuscular`, `Subcutaneous`, `Rectal`, `Transdermal`, `Buccal`, `Topical`, `Ophthalmic`. |
 | `erowidUrl` | `string` | `""` | Erowid experience vault URL. |
 
@@ -120,7 +120,7 @@ A substance in the library. Pure compounds are keyed by PubChem CID. Plants and 
 | `addictionPotential` | `string` | `null` | Addiction potential classification. |
 | `toxicity` | `string[]` | `[]` | Toxicity warnings. |
 | `crossTolerances` | `string[]` | `[]` | Substance names this has cross-tolerance with. |
-| `effects` | `string[]` | `[]` | Effect labels from SMW. Unstructured — use DoseWiki data for structured effects. |
+| `effects` | `string[]` | `[]` | Effect labels from SMW. Unstructured - use DoseWiki data for structured effects. |
 | `interactionClasses` | `string[]` | `[]` | Interaction pharmacology classes. Valid values: `maoi`, `ssri`, `serotonin_releaser`, `serotonergic`, `stimulant`, `depressant`, `benzodiazepine`, `opioid`, `psychedelic`, `dissociative`, `lithium`, `cannabinoid`, `deliriant`. |
 
 ### Chemical properties (from PubChem)
@@ -175,9 +175,9 @@ A journal session representing a single experience. Groups doses, timeline event
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Device-keyed UUID. |
-| `title` | `string` | yes | — | Session title (auto-generated from substance + date, user-editable). |
-| `startTime` | `int` | yes | — | Unix ms timestamp of first dose. |
+| `id` | `string` | yes | - | Device-keyed UUID. |
+| `title` | `string` | yes | - | Session title (auto-generated from substance + date, user-editable). |
+| `startTime` | `int` | yes | - | Unix ms timestamp of first dose. |
 | `endTime` | `int` | no | `null` | Unix ms timestamp of session end. Null while live. |
 | `tags` | `string[]` | no | `[]` | User tags for filtering. |
 | `set` | `string` | no | `null` | Mindset before session. |
@@ -210,13 +210,13 @@ An individual ingestion. Belongs to one session, references one substance.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Device-keyed UUID. |
-| `sessionId` | `string` | yes | — | Parent session ID. |
-| `substanceId` | `string` | yes | — | Substance ID (e.g. `cid:5761`). |
-| `routeOfAdministration` | `string` | yes | — | Route (see substance routes list). |
-| `amount` | `float` | yes | — | Dose amount. |
-| `unit` | `string` | yes | — | Unit: `mg`, `µg`, `ug`, `ml`, or custom. |
-| `timestamp` | `int` | yes | — | Unix ms ingestion time. |
+| `id` | `string` | yes | - | Device-keyed UUID. |
+| `sessionId` | `string` | yes | - | Parent session ID. |
+| `substanceId` | `string` | yes | - | Substance ID (e.g. `cid:5761`). |
+| `routeOfAdministration` | `string` | yes | - | Route (see substance routes list). |
+| `amount` | `float` | yes | - | Dose amount. |
+| `unit` | `string` | yes | - | Unit: `mg`, `µg`, `ug`, `ml`, or custom. |
+| `timestamp` | `int` | yes | - | Unix ms ingestion time. |
 | `redosing` | `bool` | no | `false` | True = this is a redose. |
 | `notes` | `string` | no | `null` | Dose-specific notes. |
 | `isDoseEstimate` | `bool` | no | `false` | Amount is estimated. |
@@ -232,10 +232,10 @@ A pairwise substance interaction risk assessment.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Usually `{substanceAId}-{substanceBId}`. |
-| `substanceAId` | `string` | yes | — | First substance (sorted alphabetically). |
-| `substanceBId` | `string` | yes | — | Second substance. |
-| `riskLevel` | `string` | yes | — | `DANGEROUS`, `UNSAFE`, `UNCERTAIN`, `LOW`, `UNKNOWN`. |
+| `id` | `string` | yes | - | Usually `{substanceAId}-{substanceBId}`. |
+| `substanceAId` | `string` | yes | - | First substance (sorted alphabetically). |
+| `substanceBId` | `string` | yes | - | Second substance. |
+| `riskLevel` | `string` | yes | - | `DANGEROUS`, `UNSAFE`, `UNCERTAIN`, `LOW`, `UNKNOWN`. |
 | `description` | `string` | no | `null` | Human-readable risk description. |
 | `sources` | `string[]` | no | `[]` | Source citations. |
 
@@ -257,8 +257,8 @@ A named psychoactive effect.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Effect identifier. |
-| `name` | `string` | yes | — | Effect name (e.g. `Anxiety`). |
+| `id` | `string` | yes | - | Effect identifier. |
+| `name` | `string` | yes | - | Effect name (e.g. `Anxiety`). |
 | `url` | `string` | no | `null` | Reference URL (PsychonautWiki page). |
 | `description` | `string` | no | `null` | Description text. |
 | `category` | `string` | no | `null` | Category: `cognitive`, `physical`, `visual`, `auditory`, etc. |
@@ -272,11 +272,11 @@ A user note. Attachable to sessions or doses, or standalone.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Device-keyed UUID. |
+| `id` | `string` | yes | - | Device-keyed UUID. |
 | `sessionId` | `string` | no | `null` | Parent session ID. |
 | `doseId` | `string` | no | `null` | Parent dose ID. |
 | `title` | `string` | no | `null` | Title (markdown). |
-| `body` | `string` | yes | — | Body text (markdown). |
+| `body` | `string` | yes | - | Body text (markdown). |
 | `tags` | `string[]` | no | `[]` | Tags. |
 | `isPinned` | `bool` | no | `false` | Pinned status. |
 | `conflictSiblings` | `ConflictSibling[]` | no | `[]` | Sync conflict versions. |
@@ -289,11 +289,11 @@ A timestamped event inside a session.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Device-keyed UUID. |
-| `sessionId` | `string` | yes | — | Parent session ID. |
-| `timestamp` | `int` | yes | — | Unix ms event time. |
-| `eventType` | `string` | yes | — | One of: `ONSET`, `COMEUP`, `PEAK`, `PLATEAU`, `OFFSET`, `AFTERGLOW`, `END`, `OBSERVATION`, `SAFETY_CHECK`, `SIDE_EFFECT`, `EMERGENCY`, `NOTE`. |
-| `label` | `string` | yes | — | Short event label. |
+| `id` | `string` | yes | - | Device-keyed UUID. |
+| `sessionId` | `string` | yes | - | Parent session ID. |
+| `timestamp` | `int` | yes | - | Unix ms event time. |
+| `eventType` | `string` | yes | - | One of: `ONSET`, `COMEUP`, `PEAK`, `PLATEAU`, `OFFSET`, `AFTERGLOW`, `END`, `OBSERVATION`, `SAFETY_CHECK`, `SIDE_EFFECT`, `EMERGENCY`, `NOTE`. |
+| `label` | `string` | yes | - | Short event label. |
 | `body` | `string` | no | `null` | Detailed description. |
 | `relatedEffectIds` | `string[]` | no | `[]` | Related effect IDs. |
 | `intensity` | `float` | no | `null` | 0.0-1.0 intensity. |
@@ -306,9 +306,9 @@ A user-defined dosing unit.
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `id` | `string` | yes | — | Device-keyed UUID. |
-| `substanceId` | `string` | yes | — | Substance this unit applies to. |
-| `name` | `string` | yes | — | Unit name (e.g. `drops`, `puffs`). |
+| `id` | `string` | yes | - | Device-keyed UUID. |
+| `substanceId` | `string` | yes | - | Substance this unit applies to. |
+| `name` | `string` | yes | - | Unit name (e.g. `drops`, `puffs`). |
 | `description` | `string` | no | `null` | Optional description. |
 | `estimatedMgPerUnit` | `float` | no | `null` | Estimated mg equivalent for tolerance. |
 | `isEstimate` | `bool` | no | `false` | When true, show `~` prefix on doses. |
@@ -437,11 +437,11 @@ Each substance's `sources` array documents which data sources contributed. The s
 
 ### Reading across versions
 
-The Kotlin deserializer uses `ignoreUnknownKeys = true`, so a future-version file with extra fields loads without errors (extra fields are silently dropped). A past-version file is missing some current fields — those fields take their Kotlin default values (usually `null` or `false`).
+The Kotlin deserializer uses `ignoreUnknownKeys = true`, so a future-version file with extra fields loads without errors (extra fields are silently dropped). A past-version file is missing some current fields - those fields take their Kotlin default values (usually `null` or `false`).
 
 ### Writing
 
-The app always writes `CURRENT_VERSION`. If a file is loaded that has a `version` higher than `CURRENT_VERSION`, the app logs a warning but proceeds. On save, it downgrades to `CURRENT_VERSION` by stripping unknown fields — this is a known limitation.
+The app always writes `CURRENT_VERSION`. If a file is loaded that has a `version` higher than `CURRENT_VERSION`, the app logs a warning but proceeds. On save, it downgrades to `CURRENT_VERSION` by stripping unknown fields - this is a known limitation.
 
 ### Recommended consumer strategy
 
@@ -458,7 +458,8 @@ The seed file shipped with the app (`scripts/seed.json`) is a JournalSnapshot ve
 
 Seed data sources and build pipeline are documented in the ETL pipeline section above. The seed is regenerated periodically by running:
 ```
-python scripts/matrix_build.py --input seed.json --output seed.json --verbose
+python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --verbose
 ```
+then copying the result over `scripts/seed.json` and the four bundled `psychonautwiki_seed.json` copies in one run so hashes stay equal (CI checks this).
 
-The `scripts/` directory also contains cache files (`chembl_cache.json`, `iuphar_cache.json`, `pdsp_cache.json`, `bindingdb_cache.json`, `pubchem_cid_cache.json`, `wikidata_cache.json`) that speed up incremental rebuilds. Delete them to force a full refresh.
+The `scripts/cache/` directory holds regenerable pipeline files (`*_cache.json`, `SubstanceIndex.json`, `pharmacology_*.csv`, `unified_seed.json`, `psychonautwiki_dump.json`) that speed up incremental rebuilds. Delete them to force a full refresh. The raw DoseWiki download is cached at `scripts/cache/SubstanceIndex.json`; the slimmed `dosewiki_slim.json` is written to all four targets (desktopMain, jvmMain, iosMain resources plus androidMain assets) by `scripts/dosewiki_slim.py`.

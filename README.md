@@ -40,7 +40,7 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 - [x] Custom theme editor with hex color pickers, card styles, background images, and opacity
 - [x] Harm reduction reference (DoseWiki integrated)
 - [x] Import/export (JSON, CSV) and auto-backup rotation
-- [x] Offline-first: full functionality without internet
+- [x] Offline-first: journaling, bundled reference data, and P2P sync work without internet (the FDA drug-label card needs network, see below)
 
 ---
 
@@ -65,10 +65,12 @@ Nepenthe Journal does NOT call the PsychonautWiki API at runtime. All substance 
 The ETL pipeline lives at `scripts/matrix_build.py` and merges all sources into a single `JournalSnapshot` JSON seed. Run it with:
 
 ```bash
-python scripts/matrix_build.py --refresh -i seed.json -o seed.json -v
+python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --verbose
 ```
 
-Substances are baked in at build time: no API calls happen in the running app.
+`scripts/seed.json` (JournalSnapshot v3, 325 substances) is the canonical seed. The four bundled copies (`desktopMain` and `jvmMain` and `iosMain` resources plus `androidMain` assets `psychonautwiki_seed.json`) are byte-identical copies of it: copy the pipeline result over all of them in one run so hashes stay equal. CI checks this. The four `dosewiki_slim.json` copies are likewise written in one `scripts/dosewiki_slim.py` run.
+
+Substances are baked in at build time: no API calls happen in the running app, except the FDA drug-label card (`OpenFdaInteractionCard`), which queries api.fda.gov on demand and needs network.
 
 ### Data Flow
 
@@ -95,7 +97,7 @@ graph TB
   end
 ```
 
-Persistence uses a single JSON file (`JournalSnapshot`) with all documents serialized via kotlinx.serialization. Auto-backup rotation keeps the last 10 copies. Save retry with atomic writes prevents corruption.
+Persistence uses a single JSON file (`JournalSnapshot`) with all documents serialized via kotlinx.serialization. Versioned backup rotation keeps 6 copies (`.bak` plus `.bak.1` through `.bak.5`; see `save()` in `composeApp/src/desktopMain/kotlin/app/journal/data/JournalStoreDesktop.kt`). Save retry with atomic writes prevents corruption.
 
 ### Navigation
 
@@ -113,7 +115,7 @@ Overlays replace the content area for editors, detail views, and the calendar.
 
 LAN-based sync using Ktor (no cloud, no Couchbase Enterprise):
 
-- **Host (JVM):** Ktor server advertises via mDNS (JmDNS), accepts push/pull sync requests
+- **Host (JVM):** Ktor server advertises via mDNS (JmDNS), accepts push/pull sync requests on port 4984 by default (`SyncConfig.DEFAULT_PORT`)
 - **Client (all targets):** Ktor client pushes local changes and pulls remote changes
 - **Transport:** HTTP REST + HMAC-SHA256 auth + optional WebSocket for live delta push
 - **Resilience:** HTTP retry with exponential backoff, WS heartbeat/pong, reconnection logic, data validation gates
@@ -126,7 +128,7 @@ Modular, serializable theme system:
 - `ThemeConfig`: all visual parameters (colors, card style, corner radius, background image, base theme)
 - `ThemeManager`: observable `StateFlow<ThemeConfig>`, derives WCAG-compliant Material3 `ColorScheme`
 - Contrast colors computed via relative luminance (WCAG): black or white text depending on background
-- Presets: Forest (dark green) and Meadow (light green) defaults
+- Presets: Forest, Ocean, Sunset, Ember, Midnight, Mono (see `ThemePresets.all` in `ThemeConfig.kt`)
 - Persistent across sessions (stored as part of JournalSnapshot)
 
 ### Cross-Platform
@@ -154,6 +156,8 @@ NEPENTHE_TEST_DATA=1 ./gradlew composeApp:run
 ```
 
 The desktop app launches a native window via Compose Desktop. Test data mode populates sessions with varied substances and combos for UI debugging. Test data is deterministic (seed 42): same data every run.
+
+Desktop keyboard shortcuts: Ctrl+F opens search, Ctrl+N starts a new live session, Esc goes back.
 
 ### Android APK
 
@@ -195,20 +199,20 @@ Enable test data via any of:
 |-------|--------|
 | UI Framework | Compose Multiplatform (JetBrains) 1.11.1 |
 | Language | Kotlin 2.4.0 |
-| Build System | Gradle 9.6.1 + AGP 9.3.0 |
+| Build System | Gradle 9.6.1 + AGP 9.3.1 |
 | Persistence | JSON file via kotlinx.serialization, atomic writes + backup rotation |
-| Networking | Ktor 3.5.1 (client + server) |
+| Networking | Ktor 3.5.2 (client + server) |
 | Charts | Vico 3.x |
-| Service Discovery | JmDNS 3.5.12 |
+| Service Discovery | JmDNS 3.6.3 |
 | Settings | multiplatform-settings 1.3.0 |
 | Thread Safety | PlatformLock (expect/actual: synchronized on JVM, NSLock on iOS) |
-| Test | kotlin.test (28 test files, 436 test methods) |
+| Test | kotlin.test (31 test files, 424 test methods) |
 
 ## CI/CD
 
 | Workflow | Trigger | Purpose | Status |
 |----------|---------|---------|--------|
-| CI | Push/PR to master | Compile Desktop + Android, run tests, build APK | Desktop + Android |
+| CI | Push/PR to master | Compile Desktop + Android, verify seed hashes, run tests, build APK | Desktop + Android |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
