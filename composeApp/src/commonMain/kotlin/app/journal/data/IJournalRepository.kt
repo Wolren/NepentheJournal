@@ -58,6 +58,7 @@ interface IJournalRepository {
     val pendingConflictCount: Flow<Int>
 
     // ---- Bulk apply ----
+    fun fullSnapshot(): JournalSnapshot
     fun applySnapshot(snapshot: JournalSnapshot)
 
     // ---- Sessions ----
@@ -147,6 +148,19 @@ interface IJournalRepository {
         doses: List<Dose> = emptyList(),
         timelineEvents: List<TimelineEvent> = emptyList(),
         interactions: List<Interaction> = emptyList()
+    )
+
+    // ---- Bulk apply (sync deltas, seed load) ----
+    fun applyBatch(
+        sessions: List<Session> = emptyList(),
+        doses: List<Dose> = emptyList(),
+        substances: List<Substance> = emptyList(),
+        effects: List<Effect> = emptyList(),
+        interactions: List<Interaction> = emptyList(),
+        notes: List<Note> = emptyList(),
+        timelineEvents: List<TimelineEvent> = emptyList(),
+        customUnits: List<CustomUnit> = emptyList(),
+        lastWriterWins: Boolean = false
     )
 
     // ---- Full-text search ----

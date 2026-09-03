@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Dose
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType

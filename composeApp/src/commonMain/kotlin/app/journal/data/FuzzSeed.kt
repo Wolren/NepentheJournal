@@ -82,7 +82,7 @@ object FuzzSeed {
      * Uses existing substances (from seed/disk) only -- will not create fake ones.
      * Skips entirely if fewer than 2 substances are present.
      */
-    fun generate(repo: JournalRepository) {
+    fun generate(repo: IJournalRepository) {
         try {
             val now = currentTimeMillis()
             val dayMs = 86400000L

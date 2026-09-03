@@ -102,7 +102,7 @@ internal fun PrivacyCardContent(privacyExpanded: Boolean, onToggle: () -> Unit) 
 
 @Composable
 internal fun DeveloperCardContent(
-    repo: app.journal.data.JournalRepository,
+    repo: app.journal.data.IJournalRepository,
     crashLogStatus: String?,
     scope: kotlinx.coroutines.CoroutineScope,
     onCrashLogStatusChange: (String?) -> Unit,

@@ -73,7 +73,7 @@ object ExportImport {
      * Includes all entities: sessions, substances, doses, notes, timeline events,
      * interactions, effects, custom units, and settings.
      */
-    fun exportFullJournal(repo: JournalRepository): String {
+    fun exportFullJournal(repo: IJournalRepository): String {
         val snapshot = repo.fullSnapshot()
         return json.encodeToString(snapshot)
     }

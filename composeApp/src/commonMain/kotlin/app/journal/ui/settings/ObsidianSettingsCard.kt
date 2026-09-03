@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.export.obsidian.ObsidianExportConfig
 import app.journal.export.obsidian.ObsidianExportManager
 import app.journal.export.obsidian.ObsidianVaultOps

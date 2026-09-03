@@ -71,7 +71,7 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
 }
 
 @Composable
-internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.JournalRepository, sessionStart: Long) {
+internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJournalRepository, sessionStart: Long) {
     val isDark = ThemeManager.instance.isDarkTheme()
     val grouped = doses.groupBy { it.substanceId }
     Card(
@@ -113,7 +113,7 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.Journa
 }
 
 @Composable
-internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journal.data.JournalRepository) {
+internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journal.data.IJournalRepository) {
     val allScores = session.checkins
         .flatMap { c -> c.effectScores.entries.map { it.key to it.value } }
         .groupBy({ it.first }, { it.second })

@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
 import app.journal.model.SyncConfig
 import app.journal.sync.*
@@ -190,7 +191,7 @@ internal fun DataSettingsContent(
                             val path = FilePicker.saveFile("nepenthe-export.zip", "ZIP archives", listOf("zip"))
                             if (path != null) {
                                 try {
-                                    val count = ZipExporter.exportAll(repo, path)
+                                    val count = ZipExporter.exportAll(repo as JournalRepository, path)
                                     onStatusChange("Exported $count CSV files as zip")
                                 } catch (e: Exception) { onStatusChange("ZIP export failed: ${e.message}") }
                             }
@@ -204,7 +205,7 @@ internal fun DataSettingsContent(
                     AppOutlinedButton(onClick = {
                         scope.launch {
                             try {
-                                val store = JournalStore(repo)
+                                val store = JournalStore(repo as JournalRepository)
                                 store.save()
                                 onStatusChange("Backup saved to ${store.dataPath()}")
                             } catch (e: Exception) {

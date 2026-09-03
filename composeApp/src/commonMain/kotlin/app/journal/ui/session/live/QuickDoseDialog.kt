@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.model.Substance

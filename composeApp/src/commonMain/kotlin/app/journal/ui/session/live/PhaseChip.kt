@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Session
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.InteractionCheckResult
 import app.journal.data.InteractionChecker
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.ui.components.InteractionWarnings

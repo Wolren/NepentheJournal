@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.SearchResult
 import app.journal.ui.components.DesktopScrollbar
 

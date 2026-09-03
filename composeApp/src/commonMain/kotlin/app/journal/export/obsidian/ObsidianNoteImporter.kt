@@ -2,6 +2,7 @@ package app.journal.export.obsidian
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.*
 import app.journal.util.ExportImport
 import app.journal.util.currentTimeMillis
@@ -38,7 +39,7 @@ object ObsidianNoteImporter {
      * @throws SecurityException if [vaultDir] contains path traversal components
      */
     fun importFromVault(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         vaultDir: String
     ): ObsidianImportResult {
         // H1: Reject ".." in vault directory path to prevent path traversal
@@ -128,7 +129,7 @@ object ObsidianNoteImporter {
      * Used instead of fragile internal IDs so the user can rename notes in Obsidian.
      */
     private fun findMatchingSession(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         startTime: Long,
         title: String
     ): Session? {
@@ -142,7 +143,7 @@ object ObsidianNoteImporter {
      * with the ones from the canonical block.
      */
     private fun replaceChildren(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         sessionId: String,
         block: ObsidianCanonicalBlock
     ) {

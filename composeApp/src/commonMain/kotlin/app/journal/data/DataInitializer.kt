@@ -42,11 +42,11 @@ object DataInitializer {
     /**
      * @param scope optional scope for auto-save coroutine. If null, auto-save is skipped.
      */
-    fun ensureInitialized(repo: JournalRepository, scope: CoroutineScope? = null) {
+    fun ensureInitialized(repo: IJournalRepository, scope: CoroutineScope? = null) {
         if (initialized) return
         initialized = true
 
-        val store = JournalStore(repo)
+        val store = JournalStore(repo as JournalRepository)
 
         // Step 1: Load user data from disk first (to check for old IDs)
         store.load()
@@ -94,7 +94,7 @@ object DataInitializer {
      * then patches any existing doses, interactions, or session data that
      * still reference the old IDs.
      */
-    internal fun migrateOldIds(repo: JournalRepository) {
+    internal fun migrateOldIds(repo: IJournalRepository) {
         // Build mapping: old pwiki:xxx ID -> new cid:xxxx ID
         val idMap = mutableMapOf<String, String>()
         for (sub in repo.substances.value) {
@@ -142,7 +142,7 @@ object DataInitializer {
         Log.withTag("DataInit").i { "  Patched $patchedDoses doses, $patchedInteractions interactions" }
     }
 
-    private fun tryLoadSeed(repo: JournalRepository): Boolean {
+    private fun tryLoadSeed(repo: IJournalRepository): Boolean {
         return try {
             val text = readBundledResource(SEED_RESOURCE)
                 ?: run {
@@ -182,7 +182,7 @@ object DataInitializer {
      *
      * Call this when the user wants to reset the substance library to defaults.
      */
-    fun reloadDefaultSubstances(repo: JournalRepository) {
+    fun reloadDefaultSubstances(repo: IJournalRepository) {
         try {
             val text = readBundledResource(SEED_RESOURCE) ?: return
             val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(text)
@@ -198,18 +198,18 @@ object DataInitializer {
             // substances with IDs not in the seed survive untouched.
             repo.applyBatch(substances = normalized.substances)
 
-            JournalStore(repo).save()
+            JournalStore(repo as JournalRepository).save()
             Log.withTag("DataInit").i { "Reloaded ${normalized.substances.size} substances from bundled seed" }
         } catch (e: Exception) {
             Log.withTag("DataInit").e(e) { "Failed to reload default substances" }
         }
     }
 
-    fun resetWithTestData(repo: JournalRepository) {
+    fun resetWithTestData(repo: IJournalRepository) {
         repo.clearAll()
         tryLoadSeed(repo)
         FuzzSeed.generate(repo)
-        val store = JournalStore(repo)
+        val store = JournalStore(repo as JournalRepository)
         store.save()
     }
 }

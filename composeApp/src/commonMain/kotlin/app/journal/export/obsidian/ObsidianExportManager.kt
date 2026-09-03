@@ -1,6 +1,7 @@
 package app.journal.export.obsidian
 
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -19,7 +20,7 @@ object ObsidianExportManager {
      * @return the file path written, or null on failure
      */
     fun exportSession(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         sessionId: String,
         config: ObsidianExportConfig
     ): String? {
@@ -31,7 +32,7 @@ object ObsidianExportManager {
      * Export all sessions to the Obsidian vault.
      */
     fun exportAllSessions(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         config: ObsidianExportConfig
     ): ObsidianExportResult {
         val start = currentTimeMillis()
@@ -62,7 +63,7 @@ object ObsidianExportManager {
      * Import all vault notes back into the journal.
      */
     fun importFromVault(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         config: ObsidianExportConfig
     ): ObsidianImportResult {
         val dir = config.resolvedDir()
@@ -88,7 +89,7 @@ object ObsidianExportManager {
      * @return the absolute file path written, or null if rendering produced no output
      */
     private fun writeSessionNote(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         session: app.journal.model.Session,
         config: ObsidianExportConfig
     ): String? {

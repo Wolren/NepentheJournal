@@ -144,16 +144,16 @@ class JournalRepository internal constructor() : IJournalRepository {
      * local data (audit M3). Seed loading and backup restore keep the default false so
      * "Reset to defaults" / restore remain authoritative.
      */
-    fun applyBatch(
-        sessions: List<Session> = emptyList(),
-        doses: List<Dose> = emptyList(),
-        substances: List<Substance> = emptyList(),
-        effects: List<Effect> = emptyList(),
-        interactions: List<Interaction> = emptyList(),
-        notes: List<Note> = emptyList(),
-        timelineEvents: List<TimelineEvent> = emptyList(),
-        customUnits: List<CustomUnit> = emptyList(),
-        lastWriterWins: Boolean = false
+    override fun applyBatch(
+        sessions: List<Session>,
+        doses: List<Dose>,
+        substances: List<Substance>,
+        effects: List<Effect>,
+        interactions: List<Interaction>,
+        notes: List<Note>,
+        timelineEvents: List<TimelineEvent>,
+        customUnits: List<CustomUnit>,
+        lastWriterWins: Boolean
     ) = lock.withLock {
         fun <T> newer(list: List<T>, get: (String) -> T?, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
             if (!lastWriterWins) list
@@ -187,7 +187,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    fun fullSnapshot(): JournalSnapshot = lock.withLock {
+    override fun fullSnapshot(): JournalSnapshot = lock.withLock {
         AppJson.snapshot(this)
     }
 

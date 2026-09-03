@@ -1,6 +1,7 @@
 package app.journal.util
 
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.SessionDataRow
 import app.journal.data.DoseDataRow
 import app.journal.data.SubstanceDataRow
@@ -99,13 +100,13 @@ object CsvExporter {
 
     // ---- Public export functions ----
 
-    fun exportSessionsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+    fun exportSessionsCsv(repo: IJournalRepository, filter: CsvExportFilter? = null): String {
         val allRows = repo.sessionsDataFrame()
         val filtered = if (filter == null) allRows else applyFilter(repo, allRows, filter)
         return sessionTable.render(filtered)
     }
 
-    fun exportDosesCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+    fun exportDosesCsv(repo: IJournalRepository, filter: CsvExportFilter? = null): String {
         val allRows = repo.dosesDataFrame()
         val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
         val filtered = if (filteredSessionIds != null)
@@ -114,10 +115,10 @@ object CsvExporter {
         return doseTable.render(filtered)
     }
 
-    fun exportSubstancesCsv(repo: JournalRepository): String =
+    fun exportSubstancesCsv(repo: IJournalRepository): String =
         substanceTable.render(repo.substancesDataFrame())
 
-    fun exportTimelineEventsCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+    fun exportTimelineEventsCsv(repo: IJournalRepository, filter: CsvExportFilter? = null): String {
         val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
         val filtered = if (filteredSessionIds != null)
             repo.timelineEvents.value.filter { it.sessionId in filteredSessionIds }
@@ -125,7 +126,7 @@ object CsvExporter {
         return eventTable.render(filtered)
     }
 
-    fun exportNotesCsv(repo: JournalRepository, filter: CsvExportFilter? = null): String {
+    fun exportNotesCsv(repo: IJournalRepository, filter: CsvExportFilter? = null): String {
         val filteredSessionIds = filter?.let { resolveSessionIds(repo, it) }
         val filtered = if (filteredSessionIds != null)
             repo.notes.value.filter { it.sessionId in filteredSessionIds }
@@ -139,7 +140,7 @@ object CsvExporter {
      * Resolves a filter into the set of session IDs that match.
      * Empty filter = all sessions.
      */
-    private fun resolveSessionIds(repo: JournalRepository, filter: CsvExportFilter): Set<String> {
+    private fun resolveSessionIds(repo: IJournalRepository, filter: CsvExportFilter): Set<String> {
         var ids = repo.sessionsDataFrame().map { it.id }.toSet()
 
         if (filter.dateFrom != null || filter.dateTo != null) {
@@ -167,7 +168,7 @@ object CsvExporter {
         return ids
     }
 
-    private fun applyFilter(repo: JournalRepository, rows: List<SessionDataRow>, filter: CsvExportFilter): List<SessionDataRow> {
+    private fun applyFilter(repo: IJournalRepository, rows: List<SessionDataRow>, filter: CsvExportFilter): List<SessionDataRow> {
         val matchingIds = resolveSessionIds(repo, filter)
         return rows.filter { it.id in matchingIds }
     }

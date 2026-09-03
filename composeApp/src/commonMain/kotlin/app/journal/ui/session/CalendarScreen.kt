@@ -26,6 +26,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import kotlinx.datetime.Instant

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import app.journal.ui.components.DesktopScrollbar
 import androidx.compose.foundation.lazy.rememberLazyListState
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.sync.*
 import app.journal.ui.theme.*
 import app.journal.ui.components.*

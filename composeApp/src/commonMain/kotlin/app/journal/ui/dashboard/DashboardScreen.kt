@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.ToleranceCalculator
 import app.journal.model.ToleranceInfo
 import app.journal.model.ToleranceLevel

@@ -2,6 +2,7 @@ package app.journal.ingest
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
@@ -34,7 +35,7 @@ object DoseWikiIngestor {
      * Load and ingest DoseWiki data. Safe to call multiple times —
      * second call is a no-op.
      */
-    fun ensureIngested(repo: JournalRepository) {
+    fun ensureIngested(repo: IJournalRepository) {
         if (ingested) return
 
         val text = readBundledResource(RESOURCE_PATH)
@@ -122,7 +123,7 @@ object DoseWikiIngestor {
     /**
      * Build an O(1) name-to-substance lookup from name + aliases.
      */
-    private fun buildLookup(repo: JournalRepository): Map<String, Substance> =
+    private fun buildLookup(repo: IJournalRepository): Map<String, Substance> =
         buildMap {
             for (sub in repo.substances.value) {
                 put(sub.name.lowercase(), sub)
@@ -152,7 +153,7 @@ object DoseWikiIngestor {
      * Returns the number of effects ingested.
      */
     private fun ingestEffectCategory(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         effects: Map<String, DoseWikiEffectGroup>?,
         category: String,
         substanceId: String,
@@ -174,7 +175,7 @@ object DoseWikiIngestor {
      * Upsert an Effect document from a DoseWiki effect entry.
      */
     private fun upsertEffect(
-        repo: JournalRepository,
+        repo: IJournalRepository,
         eff: DoseWikiEffect,
         category: String,
         substanceId: String,
