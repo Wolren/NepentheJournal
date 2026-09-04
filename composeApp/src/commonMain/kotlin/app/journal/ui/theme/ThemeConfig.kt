@@ -177,7 +177,94 @@ object ThemePresets {
         )
     )
 
-    val all: List<ThemePreset> = listOf(Forest, Ocean, Sunset, Ember, Midnight, Mono)
+    val Meadow = ThemePreset(
+        name = "Meadow",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFF9CCC65, secondaryColor = 0xFFAED581, tertiaryColor = 0xFFFFF176,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0D140F, surfaceColor = 0xFF182420
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF2E7D32, secondaryColor = 0xFF558B2F, tertiaryColor = 0xFF9E9D24,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF1F8E9, surfaceColor = 0xFFFFFFFF
+        )
+    )
+    val Plum = ThemePreset(
+        name = "Plum",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFCE93D8, secondaryColor = 0xFFF48FB1, tertiaryColor = 0xFFFFAB91,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF150F18, surfaceColor = 0xFF221624
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF6A1B9A, secondaryColor = 0xFFAD1457, tertiaryColor = 0xFFBF360C,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFFAF0F7, surfaceColor = 0xFFFFFFFF
+        )
+    )
+    val Slate = ThemePreset(
+        name = "Slate",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFF90A4AE, secondaryColor = 0xFF78909C, tertiaryColor = 0xFFB0BEC5,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0E1318, surfaceColor = 0xFF1A222B
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF37474F, secondaryColor = 0xFF455A64, tertiaryColor = 0xFF546E7A,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFECEFF1, surfaceColor = 0xFFFFFFFF
+        )
+    )
+    val Coffee = ThemePreset(
+        name = "Coffee",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFD7CCC8, secondaryColor = 0xFFBCAAA4, tertiaryColor = 0xFFFFCC80,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF140F0C, surfaceColor = 0xFF221915
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF4E342E, secondaryColor = 0xFF5D4037, tertiaryColor = 0xFFEF6C00,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF7F1EA, surfaceColor = 0xFFFFFFFF
+        )
+    )
+    val Rose = ThemePreset(
+        name = "Rose",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFF06292, secondaryColor = 0xFFBA68C8, tertiaryColor = 0xFFFFD54F,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF160D12, surfaceColor = 0xFF241419
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFFC2185B, secondaryColor = 0xFF7B1FA2, tertiaryColor = 0xFFF9A825,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFFDF0F4, surfaceColor = 0xFFFFFFFF
+        )
+    )
+    /**
+     * dose.wiki "fun" style, sampled from the live site stylesheet
+     * (appearance-chroma.css): near-black purple ground, deep purple
+     * surface, fuchsia accents, amber highlights, lavender light mode.
+     */
+    val DoseWiki = ThemePreset(
+        name = "DoseWiki",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFF0ABFC, secondaryColor = 0xFFE879F9, tertiaryColor = 0xFFFBBF24,
+            errorColor = 0xFFFCA5A5, backgroundColor = 0xFF110617, surfaceColor = 0xFF220C2A
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFFA21CAF, secondaryColor = 0xFFC026D3, tertiaryColor = 0xFFB45309,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF6EFFF, surfaceColor = 0xFFFFFFFF
+        )
+    )
+
+    val all: List<ThemePreset> = listOf(
+        Forest, Ocean, Sunset, Ember, Midnight, Mono,
+        Meadow, Plum, Slate, Coffee, Rose, DoseWiki
+    )
 }
 
 val LocalThemeConfig = staticCompositionLocalOf { ThemeDefaults.Dark }

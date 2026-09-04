@@ -69,7 +69,7 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
-                persons.forEach { person ->
+                persons.forEachIndexed { index, person ->
                     val trips = sessions.count { it.personId == person.id }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -79,7 +79,7 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                             Text(person.displayName, style = MaterialTheme.typography.bodyLarge)
                             Text(
                                 "${person.role.name.lowercase().replaceFirstChar { it.uppercase() }}" +
-                                    (if (trips > 0) " : $trips trip${if (trips == 1) "" else "s"}" else ""),
+                                    (if (trips > 0) " · $trips trip${if (trips == 1) "" else "s"}" else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -93,7 +93,7 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                             modifier = Modifier.size(48.dp)
                         ) { Icon(Icons.Default.Delete, "Delete ${person.displayName}") }
                     }
-                    HorizontalDivider()
+                    if (index < persons.size - 1) HorizontalDivider()
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(
