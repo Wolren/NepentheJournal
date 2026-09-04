@@ -141,7 +141,7 @@ private fun entryOf(event: TimelineEvent, startTime: Long): TripReportEntry {
 /**
  * Build the canonical TR-1 payload for a session.
  *
- * Demographics come from the assigned [person]; the session legacy profile
+ * Demographics come from the assigned individual [person]; the session legacy profile
  * ([Session.profile]) and [Session.consumerName] are fallbacks only.
  * Timeline events typed onset/comeup, peak/plateau, offset/afterglow/end fill
  * the phase arrays (Path A). All other event types fold into the introduction

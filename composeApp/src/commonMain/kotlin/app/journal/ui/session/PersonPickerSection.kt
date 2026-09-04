@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.Person
 
 /**
- * Assigns the person who took the substances in this trip. The assigned
- * person owns the trip demographics at dose.wiki export time. Demographics
- * themselves are edited in Settings, People.
+ * Assigns the individual who took the substances in this trip. The assigned
+ * individual owns the trip demographics at dose.wiki export time. Demographics
+ * themselves are edited in Settings, Individuals.
  */
 @Composable
 fun PersonPickerSection(
@@ -44,7 +44,7 @@ fun PersonPickerSection(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
-            Text("Person", style = MaterialTheme.typography.titleSmall)
+            Text("Individual", style = MaterialTheme.typography.titleSmall)
         }
         Spacer(Modifier.height(4.dp))
         Box {
@@ -53,14 +53,14 @@ fun PersonPickerSection(
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Text(
-                    selected?.displayName ?: "No person assigned",
+                    selected?.displayName ?: "No individual assigned",
                     modifier = Modifier.weight(1f)
                 )
                 Icon(Icons.Default.ExpandMore, null)
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
-                    text = { Text("No person assigned") },
+                    text = { Text("No individual assigned") },
                     onClick = { onSelect(null); menuOpen = false }
                 )
                 persons.forEach { person ->
@@ -74,13 +74,13 @@ fun PersonPickerSection(
         if (selected != null) {
             Text(
                 "Demographics for this trip come from ${selected.displayName} " +
-                    "(Settings, People).",
+                    "(Settings, Individuals).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             Text(
-                "Without a person, the export falls back to the consumer name " +
+                "Without an individual, the export falls back to the consumer name " +
                     "and demographics below.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

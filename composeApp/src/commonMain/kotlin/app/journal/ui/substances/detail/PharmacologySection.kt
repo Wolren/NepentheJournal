@@ -96,7 +96,7 @@ internal fun PharmacologySection(substance: Substance) {
             raw.add(
                 RawEntry(
                     targetName = r.targetName ?: "Unknown target",
-                    species = r.species ?: "Human",
+                    species = r.species,
                     affinityType = "Ki",
                     affinityNM = r.kiNanoMolar,
                     source = "PDSP",
@@ -116,7 +116,7 @@ internal fun PharmacologySection(substance: Substance) {
             raw.add(
                 RawEntry(
                     targetName = r.targetName ?: "Unknown target",
-                    species = r.species ?: "Human",
+                    species = r.species,
                     affinityType = affinityType,
                     affinityNM = affinityNM,
                     source = "WP",

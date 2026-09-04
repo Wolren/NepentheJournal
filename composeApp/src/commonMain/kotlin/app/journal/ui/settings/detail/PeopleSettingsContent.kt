@@ -17,9 +17,9 @@ import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 
 /**
- * People settings: the person roster behind trip demographics. The person
+ * Individuals settings: the roster behind trip demographics. The individual
  * assigned to a session owns that trip's age, gender, height, weight and
- * medications at dose.wiki export time. People are device-local and never sync.
+ * medications at dose.wiki export time. Individuals are device-local and never sync.
  */
 @Composable
 fun PeopleSettingsContent(repo: IJournalRepository) {
@@ -44,11 +44,11 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.Group, null, tint = MaterialTheme.colorScheme.primary)
-                    Text("People", style = MaterialTheme.typography.titleMedium)
+                    Text("Individuals", style = MaterialTheme.typography.titleMedium)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${persons.size} people",
+                        "${persons.size} individuals",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = 8.dp)
@@ -62,9 +62,9 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
             if (expanded) {
                 Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                 Text(
-                    "Trip demographics live here, on the person assigned to each session. " +
+                    "Trip demographics live here, on the individual assigned to each session. " +
                         "The dose.wiki export reads age, gender, height, weight and " +
-                        "medications from that person.",
+                        "medications from that individual.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -102,7 +102,7 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                 ) {
                     Icon(Icons.Default.Add, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Add person")
+                    Text("Add individual")
                 }
             }
         }
@@ -141,7 +141,7 @@ private fun PersonEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Add person" else "Edit person") },
+        title = { Text(if (initial == null) "Add individual" else "Edit individual") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(

@@ -4,15 +4,15 @@ import kotlinx.serialization.Serializable
 enum class PersonRole { PARTICIPANT, SITTER, OBSERVER }
 
 /**
- * A person known to the journal. The PARTICIPANT assigned to a session owns
+ * An individual known to the journal. The PARTICIPANT assigned to a session owns
  * that trip's demographics: the dose.wiki trip report export reads age,
- * gender, height, weight and medications from the assigned person, falling
- * back to the session's legacy [Session.profile] only when no person is set.
+ * gender, height, weight and medications from the assigned individual, falling
+ * back to the session's legacy [Session.profile] only when no individual is set.
  *
  * Height and weight are free text with the unit inside ("5 ft 8 in", "68 kg"),
  * matching the dose.wiki subject contract which has no numeric fields.
  *
- * Conflict: FIELD_LEVEL_MERGE. People are device-local profile data and are
+ * Conflict: FIELD_LEVEL_MERGE. Individuals are device-local profile data and are
  * deliberately excluded from sync replication and tombstones.
  */
 @Serializable

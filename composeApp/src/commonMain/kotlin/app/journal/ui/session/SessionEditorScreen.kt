@@ -307,7 +307,7 @@ fun SessionEditorScreen(
             )
         }
 
-        // Person assigned to this trip (owns the demographics at export time)
+        // Individual assigned to this trip (owns the demographics at export time)
         item {
             PersonPickerSection(
                 persons = persons,
@@ -316,7 +316,7 @@ fun SessionEditorScreen(
             )
         }
 
-        // Consumer name fallback, only without an assigned person
+        // Consumer name fallback, only without an assigned individual
         if (personId == null) {
             item {
                 OutlinedTextField(
@@ -362,8 +362,8 @@ fun SessionEditorScreen(
             )
         }
 
-        // Legacy per-session demographics, only without an assigned person.
-        // With a person, demographics live on the person (Settings, People).
+        // Legacy per-session demographics, only without an assigned individual.
+        // With an individual, demographics live on the individual (Settings, Individuals).
         if (personId == null) {
         item {
             SessionDemographicsSection(

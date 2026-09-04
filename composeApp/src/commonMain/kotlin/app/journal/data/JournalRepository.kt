@@ -389,7 +389,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     // ========================
-    //  People (device-local, never synced, no tombstones)
+    //  Individuals (device-local, never synced, no tombstones)
     // ========================
 
     override fun upsertPerson(person: Person) = lock.withLock {

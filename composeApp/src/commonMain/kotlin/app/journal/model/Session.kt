@@ -58,7 +58,7 @@ data class Session(
     val isArchived: Boolean = false,
     val isFavorite: Boolean = false,
     val consumerName: String? = null,
-    /** Person assigned to this trip. Owns the trip demographics at export time. */
+    /** Individual assigned to this trip. Owns the trip demographics at export time. */
     val personId: String? = null,
     val profile: SessionProfile? = null
 ) : VaultDocument
