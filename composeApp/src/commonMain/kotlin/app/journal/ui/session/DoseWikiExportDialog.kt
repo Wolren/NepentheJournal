@@ -2,13 +2,10 @@ package app.journal.ui.session
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -18,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
@@ -32,10 +28,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * dose.wiki export dialog. Shows the exact consent and age wording from the
- * TR-1 spec beside the checkboxes, lists validation errors and warnings, and
- * writes the canonical trip report JSON. Nothing is posted anywhere: the file
- * is the handoff, for the sandbox or the manual form.
+ * dose.wiki export dialog. The app is offline, so this only writes the
+ * canonical trip report file. Consent and age confirmation happen on
+ * dose.wiki when the file is uploaded, so the dialog asks for neither:
+ * the flags stay false in the file and the site collects them.
+ * Only content problems (title, substance) block the export.
  */
 @Composable
 fun DoseWikiExportDialog(
@@ -55,27 +52,25 @@ fun DoseWikiExportDialog(
         repo.substances.value.associateBy { it.id }
     }
 
-    var consent by remember { mutableStateOf(false) }
-    var ageOk by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf(person?.contactEmail ?: "") }
-    var mayContact by remember { mutableStateOf(person?.mayContact == true) }
 
-    fun preview(withConsent: Boolean, withAge: Boolean) = buildDoseWikiReport(
+    fun preview() = buildDoseWikiReport(
         session = session,
         person = person?.copy(
-            contactEmail = email.trim().ifEmpty { null },
-            mayContact = mayContact
+            contactEmail = email.trim().ifEmpty { null }
         ),
         doses = doses,
         substancesById = substancesById,
         notes = notes,
         events = events,
-        publishConsent = withConsent,
-        ageConfirmed = withAge
+        publishConsent = false,
+        ageConfirmed = false
     )
 
-    val check = remember(consent, ageOk, email, mayContact) {
-        preview(consent, ageOk).check()
+    val check = remember(email) { preview().check() }
+    // Consent and age are collected on the site, so only content errors block.
+    val contentErrors = check.errors.filter {
+        it != DoseWikiTripReport.ERR_CONSENT && it != DoseWikiTripReport.ERR_AGE
     }
 
     AlertDialog(
@@ -84,13 +79,13 @@ fun DoseWikiExportDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Canonical dose.wiki format. Save the file, then send it to the " +
-                        "sandbox or paste it into the submission form.",
+                    "Saves the canonical dose.wiki file. Consent and age " +
+                        "confirmation happen on dose.wiki when you upload it.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (check.errors.isNotEmpty()) {
-                    check.errors.forEach {
+                if (contentErrors.isNotEmpty()) {
+                    contentErrors.forEach {
                         Text(it, color = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -99,16 +94,6 @@ fun DoseWikiExportDialog(
                         Text(it, style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = consent, onCheckedChange = { consent = it })
-                    Spacer(Modifier.width(8.dp))
-                    Text(DoseWikiTripReport.CONSENT_TEXT, style = MaterialTheme.typography.bodySmall)
-                }
-                Row(verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = ageOk, onCheckedChange = { ageOk = it })
-                    Spacer(Modifier.width(8.dp))
-                    Text(DoseWikiTripReport.AGE_TEXT, style = MaterialTheme.typography.bodySmall)
-                }
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -116,24 +101,15 @@ fun DoseWikiExportDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = mayContact, onCheckedChange = { mayContact = it })
-                    Text(DoseWikiTripReport.CONTACT_TEXT, style = MaterialTheme.typography.bodySmall)
-                }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = check.ok,
+                enabled = contentErrors.isEmpty(),
                 onClick = {
                     scope.launch {
                         try {
-                            val report = preview(consent, ageOk)
-                            val finalCheck = report.check()
-                            if (!finalCheck.ok) {
-                                onStatus("Export blocked: ${finalCheck.errors.first()}")
-                                return@launch
-                            }
+                            val report = preview()
                             val slug = session.title.trim().lowercase()
                                 .replace(Regex("[^a-z0-9]+"), "-").trim('-')
                                 .ifEmpty { "untitled-report" }
