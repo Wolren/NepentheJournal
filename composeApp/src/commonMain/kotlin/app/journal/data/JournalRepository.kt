@@ -52,6 +52,8 @@ class JournalRepository internal constructor() : IJournalRepository {
         get() = effectsStore.flow
     override val customUnits: StateFlow<List<CustomUnit>>
         get() = customUnitsStore.flow
+    override val persons: StateFlow<List<Person>>
+        get() = personsStore.flow
 
     private val sessionsStore = EntityStore(Session::id)
     private val dosesStore = EntityStore(Dose::id)
@@ -61,6 +63,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val interactionsStore = EntityStore(Interaction::id)
     private val effectsStore = EntityStore(Effect::id)
     private val customUnitsStore = EntityStore(CustomUnit::id)
+    private val personsStore = EntityStore(Person::id)
 
     // ---- Preferences ----
     private val _useShulginRating = MutableStateFlow(false)
@@ -313,6 +316,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         interactionsStore.putAll(snapshot.interactions)
         effectsStore.putAll(snapshot.effects)
         customUnitsStore.putAll(snapshot.customUnits)
+        personsStore.putAll(snapshot.persons)
         rebuildAllIndices()
         setShulginRating(snapshot.useShulginRating)
         setSubstanceColors(snapshot.useSubstanceColors)
@@ -383,6 +387,19 @@ class JournalRepository internal constructor() : IJournalRepository {
         val lastUsed = maxOf(_substanceDoseStats[substanceId]?.second ?: 0L, timestamp)
         _substanceDoseStats[substanceId] = Pair(count, lastUsed)
     }
+
+    // ========================
+    //  People (device-local, never synced, no tombstones)
+    // ========================
+
+    override fun upsertPerson(person: Person) = lock.withLock {
+        personsStore.put(person)
+        bumpMutationCount()
+    }
+
+    override fun getPerson(id: String): Person? = lock.withLock { personsStore.get(id) }
+
+    override fun deletePerson(id: String) = lock.withLock { personsStore.remove(id); bumpMutationCount() }
 
     // ========================
     //  Sessions
@@ -917,6 +934,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         effectsStore.clear()
         _effectsBySubstance.clear()
         customUnitsStore.clear()
+        personsStore.clear()
         _customUnitsBySubstance.clear()
         _tombstones.clear()
         _dosesBySession.clear()

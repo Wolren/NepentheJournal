@@ -74,6 +74,26 @@ fun SessionTimelineScreen(
         actions = {
             val vaultPath by repo.obsidianVaultPath.collectAsState()
             val subfolder by repo.obsidianSubfolder.collectAsState()
+            val exportScope = rememberCoroutineScope()
+            var doseWikiDialog by remember { mutableStateOf(false) }
+            var doseWikiStatus by remember { mutableStateOf<String?>(null) }
+            IconButton(onClick = { doseWikiDialog = true }) {
+                Icon(Icons.Default.Description, contentDescription = "Export trip report",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (doseWikiDialog) {
+                DoseWikiExportDialog(
+                    repo = repo,
+                    sessionId = sessionId,
+                    scope = exportScope,
+                    onDismiss = { doseWikiDialog = false },
+                    onStatus = { doseWikiStatus = it }
+                )
+            }
+            doseWikiStatus?.let { status ->
+                Text(status, style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (vaultPath.isNotBlank()) {
                 var exportStatus by remember { mutableStateOf<String?>(null) }
                 IconButton(onClick = {

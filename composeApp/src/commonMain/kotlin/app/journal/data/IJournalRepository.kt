@@ -66,6 +66,12 @@ interface IJournalRepository {
     fun getSession(id: String): Session?
     fun deleteSession(id: String)
 
+    // ---- People (device-local, never synced) ----
+    val persons: StateFlow<List<Person>>
+    fun upsertPerson(person: Person)
+    fun getPerson(id: String): Person?
+    fun deletePerson(id: String)
+
     // ---- Doses ----
     fun upsertDose(dose: Dose)
     fun dosesForSession(sessionId: String): List<Dose>

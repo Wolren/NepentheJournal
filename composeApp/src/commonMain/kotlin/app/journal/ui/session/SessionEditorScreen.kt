@@ -50,6 +50,8 @@ fun SessionEditorScreen(
     }
     var endTime by remember { mutableStateOf(sessionToEdit?.endTime) }
     var consumerName by remember { mutableStateOf(sessionToEdit?.consumerName ?: "") }
+    var personId by remember { mutableStateOf(sessionToEdit?.personId) }
+    val persons by repo.persons.collectAsState()
     var set by remember { mutableStateOf(sessionToEdit?.set ?: "") }
     var setting by remember { mutableStateOf(sessionToEdit?.setting ?: "") }
     var intention by remember { mutableStateOf(sessionToEdit?.intention ?: "") }
@@ -104,6 +106,7 @@ fun SessionEditorScreen(
             val originalProfile = s?.profile
             title != (s?.title ?: "") ||
             consumerName != (s?.consumerName ?: "") ||
+            personId != s?.personId ||
             set != (s?.set ?: "") ||
             setting != (s?.setting ?: "") ||
             intention != (s?.intention ?: "") ||
@@ -156,6 +159,7 @@ fun SessionEditorScreen(
             startTime = startTime,
             endTime = if (endTimeValue != null && endTimeValue > 1000L && endTimeValue != startTime) endTimeValue else null,
             consumerName = consumerName.ifBlank { null },
+            personId = personId,
             set = set.ifBlank { null },
             setting = setting.ifBlank { null },
             intention = intention.ifBlank { null },
@@ -303,16 +307,27 @@ fun SessionEditorScreen(
             )
         }
 
-        // Consumer name
+        // Person assigned to this trip (owns the demographics at export time)
         item {
-            OutlinedTextField(
-                value = consumerName,
-                onValueChange = { consumerName = it },
-                label = { Text("Consumer name") },
-                placeholder = { Text("Me") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+            PersonPickerSection(
+                persons = persons,
+                selectedPersonId = personId,
+                onSelect = { personId = it }
             )
+        }
+
+        // Consumer name fallback, only without an assigned person
+        if (personId == null) {
+            item {
+                OutlinedTextField(
+                    value = consumerName,
+                    onValueChange = { consumerName = it },
+                    label = { Text("Consumer name") },
+                    placeholder = { Text("Me") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         // Start / End time
@@ -347,7 +362,9 @@ fun SessionEditorScreen(
             )
         }
 
-        // Subject Profile (demographics) - expandable
+        // Legacy per-session demographics, only without an assigned person.
+        // With a person, demographics live on the person (Settings, People).
+        if (personId == null) {
         item {
             SessionDemographicsSection(
                 expanded = profileExpanded,
@@ -357,6 +374,7 @@ fun SessionEditorScreen(
                 heightCm = profileHeightCm, onHeightCmChange = { profileHeightCm = it },
                 weightKg = profileWeightKg, onWeightKgChange = { profileWeightKg = it }
             )
+        }
         }
 
         // Doses section

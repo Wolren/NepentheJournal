@@ -23,6 +23,7 @@ data class JournalSnapshot(
     val interactions: List<Interaction> = emptyList(),
     val effects: List<Effect> = emptyList(),
     val customUnits: List<CustomUnit> = emptyList(),
+    val persons: List<Person> = emptyList(),
     val tombstones: Map<String, Long> = emptyMap(),
     val useShulginRating: Boolean = false,
     val useSubstanceColors: Boolean = true,
@@ -33,7 +34,7 @@ data class JournalSnapshot(
     val showSessionsTrendChart: Boolean = false
 ) {
     companion object {
-        const val CURRENT_VERSION = 6
+        const val CURRENT_VERSION = 7
     }
 }
 
@@ -107,6 +108,7 @@ object AppJson {
             interactions = repo.interactions.value,
             effects = repo.effects.value,
             customUnits = repo.customUnits.value,
+            persons = repo.persons.value,
             tombstones = repo.exportTombstones(),
             useShulginRating = repo.useShulginRating.value,
             useSubstanceColors = repo.useSubstanceColors.value,

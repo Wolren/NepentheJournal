@@ -196,6 +196,9 @@ fun SettingsScreen(
             )
         }
 
+        // ================ PEOPLE ================
+        item { PeopleSettingsContent(repo = repo) }
+
         // ================ OBSIDIAN VAULT ================
         item { ObsidianSettingsCard() }
 
