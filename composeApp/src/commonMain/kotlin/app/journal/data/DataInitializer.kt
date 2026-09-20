@@ -4,6 +4,7 @@ import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
 import app.journal.util.readBundledResource
 import kotlinx.coroutines.*
@@ -83,6 +84,20 @@ object DataInitializer {
             markers.forEach { repo.deleteTimelineEvent(it.id) }
             store.save()
             Log.withTag("DataInit").i { "Purged ${markers.size} pause/resume marker events" }
+        }
+
+        // Abort stale empty live sessions. A live timer older than 1h with no
+        // logged doses is abandoned, not a trip: delete so dead timers stop
+        // piling up behind the single-live cap.
+        val staleCutoff = currentTimeMillis() - 3_600_000L
+        val staleLive = repo.sessions.value.filter {
+            it.id.startsWith("session:live:") && it.endTime == null &&
+                it.startTime < staleCutoff && repo.dosesForSession(it.id).isEmpty()
+        }
+        if (staleLive.isNotEmpty()) {
+            staleLive.forEach { repo.deleteSession(it.id) }
+            store.save()
+            Log.withTag("DataInit").i { "Aborted ${staleLive.size} stale empty live sessions" }
         }
 
         // Step 4: If test mode, generate fuzz sessions on top of seed/disk data.
