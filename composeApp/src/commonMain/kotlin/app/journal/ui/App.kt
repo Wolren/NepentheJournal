@@ -61,6 +61,7 @@ import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
 import app.journal.util.TimeDisplayMode
+import app.journal.ui.components.PersonEditorDialog
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
 import app.journal.ui.search.SearchOverlay
@@ -150,6 +151,41 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                 }) {
                     Text("Restore from backup")
                 }
+            }
+        )
+    }
+
+    // ── First run: welcome + profile prompt ──
+    val persons by repo.persons.collectAsState()
+    val welcomeCompleted by repo.welcomeCompleted.collectAsState()
+    var showProfileEditor by remember { mutableStateOf(false) }
+    if (!welcomeCompleted && persons.isEmpty()) {
+        AlertDialog(
+            onDismissRequest = { repo.setWelcomeCompleted(true) },
+            title = { Text("Welcome to Nepenthe Journal") },
+            text = {
+                Text(
+                    "Trips belong to individuals. Create your profile so doses, timelines " +
+                        "and dose.wiki exports carry the right demographics from the start. " +
+                        "You can add more individuals later in Settings, Individuals."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showProfileEditor = true }) { Text("Create profile") }
+            },
+            dismissButton = {
+                TextButton(onClick = { repo.setWelcomeCompleted(true) }) { Text("Skip") }
+            }
+        )
+    }
+    if (showProfileEditor) {
+        PersonEditorDialog(
+            initial = null,
+            onDismiss = { showProfileEditor = false },
+            onSave = { person ->
+                repo.upsertPerson(person)
+                showProfileEditor = false
+                repo.setWelcomeCompleted(true)
             }
         )
     }

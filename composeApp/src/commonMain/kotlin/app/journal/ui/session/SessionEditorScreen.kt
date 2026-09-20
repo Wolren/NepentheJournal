@@ -317,7 +317,11 @@ fun SessionEditorScreen(
             PersonPickerSection(
                 persons = persons,
                 selectedPersonId = personId,
-                onSelect = { personId = it }
+                onSelect = { personId = it },
+                onCreatePerson = { person ->
+                    repo.upsertPerson(person)
+                    personId = person.id
+                }
             )
         }
 

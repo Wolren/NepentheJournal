@@ -27,6 +27,7 @@ data class JournalSnapshot(
     val tombstones: Map<String, Long> = emptyMap(),
     val useShulginRating: Boolean = false,
     val useSubstanceColors: Boolean = true,
+    val welcomeCompleted: Boolean = false,
     val obsidianVaultPath: String = "",
     val obsidianAutoExport: Boolean = false,
     val obsidianSubfolder: String = "Nepenthe",
@@ -112,6 +113,7 @@ object AppJson {
             tombstones = repo.exportTombstones(),
             useShulginRating = repo.useShulginRating.value,
             useSubstanceColors = repo.useSubstanceColors.value,
+            welcomeCompleted = repo.welcomeCompleted.value,
             obsidianVaultPath = repo.obsidianVaultPath.value,
             obsidianAutoExport = repo.obsidianAutoExport.value,
             obsidianSubfolder = repo.obsidianSubfolder.value,
@@ -137,6 +139,7 @@ object AppJson {
         repo.importTombstones(snapshot.tombstones)
         repo.setShulginRating(snapshot.useShulginRating)
         repo.setSubstanceColors(snapshot.useSubstanceColors)
+        repo.setWelcomeCompleted(snapshot.welcomeCompleted)
         repo.setObsidianVaultPath(snapshot.obsidianVaultPath)
         repo.setObsidianAutoExport(snapshot.obsidianAutoExport)
         repo.setObsidianSubfolder(snapshot.obsidianSubfolder)

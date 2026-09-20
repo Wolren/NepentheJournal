@@ -72,6 +72,9 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val _useSubstanceColors = MutableStateFlow(true)
     override val useSubstanceColors: StateFlow<Boolean> = _useSubstanceColors.asStateFlow()
 
+    private val _welcomeCompleted = MutableStateFlow(false)
+    override val welcomeCompleted: StateFlow<Boolean> = _welcomeCompleted.asStateFlow()
+
     // ---- Obsidian vault config ----
     private val _obsidianVaultPath = MutableStateFlow("")
     override val obsidianVaultPath: StateFlow<String> = _obsidianVaultPath.asStateFlow()
@@ -320,6 +323,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         rebuildAllIndices()
         setShulginRating(snapshot.useShulginRating)
         setSubstanceColors(snapshot.useSubstanceColors)
+        setWelcomeCompleted(snapshot.welcomeCompleted)
     }
 
     // ========================
@@ -691,6 +695,11 @@ class JournalRepository internal constructor() : IJournalRepository {
         _useSubstanceColors.value = enabled
     }
 
+    override fun setWelcomeCompleted(completed: Boolean) = lock.withLock {
+        _welcomeCompleted.value = completed
+        bumpMutationCount()
+    }
+
     override fun setObsidianVaultPath(path: String) = lock.withLock {
         _obsidianVaultPath.value = path
         bumpMutationCount()
@@ -947,6 +956,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         rebuildSearchIndexLocked()
         _useShulginRating.value = false
         _useSubstanceColors.value = true
+        _welcomeCompleted.value = false
         bumpToleranceVersion()
         bumpMutationCount()
     }

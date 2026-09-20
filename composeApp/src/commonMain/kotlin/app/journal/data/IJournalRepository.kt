@@ -32,6 +32,7 @@ interface IJournalRepository {
 
     val useShulginRating: StateFlow<Boolean>
     val useSubstanceColors: StateFlow<Boolean>
+    val welcomeCompleted: StateFlow<Boolean>
     val toleranceVersion: StateFlow<Int>
     val mutationCount: StateFlow<Long>
 
@@ -102,6 +103,7 @@ interface IJournalRepository {
     // ---- Preferences ----
     fun setShulginRating(enabled: Boolean)
     fun setSubstanceColors(enabled: Boolean)
+    fun setWelcomeCompleted(completed: Boolean)
 
     // ---- Notes ----
     fun upsertNote(note: Note)

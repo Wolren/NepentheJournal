@@ -6,10 +6,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -25,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.model.Person
+import app.journal.ui.components.PersonEditorDialog
 
 /**
  * Assigns the individual who took the substances in this trip. The assigned
@@ -35,9 +41,11 @@ import app.journal.model.Person
 fun PersonPickerSection(
     persons: List<Person>,
     selectedPersonId: String?,
-    onSelect: (String?) -> Unit
+    onSelect: (String?) -> Unit,
+    onCreatePerson: (Person) -> Unit = {}
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    var showCreate by remember { mutableStateOf(false) }
     val selected = persons.firstOrNull { it.id == selectedPersonId }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -47,6 +55,27 @@ fun PersonPickerSection(
             Text("Individual", style = MaterialTheme.typography.titleSmall)
         }
         Spacer(Modifier.height(4.dp))
+        if (persons.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(
+                        "No individuals yet. Create your profile so this trip carries " +
+                            "the right demographics on export.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = { showCreate = true },
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) { Text("Create profile") }
+                }
+            }
+        } else {
         Box {
             OutlinedButton(
                 onClick = { menuOpen = true },
@@ -70,6 +99,7 @@ fun PersonPickerSection(
                     )
                 }
             }
+            }
         }
         if (selected != null) {
             Text(
@@ -86,5 +116,12 @@ fun PersonPickerSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+    if (showCreate) {
+        PersonEditorDialog(
+            initial = null,
+            onDismiss = { showCreate = false },
+            onSave = { person -> onCreatePerson(person); showCreate = false }
+        )
     }
 }

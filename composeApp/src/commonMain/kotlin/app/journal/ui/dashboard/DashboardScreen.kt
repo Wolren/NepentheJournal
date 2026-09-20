@@ -45,6 +45,7 @@ fun DashboardScreen(
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
     val showTrendChart by repo.showSessionsTrendChart.collectAsState()
+    val persons by repo.persons.collectAsState()
 
     val toleranceVersion by repo.toleranceVersion.collectAsState()
     val calculator = remember { ToleranceCalculator(repo) }
@@ -77,6 +78,7 @@ fun DashboardScreen(
     }
 
     var clickedDayInfo by remember { mutableStateOf<DaySubstanceInfo?>(null) }
+    var showProfileEditor by remember { mutableStateOf(false) }
     val scrollState = rememberLazyListState()
 
     Box(Modifier.fillMaxSize()) {
@@ -128,6 +130,36 @@ fun DashboardScreen(
                         "Substances", totalSubstances.toString())
                     StatCard(Modifier.weight(1f), Icons.Default.Timeline,
                         "Doses", doses.size.toString())
+                }
+            }
+
+            if (persons.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        )
+                    ) {
+                        Column(Modifier.padding(14.dp).fillMaxWidth()) {
+                            Text("Create your profile",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Trips belong to individuals. Add your profile so doses, " +
+                                    "timelines and exports carry the right demographics.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = { showProfileEditor = true },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) { Text("Create profile") }
+                        }
+                    }
                 }
             }
 
@@ -226,6 +258,17 @@ fun DashboardScreen(
             confirmButton = { TextButton(onClick = { clickedDayInfo = null }) { Text("OK") } },
             shape = RoundedCornerShape(16.dp),
             containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+
+    if (showProfileEditor) {
+        PersonEditorDialog(
+            initial = null,
+            onDismiss = { showProfileEditor = false },
+            onSave = { person ->
+                repo.upsertPerson(person)
+                showProfileEditor = false
+            }
         )
     }
 }
