@@ -59,20 +59,20 @@ enum class CornerRadius { SMALL, MEDIUM, LARGE }
 object ThemeDefaults {
     val Dark = ThemeConfig(
         baseTheme = BaseTheme.DARK,
-        primaryColor = 0xFFDCA2F4,
-        secondaryColor = 0xFFAD89D6,
-        tertiaryColor = 0xFF8100F5,
+        primaryColor = 0xFF90A4AE,
+        secondaryColor = 0xFF78909C,
+        tertiaryColor = 0xFFB0BEC5,
         errorColor = 0xFFEF9A9A,
-        backgroundColor = 0xFF0E1511,
-        surfaceColor = 0xFF16211A
+        backgroundColor = 0xFF0E1318,
+        surfaceColor = 0xFF1A222B
     )
     val Light = ThemeConfig(
         baseTheme = BaseTheme.LIGHT,
-        primaryColor = 0xFF7B1FA2,
-        secondaryColor = 0xFF5E35B1,
-        tertiaryColor = 0xFF8100F5,
+        primaryColor = 0xFF37474F,
+        secondaryColor = 0xFF455A64,
+        tertiaryColor = 0xFF546E7A,
         errorColor = 0xFFD32F2F,
-        backgroundColor = 0xFFF3F8EF,
+        backgroundColor = 0xFFECEFF1,
         surfaceColor = 0xFFFFFFFF
     )
 }
@@ -105,13 +105,13 @@ object ThemePresets {
         name = "Forest",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFDCA2F4, secondaryColor = 0xFFAD89D6, tertiaryColor = 0xFF8100F5,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0E1511, surfaceColor = 0xFF16211A
+            primaryColor = 0xFF6FCF97, secondaryColor = 0xFF43A047, tertiaryColor = 0xFFFFD54F,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0B1410, surfaceColor = 0xFF15241B
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF7B1FA2, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF8100F5,
-            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF3F8EF, surfaceColor = 0xFFFFFFFF
+            primaryColor = 0xFF14632E, secondaryColor = 0xFF2E7D32, tertiaryColor = 0xFF9E7B1E,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFEFF6EF, surfaceColor = 0xFFFFFFFF
         )
     )
     val Ocean = ThemePreset(
@@ -157,13 +157,13 @@ object ThemePresets {
         name = "Midnight",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFB39DDB, secondaryColor = 0xFF80CBC4, tertiaryColor = 0xFFF48FB1,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0E0E1A, surfaceColor = 0xFF191928
+            primaryColor = 0xFF8FB8FF, secondaryColor = 0xFF5B8DEF, tertiaryColor = 0xFF6FE3C1,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF060B16, surfaceColor = 0xFF0E1728
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF4527A0, secondaryColor = 0xFF00695C, tertiaryColor = 0xFFAD1457,
-            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF4F2FA, surfaceColor = 0xFFFFFFFF
+            primaryColor = 0xFF1E40AF, secondaryColor = 0xFF0E7490, tertiaryColor = 0xFF047857,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFEEF3FA, surfaceColor = 0xFFFFFFFF
         )
     )
     val Mono = ThemePreset(
@@ -193,17 +193,17 @@ object ThemePresets {
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFF1F8E9, surfaceColor = 0xFFFFFFFF
         )
     )
-    val Plum = ThemePreset(
-        name = "Plum",
+    val Copper = ThemePreset(
+        name = "Copper",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFCE93D8, secondaryColor = 0xFFF48FB1, tertiaryColor = 0xFFFFAB91,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF150F18, surfaceColor = 0xFF221624
+            primaryColor = 0xFFD69A63, secondaryColor = 0xFFB0764A, tertiaryColor = 0xFFE8C07A,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF130D08, surfaceColor = 0xFF211510
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF6A1B9A, secondaryColor = 0xFFAD1457, tertiaryColor = 0xFFBF360C,
-            errorColor = 0xFFD32F2F, backgroundColor = 0xFFFAF0F7, surfaceColor = 0xFFFFFFFF
+            primaryColor = 0xFF8C5A2B, secondaryColor = 0xFFA9713F, tertiaryColor = 0xFFB7791F,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFFAF4EA, surfaceColor = 0xFFFFFFFF
         )
     )
     val Slate = ThemePreset(
@@ -270,8 +270,8 @@ object ThemePresets {
     )
 
     val all: List<ThemePreset> = listOf(
-        Forest, Ocean, Sunset, Ember, Midnight, Mono,
-        Meadow, Plum, Slate, Amethyst, Rose, DoseWiki
+        Slate, Forest, Ocean, Sunset, Ember, Midnight, Mono,
+        Meadow, Copper, Amethyst, Rose, DoseWiki
     )
 }
 
