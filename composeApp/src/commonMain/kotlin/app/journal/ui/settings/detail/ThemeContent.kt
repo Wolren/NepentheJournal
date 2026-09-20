@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
@@ -58,16 +59,16 @@ internal fun ThemeContent(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = editBaseTheme == BaseTheme.DARK,
                         onClick = { onBaseThemeChange(BaseTheme.DARK); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(0xFF0E1318L); onSurfaceColorChange(0xFF1A222BL); applyTheme() },
-                        label = { Text("Dark") }, modifier = Modifier.weight(1f))
+                        label = { Text("Dark", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.LIGHT,
                         onClick = { onBaseThemeChange(BaseTheme.LIGHT); onPrimaryChange(ThemeDefaults.Light.primaryColor); onSecondaryChange(ThemeDefaults.Light.secondaryColor); onTertiaryChange(ThemeDefaults.Light.tertiaryColor); onBgColorChange(0xFFECEFF1L); onSurfaceColorChange(0xFFFFFFFFL); applyTheme() },
-                        label = { Text("Light") }, modifier = Modifier.weight(1f))
+                        label = { Text("Light", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.SYSTEM,
                         onClick = { onBaseThemeChange(BaseTheme.SYSTEM); applyTheme() },
-                        label = { Text("System") }, modifier = Modifier.weight(1f))
+                        label = { Text("System", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.CUSTOM,
                         onClick = { onBaseThemeChange(BaseTheme.CUSTOM) },
-                        label = { Text("Custom") }, modifier = Modifier.weight(1f))
+                        label = { Text("Custom", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                 }
 
                 Spacer(Modifier.height(10.dp))
