@@ -26,7 +26,7 @@ data class ThemeConfig(
     val fontScale: Float = 1.0f,
     val animationScale: Float = 1.0f,
     /** Activity grid uses classic GitHub greens instead of the theme accent. */
-    val githubGreenActivity: Boolean = true
+    val githubGreenActivity: Boolean = false
 ) {
     val primary: Color get() = Color(primaryColor)
     val secondary: Color get() = Color(secondaryColor)
