@@ -147,6 +147,8 @@ fun SettingsScreen(
                 editTertiary = v.tertiaryColor
                 editBgColor = v.backgroundColor ?: editBgColor
                 editSurfaceColor = v.surfaceColor ?: editSurfaceColor
+                preset.cardStyle?.let { editCardStyle = it }
+                preset.cornerRadius?.let { editCornerRadius = it }
                 applyTheme()
             },
             applyTheme = { applyTheme() }

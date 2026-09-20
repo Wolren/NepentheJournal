@@ -84,7 +84,10 @@ object ThemeDefaults {
 data class ThemePreset(
     val name: String,
     val dark: ThemeConfig,
-    val light: ThemeConfig
+    val light: ThemeConfig,
+    /** Optional card geometry the preset pairs with; applied on select when non-null. */
+    val cardStyle: CardStyle? = null,
+    val cornerRadius: CornerRadius? = null
 ) {
     /** The variant for [isDark] rendering. */
     fun variant(isDark: Boolean): ThemeConfig = if (isDark) dark else light
@@ -244,21 +247,26 @@ object ThemePresets {
     )
     /**
      * dose.wiki "fun" style, sampled from the live site stylesheet
-     * (appearance-chroma.css): near-black purple ground, deep purple
-     * surface, fuchsia accents, amber highlights, lavender light mode.
+     * (appearance-chroma.css, 20 Sep 2026): near-black plum ground #110617,
+     * deep purple surface (color-mix of #1F1633 over #110617), orchid accent
+     * #F0ABFC with soft #F5D0FE, gold highlights, pale lavender #F6EFFF
+     * light mode. Pairs with outlined cards and large corners to echo the
+     * site's bordered, generous-radius panels.
      */
     val DoseWiki = ThemePreset(
         name = "DoseWiki",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFF0ABFC, secondaryColor = 0xFFE879F9, tertiaryColor = 0xFFFBBF24,
-            errorColor = 0xFFFCA5A5, backgroundColor = 0xFF110617, surfaceColor = 0xFF220C2A
+            primaryColor = 0xFFF0ABFC, secondaryColor = 0xFFF5D0FE, tertiaryColor = 0xFFFBBF24,
+            errorColor = 0xFFFCA5A5, backgroundColor = 0xFF110617, surfaceColor = 0xFF1B122B
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFFA21CAF, secondaryColor = 0xFFC026D3, tertiaryColor = 0xFFB45309,
+            primaryColor = 0xFF932998, secondaryColor = 0xFFC026D3, tertiaryColor = 0xFFB45309,
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFF6EFFF, surfaceColor = 0xFFFFFFFF
-        )
+        ),
+        cardStyle = CardStyle.OUTLINED,
+        cornerRadius = CornerRadius.LARGE
     )
 
     val all: List<ThemePreset> = listOf(

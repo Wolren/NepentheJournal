@@ -264,7 +264,7 @@ private data class Resource(
 )
 
 private val resources = listOf(
-    Resource("DoseWiki", "dosewiki-admin.vercel.app", "In-app dosage and duration reference data", "https://dosewiki-admin.vercel.app/"),
+    Resource("DoseWiki", "dose.wiki", "In-app dosage and duration reference data", "https://dose.wiki/"),
     Resource("PsychonautWiki", "psychonautwiki.org", "Comprehensive substance information, effects, and interaction database", "https://psychonautwiki.org"),
     Resource("Erowid", "erowid.org", "Extensive library of substance experience reports and reference materials", "https://erowid.org"),
     Resource("TripSit", "tripsit.me", "Real-time harm reduction chat, combination charts, and substance fact sheets", "https://tripsit.me"),

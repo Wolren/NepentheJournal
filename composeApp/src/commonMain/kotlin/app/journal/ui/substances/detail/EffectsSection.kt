@@ -109,15 +109,21 @@ internal fun EffectsSection(substance: Substance) {
         val record = allEffects.find { it.name == effectName && substance.id in it.substanceIds }
         val isDoseWiki = record?.id?.startsWith("effect:dw:") == true
         val sourceName = if (isDoseWiki) "DoseWiki" else "PsychonautWiki"
-        val readMoreUrl = record?.url ?: if (!isDoseWiki) {
-            "https://psychonautwiki.org/wiki/${effectName.replace(" ", "_")}"
-        } else null
+        // Many per-substance writeups are empty; fall back to the same named
+        // effect documented under another substance before giving up.
+        val description = record?.description?.takeIf { it.isNotBlank() }
+            ?: allEffects.firstOrNull { it.name == effectName && !it.description.isNullOrBlank() }?.description
+        // PsychonautWiki effect index pages resolve as /wiki/<Name_with_underscores>
+        // (verified 20 Sep 2026: Euphoria, Geometry return 200). DoseWiki effect
+        // writeups are PW-forked content, so the same page applies to both.
+        val readMoreUrl = record?.url
+            ?: "https://psychonautwiki.org/wiki/${effectName.replace(" ", "_")}"
         AlertDialog(
             onDismissRequest = { selectedEffect = null },
             title = { Text(effectName, fontWeight = FontWeight.SemiBold) },
             text = {
                 Column {
-                    record?.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    description?.let { desc ->
                         Text(desc, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(8.dp))
                     }
@@ -129,13 +135,11 @@ internal fun EffectsSection(substance: Substance) {
                 }
             },
             confirmButton = {
-                if (readMoreUrl != null) {
-                    TextButton(onClick = {
-                        uriHandler.openUri(readMoreUrl)
-                        selectedEffect = null
-                    }) {
-                        Text("Read more")
-                    }
+                TextButton(onClick = {
+                    uriHandler.openUri(readMoreUrl)
+                    selectedEffect = null
+                }) {
+                    Text("Read more")
                 }
             },
             dismissButton = {

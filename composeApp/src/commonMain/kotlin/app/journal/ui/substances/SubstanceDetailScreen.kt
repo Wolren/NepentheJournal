@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -175,6 +176,50 @@ fun SubstanceDetailScreen(
                                 )
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Full articles on external references
+        item {
+            val uriHandler = LocalUriHandler.current
+            // DoseWiki rows carry the exact site slug in dw:{slug}; other rows
+            // fall back to a slugified name (verified pattern: dose.wiki/<slug>
+            // returns 200, e.g. /lsd).
+            val dwSlug = remember(substance.id, substance.name) {
+                if (substance.id.startsWith("dw:")) substance.id.removePrefix("dw:")
+                else substance.name.lowercase()
+                    .replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            }
+            val articles = remember(substance.name, dwSlug) {
+                listOf(
+                    Triple("DoseWiki", "dose.wiki",
+                        "https://dose.wiki/$dwSlug"),
+                    Triple("PsychonautWiki", "psychonautwiki.org",
+                        "https://psychonautwiki.org/wiki/${substance.name.replace(" ", "_")}"),
+                    Triple("Wikipedia", "wikipedia.org",
+                        "https://en.wikipedia.org/wiki/Special:Search?search=${substance.name.replace(" ", "+")}")
+                )
+            }
+            SectionCard(title = "Full Articles") {
+                articles.forEach { (title, host, url) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable { uriHandler.openUri(url) }
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(title, style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium)
+                            Text(host, style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Icon(Icons.Default.OpenInNew, contentDescription = "Open $title",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp))
                     }
                 }
             }

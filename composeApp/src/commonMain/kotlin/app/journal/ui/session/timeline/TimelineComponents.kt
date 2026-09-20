@@ -112,7 +112,7 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
             Column(Modifier.weight(1f)) {
                 Text(substance?.name ?: dose.substanceId,
                     style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Text(buildString { val prefix = if (dose.isDoseEstimate) "~" else ""; append("$prefix${dose.amount}"); if (dose.isDoseEstimate) append(" ±${dose.estimatedDoseStandardDeviation}"); append(" ${dose.unit} - ${dose.routeOfAdministration}"); if (dose.redosing) append(" (redose)") },
+                Text(buildString { val prefix = if (dose.isDoseEstimate) "~" else ""; append("$prefix${formatDoseAmount(dose.amount)}"); dose.estimatedDoseStandardDeviation?.let { append(" ±${formatDoseAmount(it)}") }; append(" ${dose.unit} · ${dose.routeOfAdministration}"); if (dose.redosing) append(" · redose") },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (dose.stomachFullness != null) Text(dose.stomachFullness.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
@@ -138,17 +138,43 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
             grouped.entries.forEachIndexed { idx, (substanceId, substanceDoses) ->
                 val substance = repo.getSubstance(substanceId)
                 val color = AdaptiveColors.colorFor(substance?.name ?: substanceId).getComposeColor(isDark)
-                if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    SubstanceMonogram(substance?.name ?: substanceId, color)
+                if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.width(4.dp).height(44.dp),
+                        shape = RoundedCornerShape(2.dp),
+                        color = color
+                    ) {}
                     Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(substance?.name ?: substanceId, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(substance?.name ?: substanceId,
+                            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         substanceDoses.forEach { dose ->
-                            val offsetMin = ((dose.timestamp - sessionStart) / 60000).toInt()
-                            val prefix = if (dose.isDoseEstimate) "~" else ""
-                            Text("$prefix${dose.amount} ${dose.unit} ${dose.routeOfAdministration} @ +${offsetMin}m",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val prefix = if (dose.isDoseEstimate) "~" else ""
+                                Text("$prefix${formatDoseAmount(dose.amount)} ${dose.unit} · ${dose.routeOfAdministration}" +
+                                        (if (dose.redosing) " · redose" else ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val offsetMin = ((dose.timestamp - sessionStart) / 60000).toInt()
+                                formatTOffsetLabel(offsetMin).takeIf { it.isNotEmpty() }?.let { label ->
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    ) {
+                                        Text(label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -127,3 +127,26 @@ internal fun formatTimeOffset(millis: Long): String {
     return if (hours > 0) "T+${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}"
     else "T+${mins}:${secs.toString().padStart(2, '0')}"
 }
+
+/**
+ * Display formatting for a logged dose amount: whole values render without
+ * decimals, fractional values round to 2 dp with trailing zeros stripped,
+ * so float dust (151.019999) and spurious precision never reach the UI.
+ */
+internal fun formatDoseAmount(amount: Double): String {
+    if (amount == amount.toLong().toDouble()) return amount.toLong().toString()
+    val rounded = kotlin.math.round(amount * 100) / 100.0
+    if (rounded == rounded.toLong().toDouble()) return rounded.toLong().toString()
+    return rounded.toString().trimEnd('0').trimEnd('.')
+}
+
+/**
+ * Compact T+ offset label for dose rows ("T+45m", "T+2h 15m"). Empty for
+ * doses at session start so rows don't carry "@ +0m" noise.
+ */
+internal fun formatTOffsetLabel(offsetMin: Int): String {
+    if (offsetMin <= 0) return ""
+    val h = offsetMin / 60
+    val m = offsetMin % 60
+    return if (h > 0) "T+${h}h ${m}m" else "T+${m}m"
+}

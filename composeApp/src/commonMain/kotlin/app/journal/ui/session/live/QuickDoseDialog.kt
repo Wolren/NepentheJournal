@@ -1,6 +1,8 @@
 package app.journal.ui.session.live
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,13 +51,39 @@ internal fun QuickDoseDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (substances.isNotEmpty()) {
                     var expanded by remember { mutableStateOf(false) }
+                    var query by remember { mutableStateOf("") }
+                    val filtered = remember(substances, query, selectedSubstanceId) {
+                        val q = (query.ifBlank {
+                            substances.find { it.id == selectedSubstanceId }?.name ?: ""
+                        }).lowercase()
+                        if (q.isBlank()) substances
+                        else substances.filter { it.name.lowercase().contains(q) }
+                    }
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-                        OutlinedTextField(value = substances.find { it.id == selectedSubstanceId }?.name ?: "",
-                            onValueChange = {}, readOnly = true, label = { Text("Substance") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        OutlinedTextField(value = if (selectedSubstanceId.isNotBlank())
+                                substances.find { it.id == selectedSubstanceId }?.name ?: "" else query,
+                            onValueChange = { query = it; selectedSubstanceId = ""; expanded = true },
+                            label = { Text("Substance (type to search)") }, singleLine = true,
+                            trailingIcon = {
+                                if (selectedSubstanceId.isNotBlank()) {
+                                    IconButton(onClick = { selectedSubstanceId = ""; query = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear substance")
+                                    }
+                                } else ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                            },
                             modifier = Modifier.menuAnchor().fillMaxWidth())
                         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                            substances.forEach { sub -> DropdownMenuItem(text = { Text(sub.name) }, onClick = { selectedSubstanceId = sub.id; expanded = false }) }
+                            filtered.take(50).forEach { sub ->
+                                DropdownMenuItem(text = { Text(sub.name) },
+                                    onClick = { selectedSubstanceId = sub.id; query = ""; expanded = false })
+                            }
+                            if (filtered.size > 50) {
+                                DropdownMenuItem(text = {
+                                    Text("...${filtered.size - 50} more, keep typing to narrow",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }, onClick = {}, enabled = false)
+                            }
                         }
                     }
                 } else Text("No substances in database. Add one first.", color = MaterialTheme.colorScheme.error)
@@ -98,9 +126,13 @@ internal fun QuickDoseDialog(
                     repo.upsertDose(Dose(id = "dose:live:${now}_${session.id}", sessionId = session.id, substanceId = chosenSubstanceId,
                         routeOfAdministration = route, amount = amount.toDoubleOrNull() ?: 0.0, unit = unit,
                         timestamp = doseTime, createdAt = now, updatedAt = now, deviceOrigin = "desktop"))
+                    val doseBody = listOfNotNull(
+                        "$amount $unit $route".takeIf { it.isNotBlank() },
+                        note.ifBlank { null }
+                    ).joinToString("\n")
                     repo.upsertTimelineEvent(TimelineEvent(id = "event:dose:${now}_${session.id}", sessionId = session.id,
                         timestamp = doseTime, eventType = TimelineEventType.NOTE, label = "Dose: ${substances.find { it.id == chosenSubstanceId }?.name ?: customSubstanceName.ifBlank { chosenSubstanceId }}",
-                        body = "$amount $unit $route".takeIf { it.isNotBlank() }, createdAt = now, updatedAt = now, deviceOrigin = "desktop"))
+                        body = doseBody.ifBlank { null }, createdAt = now, updatedAt = now, deviceOrigin = "desktop"))
                     onDismiss()
                 }
             }, enabled = canSubmit) { Text("Log") }

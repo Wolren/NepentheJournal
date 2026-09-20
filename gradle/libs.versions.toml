@@ -12,6 +12,7 @@ ktor-server            = "3.5.2"
 jmdns                  = "3.6.3"
 coil                   = "3.5.0"
 vico                   = "3.2.3"
+koalaplot              = "0.12.1"
 kermit                 = "2.1.0"
 
 bouncycastle = "1.85"
@@ -38,6 +39,7 @@ coil-compose            = { module = "io.coil-kt.coil3:coil-compose",           
 coil-network-ktor       = { module = "io.coil-kt.coil3:coil-network-ktor3",    version.ref = "coil" }
 vico-compose            = { module = "com.patrykandpatrick.vico:compose",            version.ref = "vico" }
 vico-compose-m3         = { module = "com.patrykandpatrick.vico:compose-m3",         version.ref = "vico" }
+koalaplot-core          = { module = "io.github.koalaplot:koalaplot-core",           version.ref = "koalaplot" }
 bouncycastle-bcpkix     = { module = "org.bouncycastle:bcpkix-jdk18on",       version.ref = "bouncycastle" }
 ktor-server-websockets  = { module = "io.ktor:ktor-server-websockets",        version.ref = "ktor-server" }
 ktor-client-websockets  = { module = "io.ktor:ktor-client-websockets",        version.ref = "ktor" }

@@ -64,7 +64,7 @@ internal fun QuickMoodDialog(
                 val combinedNote = listOfNotNull(note.ifBlank { null }, effectsBody).joinToString("\n")
                 repo.upsertTimelineEvent(TimelineEvent(id = "event:mood:${now}_${session.id}", sessionId = session.id,
                     timestamp = now, eventType = TimelineEventType.OBSERVATION, label = label,
-                    body = note.ifBlank { effectsBody } ?: null, intensity = intensity, createdAt = now, updatedAt = now,
+                    body = combinedNote.ifBlank { null }, intensity = intensity, createdAt = now, updatedAt = now,
                     deviceOrigin = "desktop"))
                 onDismiss()
             }) { Text("Save") }
