@@ -35,7 +35,7 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.charts.ChartCard
 import app.journal.ui.theme.AdaptiveColors
-import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.isDarkTheme
 import app.journal.ui.theme.foregroundFor
 import app.journal.util.currentTimeMillis
 import io.github.koalaplot.core.legend.FlowLegend
@@ -130,7 +130,7 @@ internal fun TimelineBar(
     shulginRating: String? = null,
 ) {
     val repo = remember { JournalRepository.instance }
-    val isDark = ThemeManager.instance.isDarkTheme()
+    val isDark = isDarkTheme()
     val now = currentTimeMillis()
     val totalDuration = (endTime ?: now) - startTime
     val rangeMs = totalDuration.coerceAtLeast(1L)

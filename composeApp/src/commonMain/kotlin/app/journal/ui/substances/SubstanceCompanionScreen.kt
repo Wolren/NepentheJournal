@@ -23,6 +23,7 @@ import app.journal.data.IJournalRepository
 import app.journal.model.*
 import app.journal.ui.charts.ChartTheme
 import app.journal.ui.components.*
+import app.journal.ui.theme.chartSeriesColors
 import app.journal.ui.substances.detail.SectionCard
 import kotlin.math.roundToInt
 import kotlinx.datetime.Instant
@@ -181,17 +182,11 @@ fun SubstanceCompanionScreen(
                         lastDoses.maxOfOrNull { it.amount } ?: 1.0
                     }
 
+                    // Unit colors derived from the theme accents.
+                    val palette = chartSeriesColors(6)
                     // Color per unit
-                    val unitColors = remember(lastDoses) {
+                    val unitColors = remember(lastDoses, palette) {
                         val units = lastDoses.map { it.unit }.distinct()
-                        val palette = listOf(
-                            Color(0xFF8BA888),
-                            Color(0xFF9E8AC7),
-                            Color(0xFF7BAFAF),
-                            Color(0xFFC4A46A),
-                            Color(0xFFB5876A),
-                            Color(0xFFA8B5A0),
-                        )
                         units.mapIndexed { i, u -> u to palette[i % palette.size] }.toMap()
                     }
 

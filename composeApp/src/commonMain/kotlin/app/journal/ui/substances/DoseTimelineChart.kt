@@ -14,7 +14,8 @@ import app.journal.ui.charts.ChartTheme
 import app.journal.ui.charts.integerFormatter
 import app.journal.ui.charts.themedStartAxis
 import app.journal.ui.theme.AdaptiveColors
-import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.chartSeriesColors
+import app.journal.ui.theme.isDarkTheme
 import app.journal.util.currentTimeMillis
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
@@ -44,7 +45,9 @@ fun DoseTimelineChart(
     val now = currentTimeMillis()
     val dayMs = 86400000L
     val tz = TimeZone.currentSystemDefault()
-    val isDark = ThemeManager.instance.isDarkTheme()
+    val isDark = isDarkTheme()
+    // Route series derived from the theme accents.
+    val routeColors = chartSeriesColors(8)
 
     val recentDoses = remember(doses) {
         doses.filter { now - it.timestamp < 60L * dayMs }
@@ -254,13 +257,3 @@ private fun StatItem(label: String, value: String, color: androidx.compose.ui.gr
     }
 }
 
-private val routeColors = listOf(
-    androidx.compose.ui.graphics.Color(0xFF8BA888),
-    androidx.compose.ui.graphics.Color(0xFF7BAFAF),
-    androidx.compose.ui.graphics.Color(0xFF9E8AC7),
-    androidx.compose.ui.graphics.Color(0xFFC4A46A),
-    androidx.compose.ui.graphics.Color(0xFFB5876A),
-    androidx.compose.ui.graphics.Color(0xFFA8B5A0),
-    androidx.compose.ui.graphics.Color(0xFF7A9A7D),
-    androidx.compose.ui.graphics.Color(0xFF6B8A6E)
-)

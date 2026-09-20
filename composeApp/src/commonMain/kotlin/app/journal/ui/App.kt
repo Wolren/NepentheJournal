@@ -348,6 +348,15 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     val liveCreateKey = stableLiveId
                                     LaunchedEffect(liveCreateKey) {
                                         if (liveCreateKey != "__new__") return@LaunchedEffect
+                                        // Live sessions are capped at one: resume the open
+                                        // live session instead of stacking a second timer.
+                                        val openLive = repo.sessions.value.firstOrNull {
+                                            it.id.startsWith("session:live:") && it.endTime == null
+                                        }
+                                        if (openLive != null) {
+                                            liveSessionId = openLive.id
+                                            return@LaunchedEffect
+                                        }
                                         try {
                                             val now = currentTimeMillis()
                                         val newSession = Session(

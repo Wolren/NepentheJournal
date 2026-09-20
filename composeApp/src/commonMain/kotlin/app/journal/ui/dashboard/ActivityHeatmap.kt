@@ -21,7 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.activityLevelColors
 import kotlinx.datetime.*
 
 @Composable
@@ -49,22 +49,13 @@ fun ActivityHeatmap(
         map
     }
 
-    // Theme-aware palette: dark mode uses dark cells on dark cards; light mode
-    // uses a subtle gray + lighter greens so the board reads as a light grid
-    // instead of a black slab (light-theme audit 2026-07-31).
-    val isDark = ThemeManager.instance.isDarkTheme()
-    val inactive = if (isDark) Color(0xFF3A3A3A) else Color(0xFFE4E4E4)
-    val activeColors = if (isDark) listOf(
-        Color(0xFF1B4A1B),
-        Color(0xFF2D6A2D),
-        Color(0xFF3D8A3D),
-        Color(0xFF4CAF50)
-    ) else listOf(
-        Color(0xFFB9DFB9),
-        Color(0xFF8FCF8F),
-        Color(0xFF66BB6A),
-        Color(0xFF43A047)
-    )
+    // Activity ramp derived from the theme accent, so accent and dark/light
+    // changes recolor the grid instead of the fixed moss greens.
+    val levels = activityLevelColors()
+    val inactive = levels[0]
+    val activeColors = levels.drop(1)
+    // Hoisted: Canvas draw scope is not @Composable.
+    val todayRing = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 
     fun colorFor(count: Int): Color = when {
         count <= 0 -> inactive
@@ -154,7 +145,7 @@ fun ActivityHeatmap(
                                     drawRoundRect(bg, Offset(x, y), Size(cellSizePx, cellSizePx), CornerRadius(2f, 2f))
                                     if (date == today) {
                                         drawRoundRect(
-                                            if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF2E7D32).copy(alpha = 0.55f),
+                                            todayRing,
                                             Offset(x, y), Size(cellSizePx, cellSizePx),
                                             CornerRadius(2f, 2f),
                                             style = Stroke(width = 1.5f)
