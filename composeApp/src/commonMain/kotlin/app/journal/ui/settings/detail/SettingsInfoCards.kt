@@ -88,14 +88,9 @@ internal fun PrivacyCardContent(privacyExpanded: Boolean, onToggle: () -> Unit) 
     CollapsibleSettingsCard(expanded = privacyExpanded, onToggle = onToggle,
         icon = Icons.Default.Shield, title = "Privacy"
     ) {
-        Text("Privacy & data", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        Text("Privacy and data", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
-        SelectableText(text = "All journal data is stored locally on your device. There is no connected server \u2014 nothing is uploaded, synced, or sent without your explicit action.\n\nThe app contains no analytics, no telemetry, and no tracking software. No data is collected or transmitted automatically.\n\nYou can manually export your full journal data at any time via \"Settings > Data (JSON, CSV, or ZIP)\". Sharing those exports is entirely at your discretion \u2014 nothing leaves your device until you explicitly choose to export and share it.\n\nOptional P2P sync transmits data directly between your own devices over your local network only. No data passes through any external relay.\n\nFull privacy policy: PRIVACY.md in the app repository.",
-            style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
-        Spacer(Modifier.height(12.dp))
-        Text("Business model pledge", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(4.dp))
-        SelectableText(text = "This app will never include:\n\n  - Advertisements of any kind\n  - Subscription tiers or paid features\n  - Telemetry, analytics, or crash reporting\n  - Account requirements or cloud dependency\n\nAll functionality is and will always be free. This is a firm commitment, not a current-state description.\n\nYou own your data. Manual export is always available \u2014 nothing leaves your device unless you explicitly choose to share it.",
+        SelectableText(text = "All journal data is stored locally on your device. There is no connected server: nothing is uploaded, synced, or sent without your explicit action.\n\nThe app contains no analytics, no telemetry, and no tracking software. No data is collected or transmitted automatically.\n\nYou can manually export your full journal data at any time via \"Settings > Data (JSON, CSV, or ZIP)\". Sharing those exports is entirely at your discretion.\n\nOptional P2P sync transmits data directly between your own devices over your local network only. No data passes through any external relay.\n\nEverything is free, forever: no ads, no subscriptions, no accounts.\n\nFull privacy policy: PRIVACY.md in the app repository.",
             style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
     }
 }
