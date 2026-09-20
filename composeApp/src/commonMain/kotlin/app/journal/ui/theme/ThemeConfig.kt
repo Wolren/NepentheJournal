@@ -24,7 +24,9 @@ data class ThemeConfig(
     val cardStyle: CardStyle = CardStyle.ELEVATED,
     val cornerRadius: CornerRadius = CornerRadius.MEDIUM,
     val fontScale: Float = 1.0f,
-    val animationScale: Float = 1.0f
+    val animationScale: Float = 1.0f,
+    /** Activity grid uses classic GitHub greens instead of the theme accent. */
+    val githubGreenActivity: Boolean = true
 ) {
     val primary: Color get() = Color(primaryColor)
     val secondary: Color get() = Color(secondaryColor)

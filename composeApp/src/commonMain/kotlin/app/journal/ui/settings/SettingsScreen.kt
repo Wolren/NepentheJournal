@@ -68,6 +68,7 @@ fun SettingsScreen(
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
     var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
     var editAnimationScale by remember(themeConfig) { mutableStateOf(themeConfig.animationScale) }
+    var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
 
     fun applyTheme() {
         themeManager.update(ThemeConfig(
@@ -75,7 +76,7 @@ fun SettingsScreen(
             tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
             backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
             cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
-            animationScale = editAnimationScale
+            animationScale = editAnimationScale, githubGreenActivity = editGithubGreen
         ))
     }
 
@@ -131,6 +132,7 @@ fun SettingsScreen(
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
             editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
             editCornerRadius = editCornerRadius, editFontScale = editFontScale, editAnimationScale = editAnimationScale,
+            editGithubGreen = editGithubGreen,
             onBaseThemeChange = { editBaseTheme = it },
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
             onTertiaryChange = { editTertiary = it }, onBgColorChange = { editBgColor = it },
@@ -138,6 +140,7 @@ fun SettingsScreen(
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
             onAnimationScaleChange = { editAnimationScale = it },
+            onGithubGreenChange = { editGithubGreen = it },
             onPresetSelect = { preset ->
                 // Apply the preset variant matching the current dark/light mode,
                 // keeping the user's base theme choice (Dark/Light/System).

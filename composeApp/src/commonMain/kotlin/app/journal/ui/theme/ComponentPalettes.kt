@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
 fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.45f
 
 /**
- * Activity grid ramp derived from the theme accent. Index 0 is the empty-cell
- * color, 1..4 are ascending activity levels toward primary.
+ * Activity grid ramp. Classic GitHub greens when [ThemeConfig.githubGreenActivity]
+ * is on (the default), otherwise a ramp from the empty tone to theme primary.
  */
 @Composable
 fun activityLevelColors(): List<Color> {
@@ -22,6 +22,15 @@ fun activityLevelColors(): List<Color> {
     // Empty-cell base is lifted off surfaceVariant (the card behind the grid
     // is surfaceVariant too, so a raw surfaceVariant grid goes invisible).
     val base = blend(scheme.surfaceVariant, scheme.onSurfaceVariant, 0.22f)
+    if (LocalThemeConfig.current.githubGreenActivity) {
+        // Classic moss greens, dark and light variants.
+        val greens = if (isDarkTheme()) listOf(
+            Color(0xFF1B4A1B), Color(0xFF2D6A2D), Color(0xFF3D8A3D), Color(0xFF4CAF50)
+        ) else listOf(
+            Color(0xFFB9DFB9), Color(0xFF8FCF8F), Color(0xFF66BB6A), Color(0xFF43A047)
+        )
+        return listOf(base) + greens
+    }
     return listOf(
         base,
         blend(base, scheme.primary, 0.30f),

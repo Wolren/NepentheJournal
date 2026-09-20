@@ -27,13 +27,14 @@ internal fun ThemeContent(
     editBaseTheme: BaseTheme, editPrimary: Long, editSecondary: Long, editTertiary: Long,
     editBgColor: Long, editSurfaceColor: Long, editBgImage: String?,
     editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
-    editFontScale: Float, editAnimationScale: Float,
+    editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
     onBaseThemeChange: (BaseTheme) -> Unit, onPrimaryChange: (Long) -> Unit,
     onSecondaryChange: (Long) -> Unit, onTertiaryChange: (Long) -> Unit,
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
+    onGithubGreenChange: (Boolean) -> Unit,
     onPresetSelect: (ThemePreset) -> Unit,
     applyTheme: () -> Unit,
 ) {
@@ -95,6 +96,13 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(8.dp))
                 }
 
+                Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("GitHub green activity", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = editGithubGreen,
+                        onCheckedChange = { onGithubGreenChange(it); applyTheme() })
+                }
                 if (editBaseTheme == BaseTheme.CUSTOM) {
                     Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
                     Text("Colors", style = MaterialTheme.typography.labelLarge)
