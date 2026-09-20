@@ -138,7 +138,7 @@ internal fun TimelineBar(
     val substanceNames = remember(doses) {
         doses.map { d -> repo.getSubstance(d.substanceId)?.name ?: d.substanceId }.distinct()
     }
-    // Plain vals, not remember: color resolution is @Composable and trivially cheap.
+    // Plain vals: getComposeColor is @Composable, so this stays out of remember.
     val fallbackPrimary = MaterialTheme.colorScheme.primary
     val subColors = substanceNames.associateWith {
         AdaptiveColors.colorFor(it).getComposeColor(isDark)

@@ -191,6 +191,23 @@ fun CalendarScreen(
             val onPrimary = MaterialTheme.colorScheme.onPrimary
             val onSurface = MaterialTheme.colorScheme.onSurface
 
+            val dayStyleBase = TextStyle(fontSize = 14.sp, textAlign = TextAlign.Center)
+            val measuredCells = remember(cellData, textMeasurer, primary, onPrimary, onSurface) {
+                cellData.map { data ->
+                    if (data == null) null
+                    else {
+                        val textColor = if (data.isSelected) onPrimary else onSurface
+                        textMeasurer.measure(
+                            data.day.toString(),
+                            style = dayStyleBase.copy(
+                                color = textColor,
+                                fontWeight = if (data.isToday || data.isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        )
+                    }
+                }
+            }
+
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val cellWPx = with(LocalDensity.current) { (maxWidth / 7f).toPx() }
                 val cellHPx = with(LocalDensity.current) { cellHeight.toPx() }
@@ -218,10 +235,6 @@ fun CalendarScreen(
                             }
                     ) {
                         val circleRadius = cellHPx * 0.43f
-                        val dayStyle = TextStyle(
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
 
                         cellData.forEachIndexed { idx, data ->
                             if (data != null) {
@@ -236,14 +249,7 @@ fun CalendarScreen(
                                     drawCircle(primary, radius = circleRadius, center = Offset(cx, cy), style = Stroke(width = 1.5f))
                                 }
 
-                                val textColor = if (data.isSelected) onPrimary else onSurface
-                                val measured = textMeasurer.measure(
-                                    data.day.toString(),
-                                    style = dayStyle.copy(
-                                        color = textColor,
-                                        fontWeight = if (data.isToday || data.isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                )
+                                val measured = measuredCells[idx] ?: return@forEachIndexed
                                 val textY = if (data.hasSession) cy - measured.size.height / 2f - 3f
                                     else cy - measured.size.height / 2f
                                 drawText(

@@ -19,6 +19,7 @@ import app.journal.data.IJournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 import app.journal.ui.session.live.*
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
@@ -34,9 +35,13 @@ fun LiveSessionScreen(
     val listState = rememberLazyListState()
 
     val allDoses by repo.doses.collectAsState()
-    val sessionDoses = remember(allDoses, session.id) { allDoses.filter { it.sessionId == session.id }.sortedBy { it.timestamp } }
+    // Reactive session row: the passed snapshot goes stale after any upsert
+    // (pause, edit), so resolve the live copy for timer and title.
+    val allSessions by repo.sessions.collectAsState()
+    val live = allSessions.find { it.id == session.id } ?: session
+    val sessionDoses = remember(allDoses, live.id) { allDoses.filter { it.sessionId == live.id }.sortedBy { it.timestamp } }
     val allTimelineEvents by repo.timelineEvents.collectAsState()
-    val sessionEvents = remember(allTimelineEvents, session.id) { allTimelineEvents.filter { it.sessionId == session.id }.sortedBy { it.timestamp } }
+    val sessionEvents = remember(allTimelineEvents, live.id) { allTimelineEvents.filter { it.sessionId == live.id }.sortedBy { it.timestamp } }
     val allSubstances by repo.substances.collectAsState()
 
     val usedSubstances = remember(sessionDoses, allSubstances) {
@@ -51,10 +56,10 @@ fun LiveSessionScreen(
     var showEndConfirm by remember { mutableStateOf(false) }
     var deletingLiveEvent by remember { mutableStateOf<TimelineEvent?>(null) }
     var menuExpanded by remember { mutableStateOf(false) }
-    var editTitle by remember { mutableStateOf(session.title.ifBlank { "Live Session" }) }
-    var editSet by remember { mutableStateOf(session.set ?: "") }
-    var editSetting by remember { mutableStateOf(session.setting ?: "") }
-    var editIntention by remember { mutableStateOf(session.intention ?: "") }
+    var editTitle by remember(live.id) { mutableStateOf(live.title.ifBlank { "Live Session" }) }
+    var editSet by remember(live.id) { mutableStateOf(live.set ?: "") }
+    var editSetting by remember(live.id) { mutableStateOf(live.setting ?: "") }
+    var editIntention by remember(live.id) { mutableStateOf(live.intention ?: "") }
 
     LaunchedEffect(sessionEvents.size) {
         val lastIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -71,7 +76,7 @@ fun LiveSessionScreen(
             onTitleChange = { editTitle = it }, onSetChange = { editSet = it }, onSettingChange = { editSetting = it },
             onIntentionChange = { editIntention = it },
             onSave = {
-                repo.upsertSession(session.copy(title = editTitle, set = editSet.ifBlank { null }, setting = editSetting.ifBlank { null },
+                repo.upsertSession(live.copy(title = editTitle, set = editSet.ifBlank { null }, setting = editSetting.ifBlank { null },
                     intention = editIntention.ifBlank { null }, updatedAt = currentTimeMillis()))
                 showEditDialog = false
             }, onDismiss = { showEditDialog = false })
@@ -79,7 +84,7 @@ fun LiveSessionScreen(
     if (showEndConfirm) {
         AlertDialog(onDismissRequest = { showEndConfirm = false }, title = { Text("End session?") },
             text = { Text("Set the session end time to now and return to the session list.") },
-            confirmButton = { AppTextButton(onClick = { repo.upsertSession(session.copy(endTime = currentTimeMillis(), updatedAt = currentTimeMillis())); showEndConfirm = false; onBack() }) { Text("End") } },
+            confirmButton = { AppTextButton(onClick = { repo.upsertSession(live.copy(endTime = currentTimeMillis(), updatedAt = currentTimeMillis())); showEndConfirm = false; onBack() }) { Text("End") } },
             dismissButton = { AppTextButton(onClick = { showEndConfirm = false }) { Text("Cancel") } })
     }
     if (deletingLiveEvent != null) {
@@ -97,7 +102,7 @@ fun LiveSessionScreen(
     }
 
     ScreenScaffold(
-        title = session.title.ifBlank { "Live Session" }, onBack = onBack,
+        title = live.title.ifBlank { "Live Session" }, onBack = onBack,
         actions = {
             Box { IconButton(onClick = { showCrisisDialog = true }) { Icon(Icons.Default.Emergency, contentDescription = "Get help", tint = MaterialTheme.colorScheme.error) } }
             Box {
@@ -109,8 +114,33 @@ fun LiveSessionScreen(
             }
         }
     ) {
-        // Main timer
-        item { TimerCard(session.startTime) }
+        // Main timer with pause/resume
+        item {
+            TimerCard(
+                session = live,
+                onPause = {
+                    val now = currentTimeMillis()
+                    repo.upsertSession(live.copy(pausedAt = now, updatedAt = now))
+                    repo.upsertTimelineEvent(TimelineEvent(
+                        id = "event:pause:${now}_${live.id}",
+                        sessionId = live.id, timestamp = now,
+                        eventType = TimelineEventType.NOTE, label = "Paused",
+                        createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
+                },
+                onResume = {
+                    val now = currentTimeMillis()
+                    val started = live.pausedAt ?: now
+                    repo.upsertSession(live.copy(
+                        pausedMs = live.pausedMs + (now - started).coerceAtLeast(0L),
+                        pausedAt = null, updatedAt = now))
+                    repo.upsertTimelineEvent(TimelineEvent(
+                        id = "event:resume:${now}_${live.id}",
+                        sessionId = live.id, timestamp = now,
+                        eventType = TimelineEventType.NOTE, label = "Resumed",
+                        createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
+                }
+            )
+        }
 
         // Interaction warnings
         if (warnings.isNotEmpty()) { item { InteractionWarningsBanner(warnings) } }

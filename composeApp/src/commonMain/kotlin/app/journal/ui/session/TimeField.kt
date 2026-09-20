@@ -32,6 +32,11 @@ internal val SHORT_MONTH_NAMES = listOf(
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 )
 
+private val NamedMonthRegex = Regex("""(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})""")
+private val IsoDateRegex = Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""")
+private val SlashDateRegex = Regex("""(\d{1,2})/(\d{1,2})/(\d{4})""")
+private val TimeRegex = Regex("""(\d{1,2}):(\d{2})""")
+
 /**
  * Date/time field with visual picker. Accepts "17 Jan 2026", "2026-01-17",
  * "17/01/2026", "01/17/2026" formats. Click the calendar icon for a date
@@ -73,7 +78,7 @@ fun TimeField(
         val trimmed = input.trim()
 
         // "17 January 2026" or "17 Jan 2026"
-        val namedMonth = Regex("""(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})""").find(trimmed)
+        val namedMonth = NamedMonthRegex.find(trimmed)
         if (namedMonth != null) {
             val (_, day, monthName, year) = namedMonth.groupValues
             val mi = MONTH_NAMES.indexOfFirst { it.startsWith(monthName, ignoreCase = true) }
@@ -83,14 +88,14 @@ fun TimeField(
         }
 
         // "2026-01-17" (ISO)
-        val iso = Regex("""(\d{4})-(\d{1,2})-(\d{1,2})""").find(trimmed)
+        val iso = IsoDateRegex.find(trimmed)
         if (iso != null) {
             val (_, y, m, d) = iso.groupValues
             return Triple(y.toInt(), m.toInt() - 1, d.toInt())
         }
 
         // "17/01/2026" or "01/17/2026" (DD/MM or MM/DD)
-        val slash = Regex("""(\d{1,2})/(\d{1,2})/(\d{4})""").find(trimmed)
+        val slash = SlashDateRegex.find(trimmed)
         if (slash != null) {
             val (_, a, b, y) = slash.groupValues
             val ia = a.toInt(); val ib = b.toInt()
@@ -103,7 +108,7 @@ fun TimeField(
 
     fun tryParse() {
         val parsed = parseDate(dateStr)
-        val timeMatch = Regex("""(\d{1,2}):(\d{2})""").find(timeStr.trim())
+        val timeMatch = TimeRegex.find(timeStr.trim())
 
         dateError = dateStr.isNotBlank() && parsed == null
         timeError = timeStr.isNotBlank() && timeMatch == null

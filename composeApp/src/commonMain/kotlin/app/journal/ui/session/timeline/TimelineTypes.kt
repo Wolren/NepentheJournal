@@ -3,6 +3,7 @@ package app.journal.ui.session.timeline
 import androidx.compose.ui.graphics.Color
 import app.journal.model.TimelineEventType
 import app.journal.model.TimelineEvent
+import kotlin.math.pow
 
 sealed class TimelineItem {
     data class Event(val event: TimelineEvent) : TimelineItem()
@@ -88,8 +89,9 @@ internal fun computePhaseRanges(
     var phaseType: TimelineEventType? = null
 
     for (event in relevant) {
-        val elapsed = event.timestamp - startTime
-        val phaseName = phaseLabel(elapsed, totalDuration) ?: continue
+        val typeLabel = phaseLabelForEntry(event.eventType)
+        val phaseName = if (typeLabel != "Event") typeLabel
+            else phaseLabel(event.timestamp - startTime, totalDuration) ?: continue
         if (phaseName != currentPhase) {
             if (currentPhase != null && phaseType != null) {
                 result.add(PhaseRange(currentPhase, phaseType, phaseStart, phaseEnd))
@@ -129,13 +131,22 @@ internal fun formatTimeOffset(millis: Long): String {
 }
 
 /**
- * Display formatting for a logged dose amount: whole values render without
- * decimals, fractional values round to 2 dp with trailing zeros stripped,
- * so float dust (151.019999) and spurious precision never reach the UI.
+ * Display formatting for a logged dose amount, scaled to the magnitude:
+ * hundreds and up render whole (195.44 mg becomes 195 mg), tens keep one
+ * decimal, singles keep two, sub-unit amounts keep three. Trailing zeros
+ * strip, so float dust (151.019999) and spurious precision never reach
+ * the UI. Stored values and exports keep full precision; this is display only.
  */
 internal fun formatDoseAmount(amount: Double): String {
-    if (amount == amount.toLong().toDouble()) return amount.toLong().toString()
-    val rounded = kotlin.math.round(amount * 100) / 100.0
+    val abs = kotlin.math.abs(amount)
+    val decimals = when {
+        abs >= 100 -> 0
+        abs >= 10 -> 1
+        abs >= 1 -> 2
+        else -> 3
+    }
+    val factor = 10.0.pow(decimals)
+    val rounded = kotlin.math.round(amount * factor) / factor
     if (rounded == rounded.toLong().toDouble()) return rounded.toLong().toString()
     return rounded.toString().trimEnd('0').trimEnd('.')
 }

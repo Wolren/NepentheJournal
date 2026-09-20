@@ -22,6 +22,8 @@ import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.*
 import app.journal.ui.components.TagChip
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
+import kotlin.random.Random
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
@@ -35,13 +37,12 @@ fun SessionEditorScreen(
     onBack: () -> Unit
 ) {
     val substances by repo.substances.collectAsState()
+    val substanceNameById = remember(substances) { substances.associate { it.id to it.name } }
     val useShulgin by repo.useShulginRating.collectAsState()
     val isEditing = sessionToEdit != null
 
-    // Snapshot interactions once - doesn't cause recomposition on every
-    // change at runtime. The InteractionChecker caches its index by
-    // content hash, so rebuild is skipped even on sessionDoses change.
-    val allInteractions = remember { repo.interactions.value }
+    // Reactive interactions: refresh warnings when the store changes.
+    val allInteractions by repo.interactions.collectAsState()
 
     // Form state
     var title by remember { mutableStateOf(sessionToEdit?.title ?: "") }
@@ -57,6 +58,7 @@ fun SessionEditorScreen(
     var intention by remember { mutableStateOf(sessionToEdit?.intention ?: "") }
     var outcome by remember { mutableStateOf(sessionToEdit?.outcome ?: "") }
     var notes by remember { mutableStateOf(sessionToEdit?.notes ?: "") }
+    var tags by remember { mutableStateOf(sessionToEdit?.tags?.joinToString(", ") ?: "") }
     var rating by remember { mutableStateOf(sessionToEdit?.rating?.toString() ?: "") }
     var shulginRating by remember {
         mutableStateOf(sessionToEdit?.shulginRating ?: "")
@@ -90,18 +92,19 @@ fun SessionEditorScreen(
     // Stable provisional id for events of a not-yet-saved session. Events are
     // persisted immediately when added, so they need an id that can be
     // re-parented to the real session id on save (and purged on discard).
-    val draftSessionId = remember { "session:draft:${currentTimeMillis()}" }
+    val draftSessionId = remember { "session:draft:${currentTimeMillis()}_${Random.nextInt(0, 0x10000).toString(16)}" }
 
     // End time validation
     val endTimeValue = endTime
 
     // Discard confirmation
     var showDiscardDialog by remember { mutableStateOf(false) }
+    val originalDoseIds = remember(sessionToEdit?.id) {
+        sessionToEdit?.let { repo.dosesForSession(it.id).map { d -> d.id }.toSet() } ?: emptySet()
+    }
     val hasUnsavedChanges by remember {
         derivedStateOf {
             val s = sessionToEdit
-            val originalDoseIds = s?.let { repo.dosesForSession(it.id).map { d -> d.id }.toSet() }
-                ?: emptySet()
             val currentDoseIds = sessionDoses.map { it.id }.toSet()
             val originalProfile = s?.profile
             title != (s?.title ?: "") ||
@@ -112,6 +115,7 @@ fun SessionEditorScreen(
             intention != (s?.intention ?: "") ||
             outcome != (s?.outcome ?: "") ||
             notes != (s?.notes ?: "") ||
+            tags != (s?.tags?.joinToString(", ") ?: "") ||
             rating != (s?.rating?.toString() ?: "") ||
             shulginRating != (s?.shulginRating ?: "") ||
             profileAge != (originalProfile?.age?.toString() ?: "") ||
@@ -152,7 +156,7 @@ fun SessionEditorScreen(
 
     fun saveSession() {
         val now = currentTimeMillis()
-        val sessionId = sessionToEdit?.id ?: "session:${now}"
+        val sessionId = sessionToEdit?.id ?: "session:${now}_${Random.nextInt(0, 0x10000).toString(16)}"
         val session = Session(
             id = sessionId,
             title = title.ifBlank { "Untitled Session" },
@@ -165,15 +169,16 @@ fun SessionEditorScreen(
             intention = intention.ifBlank { null },
             outcome = outcome.ifBlank { null },
             notes = notes.ifBlank { null },
+            tags = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
             rating = if (useShulgin) {
                 shulginRating.let { s -> ShulginRating.entries.find { it.name == s }?.numericValue }
-            } else rating.toIntOrNull(),
+            } else rating.toIntOrNull()?.coerceIn(1, 10),
             shulginRating = if (useShulgin) shulginRating.ifBlank { null } else null,
             checkins = sessionToEdit?.checkins ?: emptyList(),
             profile = buildProfile(),
             createdAt = sessionToEdit?.createdAt ?: now,
             updatedAt = now,
-            deviceOrigin = sessionToEdit?.deviceOrigin ?: "desktop"
+            deviceOrigin = sessionToEdit?.deviceOrigin ?: platformDeviceOrigin()
         )
         repo.upsertSession(session)
 
@@ -358,7 +363,8 @@ fun SessionEditorScreen(
                 setting = setting, onSettingChange = { setting = it },
                 intention = intention, onIntentionChange = { intention = it },
                 outcome = outcome, onOutcomeChange = { outcome = it },
-                notes = notes, onNotesChange = { notes = it }
+                notes = notes, onNotesChange = { notes = it },
+                tags = tags, onTagsChange = { tags = it }
             )
         }
 
@@ -382,7 +388,7 @@ fun SessionEditorScreen(
             SessionDoseSection(
                 sessionDoses = sessionDoses,
                 interactionCheckResult = interactionCheckResult,
-                substanceNameLookup = { id -> repo.getSubstance(id)?.name ?: stripPrefix(id) },
+                substanceNameLookup = { id -> substanceNameById[id] ?: stripPrefix(id) },
                 onAddDose = {
                     editingDose = null
                     showDoseDialog = true

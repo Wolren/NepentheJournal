@@ -1,5 +1,6 @@
 package app.journal.ui.substances
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +29,7 @@ import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
+import app.journal.ui.session.timeline.formatDoseAmount
 import app.journal.ui.substances.detail.*
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
@@ -34,6 +37,19 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+
+private val DosageBandOrder = listOf("threshold", "light", "common", "strong", "heavy")
+private val DosageBandLabels = mapOf(
+    "threshold" to "Thresh", "light" to "Light",
+    "common" to "Common", "strong" to "Strong", "heavy" to "Heavy"
+)
+private val DosageBandColors = mapOf(
+    "threshold" to Color(0xFF9E9E9E),
+    "light" to Color(0xFF66BB6A),
+    "common" to Color(0xFF42A5F5),
+    "strong" to Color(0xFFFFA726),
+    "heavy" to Color(0xFFEF5350)
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,10 +61,14 @@ fun SubstanceDetailScreen(
     onCompanion: () -> Unit = {},
     onOpenSubstance: (String) -> Unit = {},
 ) {
-    val substance = remember(substanceId) { repo.getSubstance(substanceId) }
     val allInteractions by repo.interactions.collectAsState()
     val allDoses by repo.doses.collectAsState()
     val allSubstances by repo.substances.collectAsState()
+    val allSessions by repo.sessions.collectAsState()
+    val substance = remember(substanceId, allSubstances) {
+        allSubstances.find { it.id == substanceId } ?: repo.getSubstance(substanceId)
+    }
+    val sessionById = remember(allSessions) { allSessions.associateBy { it.id } }
     // Name lookup for cross-tolerance chips: exact match first, then
     // case-insensitive, so resolvable chips navigate to that substance.
     val substanceIdByName = remember(allSubstances) {
@@ -61,8 +81,12 @@ fun SubstanceDetailScreen(
 
     if (substance == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Substance not found", style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Substance not found", style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+                AppButton(onClick = onBack) { Text("Go back") }
+            }
         }
         return
     }
@@ -75,6 +99,9 @@ fun SubstanceDetailScreen(
 
     val allDosesForSubstance = remember(allDoses, substanceId) {
         allDoses.filter { it.substanceId == substanceId }
+    }
+    val sortedDosesForSubstance = remember(allDosesForSubstance) {
+        allDosesForSubstance.sortedByDescending { it.timestamp }
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
@@ -91,7 +118,7 @@ fun SubstanceDetailScreen(
         actions = {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                    Icon(Icons.Default.MoreVert, contentDescription = "Substance options")
                 }
                 DropdownMenu(
                     expanded = menuExpanded,
@@ -122,16 +149,52 @@ fun SubstanceDetailScreen(
         // Greeting / top section
         item {
             Spacer(Modifier.height(4.dp))
-            SelectableText(substance.name, style = MaterialTheme.typography.headlineMedium.copy(
-                fontWeight = FontWeight.Bold
-            ))
-            if (substance.aliases.isNotEmpty()) {
-                SelectableText(
-                    text = substance.aliases.joinToString(", "),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
+            // DoseWiki rows carry the exact site slug in dw:{slug}; other rows
+            // fall back to a slugified name (verified pattern: dose.wiki/<slug>
+            // returns 200, e.g. /lsd).
+            val dwSlug = remember(substance.id, substance.name) {
+                if (substance.id.startsWith("dw:")) substance.id.removePrefix("dw:")
+                else substance.name.lowercase()
+                    .replace(Regex("[^a-z0-9]+"), "-").trim('-')
+            }
+            val uriHandler = LocalUriHandler.current
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    SelectableText(substance.name, style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    ))
+                    if (substance.aliases.isNotEmpty()) {
+                        SelectableText(
+                            text = substance.aliases.joinToString(", "),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    val dwIcon = remember { BrandIcons.get("dosewiki") }
+                    val pwIcon = remember { BrandIcons.get("psychonautwiki") }
+                    val wikiIcon = remember { BrandIcons.get("wikipedia") }
+                    if (dwIcon != null) {
+                        IconButton(onClick = { uriHandler.openUri("https://dose.wiki/$dwSlug") }) {
+                            Image(dwIcon, contentDescription = "Open DoseWiki article",
+                                modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)))
+                        }
+                    }
+                    if (pwIcon != null) {
+                        IconButton(onClick = { uriHandler.openUri("https://psychonautwiki.org/wiki/${substance.name.replace(" ", "_")}") }) {
+                            Image(pwIcon, contentDescription = "Open PsychonautWiki article",
+                                modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    if (wikiIcon != null) {
+                        IconButton(onClick = { uriHandler.openUri("https://en.wikipedia.org/wiki/Special:Search?search=${substance.name.replace(" ", "+")}") }) {
+                            Image(wikiIcon, contentDescription = "Open Wikipedia article",
+                                modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(4.dp))
             if (substance.substanceClass.isNotEmpty()) {
@@ -181,68 +244,14 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Full articles on external references
-        item {
-            val uriHandler = LocalUriHandler.current
-            // DoseWiki rows carry the exact site slug in dw:{slug}; other rows
-            // fall back to a slugified name (verified pattern: dose.wiki/<slug>
-            // returns 200, e.g. /lsd).
-            val dwSlug = remember(substance.id, substance.name) {
-                if (substance.id.startsWith("dw:")) substance.id.removePrefix("dw:")
-                else substance.name.lowercase()
-                    .replace(Regex("[^a-z0-9]+"), "-").trim('-')
-            }
-            val articles = remember(substance.name, dwSlug) {
-                listOf(
-                    Triple("DoseWiki", "dose.wiki",
-                        "https://dose.wiki/$dwSlug"),
-                    Triple("PsychonautWiki", "psychonautwiki.org",
-                        "https://psychonautwiki.org/wiki/${substance.name.replace(" ", "_")}"),
-                    Triple("Wikipedia", "wikipedia.org",
-                        "https://en.wikipedia.org/wiki/Special:Search?search=${substance.name.replace(" ", "+")}")
-                )
-            }
-            SectionCard(title = "Full Articles") {
-                articles.forEach { (title, host, url) ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clickable { uriHandler.openUri(url) }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(title, style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium)
-                            Text(host, style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Icon(Icons.Default.OpenInNew, contentDescription = "Open $title",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-        }
-
         // Dosage
         if (substance.dosageBands.isNotEmpty()) {
             item {
                 SectionCard(title = "Dosage") {
-                    val orderedBands = listOf("threshold", "light", "common", "strong", "heavy")
-                    val bandLabels = mapOf(
-                        "threshold" to "Thresh", "light" to "Light",
-                        "common" to "Common", "strong" to "Strong", "heavy" to "Heavy"
-                    )
-                    val bandColors = mapOf(
-                        "threshold" to Color(0xFF9E9E9E),
-                        "light" to Color(0xFF66BB6A),
-                        "common" to Color(0xFF42A5F5),
-                        "strong" to Color(0xFFFFA726),
-                        "heavy" to Color(0xFFEF5350)
-                    )
-                    val entries = orderedBands.mapNotNull { band ->
-                        substance.dosageBands[band]?.let { band to it }
+                    val entries = remember(substance.dosageBands) {
+                        DosageBandOrder.mapNotNull { band ->
+                            substance.dosageBands[band]?.let { band to it }
+                        }
                     }
                     if (entries.isNotEmpty()) {
                         Row(
@@ -251,7 +260,7 @@ fun SubstanceDetailScreen(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             entries.forEach { (band, value) ->
-                                val color = bandColors[band] ?: Color.Gray
+                                val color = DosageBandColors[band] ?: Color.Gray
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.weight(1f)
@@ -271,7 +280,7 @@ fun SubstanceDetailScreen(
                                     ) {}
                                     Spacer(Modifier.height(2.dp))
                                     Text(
-                                        bandLabels[band] ?: band,
+                                        DosageBandLabels[band] ?: band,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = color.copy(alpha = 0.8f)
                                     )
@@ -374,15 +383,19 @@ fun SubstanceDetailScreen(
         // Cross-tolerances
         if (substance.crossTolerances.isNotEmpty()) {
             item {
-                val toleranceTimes = substance.crossTolerances.filter {
-                    it.startsWith("Full tolerance:") || it.startsWith("Half tolerance:") ||
-                    it.startsWith("Zero tolerance:")
-                }.map { cleanWikiMarkup(it) }
+                val toleranceTimes = remember(substance.crossTolerances) {
+                    substance.crossTolerances.filter {
+                        it.startsWith("Full tolerance:") || it.startsWith("Half tolerance:") ||
+                        it.startsWith("Zero tolerance:")
+                    }.map { cleanWikiMarkup(it) }
+                }
 
-                val crossSubstances = substance.crossTolerances.filter {
-                    !it.startsWith("Full tolerance:") && !it.startsWith("Half tolerance:") &&
-                    !it.startsWith("Zero tolerance:")
-                }.map { cleanWikiMarkup(it) }
+                val crossSubstances = remember(substance.crossTolerances) {
+                    substance.crossTolerances.filter {
+                        !it.startsWith("Full tolerance:") && !it.startsWith("Half tolerance:") &&
+                        !it.startsWith("Zero tolerance:")
+                    }.map { cleanWikiMarkup(it) }
+                }
 
                 SectionCard(title = "Tolerance") {
                     if (toleranceTimes.isNotEmpty()) {
@@ -568,9 +581,8 @@ fun SubstanceDetailScreen(
             }
         }
         if (allDosesForSubstance.isNotEmpty()) {
-            val sorted = allDosesForSubstance.sortedByDescending { it.timestamp }
-            items(sorted, key = { it.id }) { dose ->
-                val session = repo.getSession(dose.sessionId)
+            items(sortedDosesForSubstance, key = { it.id }) { dose ->
+                val session = sessionById[dose.sessionId]
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     modifier = Modifier.fillMaxWidth()
@@ -580,8 +592,8 @@ fun SubstanceDetailScreen(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 buildString {
-                                    append("${dose.amount} ")
-                                    if (dose.isDoseEstimate) append("\u00B1${dose.estimatedDoseStandardDeviation} ")
+                                    append("${formatDoseAmount(dose.amount)} ")
+                                    if (dose.isDoseEstimate) append("\u00B1${(dose.estimatedDoseStandardDeviation?.let { formatDoseAmount(it) } ?: "?")} ")
                                     append("${dose.unit} - ${dose.routeOfAdministration}")
                                     if (dose.redosing) append(" (redose)")
                                 }.toString(),

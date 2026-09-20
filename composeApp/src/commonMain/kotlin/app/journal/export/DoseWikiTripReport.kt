@@ -218,7 +218,7 @@ fun buildDoseWikiReport(
             peak = phase(PEAK_TYPES),
             offset = phase(OFFSET_TYPES),
             conclusion = session.outcome?.trim()?.takeIf { it.isNotEmpty() },
-            tags = emptyList()
+            tags = session.tags
         ),
         contact_email = person?.contactEmail?.trim()?.takeIf { it.isNotEmpty() },
         may_contact = person?.mayContact == true,

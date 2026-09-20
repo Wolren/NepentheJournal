@@ -2,6 +2,15 @@ package app.journal.ui.session.live
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.SentimentDissatisfied
+import androidx.compose.material.icons.filled.SentimentVerySatisfied
+import androidx.compose.material.icons.filled.Sick
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -14,6 +23,22 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
+
+private val MoodOptions = listOf("Calm", "Euphoric", "Anxious", "Focused", "Tired", "Awestruck", "Introspective", "Happy", "Overwhelmed", "Peaceful")
+
+// System emoji render inconsistently across platforms (notably Windows),
+// so effects use themed Material icons instead of unicode emoji.
+private val EffectOptions = listOf(
+    "Euphoria" to Icons.Default.SentimentVerySatisfied,
+    "Stimulation" to Icons.Default.Bolt,
+    "Sedation" to Icons.Default.Bedtime,
+    "Introspection" to Icons.Default.Psychology,
+    "Anxiety" to Icons.Default.SentimentDissatisfied,
+    "Nausea" to Icons.Default.Sick,
+    "Body high" to Icons.Default.Whatshot,
+    "Clarity" to Icons.Default.Lightbulb
+)
 
 @Composable
 internal fun QuickMoodDialog(
@@ -22,15 +47,15 @@ internal fun QuickMoodDialog(
     substances: List<app.journal.model.Substance> = emptyList(),
     onDismiss: () -> Unit,
 ) {
-    val now = currentTimeMillis()
+    val now = remember(session.id) { currentTimeMillis() }
     var mood by remember { mutableStateOf("") }
     var intensity by remember { mutableStateOf(5f) }
     var note by remember { mutableStateOf("") }
 
-    val moodOptions = listOf("Calm", "Euphoric", "Anxious", "Focused", "Tired", "Awestruck", "Introspective", "Happy", "Overwhelmed", "Peaceful")
-    val effectOptions = listOf("Euphoria" to "\uD83D\uDE0A", "Stimulation" to "\u26A1", "Sedation" to "\uD83D\uDE0C",
-        "Introspection" to "\uD83E\uDDE0", "Anxiety" to "\uD83D\uDE30", "Nausea" to "\uD83E\uDD22", "Body high" to "\uD83D\uDD25", "Clarity" to "\uD83D\uDCA1")
+    val moodOptions = MoodOptions
+    val effectOptions = EffectOptions
     val activeEffects = remember { mutableStateListOf<String>() }
+    val canSave = mood.isNotBlank() || note.isNotBlank() || activeEffects.isNotEmpty()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -48,9 +73,13 @@ internal fun QuickMoodDialog(
                 Slider(value = intensity, onValueChange = { intensity = it }, valueRange = 1f..10f, steps = 8)
                 Text("Effects present", style = MaterialTheme.typography.labelMedium)
                 FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    effectOptions.forEach { (name, emoji) ->
+                    effectOptions.forEach { (name, icon) ->
                         FilterChip(selected = name in activeEffects, onClick = { if (name in activeEffects) activeEffects.remove(name) else activeEffects.add(name) },
-                            label = { Text("$emoji $name", style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(28.dp))
+                            leadingIcon = {
+                                Icon(icon, contentDescription = null,
+                                    modifier = Modifier.size(16.dp))
+                            },
+                            label = { Text(name, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(28.dp))
                     }
                 }
                 OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Notes (optional)") },
@@ -65,9 +94,9 @@ internal fun QuickMoodDialog(
                 repo.upsertTimelineEvent(TimelineEvent(id = "event:mood:${now}_${session.id}", sessionId = session.id,
                     timestamp = now, eventType = TimelineEventType.OBSERVATION, label = label,
                     body = combinedNote.ifBlank { null }, intensity = intensity, createdAt = now, updatedAt = now,
-                    deviceOrigin = "desktop"))
+                    deviceOrigin = platformDeviceOrigin()))
                 onDismiss()
-            }) { Text("Save") }
+            }, enabled = canSave) { Text("Save") }
         },
         dismissButton = { AppTextButton(onClick = onDismiss) { Text("Cancel") } }
     )

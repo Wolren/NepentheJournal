@@ -16,7 +16,9 @@ import app.journal.data.IJournalRepository
 import app.journal.model.Session
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
+import androidx.compose.ui.semantics.Role
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -39,7 +41,7 @@ internal fun PhaseChip(label: String, eventType: TimelineEventType, session: Ses
             sessionId = session.id, timestamp = now,
             eventType = eventType, label = label,
             body = note?.ifBlank { null },
-            createdAt = now, updatedAt = now, deviceOrigin = "desktop",
+            createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin(),
         ))
     }
 
@@ -71,6 +73,8 @@ internal fun PhaseChip(label: String, eventType: TimelineEventType, session: Ses
             modifier = Modifier.fillMaxWidth().combinedClickable(
                 onClick = { logPhase(null) },
                 onLongClick = { showNoteDialog = true },
+                onLongClickLabel = "Add note",
+                role = Role.Button,
             ),
             contentAlignment = Alignment.Center
         ) {

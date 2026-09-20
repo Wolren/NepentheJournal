@@ -60,5 +60,11 @@ data class Session(
     val consumerName: String? = null,
     /** Individual assigned to this trip. Owns the trip demographics at export time. */
     val personId: String? = null,
-    val profile: SessionProfile? = null
+    val profile: SessionProfile? = null,
+    /** Free tags for this session; exported to the dose.wiki trip report. */
+    val tags: List<String> = emptyList(),
+    /** Live-session pause bookkeeping: ms accumulated in earlier pauses. */
+    val pausedMs: Long = 0L,
+    /** Non-null while the live timer is paused: wall time the pause started. */
+    val pausedAt: Long? = null
 ) : VaultDocument

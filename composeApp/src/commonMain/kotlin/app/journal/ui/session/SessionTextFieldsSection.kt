@@ -12,7 +12,8 @@ fun SessionTextFieldsSection(
     setting: String, onSettingChange: (String) -> Unit,
     intention: String, onIntentionChange: (String) -> Unit,
     outcome: String, onOutcomeChange: (String) -> Unit,
-    notes: String, onNotesChange: (String) -> Unit
+    notes: String, onNotesChange: (String) -> Unit,
+    tags: String, onTagsChange: (String) -> Unit
 ) {
     OutlinedTextField(
         value = set,
@@ -56,6 +57,15 @@ fun SessionTextFieldsSection(
         label = { Text("Notes") },
         placeholder = { Text("Freeform notes, observations...") },
         minLines = 3, maxLines = 8,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(8.dp))
+    OutlinedTextField(
+        value = tags,
+        onValueChange = onTagsChange,
+        label = { Text("Tags") },
+        placeholder = { Text("Comma separated: first time, nature, low dose...") },
+        singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
 }

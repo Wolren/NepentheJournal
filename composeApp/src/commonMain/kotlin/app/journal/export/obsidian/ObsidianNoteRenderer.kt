@@ -115,7 +115,7 @@ fun renderSessionToObsidianNote(
         appendLine()
 
         // ---- Title ----
-        append("# $titleText — $dateTimeStr")
+        append("# $titleText: $dateTimeStr")
         appendLine()
         appendLine()
 
@@ -245,7 +245,7 @@ fun renderSessionToObsidianNote(
         appendLine("---")
         appendLine()
         appendLine("> [!INFO] Nepenthe Journal Data")
-        appendLine("> Machine-readable block — edit the sections above and re-import to sync.")
+        appendLine("> Machine-readable block: edit the sections above and re-import to sync.")
         appendLine()
         appendLine(BLOCK_OPEN)
         append(json)

@@ -18,7 +18,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -40,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -82,10 +86,10 @@ enum class Screen(
     val filledIcon: ImageVector,
     val outlinedIcon: ImageVector
 ) {
-    DASHBOARD("Board", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
+    DASHBOARD("Dashboard", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
     SESSIONS("Sessions", Icons.AutoMirrored.Filled.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
-    SUBSTANCES("Drugs", Icons.Filled.Science, Icons.Outlined.Science),
-    SAFER("Safe", Icons.Filled.Warning, Icons.Outlined.Warning),
+    SUBSTANCES("Substances", Icons.Filled.Science, Icons.Outlined.Science),
+    SAFER("Safety", Icons.Filled.Warning, Icons.Outlined.Warning),
     SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
@@ -96,7 +100,8 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeConfig by themeManager.config.collectAsState()
 
     // ── Data integrity: startup recovery dialog ──
-    val journalStore = remember { JournalStore(repo as JournalRepository) }
+    val concreteRepo = remember(repo) { (repo as? JournalRepository) ?: JournalRepository.instance }
+    val journalStore = remember(concreteRepo) { JournalStore(concreteRepo) }
     var showRecoveryDialog by remember { mutableStateOf(false) }
     var recoveryMessage by remember { mutableStateOf("") }
 
@@ -158,7 +163,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
-    val syncEngine = remember { createSyncEngine(JournalRepository.instance) }
+    val syncEngine = remember(concreteRepo) { createSyncEngine(concreteRepo) }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     val showArch by sessionListViewModel.showArchived.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
@@ -197,13 +202,17 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                     )
 
                     // Foreground content
-                    val editingSession = editingSessionId?.let { id ->
-                        if (id == "__new__") null
-                        else repo.getSession(id)
+                    val editingSession = remember(editingSessionId) {
+                        editingSessionId?.let { id ->
+                            if (id == "__new__") null
+                            else repo.getSession(id)
+                        }
                     }
-                    val editingSubstance = editingSubstanceId?.let { id ->
-                        if (id == "__new__") null
-                        else repo.getSubstance(id)
+                    val editingSubstance = remember(editingSubstanceId) {
+                        editingSubstanceId?.let { id ->
+                            if (id == "__new__") null
+                            else repo.getSubstance(id)
+                        }
                     }
 
                     val stableTimelineId = selectedTimelineSessionId
@@ -277,10 +286,13 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                 )
                             }
                             NavigationState.LiveSession -> {
-                                val session = stableLiveId?.let { id ->
-                                    if (id == "__new__") null
-                                    else repo.getSession(id)
+                                val session = remember(stableLiveId) {
+                                    stableLiveId?.let { id ->
+                                        if (id == "__new__") null
+                                        else repo.getSession(id)
+                                    }
                                 }
+                                var liveCreateError by remember { mutableStateOf<String?>(null) }
                                 if (session != null) {
                                     LiveSessionScreen(
                                         repo = repo,
@@ -289,10 +301,19 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                     )
                                 } else {
                                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("Starting session...")
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Starting session...")
+                                            liveCreateError?.let { err ->
+                                                Spacer(Modifier.height(8.dp))
+                                                Text(err, color = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
                                     }
-                                    LaunchedEffect(Unit) {
-                                        val now = currentTimeMillis()
+                                    val liveCreateKey = stableLiveId
+                                    LaunchedEffect(liveCreateKey) {
+                                        if (liveCreateKey != "__new__") return@LaunchedEffect
+                                        try {
+                                            val now = currentTimeMillis()
                                         val newSession = Session(
                                             id = "session:live:${now}",
                                             title = "Live Session",
@@ -302,6 +323,9 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                         )
                                         repo.upsertSession(newSession)
                                         liveSessionId = newSession.id
+                                        } catch (e: Exception) {
+                                            liveCreateError = "Could not start session: ${e.message ?: "unknown error"}"
+                                        }
                                     }
                                 }
                             }
@@ -432,7 +456,13 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                                 viewModel = sessionListViewModel,
                                                 onNewSession = { editingSessionId = "__new__" },
                                                 onEditSession = { id -> editingSessionId = id },
-                                                onSessionClick = { id -> selectedTimelineSessionId = id },
+                                                onSessionClick = { id ->
+                                                    // Ongoing sessions open the live card with its
+                                                    // ingestion options; ended sessions open the
+                                                    // read-only timeline.
+                                                    if (repo.getSession(id)?.endTime == null) liveSessionId = id
+                                                    else selectedTimelineSessionId = id
+                                                },
                                                 onLiveSession = { liveSessionId = "__new__" },
                                                 timeDisplayMode = timeDisplayMode,
                                                 onCycleTimeDisplay = {
