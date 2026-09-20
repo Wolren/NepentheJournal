@@ -126,70 +126,6 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
         }
     }
 
-    // ── Recovery dialog ──
-    if (showRecoveryDialog) {
-        AlertDialog(
-            onDismissRequest = { showRecoveryDialog = false },
-            title = { Text("Data Recovery Notice") },
-            text = {
-                Text("Your journal data had issues when loading:\n\n$recoveryMessage\n\nDo you want to continue with the partially recovered data or restore from the previous backup (.bak)?")
-            },
-            confirmButton = {
-                TextButton(onClick = { showRecoveryDialog = false }) {
-                    Text("Continue")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    val restored = journalStore.restoreFromBackup()
-                    if (restored) {
-                        recoveryMessage = "Restored from backup successfully."
-                    } else {
-                        recoveryMessage = "No backup available to restore from."
-                    }
-                    showRecoveryDialog = false
-                }) {
-                    Text("Restore from backup")
-                }
-            }
-        )
-    }
-
-    // ── First run: welcome + profile prompt ──
-    val persons by repo.persons.collectAsState()
-    val welcomeCompleted by repo.welcomeCompleted.collectAsState()
-    var showProfileEditor by remember { mutableStateOf(false) }
-    if (!welcomeCompleted && persons.isEmpty()) {
-        AlertDialog(
-            onDismissRequest = { repo.setWelcomeCompleted(true) },
-            title = { Text("Welcome to Nepenthe Journal") },
-            text = {
-                Text(
-                    "Trips belong to individuals. Create your profile so doses, timelines " +
-                        "and dose.wiki exports carry the right demographics from the start. " +
-                        "You can add more individuals later in Settings, Individuals."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showProfileEditor = true }) { Text("Create profile") }
-            },
-            dismissButton = {
-                TextButton(onClick = { repo.setWelcomeCompleted(true) }) { Text("Skip") }
-            }
-        )
-    }
-    if (showProfileEditor) {
-        PersonEditorDialog(
-            initial = null,
-            onDismiss = { showProfileEditor = false },
-            onSave = { person ->
-                repo.upsertPerson(person)
-                showProfileEditor = false
-                repo.setWelcomeCompleted(true)
-            }
-        )
-    }
-
     var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
     var editingSessionId by remember { mutableStateOf<String?>(null) }
     var selectedTimelineSessionId by remember { mutableStateOf<String?>(null) }
@@ -214,6 +150,69 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
             typography = NepentheTypography,
             shapes = themeConfig.shapes
         ) {
+            // ── Recovery dialog ──
+            if (showRecoveryDialog) {
+                AlertDialog(
+                    onDismissRequest = { showRecoveryDialog = false },
+                    title = { Text("Data Recovery Notice") },
+                    text = {
+                        Text("Your journal data had issues when loading:\n\n$recoveryMessage\n\nDo you want to continue with the partially recovered data or restore from the previous backup (.bak)?")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showRecoveryDialog = false }) {
+                            Text("Continue")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            val restored = journalStore.restoreFromBackup()
+                            if (restored) {
+                                recoveryMessage = "Restored from backup successfully."
+                            } else {
+                                recoveryMessage = "No backup available to restore from."
+                            }
+                            showRecoveryDialog = false
+                        }) {
+                            Text("Restore from backup")
+                        }
+                    }
+                )
+            }
+
+            // ── First run: welcome + profile prompt ──
+            val persons by repo.persons.collectAsState()
+            val welcomeCompleted by repo.welcomeCompleted.collectAsState()
+            var showProfileEditor by remember { mutableStateOf(false) }
+            if (!welcomeCompleted && persons.isEmpty()) {
+                AlertDialog(
+                    onDismissRequest = { repo.setWelcomeCompleted(true) },
+                    title = { Text("Welcome to Nepenthe Journal") },
+                    text = {
+                        Text(
+                            "Trips belong to individuals. Create your profile so doses, timelines " +
+                                "and dose.wiki exports carry the right demographics from the start. " +
+                                "You can add more individuals later in Settings, Individuals."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showProfileEditor = true }) { Text("Create profile") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { repo.setWelcomeCompleted(true) }) { Text("Skip") }
+                    }
+                )
+            }
+            if (showProfileEditor) {
+                PersonEditorDialog(
+                    initial = null,
+                    onDismiss = { showProfileEditor = false },
+                    onSave = { person ->
+                        repo.upsertPerson(person)
+                        showProfileEditor = false
+                        repo.setWelcomeCompleted(true)
+                    }
+                )
+            }
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = colorScheme.background
