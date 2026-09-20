@@ -19,7 +19,9 @@ fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 
 @Composable
 fun activityLevelColors(): List<Color> {
     val scheme = MaterialTheme.colorScheme
-    val base = scheme.surfaceVariant
+    // Empty-cell base is lifted off surfaceVariant (the card behind the grid
+    // is surfaceVariant too, so a raw surfaceVariant grid goes invisible).
+    val base = blend(scheme.surfaceVariant, scheme.onSurfaceVariant, 0.22f)
     return listOf(
         base,
         blend(base, scheme.primary, 0.30f),
