@@ -103,11 +103,14 @@ private val stageLabelMap = mapOf(
 )
 
 /**
- * Parse phases from DoseWiki structured duration data.
- * Uses the first route's stages. The stage names map directly to phase labels.
+ * Parse phases from DoseWiki structured duration data for one route.
+ * The stage names map directly to phase labels.
  */
-private fun parseDoseWikiDuration(duration: DoseWikiDuration): List<DurationPhase> {
-    val stages = duration.routes?.firstOrNull()?.stages ?: return emptyList()
+private fun parseDoseWikiDuration(
+    duration: DoseWikiDuration,
+    routeIndex: Int = 0,
+): List<DurationPhase> {
+    val stages = duration.routes?.getOrNull(routeIndex)?.stages ?: return emptyList()
 
     val stageKeys = listOf("onset", "come_up", "peak", "offset", "after_effects")
 
@@ -141,10 +144,13 @@ private fun parseDoseWikiDuration(duration: DoseWikiDuration): List<DurationPhas
 }
 
 /**
- * Get the total duration stage from DoseWiki data.
+ * Get the total duration stage from DoseWiki data for one route.
  */
-private fun getDoseWikiTotal(duration: DoseWikiDuration): Triple<Double?, Double?, String>? {
-    val totalStage = duration.routes?.firstOrNull()?.stages?.total_duration ?: return null
+private fun getDoseWikiTotal(
+    duration: DoseWikiDuration,
+    routeIndex: Int = 0,
+): Triple<Double?, Double?, String>? {
+    val totalStage = duration.routes?.getOrNull(routeIndex)?.stages?.total_duration ?: return null
     val parsed = stageToMinutes(totalStage) ?: return null
     return Triple(parsed.first, parsed.second, formatStage(totalStage))
 }
@@ -154,11 +160,16 @@ internal fun DurationTimelineSection(
     profile: Map<String, String>,
     doseWikiDuration: DoseWikiDuration? = null
 ) {
-    val doseWikiPhases = remember(doseWikiDuration) {
-        doseWikiDuration?.let { parseDoseWikiDuration(it) }
+    // Route selector when DoseWiki carries stages for several routes.
+    var routeIndex by remember(doseWikiDuration) { mutableStateOf(0) }
+    val dwRoutes = doseWikiDuration?.routes.orEmpty()
+    val validRouteIndex = routeIndex.coerceIn(0, maxOf(dwRoutes.size - 1, 0))
+    val doseWikiPhases = remember(doseWikiDuration, validRouteIndex) {
+        doseWikiDuration?.let { parseDoseWikiDuration(it, validRouteIndex) }
     }
-    val phases = remember(doseWikiDuration, profile) {
-        doseWikiPhases ?: parseDurationProfile(profile)
+    val phases = remember(doseWikiDuration, validRouteIndex, profile) {
+        val dw = doseWikiPhases?.takeIf { it.isNotEmpty() }
+        dw ?: parseDurationProfile(profile)
     }
 
     val totalMax: Double
@@ -167,7 +178,7 @@ internal fun DurationTimelineSection(
     val totalMaxStr: String
 
     if (doseWikiDuration != null) {
-        val total = getDoseWikiTotal(doseWikiDuration)
+        val total = getDoseWikiTotal(doseWikiDuration, validRouteIndex)
         if (total != null) {
             totalMax = total.second ?: total.first ?: phases.maxOfOrNull { it.maxMinutes } ?: return
             totalRaw = total.third
@@ -222,6 +233,30 @@ internal fun DurationTimelineSection(
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Duration", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+            // Per-route selector when several DoseWiki routes carry stages.
+            if (dwRoutes.size > 1) {
+                Spacer(Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    dwRoutes.forEachIndexed { idx, route ->
+                        val selected = idx == validRouteIndex
+                        FilterChip(
+                            selected = selected,
+                            onClick = { routeIndex = idx },
+                            label = {
+                                Text(
+                                    route.route?.replaceFirstChar { it.uppercase() }
+                                        ?: "Route ${idx + 1}",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
 
             // 2D intensity-over-time curve (ggplot2 style)

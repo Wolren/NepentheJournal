@@ -31,6 +31,95 @@ class DoseWikiIngestorTest {
     }
 
     @Test
+    fun createsMissingSubstancesAsPrimary() {
+        val repo = JournalRepository()
+
+        DoseWikiIngestor.ensureIngested(repo)
+
+        val created = repo.substances.value.firstOrNull { it.id == "dw:testlsd" }
+        assertNotNull(created, "unmatched DoseWiki entry should be created as dw:testlsd")
+        assertEquals("A powerful psychedelic substance for testing", created.summary)
+        assertEquals(listOf("Euphoria", "Stimulation"), created.effects)
+        assertTrue("dosewiki" in created.sources, "created row should be tagged dosewiki")
+        assertEquals("dw-v1", created.sourceVersion)
+        assertTrue(repo.substances.value.any { it.id == "dw:testmix" }, "TestMix should be created too")
+    }
+
+    @Test
+    fun overwritesStaleSeedFields() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(
+            sub("sub:test1", "TestLSD").copy(
+                summary = "OLD stale summary",
+                substanceClass = listOf("placeholder"),
+            )
+        )
+
+        DoseWikiIngestor.ensureIngested(repo)
+
+        val updated = repo.substances.value.first { it.id == "sub:test1" }
+        assertEquals(
+            "A powerful psychedelic substance for testing",
+            updated.summary,
+            "DoseWiki summary should overwrite the stale seed value"
+        )
+        assertEquals("10-75 ug", updated.dosageBands["light"])
+        assertEquals("75-150 ug", updated.dosageBands["common"])
+        assertEquals("20-40 minutes", updated.durationProfile["onset"])
+        assertTrue("Test Acid" in updated.aliases, "aliases should merge from identification")
+        assertTrue("psychedelic" in updated.substanceClass, "classes should overwrite")
+        assertTrue("dosewiki" in updated.sources, "matched row should gain the dosewiki tag")
+        assertEquals("dw-v1", updated.sourceVersion)
+        assertEquals(listOf("Euphoria", "Stimulation"), updated.effects)
+    }
+
+    @Test
+    fun ingestsInteractionsWithReasons() {
+        val repo = JournalRepository()
+
+        DoseWikiIngestor.ensureIngested(repo)
+
+        val pair = repo.interactions.value.firstOrNull {
+            (it.substanceAId == "dw:testlsd" && it.substanceBId == "dw:testmix") ||
+                (it.substanceAId == "dw:testmix" && it.substanceBId == "dw:testlsd")
+        }
+        assertNotNull(pair, "TestLSD-TestMix interaction should be ingested")
+        assertEquals(InteractionRisk.DANGEROUS, pair.riskLevel)
+        assertEquals("Test reason text", pair.description)
+        assertEquals(listOf("dosewiki", "tripsit"), pair.sources)
+        assertTrue(
+            repo.interactions.value.none { it.substanceAId.contains("mphetamine") || it.substanceBId.contains("mphetamine") },
+            "class-level entries like Amphetamines should not create placeholder interactions"
+        )
+    }
+
+    @Test
+    fun unmatchedSeedSubstanceLeftAlone() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sub("sub:unknown", "NonexistentCompound"))
+
+        DoseWikiIngestor.ensureIngested(repo)
+
+        val untouched = repo.substances.value.first { it.id == "sub:unknown" }
+        assertNull(untouched.summary, "no DoseWiki match means no field changes")
+        assertTrue(untouched.sources.isEmpty(), "no DoseWiki match means no source tag")
+    }
+
+    @Test
+    fun parseInteractionEntrySplitsNameAndReason() {
+        val (name, reason) = DoseWikiIngestor.parseInteractionEntry("Lithium (High seizure risk here)")
+        assertEquals("Lithium", name)
+        assertEquals("High seizure risk here", reason)
+    }
+
+    @Test
+    fun parseInteractionEntryWithoutReason() {
+        val (name, reason) = DoseWikiIngestor.parseInteractionEntry("Cannabis")
+        assertEquals("Cannabis", name)
+        assertNull(reason)
+    }
+
+    @Test
     fun secondCallIsNoopDueToIngestedFlag() {
         val repo = JournalRepository()
         repo.upsertSubstance(sub("sub:test1", "TestLSD"))
@@ -54,15 +143,6 @@ class DoseWikiIngestorTest {
         DoseWikiIngestor.reset()
         DoseWikiIngestor.ensureIngested(repo)
         assertTrue(repo.effects.value.isNotEmpty(), "after reset should still ingest")
-    }
-
-    @Test
-    fun skipsUnmatchedSubstances() {
-        val repo = JournalRepository()
-        repo.upsertSubstance(sub("sub:unknown", "NonexistentCompound"))
-
-        DoseWikiIngestor.ensureIngested(repo)
-        assertEquals(0, repo.effects.value.size, "no match = no effects")
     }
 
     private fun sub(id: String, name: String) = Substance(

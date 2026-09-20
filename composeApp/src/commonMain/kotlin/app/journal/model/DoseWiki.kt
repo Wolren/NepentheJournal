@@ -6,10 +6,12 @@ import app.journal.data.AppJson
 
 /**
  * Slimmed DoseWiki substance data, deserialized directly from the bundled
- * dosewiki_slim.json. This is the PRIMARY source for subjective effect
- * descriptions. All other fields are supplementary to the PsychonautWiki seed.
+ * dosewiki_slim.json. This is the PRIMARY substance entity for Nepenthe:
+ * matched seed rows are overwritten with these fields and unmatched
+ * entries are created as dw:{slug} rows.
  *
- * DoseWiki content is CC0 public domain. See https://dose.wiki
+ * DoseWiki substance prose is CC0 1.0; the interactions field keeps
+ * TripSit non-commercial attribution terms. See https://dose.wiki/docs/license
  */
 @Serializable
 data class DoseWikiSubstance(

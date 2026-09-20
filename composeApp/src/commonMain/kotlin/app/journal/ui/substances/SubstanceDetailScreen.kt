@@ -1,6 +1,7 @@
 package app.journal.ui.substances
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,10 +42,20 @@ fun SubstanceDetailScreen(
     onBack: () -> Unit,
     onEdit: (String) -> Unit = {},
     onCompanion: () -> Unit = {},
+    onOpenSubstance: (String) -> Unit = {},
 ) {
     val substance = remember(substanceId) { repo.getSubstance(substanceId) }
     val allInteractions by repo.interactions.collectAsState()
     val allDoses by repo.doses.collectAsState()
+    val allSubstances by repo.substances.collectAsState()
+    // Name lookup for cross-tolerance chips: exact match first, then
+    // case-insensitive, so resolvable chips navigate to that substance.
+    val substanceIdByName = remember(allSubstances) {
+        buildMap {
+            allSubstances.forEach { put(it.name, it.id) }
+            allSubstances.forEach { putIfAbsent(it.name.lowercase(), it.id) }
+        }
+    }
     val themeManager = remember { ThemeManager.instance }
 
     if (substance == null) {
@@ -236,7 +247,7 @@ fun SubstanceDetailScreen(
         }
 
         // Duration
-        if (substance.durationProfile.isNotEmpty()) {
+        if (substance.durationProfile.isNotEmpty() || doseWikiDuration != null) {
             item { DurationTimelineSection(profile = substance.durationProfile, doseWikiDuration = doseWikiDuration) }
         }
 
@@ -309,7 +320,7 @@ fun SubstanceDetailScreen(
 
         // Interactions
         if (relatedInteractions.isNotEmpty()) {
-            item { InteractionsSection(interactions = relatedInteractions, substanceId = substanceId) }
+            item { InteractionsSection(interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
         }
 
         // FDA drug interaction data
@@ -370,14 +381,21 @@ fun SubstanceDetailScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             crossSubstances.forEach { sub ->
+                                val targetId = substanceIdByName[sub]
+                                    ?: substanceIdByName[sub.lowercase()]
+                                val canOpen = targetId != null && targetId != substanceId
                                 Text(
                                     sub,
                                     style = MaterialTheme.typography.labelSmall,
+                                    color = if (canOpen) MaterialTheme.colorScheme.onSecondaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier
                                         .background(
-                                            MaterialTheme.colorScheme.secondaryContainer,
+                                            if (canOpen) MaterialTheme.colorScheme.secondaryContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant,
                                             RoundedCornerShape(6.dp)
                                         )
+                                        .then(if (canOpen) Modifier.clickable { onOpenSubstance(targetId!!) } else Modifier)
                                         .padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }

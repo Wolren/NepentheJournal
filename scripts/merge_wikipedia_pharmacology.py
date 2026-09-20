@@ -467,17 +467,100 @@ def to_wikipedia_record(r: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _fold_target(name: str) -> str:
+    """Lowercase, greek to latin, punctuation to spaces."""
+    t = (name or "").lower().strip()
+    for greek, latin in (("α", "alpha"), ("β", "beta"), ("μ", "mu"),
+                         ("κ", "kappa"), ("δ", "delta")):
+        t = t.replace(greek, latin)
+    t = re.sub(r"<[^>]+>", " ", t)
+    for ch in "()[]-/_,.":
+        t = t.replace(ch, " " if ch != "." else "")
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def _target_key(name: str) -> str:
-    """Normalize target name for comparison."""
-    name = name.lower().strip()
-    # Strip common suffixes
-    name = re.sub(r'\s*\(?(receptor|transporter|protein|channel|enzyme)\)?\s*$', '', name)
-    # Normalize whitespace
-    name = re.sub(r'\s+', ' ', name)
-    # Remove html sub/sup remnants
-    name = name.replace('<sub>', '').replace('</sub>', '')
-    name = name.replace('<sup>', '').replace('</sup>', '')
-    return name.strip()
+    """Normalize target name for comparison.
+
+    Mirrors app.journal.model.TargetNormalizer (Kotlin): receptor
+    families map to canonical keys (htr2A, drd2, adra1A, hrh1, slc6a4,
+    taar1, oprm1, grm2) so cross-source spelling variants compare
+    equal. Conservative: no-subtype rows never merge into subtyped
+    rows, and D(1B) never merges into D1.
+    """
+    flat = _fold_target(name)
+    if not flat:
+        return ""
+    # Serotonin: 5-HT2A, 5HT2A, 5-hydroxytryptamine receptor 2A.
+    head = None
+    if "hydroxytryptamine" in flat:
+        after = flat.split("hydroxytryptamine", 1)[1].replace("receptor", " ").strip()
+        head = after.split(" ")[0] if after else ""
+    else:
+        mm = re.match(r"^5\s*h\s*t?\s*(.*)$", flat)
+        if mm and mm.group(1).strip():
+            head = mm.group(1).split(" ")[0]
+    if head and head[0].isdigit():
+        m = re.match(r"^(\d)([a-z]?)(l?)$", head)
+        if m:
+            sub = m.group(1) + m.group(2).upper()
+            if len(sub) > 1 and sub.endswith("L"):
+                sub = sub[:-1]
+            return "htr" + sub
+    # Dopamine: DOPAMINE D2, D2, D(1A) dopamine receptor.
+    def _digit(m):
+        if not m:
+            return None
+        if m.group(2) and m.group(2) != "a":
+            return None
+        return m.group(1)
+    dm = _digit(re.search(r"dopamine\s*d\s*([1-5])([a-z]?)(?=\s|$)", flat)) \
+        or _digit(re.match(r"^d\s*([1-5])([a-z]?)(?=\s|$)", flat)
+                  if "dopamine" in flat or re.match(r"^d\s*([1-5])$", flat) else None)
+    if dm:
+        return "drd" + dm
+    # Adrenergic alpha/beta with subtype.
+    if any(w in flat for w in ("adrenergic", "adreno", "alpha", "beta")) \
+            and "acetylcholine" not in flat and "nicotinic" not in flat:
+        a = re.search(r"alpha\s*(\d)\s*([ab]?)", flat)
+        if a and ("adrenergic" in flat or "adreno" in flat
+                  or (len(flat.split(" ")) == 1 and flat.startswith("alpha"))):
+            return "adra" + a.group(1) + a.group(2).upper()
+        b = re.search(r"beta\s*(\d)\s*", flat)
+        if b and ("adrenergic" in flat or "adreno" in flat
+                  or (len(flat.split(" ")) == 1 and flat.startswith("beta"))):
+            return "adrb" + b.group(1)
+    # Histamine H1-H4.
+    hm = re.search(r"histamine\s*h\s*([1-4])", flat) or re.match(r"^h\s*([1-4])$", flat)
+    if hm:
+        return "hrh" + hm.group(1)
+    # Monoamine transporters.
+    toks = set(flat.split(" "))
+    if "sert" in toks or ("serotonin" in flat and "transporter" in flat):
+        return "slc6a4"
+    if "dat" in toks or ("dopamine" in flat and "transporter" in flat):
+        return "slc6a3"
+    if "net" in toks or "noradrenaline transporter" in flat \
+            or "norepinephrine transporter" in flat:
+        return "slc6a2"
+    # TAAR, opioid, mGluR, NMDA.
+    if "taar" in flat or "trace amine" in flat:
+        return "taar1"
+    if "opioid" in flat or "opiate" in flat:
+        if "mu" in toks:
+            return "oprm1"
+        if "kappa" in toks:
+            return "oprk1"
+        if "delta" in toks:
+            return "oprd1"
+    mg = re.search(r"m\s*glu\s*r?\s*(\d)|metabotropic glutamate[^0-9]*(\d)", flat)
+    if mg:
+        return "grm" + (mg.group(1) or mg.group(2))
+    if "nmda" in flat:
+        return "nmda"
+    # Fallback: previous behavior (strip suffix words, html already gone).
+    name = re.sub(r"\s*\(?(receptor|transporter|protein|channel|enzyme)\)?\s*$", "", flat)
+    return "x:" + re.sub(r"\s+", " ", name).strip()
 
 
 def _ki_overlaps(rec1: dict, rec2: dict) -> bool:

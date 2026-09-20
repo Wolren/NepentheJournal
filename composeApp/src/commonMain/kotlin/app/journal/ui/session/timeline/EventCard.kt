@@ -39,20 +39,7 @@ internal fun EventCard(
     val elapsed = event.timestamp - sessionStart
     val mins = elapsed / 60000
 
-    val icon = when (event.eventType) {
-        TimelineEventType.ONSET -> Icons.Default.ArrowForward
-        TimelineEventType.COMEUP -> Icons.Default.TrendingUp
-        TimelineEventType.PEAK -> Icons.Default.Star
-        TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
-        TimelineEventType.OFFSET -> Icons.Default.TrendingDown
-        TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
-        TimelineEventType.END -> Icons.Default.Stop
-        TimelineEventType.OBSERVATION -> Icons.Default.Visibility
-        TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
-        TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
-        TimelineEventType.EMERGENCY -> Icons.Default.Error
-        TimelineEventType.NOTE -> Icons.Default.Notes
-    }
+    val icon = eventTypeIcon(event.eventType)
 
     val accent = when (event.eventType) {
         TimelineEventType.EMERGENCY, TimelineEventType.SIDE_EFFECT, TimelineEventType.NOTE -> MaterialTheme.colorScheme.error

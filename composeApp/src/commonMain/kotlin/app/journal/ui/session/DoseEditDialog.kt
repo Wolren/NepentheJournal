@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -142,7 +143,10 @@ fun DoseEditDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initialDose != null) "Edit Dose" else "Add Dose") },
         text = {
+            val dialogScroll = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxWidth()) {
             LazyColumn(
+                state = dialogScroll,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -398,6 +402,8 @@ fun DoseEditDialog(
                         )
                     }
                 }
+            }
+            DesktopScrollbar(dialogScroll)
             }
         },
         confirmButton = {

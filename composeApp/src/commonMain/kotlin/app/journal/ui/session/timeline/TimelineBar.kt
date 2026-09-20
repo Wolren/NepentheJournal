@@ -119,6 +119,28 @@ internal fun TimelineBar(
             dose.id to (repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId)
         }
     }
+
+    // Data-fitted window: map the bar to where the data is, not the empty
+    // session margins. Axis labels stay as T+ offsets from session start.
+    val dataTimes = remember(doses, events, checkins, phaseEvents, nonPhaseEvents) {
+        buildList {
+            doses.forEach { add(it.timestamp) }
+            phaseEvents.forEach { add(it.timestamp) }
+            nonPhaseEvents.forEach { add(it.timestamp) }
+            events.filter { it.intensity != null }.forEach { add(it.timestamp) }
+            checkins.forEach { add(it.timestamp) }
+        }
+    }
+    val windowPad = remember(rangeMs) { maxOf((rangeMs * 0.05).toLong(), 60_000L) }
+    val windowStart = remember(dataTimes, startTime, windowPad) {
+        if (dataTimes.isEmpty()) startTime else dataTimes.min() - windowPad
+    }
+    val windowEnd = remember(dataTimes, startTime, endTime, now, rangeMs, windowPad) {
+        if (dataTimes.isEmpty()) startTime + rangeMs
+        else if (endTime == null) maxOf(dataTimes.max(), now)
+        else dataTimes.max() + windowPad
+    }
+    val windowSpan = remember(windowStart, windowEnd) { (windowEnd - windowStart).coerceAtLeast(1L) }
     val rowH = 20.dp
     val labelW = 76.dp
     val rowGap = 4.dp
@@ -145,7 +167,7 @@ internal fun TimelineBar(
     }
 
     // Phase ribbon segments: from phase events when present, else proportional fallback.
-    val ribbonSegments = remember(phaseEvents, rangeMs) {
+    val ribbonSegments = remember(phaseEvents, windowStart, windowSpan) {
         val fallback = listOf(
             Triple("Onset", TimelineEventType.ONSET, 0f to 0.25f),
             Triple("Comeup", TimelineEventType.COMEUP, 0.25f to 0.50f),
@@ -153,15 +175,13 @@ internal fun TimelineBar(
             Triple("Offset", TimelineEventType.OFFSET, 0.75f to 1.0f),
         )
         if (phaseEvents.size >= 2) {
-            val first = phaseEvents.first().timestamp
             val last = phaseEvents.last().timestamp
-            val span = (last - first).coerceAtLeast(1L)
             val segs = mutableListOf<RibbonSegment>()
             for (i in phaseEvents.indices) {
                 val ev = phaseEvents[i]
                 val nextT = if (i + 1 < phaseEvents.size) phaseEvents[i + 1].timestamp else last
-                val startF = ((ev.timestamp - first).toFloat() / span).coerceIn(0f, 1f)
-                val endF = ((nextT - first).toFloat() / span).coerceIn(0f, 1f)
+                val startF = ((ev.timestamp - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
+                val endF = ((nextT - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
                 if (endF > startF) {
                     segs.add(
                         RibbonSegment(
@@ -197,18 +217,18 @@ internal fun TimelineBar(
         fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
     val preMeasuredLabels = remember(rows, labelStyle) {
         rows.map { row ->
-            textMeasurer.measure(row.name.take(10),
+            val short = if (row.name.length > 10) row.name.take(9) + "…" else row.name
+            textMeasurer.measure(short,
                 style = labelStyle.copy(color = foregroundFor(row.color)))
         }
     }
 
     val ribbonH = 18.dp
-    val ribbonLabelH = 13.dp
     val eventLaneH = if (nonPhaseEvents.isNotEmpty()) 18.dp else 0.dp
     val curveH = if (intensityPoints.size >= 2) 64.dp else 0.dp
     val axisH = 16.dp
     val laneBlock = (rowH + rowGap) * rows.size + rowGap
-    val canvasH = 6.dp + ribbonH + ribbonLabelH + 8.dp + laneBlock +
+    val canvasH = 6.dp + ribbonH + 8.dp + laneBlock +
         (if (eventLaneH > 0.dp) eventLaneH + 6.dp else 0.dp) +
         (if (curveH > 0.dp) curveH + 6.dp else 0.dp) + axisH + 4.dp
 
@@ -273,7 +293,6 @@ internal fun TimelineBar(
                     val rowPx = rowH.toPx()
                     val gapPx = rowGap.toPx()
                     val ribbonPx = ribbonH.toPx()
-                    val ribbonLabelPx = ribbonLabelH.toPx()
 
                     // ---- Phase ribbon ----
                     var y = 6.dp.toPx()
@@ -284,19 +303,23 @@ internal fun TimelineBar(
                         size = Size(barW, ribbonPx),
                         cornerRadius = CornerRadius(9.dp.toPx(), 9.dp.toPx())
                     )
-                    // segments
-                    ribbonSegments.forEach { seg ->
+                    // segments: one continuous bar, only the outer ends are rounded
+                    val ribbonRadius = 9.dp.toPx()
+                    ribbonSegments.forEachIndexed { segIdx, seg ->
                         val sx = barX + seg.startFrac * barW
                         val ex = barX + seg.endFrac * barW
-                        val sw = (ex - sx).coerceAtLeast(2f)
+                        // extend into neighbours so inner joints are square, not notched
+                        val drawSx = if (segIdx == 0) sx else sx - ribbonRadius
+                        val drawEx = if (segIdx == ribbonSegments.lastIndex) ex else ex + ribbonRadius
+                        val sw = (drawEx - drawSx).coerceAtLeast(2f)
                         drawRoundRect(
                             brush = Brush.horizontalGradient(
                                 listOf(seg.color.copy(alpha = 0.85f), seg.color.copy(alpha = 0.55f)),
                                 startX = sx, endX = ex
                             ),
-                            topLeft = Offset(sx, y),
+                            topLeft = Offset(drawSx, y),
                             size = Size(sw, ribbonPx),
-                            cornerRadius = CornerRadius(9.dp.toPx(), 9.dp.toPx())
+                            cornerRadius = CornerRadius(ribbonRadius, ribbonRadius)
                         )
                     }
                     // segment labels inside the band (skip narrow ones)
@@ -314,33 +337,25 @@ internal fun TimelineBar(
                                     y + (ribbonPx - m.size.height) / 2f))
                         }
                     }
-                    y += ribbonPx + ribbonLabelPx + 8.dp.toPx()
+                    y += ribbonPx + 8.dp.toPx()
 
                     // ---- Substance lanes ----
                     rows.forEachIndexed { idx, row ->
                         val ly = y + idx * (rowPx + gapPx)
-                        // Row shell: tinted rounded background + hairline outline
-                        drawRoundRect(row.color.copy(alpha = 0.07f), Offset(0f, ly), Size(w, rowPx),
-                            CornerRadius(8.dp.toPx(), 8.dp.toPx()))
-                        drawRoundRect(row.color.copy(alpha = 0.18f), Offset(0f, ly), Size(w, rowPx),
-                            CornerRadius(8.dp.toPx(), 8.dp.toPx()), style = Stroke(1.dp.toPx()))
                         // Label chip: soft solid pill
-                        drawRoundRect(row.color.copy(alpha = 0.15f), Offset(0f, ly), Size(labelPx, rowPx),
+                        drawRoundRect(row.color.copy(alpha = 0.18f), Offset(0f, ly), Size(labelPx, rowPx),
                             CornerRadius(8.dp.toPx(), 8.dp.toPx()))
-                        // Bar track: recessed well
-                        drawRoundRect(row.color.copy(alpha = 0.09f), Offset(barX, ly), Size(barW, rowPx),
+                        // Bar track: single recessed well, no nested shells
+                        drawRoundRect(row.color.copy(alpha = 0.10f), Offset(barX, ly), Size(barW, rowPx),
                             CornerRadius(8.dp.toPx(), 8.dp.toPx()))
 
                         // Phase-matched segments across the bar
                         if (row.matched.size >= 2) {
-                            val firstT = row.matched.first().timestamp
-                            val lastT = row.matched.last().timestamp
-                            val segR = (lastT - firstT).coerceAtLeast(1L)
                             for (i in 0 until row.matched.size - 1) {
                                 val cur = row.matched[i]
                                 val nxt = row.matched[i + 1]
-                                val p1 = ((cur.timestamp - firstT).toFloat() / segR).coerceIn(0f, 1f)
-                                val p2 = ((nxt.timestamp - firstT).toFloat() / segR).coerceIn(0f, 1f)
+                                val p1 = ((cur.timestamp - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
+                                val p2 = ((nxt.timestamp - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
                                 val sc = phaseColors[cur.eventType] ?: row.color
                                 val segX = barX + p1 * barW
                                 val segWid = ((p2 - p1) * barW).coerceAtLeast(1f)
@@ -358,14 +373,18 @@ internal fun TimelineBar(
 
                         // Dose markers with halo - one per dose (redoses included)
                         row.doses.sortedBy { it.timestamp }.forEach { dose ->
-                            val pct = ((dose.timestamp - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
-                            val mx = barX + pct * barW
+                            val pct = ((dose.timestamp - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
+                            // clamp so the halo never bleeds into the label column or past the end
+                            val mx = (barX + pct * barW).coerceIn(barX + 10.dp.toPx(), barX + barW - 10.dp.toPx())
                             val isFirst = dose.id == row.doses.minByOrNull { it.timestamp }?.id
                             if (isFirst) {
+                                // Glow dot with light core, same language as the event lane markers
                                 drawCircle(row.color.copy(alpha = 0.25f), radius = 9.dp.toPx(),
                                     center = Offset(mx, ly + rowPx / 2f))
-                                drawRoundRect(row.color, Offset(mx - 2.dp.toPx(), ly + 3.dp.toPx()),
-                                    Size(4.dp.toPx(), rowPx - 6.dp.toPx()), CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+                                drawCircle(row.color, radius = 5.dp.toPx(),
+                                    center = Offset(mx, ly + rowPx / 2f))
+                                drawCircle(Color.White.copy(alpha = 0.45f), radius = 2.dp.toPx(),
+                                    center = Offset(mx, ly + rowPx / 2f))
                             } else {
                                 // Redose: smaller ring marker
                                 drawCircle(row.color.copy(alpha = 0.30f), radius = 5.5.dp.toPx(),
@@ -377,7 +396,7 @@ internal fun TimelineBar(
 
                         // Now line per lane
                         if (endTime == null || now < endTime) {
-                            val p = ((now - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                            val p = ((now - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
                             val nx = barX + p * barW
                             drawLine(onSurface.copy(alpha = 0.85f), Offset(nx, ly + 1.dp.toPx()),
                                 Offset(nx, ly + rowPx - 1.dp.toPx()), strokeWidth = 2.dp.toPx())
@@ -404,7 +423,7 @@ internal fun TimelineBar(
                         drawLine(onSurface.copy(alpha = 0.08f), Offset(barX, laneY + 4.dp.toPx()),
                             Offset(barX + barW, laneY + 4.dp.toPx()), strokeWidth = 1.dp.toPx())
                         nonPhaseEvents.forEach { ev ->
-                            val pct = ((ev.timestamp - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                            val pct = ((ev.timestamp - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
                             val mx = barX + pct * barW
                             val mc = EVENT_MARKER_COLORS[ev.eventType] ?: onSurface
                             val cy = laneY + 4.dp.toPx()
@@ -439,12 +458,9 @@ internal fun TimelineBar(
                         val curveTop = y + rows.size * (rowPx + gapPx) +
                             (if (nonPhaseEvents.isNotEmpty()) 18.dp.toPx() + 6.dp.toPx() else 0f) + 6.dp.toPx()
                         val curveHpx = curveH.toPx()
-                        val padL = 20.dp.toPx()
-                        val curveW = (barW - padL).coerceAtLeast(1f)
-                        val curveX = barX + padL
-                        val firstT = startTime
-                        val lastT = startTime + rangeMs
-                        val tSpan = (lastT - firstT).coerceAtLeast(1L)
+                        // same mapping as lanes and axis: no extra inset
+                        val curveW = barW.coerceAtLeast(1f)
+                        val curveX = barX
                         val primary = primaryColor
                         // grid lines
                         val gridColor = onSurface.copy(alpha = 0.06f)
@@ -456,7 +472,7 @@ internal fun TimelineBar(
 
                         // smooth bezier through intensity points
                         val pts = intensityPoints.map { (t, inten) ->
-                            val x = curveX + ((t - firstT).toFloat() / tSpan * curveW).coerceIn(0f, curveW)
+                            val x = curveX + (((t - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f) * curveW)
                             val v = (inten / 10f).coerceIn(0f, 1f)
                             Offset(x, curveTop + curveHpx * (1f - v))
                         }
@@ -485,12 +501,15 @@ internal fun TimelineBar(
 
                     // ---- Smart time axis ----
                     val axisY = canvasH.toPx() - 4.dp.toPx() - axisH.toPx()
-                    val step = axisStepMs(rangeMs)
+                    val step = axisStepMs(windowSpan)
                     val axisStyle = TextStyle(color = onSurface.copy(alpha = 0.55f), fontSize = 9.sp)
                     var i = 0L
                     var lastLabelX = -1000f
                     while (i <= rangeMs) {
-                        val px = barX + (i.toFloat() / rangeMs * barW)
+                        // ticks stay on session-start offsets, only the visible ones draw
+                        val f = (startTime + i - windowStart).toFloat() / windowSpan
+                        if (f < 0f || f > 1f) { i += step; continue }
+                        val px = barX + f * barW
                         drawLine(onSurface.copy(alpha = 0.12f), Offset(px, axisY),
                             Offset(px, axisY + 4.dp.toPx()), strokeWidth = 1.dp.toPx())
                         val lbl = axisLabel(i)
@@ -510,7 +529,7 @@ internal fun TimelineBar(
                             Offset(scrbX - 3.dp.toPx(), size.height), strokeWidth = 7.dp.toPx())
                         drawLine(onSurface.copy(alpha = 0.8f), Offset(scrbX, 0f),
                             Offset(scrbX, size.height), strokeWidth = 1.5.dp.toPx())
-                        val elapsedMs = (dragFraction!! * rangeMs).toLong()
+                        val elapsedMs = ((windowStart - startTime) + dragFraction!! * windowSpan).toLong()
                         val timeLabel = formatTimeOffset(elapsedMs)
                         val measured = textMeasurer.measure(
                             timeLabel,
@@ -543,7 +562,7 @@ internal fun TimelineBar(
                             val midIdx = phaseEvents.size / 2
                             phaseEvents[midIdx].timestamp
                         }
-                        val pct = ((peakTime - startTime).toFloat() / rangeMs).coerceIn(0f, 1f)
+                        val pct = ((peakTime - windowStart).toFloat() / windowSpan).coerceIn(0f, 1f)
                         val markerX = barX + pct * barW
                         val markerColor = if (isDark) Color(0xFFFFD54F) else Color(0xFFB28704)
                         val ratingStyle = TextStyle(color = markerColor, fontSize = 10.sp,
@@ -566,13 +585,15 @@ internal fun TimelineBar(
             Spacer(Modifier.height(6.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                phases.forEach { (type, label) ->
+                // only phases actually present on the ribbon, in ribbon order
+                val legendSegments = remember(ribbonSegments) { ribbonSegments.distinctBy { it.label } }
+                legendSegments.forEach { seg ->
                     Row(verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(Modifier.size(7.dp).background(
-                            (phaseColors[type] ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.85f),
+                            seg.color.copy(alpha = 0.85f),
                             CircleShape))
-                        Text(label, style = MaterialTheme.typography.labelSmall,
+                        Text(seg.label, style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

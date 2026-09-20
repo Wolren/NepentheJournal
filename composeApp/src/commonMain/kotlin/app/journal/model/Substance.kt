@@ -245,7 +245,7 @@ data class Substance(
     // --- Wikipedia pharmacology data ---
     val wikipediaData: WikipediaData? = null,
     val erowidUrl: String = "",
-    /** Source attributions: "psychonautwiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
+    /** Source attributions: "psychonautwiki", "dosewiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
     val sources: List<String> = emptyList(),
     val cachedAt: Long,
     val sourceVersion: String,

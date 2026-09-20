@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Substance
+import app.journal.model.TargetNormalizer
 import app.journal.model.pharmacologySources
 import kotlin.math.roundToInt
 
@@ -73,18 +74,39 @@ internal fun PharmacologySection(substance: Substance) {
 
     data class RawEntry(
         val targetName: String,
+        val canonKey: String,
+        val canonLabel: String,
         val species: String?,
         val affinityType: String,
         val affinityNM: Double?,
         val source: String,
     )
 
+    fun rawEntry(
+        name: String?,
+        species: String?,
+        affinityType: String,
+        affinityNM: Double?,
+        source: String,
+    ): RawEntry {
+        val norm = TargetNormalizer.normalize(name)
+        return RawEntry(
+            targetName = name ?: "Unknown target",
+            canonKey = norm.key,
+            canonLabel = norm.label,
+            species = species,
+            affinityType = affinityType,
+            affinityNM = affinityNM,
+            source = source,
+        )
+    }
+
     val groups = remember(substance) {
         val raw = mutableListOf<RawEntry>()
         bindingdbRecords.forEach { r ->
             raw.add(
-                RawEntry(
-                    targetName = r.targetName ?: "Unknown target",
+                rawEntry(
+                    name = r.targetName,
                     species = r.species,
                     affinityType = r.affinityType ?: "?",
                     affinityNM = r.affinityNM,
@@ -94,8 +116,8 @@ internal fun PharmacologySection(substance: Substance) {
         }
         pdspRecords.forEach { r ->
             raw.add(
-                RawEntry(
-                    targetName = r.targetName ?: "Unknown target",
+                rawEntry(
+                    name = r.targetName,
                     species = r.species,
                     affinityType = "Ki",
                     affinityNM = r.kiNanoMolar,
@@ -114,8 +136,8 @@ internal fun PharmacologySection(substance: Substance) {
                 else -> "?"
             }
             raw.add(
-                RawEntry(
-                    targetName = r.targetName ?: "Unknown target",
+                rawEntry(
+                    name = r.targetName,
                     species = r.species,
                     affinityType = affinityType,
                     affinityNM = affinityNM,
@@ -123,16 +145,20 @@ internal fun PharmacologySection(substance: Substance) {
                 )
             )
         }
-        val byTargetType = raw.groupBy { Pair(it.targetName, it.affinityType) }
+        // Group by canonical target key so spelling variants from
+        // different sources ("5-HT2A" vs "5-hydroxytryptamine
+        // receptor 2A") aggregate into one row.
+        val byTargetType = raw.groupBy { Pair(it.canonKey, it.affinityType) }
         val aggByTarget = mutableMapOf<String, MutableList<Pair<String, AggEntry>>>()
         byTargetType.forEach { (key, entries) ->
-            val (target, type) = key
+            val (canonKey, type) = key
+            val label = entries.first().canonLabel
             val values = entries.mapNotNull { it.affinityNM }.sorted()
             val medianNM = if (values.isEmpty()) null
                 else if (values.size % 2 == 1) values[values.size / 2]
                 else (values[values.size / 2 - 1] + values[values.size / 2]) / 2.0
-            aggByTarget.getOrPut(target) { mutableListOf() }.add(
-                target to AggEntry(
+            aggByTarget.getOrPut(canonKey) { mutableListOf() }.add(
+                label to AggEntry(
                     affinityType = type,
                     minNM = values.minOrNull(),
                     medianNM = medianNM,

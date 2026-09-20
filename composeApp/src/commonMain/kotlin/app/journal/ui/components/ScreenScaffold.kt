@@ -1,12 +1,14 @@
 package app.journal.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -74,15 +76,23 @@ fun ScreenScaffold(
             )
         }
     ) { innerPadding ->
-        LazyColumn(
+        val scrollState = rememberLazyListState()
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = verticalArrangement,
-            contentPadding = contentPadding
         ) {
-            content()
+            LazyColumn(
+                state = scrollState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = verticalArrangement,
+                contentPadding = contentPadding
+            ) {
+                content()
+            }
+            DesktopScrollbar(scrollState)
         }
     }
 }

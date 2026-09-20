@@ -53,22 +53,14 @@ class ThemeManager private constructor() {
     }
 
     private fun recomputeColorScheme(cfg: ThemeConfig, isDark: Boolean): ColorScheme {
-        val bg = cfg.background ?: if (isDark) Color(0xFF0F1410) else Color(0xFFF3F8EF)
-        val surf = cfg.surface ?: if (isDark) Color(0xFF1D2620) else Color(0xFFFFFFFF)
+        val bg = cfg.background ?: if (isDark) Color(0xFF0E1511) else Color(0xFFF3F8EF)
+        val surf = cfg.surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
-        // Containers whisper rather than shout purple - muted blend keeps forest calm
-        val d = if (isDark) 0.18f else 0.10f
+        val d = if (isDark) 0.30f else 0.16f
 
         fun container(accent: Color): Color = blend(bg, accent, d)
-        // surfaceVariant is a near-neutral tint, not a purple wash
-        fun surfaceVariant(accent: Color, factor: Float = if (isDark) 0.07f else 0.04f): Color =
+        fun surfaceVariant(accent: Color, factor: Float = if (isDark) 0.12f else 0.06f): Color =
             blend(surf, accent, factor)
-        // Outlines are warm neutral, not purple - purple outline on every card was the taste fail
-        fun neutralOutline(alpha: Float): Color = blend(
-            surf,
-            if (isDark) Color(0xFFA8B5A0) else Color(0xFF3A3D2F),
-            alpha
-        )
 
         return base.copy(
             primary = cfg.primary,
@@ -85,16 +77,16 @@ class ThemeManager private constructor() {
             onTertiaryContainer = contrastColor(container(cfg.tertiary)),
             error = cfg.error,
             onError = contrastColor(cfg.error),
-            errorContainer = blend(bg, cfg.error, 0.22f),
-            onErrorContainer = contrastColor(blend(bg, cfg.error, 0.22f)),
+            errorContainer = blend(bg, cfg.error, 0.30f),
+            onErrorContainer = contrastColor(blend(bg, cfg.error, 0.30f)),
             background = bg,
             onBackground = contrastColor(bg),
             surface = surf,
             onSurface = contrastColor(surf),
             surfaceVariant = surfaceVariant(cfg.primary),
             onSurfaceVariant = contrastColor(surfaceVariant(cfg.primary)),
-            outline = neutralOutline(if (isDark) 0.14f else 0.12f),
-            outlineVariant = neutralOutline(if (isDark) 0.08f else 0.06f)
+            outline = surfaceVariant(cfg.primary, if (isDark) 0.28f else 0.18f),
+            outlineVariant = surfaceVariant(cfg.primary, if (isDark) 0.16f else 0.10f)
         )
     }
 

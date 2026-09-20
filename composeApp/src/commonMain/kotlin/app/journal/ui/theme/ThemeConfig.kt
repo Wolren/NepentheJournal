@@ -59,18 +59,18 @@ enum class CornerRadius { SMALL, MEDIUM, LARGE }
 object ThemeDefaults {
     val Dark = ThemeConfig(
         baseTheme = BaseTheme.DARK,
-        primaryColor = 0xFFC9A8E0,
-        secondaryColor = 0xFF9A85C2,
-        tertiaryColor = 0xFF7A6BA6,
+        primaryColor = 0xFFDCA2F4,
+        secondaryColor = 0xFFAD89D6,
+        tertiaryColor = 0xFF8100F5,
         errorColor = 0xFFEF9A9A,
-        backgroundColor = 0xFF0F1410,
-        surfaceColor = 0xFF1D2620
+        backgroundColor = 0xFF0E1511,
+        surfaceColor = 0xFF16211A
     )
     val Light = ThemeConfig(
         baseTheme = BaseTheme.LIGHT,
         primaryColor = 0xFF7B1FA2,
         secondaryColor = 0xFF5E35B1,
-        tertiaryColor = 0xFF7A6BA6,
+        tertiaryColor = 0xFF8100F5,
         errorColor = 0xFFD32F2F,
         backgroundColor = 0xFFF3F8EF,
         surfaceColor = 0xFFFFFFFF
@@ -102,12 +102,12 @@ object ThemePresets {
         name = "Forest",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFC9A8E0, secondaryColor = 0xFF9A85C2, tertiaryColor = 0xFF7A6BA6,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0F1410, surfaceColor = 0xFF1D2620
+            primaryColor = 0xFFDCA2F4, secondaryColor = 0xFFAD89D6, tertiaryColor = 0xFF8100F5,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF0E1511, surfaceColor = 0xFF16211A
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF7B1FA2, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF7A6BA6,
+            primaryColor = 0xFF7B1FA2, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF8100F5,
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFF3F8EF, surfaceColor = 0xFFFFFFFF
         )
     )
@@ -216,17 +216,17 @@ object ThemePresets {
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFECEFF1, surfaceColor = 0xFFFFFFFF
         )
     )
-    val Coffee = ThemePreset(
-        name = "Coffee",
+    val Amethyst = ThemePreset(
+        name = "Amethyst",
         dark = ThemeConfig(
             baseTheme = BaseTheme.DARK,
-            primaryColor = 0xFFD7CCC8, secondaryColor = 0xFFBCAAA4, tertiaryColor = 0xFFFFCC80,
-            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF140F0C, surfaceColor = 0xFF221915
+            primaryColor = 0xFFC9A6EC, secondaryColor = 0xFFA08CF0, tertiaryColor = 0xFFE3B778,
+            errorColor = 0xFFEF9A9A, backgroundColor = 0xFF1E1626, surfaceColor = 0xFF2C2139
         ),
         light = ThemeConfig(
             baseTheme = BaseTheme.LIGHT,
-            primaryColor = 0xFF4E342E, secondaryColor = 0xFF5D4037, tertiaryColor = 0xFFEF6C00,
-            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF7F1EA, surfaceColor = 0xFFFFFFFF
+            primaryColor = 0xFF8E24AA, secondaryColor = 0xFF5E35B1, tertiaryColor = 0xFF9A6B1F,
+            errorColor = 0xFFD32F2F, backgroundColor = 0xFFF9F3FC, surfaceColor = 0xFFFFFFFF
         )
     )
     val Rose = ThemePreset(
@@ -263,7 +263,7 @@ object ThemePresets {
 
     val all: List<ThemePreset> = listOf(
         Forest, Ocean, Sunset, Ember, Midnight, Mono,
-        Meadow, Plum, Slate, Coffee, Rose, DoseWiki
+        Meadow, Plum, Slate, Amethyst, Rose, DoseWiki
     )
 }
 

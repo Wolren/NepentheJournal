@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
 import app.journal.model.Substance
 import app.journal.model.TimelineEvent
+import app.journal.model.TimelineEventType
 import app.journal.util.currentTimeMillis
 import app.journal.ui.charts.ChartTheme
 import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.foregroundFor
 
 @Composable
 internal fun RatingBadge(rating: Int?, shulginRating: String?) {
@@ -44,6 +47,56 @@ internal fun RatingBadge(rating: Int?, shulginRating: String?) {
             Text(displayText, style = MaterialTheme.typography.labelMedium,
                 color = accent, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+        }
+    }
+}
+
+/** Shared event-type glyph, one mapping for every timeline surface. */
+internal fun eventTypeIcon(type: TimelineEventType): ImageVector = when (type) {
+    TimelineEventType.ONSET -> Icons.Default.ArrowForward
+    TimelineEventType.COMEUP -> Icons.Default.TrendingUp
+    TimelineEventType.PEAK -> Icons.Default.Star
+    TimelineEventType.PLATEAU -> Icons.Default.HorizontalRule
+    TimelineEventType.OFFSET -> Icons.Default.TrendingDown
+    TimelineEventType.AFTERGLOW -> Icons.Default.NightsStay
+    TimelineEventType.END -> Icons.Default.Stop
+    TimelineEventType.OBSERVATION -> Icons.Default.Visibility
+    TimelineEventType.SAFETY_CHECK -> Icons.Default.CheckCircle
+    TimelineEventType.SIDE_EFFECT -> Icons.Default.Warning
+    TimelineEventType.EMERGENCY -> Icons.Default.Error
+    TimelineEventType.NOTE -> Icons.Default.Notes
+}
+
+/**
+ * Substance monogram: solid color disc with a contrasting initial.
+ * Replaces the halo-circle-plus-bar marker.
+ */
+@Composable
+internal fun SubstanceMonogram(name: String, color: Color, modifier: Modifier = Modifier) {
+    val initial = name.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    Box(
+        modifier = modifier.size(34.dp).background(color, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(initial, style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold, color = foregroundFor(color))
+    }
+}
+
+/**
+ * Phase marker: tinted ring with the phase glyph inside.
+ * Same language as EventCard, no bar.
+ */
+@Composable
+internal fun PhaseMarker(type: TimelineEventType, color: Color, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(34.dp),
+        shape = CircleShape,
+        color = color.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.35f))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(eventTypeIcon(type), null, tint = color, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -87,15 +140,7 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
                 val color = AdaptiveColors.colorFor(substance?.name ?: substanceId).getComposeColor(isDark)
                 if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    // Accent capsule with halo
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(
-                            Modifier.size(22.dp).background(color.copy(alpha = 0.18f), CircleShape)
-                        )
-                        Box(
-                            Modifier.size(4.dp, 40.dp).clip(RoundedCornerShape(2.dp)).background(color)
-                        )
-                    }
+                    SubstanceMonogram(substance?.name ?: substanceId, color)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(substance?.name ?: substanceId, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
@@ -234,16 +279,7 @@ internal fun PhaseCard(
         modifier = modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp)) {
-            // Gradient accent capsule with halo
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier.size(24.dp).background(phaseColor.copy(alpha = 0.16f), CircleShape)
-                )
-                Box(
-                    Modifier.size(4.dp, 44.dp).clip(RoundedCornerShape(2.dp))
-                        .background(Brush.verticalGradient(listOf(phaseColor, phaseColor.copy(alpha = 0.5f))))
-                )
-            }
+            PhaseMarker(phase.eventType, phaseColor)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(

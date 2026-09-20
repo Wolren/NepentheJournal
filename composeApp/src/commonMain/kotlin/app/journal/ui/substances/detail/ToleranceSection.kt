@@ -25,6 +25,7 @@ internal fun cleanWikiMarkup(text: String): String {
 internal fun formatSource(version: String): String {
     return when {
         version.startsWith("pwiki-") -> "PsychonautWiki"
+        version.startsWith("dw-") -> "DoseWiki"
         version.startsWith("tripsit") -> "TripSit"
         version.startsWith("wikidata") -> "Wikidata"
         version.startsWith("pubchem") || version.startsWith("pubsci") -> "PubChem"
@@ -46,6 +47,10 @@ internal fun ToleranceTimelineSection(doses: List<Dose>, substanceName: String, 
         val lineColor = AdaptiveColors.colorFor(substanceName).getComposeColor(isDark)
         val axisLine = ChartTheme.axisLineColor()
         val grid = ChartTheme.gridColorFaint()
+        // Normalize bar height to the largest dose in the window: a fixed
+        // denominator flattens every substance (20 mg vs 5000 mg scales).
+        val windowMax = sorted.filter { it.timestamp > now - lookbackDays * dayMs }
+            .maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 1.0
         Canvas(modifier = Modifier.fillMaxWidth().height(60.dp)) {
             val w = size.width
             val h = size.height
@@ -58,7 +63,7 @@ internal fun ToleranceTimelineSection(doses: List<Dose>, substanceName: String, 
             sorted.forEach { dose ->
                 if (dose.timestamp > start) {
                     val x = ((dose.timestamp - start).toFloat() / (lookbackDays * dayMs)) * w
-                    val relHeight = (dose.amount / 500.0).coerceIn(0.05, 1.0).toFloat() * h
+                    val relHeight = (dose.amount / windowMax).coerceIn(0.05, 1.0).toFloat() * h
                     drawLine(
                         lineColor,
                         Offset(x, h), Offset(x, h - relHeight), strokeWidth = 2f

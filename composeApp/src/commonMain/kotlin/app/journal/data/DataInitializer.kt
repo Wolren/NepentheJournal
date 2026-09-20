@@ -11,14 +11,19 @@ import kotlinx.coroutines.*
 /**
  * Orchestrates data initialization on startup.
  *
- * Priority:
- * 1. Load bundled seed (substances + interactions) - always, to ensure latest data.
- * 2. Migrate old session/dose references from pwiki: IDs to cid: IDs.
- * 3. Load user data from disk (sessions, doses, notes, timeline events).
- * 4. If test mode and nothing loaded, generate fuzz session data.
+ * Priority (DoseWiki-first):
+ * 1. Load bundled PW seed (substances + interactions) as the fallback base.
+ * 2. Ingest DoseWiki data as the PRIMARY entity: matched substances are
+ *    overwritten with DoseWiki fields, unmatched DoseWiki substances are
+ *    created as dw:{slug} rows. DoseWiki wins every field it carries.
+ * 3. Migrate old session/dose references from pwiki: IDs to cid: IDs.
+ * 4. Load user data from disk (sessions, doses, notes, timeline events).
+ * 5. If test mode and nothing loaded, generate fuzz session data.
  *
- * The seed is built by scripts/matrix_build.py from PsychonautWiki SMW +
- * PubChem + TripSit data. Run it monthly to refresh.
+ * The PW seed is built by scripts/matrix_build.py from PsychonautWiki SMW +
+ * PubChem + TripSit data. The DoseWiki slim bundle is built by
+ * scripts/dosewiki_slim.py from https://dose.wiki open data. Refresh both
+ * monthly.
  *
  * Test mode: -Dnepenthe.test-data=true or NEPENTHE_TEST_DATA=1.
  */
@@ -51,11 +56,12 @@ object DataInitializer {
         // Step 1: Load user data from disk first (to check for old IDs)
         store.load()
 
-        // Step 2: Load bundled seed (substances + interactions).
-        // Always done to refresh substance data on every startup.
+        // Step 2: Load bundled PW seed (substances + interactions) as the
+        // fallback base. Always done to refresh substance data on startup.
         val seedLoaded = tryLoadSeed(repo)
 
-        // Step 3: Ingest DoseWiki data (effects, supplementary info)
+        // Step 3: Ingest DoseWiki data as the PRIMARY entity (overwrites
+        // matched seed rows, creates dw:{slug} rows for the rest).
         DoseWikiIngestor.ensureIngested(repo)
 
         // Step 4: Migrate old session/dose references if ID scheme changed.
@@ -197,6 +203,10 @@ object DataInitializer {
             // User-created substances are also overwritten if they share an ID;
             // substances with IDs not in the seed survive untouched.
             repo.applyBatch(substances = normalized.substances)
+
+            // Re-apply DoseWiki on top so it stays the primary entity.
+            DoseWikiIngestor.reset()
+            DoseWikiIngestor.ensureIngested(repo)
 
             JournalStore(repo as JournalRepository).save()
             Log.withTag("DataInit").i { "Reloaded ${normalized.substances.size} substances from bundled seed" }

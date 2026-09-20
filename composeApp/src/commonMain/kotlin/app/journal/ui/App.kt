@@ -337,7 +337,8 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                         substanceId = id,
                                         onBack = { selectedSubstanceId = null },
                                         onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null },
-                                        onCompanion = { companionSubstanceId = id }
+                                        onCompanion = { companionSubstanceId = id },
+                                        onOpenSubstance = { selectedSubstanceId = it },
                                     )
                                 }
                             }

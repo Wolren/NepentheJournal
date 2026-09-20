@@ -1,5 +1,6 @@
 package app.journal.ui.substances.detail
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,7 +20,8 @@ import app.journal.model.InteractionRisk
 @Composable
 internal fun InteractionsSection(
     interactions: List<Interaction>,
-    substanceId: String
+    substanceId: String,
+    onOpenSubstance: (String) -> Unit = {},
 ) {
     val repo = remember { JournalRepository.instance }
     val dangerous = interactions.filter { it.riskLevel == InteractionRisk.DANGEROUS }
@@ -27,8 +29,9 @@ internal fun InteractionsSection(
     val uncertain = interactions.filter {
         it.riskLevel == InteractionRisk.UNCERTAIN || it.riskLevel == InteractionRisk.UNKNOWN
     }
+    val low = interactions.filter { it.riskLevel == InteractionRisk.LOW }
 
-    if (dangerous.isEmpty() && unsafe.isEmpty() && uncertain.isEmpty()) return
+    if (dangerous.isEmpty() && unsafe.isEmpty() && uncertain.isEmpty() && low.isEmpty()) return
 
     Card(
         colors = CardDefaults.cardColors(
@@ -44,19 +47,27 @@ internal fun InteractionsSection(
             if (dangerous.isNotEmpty()) {
                 InteractionSubgroup("Dangerous", dangerous, substanceId, repo,
                     MaterialTheme.colorScheme.error,
-                    Icons.Default.Dangerous)
+                    Icons.Default.Dangerous, onOpenSubstance)
             }
             if (unsafe.isNotEmpty()) {
                 if (dangerous.isNotEmpty()) Spacer(Modifier.height(6.dp))
                 InteractionSubgroup("Unsafe", unsafe, substanceId, repo,
                     MaterialTheme.colorScheme.tertiary,
-                    Icons.Default.Warning)
+                    Icons.Default.Warning, onOpenSubstance)
             }
             if (uncertain.isNotEmpty()) {
                 if (dangerous.isNotEmpty() || unsafe.isNotEmpty()) Spacer(Modifier.height(6.dp))
                 InteractionSubgroup("Uncertain", uncertain, substanceId, repo,
                     MaterialTheme.colorScheme.onSurfaceVariant,
-                    Icons.Default.Info)
+                    Icons.Default.Info, onOpenSubstance)
+            }
+            if (low.isNotEmpty()) {
+                if (dangerous.isNotEmpty() || unsafe.isNotEmpty() || uncertain.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                }
+                InteractionSubgroup("Low risk", low, substanceId, repo,
+                    MaterialTheme.colorScheme.secondary,
+                    Icons.Default.CheckCircle, onOpenSubstance)
             }
         }
     }
@@ -69,7 +80,8 @@ private fun InteractionSubgroup(
     substanceId: String,
     repo: IJournalRepository,
     color: Color,
-    icon: ImageVector
+    icon: ImageVector,
+    onOpenSubstance: (String) -> Unit,
 ) {
     Text(label, style = MaterialTheme.typography.labelMedium,
         color = color, fontWeight = FontWeight.SemiBold)
@@ -78,8 +90,11 @@ private fun InteractionSubgroup(
         val otherId = if (interaction.substanceAId == substanceId)
             interaction.substanceBId else interaction.substanceAId
         val otherName = interactionSubstanceName(repo, otherId)
+        // Only resolvable endpoints navigate; unknown ids stay plain text.
+        val canOpen = remember(otherId) { repo.getSubstance(otherId) != null }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                .then(if (canOpen) Modifier.clickable { onOpenSubstance(otherId) } else Modifier),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -91,7 +106,9 @@ private fun InteractionSubgroup(
             )
             Text(
                 text = otherName,
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = if (canOpen) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
             )
         }
         if (interaction.description != null) {
@@ -107,6 +124,10 @@ internal fun interactionSubstanceName(repo: IJournalRepository, id: String): Str
     if (sub != null) return sub.name
     if (id.startsWith("pwiki:")) {
         return id.removePrefix("pwiki:").replace("_", " ").replaceFirstChar { it.uppercase() }
+    }
+    if (id.startsWith("dw:")) {
+        return id.removePrefix("dw:").replace("_", " ").replace("-", " ")
+            .replaceFirstChar { it.uppercase() }
     }
     return id
 }

@@ -2,6 +2,7 @@ package app.journal.ui.sync
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -56,7 +57,10 @@ fun SyncScreen(syncEngine: SyncEngine) {
     val hostError = if (manualHost.isNotBlank() && !isIpValid) "Invalid IP format" else null
     val portError = if (manualPort.isNotBlank() && !isPortValid) "Port must be 1-65535" else null
 
+    val scrollState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
+        state = scrollState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)
@@ -269,5 +273,7 @@ fun SyncScreen(syncEngine: SyncEngine) {
                 )
             }
         }
+    }
+    DesktopScrollbar(scrollState)
     }
 }
