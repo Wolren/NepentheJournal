@@ -24,7 +24,8 @@ import kotlin.random.Random
 internal fun PersonEditorDialog(
     initial: Person?,
     onDismiss: () -> Unit,
-    onSave: (Person) -> Unit
+    onSave: (Person) -> Unit,
+    dialogTitle: String? = null
 ) {
     var displayName by remember { mutableStateOf(initial?.displayName ?: "") }
     var role by remember { mutableStateOf(initial?.role ?: PersonRole.PARTICIPANT) }
@@ -41,7 +42,7 @@ internal fun PersonEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "Add individual" else "Edit individual") },
+        title = { Text(dialogTitle ?: if (initial == null) "Add individual" else "Edit individual") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(

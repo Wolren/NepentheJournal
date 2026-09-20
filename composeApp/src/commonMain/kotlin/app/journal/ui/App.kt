@@ -206,8 +206,9 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                 PersonEditorDialog(
                     initial = null,
                     onDismiss = { showProfileEditor = false },
+                    dialogTitle = "Create profile",
                     onSave = { person ->
-                        repo.upsertPerson(person)
+                        repo.upsertPerson(person.copy(isSelf = true))
                         showProfileEditor = false
                         repo.setWelcomeCompleted(true)
                     }

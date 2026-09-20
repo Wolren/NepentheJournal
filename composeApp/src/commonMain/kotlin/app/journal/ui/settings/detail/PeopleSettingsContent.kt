@@ -25,6 +25,8 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
     val sessions by repo.sessions.collectAsState(initial = emptyList())
     var editing by remember { mutableStateOf<Person?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var creatingProfile by remember { mutableStateOf(false) }
+    val hasSelf = persons.any { it.isSelf }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -75,7 +77,8 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(person.displayName, style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                "${person.role.name.lowercase().replaceFirstChar { it.uppercase() }}" +
+                                (if (person.isSelf) "Your profile · " else "") +
+                                    "${person.role.name.lowercase().replaceFirstChar { it.uppercase() }}" +
                                     (if (trips > 0) " · $trips trip${if (trips == 1) "" else "s"}" else ""),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -101,17 +104,36 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                     Spacer(Modifier.width(8.dp))
                     Text("Add individual")
                 }
+                if (!hasSelf) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { creatingProfile = true },
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Icon(Icons.Default.Person, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Create profile")
+                    }
+                }
             }
         }
     }
 
-    if (creating || editing != null) {
+    if (creating || creatingProfile || editing != null) {
         PersonEditorDialog(
             initial = editing,
-            onDismiss = { creating = false; editing = null },
+            onDismiss = { creating = false; creatingProfile = false; editing = null },
+            dialogTitle = if (creatingProfile) "Create profile" else null,
             onSave = { person ->
-                repo.upsertPerson(person)
-                creating = false; editing = null
+                if (creatingProfile) {
+                    persons.filter { it.isSelf && it.id != person.id }.forEach {
+                        repo.upsertPerson(it.copy(isSelf = false, updatedAt = person.updatedAt))
+                    }
+                    repo.upsertPerson(person.copy(isSelf = true))
+                } else {
+                    repo.upsertPerson(person)
+                }
+                creating = false; creatingProfile = false; editing = null
             }
         )
     }

@@ -40,5 +40,7 @@ data class Person(
     /** Author contact for dose.wiki editors. Never exported without mayContact. */
     val contactEmail: String? = null,
     /** Editors may write to [contactEmail] about an exported report. */
-    val mayContact: Boolean = false
+    val mayContact: Boolean = false,
+    /** This individual's roster entry is the device owner's own profile. */
+    val isSelf: Boolean = false
 ) : VaultDocument

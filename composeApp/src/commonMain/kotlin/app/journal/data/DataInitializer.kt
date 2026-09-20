@@ -73,6 +73,18 @@ object DataInitializer {
         val subCount = repo.substances.value.size
         val sessionCount = repo.sessions.value.size
 
+        // Purge legacy pause/resume marker notes. Pause used to write NOTE
+        // "Paused"/"Resumed" events; timer state lives on Session now, so the
+        // markers are pure noise in timelines and exports.
+        val markers = repo.timelineEvents.value.filter {
+            it.id.startsWith("event:pause:") || it.id.startsWith("event:resume:")
+        }
+        if (markers.isNotEmpty()) {
+            markers.forEach { repo.deleteTimelineEvent(it.id) }
+            store.save()
+            Log.withTag("DataInit").i { "Purged ${markers.size} pause/resume marker events" }
+        }
+
         // Step 4: If test mode, generate fuzz sessions on top of seed/disk data.
         if (isTestDataEnabled() && subCount >= 2) {
             FuzzSeed.generate(repo)

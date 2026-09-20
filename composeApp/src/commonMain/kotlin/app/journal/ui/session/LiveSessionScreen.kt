@@ -19,7 +19,6 @@ import app.journal.data.IJournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
-import app.journal.util.platformDeviceOrigin
 import app.journal.ui.session.live.*
 import kotlinx.coroutines.delay
 import kotlinx.datetime.Instant
@@ -121,11 +120,6 @@ fun LiveSessionScreen(
                 onPause = {
                     val now = currentTimeMillis()
                     repo.upsertSession(live.copy(pausedAt = now, updatedAt = now))
-                    repo.upsertTimelineEvent(TimelineEvent(
-                        id = "event:pause:${now}_${live.id}",
-                        sessionId = live.id, timestamp = now,
-                        eventType = TimelineEventType.NOTE, label = "Paused",
-                        createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                 },
                 onResume = {
                     val now = currentTimeMillis()
@@ -133,11 +127,6 @@ fun LiveSessionScreen(
                     repo.upsertSession(live.copy(
                         pausedMs = live.pausedMs + (now - started).coerceAtLeast(0L),
                         pausedAt = null, updatedAt = now))
-                    repo.upsertTimelineEvent(TimelineEvent(
-                        id = "event:resume:${now}_${live.id}",
-                        sessionId = live.id, timestamp = now,
-                        eventType = TimelineEventType.NOTE, label = "Resumed",
-                        createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                 }
             )
         }
