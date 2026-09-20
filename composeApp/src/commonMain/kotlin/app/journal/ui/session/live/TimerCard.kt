@@ -2,9 +2,6 @@ package app.journal.ui.session.live
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,31 +12,23 @@ import app.journal.model.Session
 import app.journal.util.currentTimeMillis
 import kotlinx.coroutines.delay
 
-/**
- * Live timer: wall time minus accumulated pauses. While paused the clock
- * freezes and the card offers resume. Timeline T+ labels stay wall-clock
- * truthful; pause/resume markers on the timeline show the gaps.
- */
+/** Live timer display: wall time minus accumulated pauses. No controls here;
+ *  stopping happens through the screen's Stop button with confirmation. */
 @Composable
-internal fun TimerCard(
-    session: Session,
-    onPause: () -> Unit,
-    onResume: () -> Unit
-) {
-    val paused = session.pausedAt != null
+internal fun TimerCard(session: Session) {
     var nowMs by remember { mutableStateOf(currentTimeMillis()) }
 
-    LaunchedEffect(paused, session.startTime, session.pausedMs) {
-        if (paused) return@LaunchedEffect
+    LaunchedEffect(session.startTime) {
         while (true) {
             delay(1000L)
             nowMs = currentTimeMillis()
         }
     }
 
+    // Legacy pause fields stay in the math so timers paused before pause was
+    // removed still show truthful elapsed time.
     val frozenAt = session.pausedAt
-    val elapsedMs = (if (paused && frozenAt != null) frozenAt else nowMs) -
-        session.startTime - session.pausedMs
+    val elapsedMs = (frozenAt ?: nowMs) - session.startTime - session.pausedMs
 
     val totalSec = (elapsedMs.coerceAtLeast(0L)) / 1000
     val hours = totalSec / 3600
@@ -61,23 +50,7 @@ internal fun TimerCard(
                     color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primaryContainer, strokeWidth = 6.dp)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(timeStr, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(if (paused) "Paused" else "Elapsed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            if (paused) {
-                Button(onClick = onResume) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null,
-                        modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Resume")
-                }
-            } else {
-                OutlinedButton(onClick = onPause) {
-                    Icon(Icons.Default.Pause, contentDescription = null,
-                        modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Pause")
+                    Text("Elapsed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

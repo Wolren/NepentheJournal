@@ -54,7 +54,6 @@ fun LiveSessionScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showEndConfirm by remember { mutableStateOf(false) }
     var deletingLiveEvent by remember { mutableStateOf<TimelineEvent?>(null) }
-    var menuExpanded by remember { mutableStateOf(false) }
     var editTitle by remember(live.id) { mutableStateOf(live.title.ifBlank { "Live Session" }) }
     var editSet by remember(live.id) { mutableStateOf(live.set ?: "") }
     var editSetting by remember(live.id) { mutableStateOf(live.setting ?: "") }
@@ -104,31 +103,23 @@ fun LiveSessionScreen(
         title = live.title.ifBlank { "Live Session" }, onBack = onBack,
         actions = {
             Box { IconButton(onClick = { showCrisisDialog = true }) { Icon(Icons.Default.Emergency, contentDescription = "Get help", tint = MaterialTheme.colorScheme.error) } }
-            Box {
-                IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Default.MoreVert, contentDescription = "Session menu") }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(text = { Text("Edit session info") }, onClick = { menuExpanded = false; showEditDialog = true }, leadingIcon = { Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp)) })
-                    DropdownMenuItem(text = { Text("End session") }, onClick = { menuExpanded = false; showEndConfirm = true }, leadingIcon = { Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp)) })
-                }
+            Box { IconButton(onClick = { showEditDialog = true }) { Icon(Icons.Default.Edit, contentDescription = "Edit session info") } }
+            Button(
+                onClick = { showEndConfirm = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Stop")
             }
         }
     ) {
-        // Main timer with pause/resume
+        // Main timer display; stopping happens through the Stop action above.
         item {
-            TimerCard(
-                session = live,
-                onPause = {
-                    val now = currentTimeMillis()
-                    repo.upsertSession(live.copy(pausedAt = now, updatedAt = now))
-                },
-                onResume = {
-                    val now = currentTimeMillis()
-                    val started = live.pausedAt ?: now
-                    repo.upsertSession(live.copy(
-                        pausedMs = live.pausedMs + (now - started).coerceAtLeast(0L),
-                        pausedAt = null, updatedAt = now))
-                }
-            )
+            TimerCard(session = live)
         }
 
         // Interaction warnings
