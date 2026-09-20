@@ -1,9 +1,7 @@
 package app.journal.ui.components
 
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
-import kotlin.io.encoding.Base64
-import org.jetbrains.skia.Image
+import app.journal.util.decodePngImage
 
 /**
  * Official brand marks for the external article buttons (96px PNGs,
@@ -457,9 +455,7 @@ object BrandIcons {
             "dosewiki" -> DOSEWIKI_B64
             else -> return null
         }
-        val decoded = runCatching {
-            Image.makeFromEncoded(Base64.decode(b64)).toComposeImageBitmap()
-        }.getOrNull()
+        val decoded = decodePngImage(b64)
         cache[name] = decoded
         return decoded
     }
