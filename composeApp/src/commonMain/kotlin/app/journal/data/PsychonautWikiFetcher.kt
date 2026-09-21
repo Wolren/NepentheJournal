@@ -115,7 +115,7 @@ class PsychonautWikiFetcher(
 
     companion object {
         private const val ENDPOINT = "https://api.psychonautwiki.org/"
-        private const val USER_AGENT = "NepentheJournal/0.1 (+https://github.com/Wolren/psychonaut-journal)"
+        private const val USER_AGENT = "NepentheJournal/0.1 (+https://github.com/Wolren/NepentheJournal)"
         private const val MAX_RETRIES = 4
         private const val RETRY_BASE_MS = 800L
         private const val REQUEST_GAP_MS = 350L

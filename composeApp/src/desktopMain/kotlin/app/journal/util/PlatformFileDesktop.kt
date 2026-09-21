@@ -12,7 +12,7 @@ actual object PlatformFile {
     }
 
     actual fun dataDir(): String {
-        return System.getProperty("user.home")?.let { "$it/.psychonautica" }
+        return System.getProperty("user.home")?.let { "$it/.nepenthe" }
             ?: throw IllegalStateException("Cannot determine home directory")
     }
 }

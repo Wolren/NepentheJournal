@@ -31,7 +31,7 @@ fun main() {
     // Force Skiko to software rendering (hardware accel may fail in some environments)
     System.setProperty("skiko.renderApi", "SOFTWARE")
     // Initialize logging
-    val appDataDir = System.getProperty("user.home")?.let { "$it/.psychonautica" }
+    val appDataDir = System.getProperty("user.home")?.let { "$it/.nepenthe" }
     initLogging(appDataDir)
 
     // Global uncaught exception handler -- writes to a separate file so crash

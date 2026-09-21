@@ -21,7 +21,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             val docs = NSSearchPathForDirectoriesInDomains(
                 NSDocumentDirectory, NSUserDomainMask, true
             ).firstOrNull() as? String ?: return "."
-            return "$docs/.psychonautica"
+            return "$docs/.nepenthe"
         }
 
     actual fun dataPath(): String = "$baseDir/journal-data.json"

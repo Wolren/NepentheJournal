@@ -5,7 +5,7 @@ import java.io.File
 
 actual fun platformSyncDataDir(): String {
     val filesDir = NepentheApp.appContext.filesDir
-    return File(filesDir, ".psychonautica").absolutePath
+    return File(filesDir, ".nepenthe").absolutePath
 }
 
 actual fun platformDeviceName(): String {

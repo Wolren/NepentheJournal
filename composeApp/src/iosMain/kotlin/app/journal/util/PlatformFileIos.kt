@@ -32,6 +32,6 @@ actual object PlatformFile {
         val docs = NSSearchPathForDirectoriesInDomains(
             NSDocumentDirectory, NSUserDomainMask, true
         ).firstOrNull() as? String ?: NSTemporaryDirectory()
-        return "$docs/.psychonautica"
+        return "$docs/.nepenthe"
     }
 }

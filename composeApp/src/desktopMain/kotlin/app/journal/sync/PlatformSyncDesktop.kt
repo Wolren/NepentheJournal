@@ -4,7 +4,7 @@ import java.io.File
 
 actual fun platformSyncDataDir(): String {
     val home = System.getProperty("user.home") ?: "."
-    return "$home${File.separator}.psychonautica"
+    return "$home${File.separator}.nepenthe"
 }
 
 actual fun platformDeviceName(): String =

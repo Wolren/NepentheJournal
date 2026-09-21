@@ -9,7 +9,7 @@ actual fun platformSyncDataDir(): String {
     val docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, true
     ).firstOrNull() as? String ?: return "."
-    return "$docs/.psychonautica"
+    return "$docs/.nepenthe"
 }
 
 actual fun platformDeviceName(): String {

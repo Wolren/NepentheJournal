@@ -136,7 +136,8 @@ internal fun DataSettingsContent(
                 if (statusText != null) {
                     Spacer(Modifier.height(4.dp))
                     Text(statusText, style = MaterialTheme.typography.labelSmall,
-                        color = if (statusText.startsWith("Import") || statusText.startsWith("Export"))
+                        color = if (statusText.startsWith("Import") || statusText.startsWith("Export") ||
+                            statusText.startsWith("Backup saved"))
                             MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.error)
                 }

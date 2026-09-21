@@ -27,7 +27,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
 
     actual fun dataPath(): String {
         val home = System.getProperty("user.home") ?: "."
-        return "$home${File.separator}.psychonautica${File.separator}journal-data.json"
+        return "$home${File.separator}.nepenthe${File.separator}journal-data.json"
     }
 
     private fun tempPath(): String = dataPath() + ".tmp"

@@ -4,8 +4,8 @@ package app.journal.sync
  * Returns the platform-specific directory for storing sync identity
  * and trust store data.
  *
- * Desktop: ~/.psychonautica/
- * Android: <app files dir>/.psychonautica/
+ * Desktop: ~/.nepenthe/
+ * Android: <app files dir>/.nepenthe/
  */
 expect fun platformSyncDataDir(): String
 

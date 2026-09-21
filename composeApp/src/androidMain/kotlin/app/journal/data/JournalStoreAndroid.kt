@@ -14,7 +14,7 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
     private val saveLock = PlatformLock()
 
     private val baseDir: File
-        get() = File(NepentheApp.appContext.filesDir, ".psychonautica")
+        get() = File(NepentheApp.appContext.filesDir, ".nepenthe")
 
     actual fun dataPath(): String {
         return File(baseDir, "journal-data.json").absolutePath
