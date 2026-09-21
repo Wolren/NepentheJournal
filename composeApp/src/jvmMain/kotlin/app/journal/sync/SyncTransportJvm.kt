@@ -380,7 +380,9 @@ class SyncTransport(
                             hostInfo.exceptionOrNull() ?: Exception("Could not reach peer for pairing")
                         )
                     }
-                    appendDebug("pairWithPeer: host reachable, completing pairing with token=$token")
+                    // Never log the pairing token: the debug log replays to the
+                    // UI viewer, and the token is the secret that wraps the key.
+                    appendDebug("pairWithPeer: host reachable, completing pairing")
                     val result = client.completePairing(
                         host = peer.host, port = peer.port,
                         token = token,
@@ -391,7 +393,9 @@ class SyncTransport(
 
                     if (result.isSuccess) {
                         val pr = result.getOrThrow()
-                        appendDebug("pairWithPeer: success, hostDeviceId=${pr.hostDeviceId}, sharedSecret=${pr.sharedSecret.take(8)}...")
+                        // Never log secret material, not even truncated: the debug
+                        // log replays 200 lines to the UI viewer.
+                        appendDebug("pairWithPeer: success, hostDeviceId=${pr.hostDeviceId}")
                         trustStore.addPeer(DeviceTrustStore.TrustedPeer(
                             deviceId = pr.hostDeviceId,
                             displayName = pr.hostDeviceName,

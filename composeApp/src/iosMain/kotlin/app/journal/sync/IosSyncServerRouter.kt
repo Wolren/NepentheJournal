@@ -2,6 +2,7 @@ package app.journal.sync
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import app.journal.util.currentTimeMillis
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -28,7 +29,14 @@ class IosSyncServerRouter(
     private val deviceName: String,
     private val fingerprint: String,
     private val onConnection: (String) -> Unit = {},
-    private val isRateLimited: (String) -> Boolean = { false }
+    private val isRateLimited: (String) -> Boolean = { false },
+    /**
+     * Persist callback invoked after every accepted apply and before the
+     * response is sent (durability: the client advances its sync cursor on
+     * a successful response, so an unpersisted ack would lose pushed data
+     * forever on crash). Mirrors the JVM persistAfterApply.
+     */
+    private val persistAfterApply: (() -> Unit)? = null
 ) {
     private val json = AppJson.json
 
@@ -60,14 +68,24 @@ class IosSyncServerRouter(
 
             get("/auth/verify") {
                 val deviceIdParam = call.request.queryParameters["deviceId"]
-                val challenge = call.request.queryParameters["challenge"]
-                if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
+                val challengeRaw = call.request.queryParameters["challenge"]
+                if (deviceIdParam.isNullOrBlank() || challengeRaw.isNullOrBlank()) {
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
                     )
                     return@get
                 }
+                // Cap the challenge like the JVM (MAX_CHALLENGE_LEN): an
+                // unbounded challenge would be signed and stored verbatim.
+                if (challengeRaw.length > MAX_CHALLENGE_LEN) {
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@get
+                }
+                val challenge = challengeRaw
                 val secret = trustStore.getSharedSecret(deviceIdParam)
                 if (secret == null) {
                     call.respondText(
@@ -96,6 +114,16 @@ class IosSyncServerRouter(
                     return@post
                 }
 
+                // Declared length is enforced BEFORE the body is buffered:
+                // missing, chunked, or oversized bodies are refused unread,
+                // mirroring the JVM pairing route.
+                if (!hasValidContentLength(call, IosPairingManager.MAX_PAIRING_BODY_BYTES.toLong())) {
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Body too large")),
+                        ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
+                    )
+                    return@post
+                }
                 val bodyText = call.receiveText()
                 if (bodyText.length > IosPairingManager.MAX_PAIRING_BODY_BYTES) {
                     call.respondText(
@@ -151,11 +179,21 @@ class IosSyncServerRouter(
                         pairedAt = currentTimeMillis()
                     )
                 )
+                // C2 wrap: the same secret encrypted under a key derived from
+                // the pairing token, so a LAN observer of this response learns
+                // nothing. The legacy field stays populated this wave.
+                val encSecretB64 = try {
+                    IosPairingSecretCrypto.encrypt(req.token, clientDeviceId, secret)
+                } catch (e: Exception) {
+                    Log.withTag("IosSync").w { "pairing secret wrap failed, sending legacy field only" }
+                    null
+                }
                 call.respondText(
                     json.encodeToString(PairingResultResponse(
                         success = true,
                         deviceId = clientDeviceId,
                         sharedSecret = secret,
+                        encSecretB64 = encSecretB64,
                         hostDeviceId = deviceId,
                         hostDeviceName = deviceName,
                         hostFingerprint = fingerprint
@@ -166,6 +204,16 @@ class IosSyncServerRouter(
             }
 
             post(SyncEndpoints.SYNC_PUSH) {
+                // Declared length is enforced BEFORE the body is buffered:
+                // missing, chunked, or oversized bodies are refused unread,
+                // mirroring the JVM push route.
+                if (!hasValidContentLength(call, MAX_SYNC_BODY_BYTES)) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Payload too large")),
+                        ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
+                    )
+                    return@post
+                }
                 val auth = verifyPushAuth(call)
                 if (auth == null) {
                     call.respondText(
@@ -233,6 +281,10 @@ class IosSyncServerRouter(
 
                 applySyncBatch(batch)
                 trustStore.updateLastSeen(callerDeviceId)
+                // Durability: persist before acknowledging, so a crash after
+                // the response cannot lose data the client believes was
+                // accepted. Mirrors the JVM push route.
+                persistAfterApply?.invoke()
                 val response = buildSyncResponse(batch.since)
                 val responseJson = json.encodeToString(response)
                 val encryptedResp = encryptBody(responseJson, aesKey)
@@ -251,7 +303,7 @@ class IosSyncServerRouter(
                 val (callerDeviceId, _) = auth
 
                 val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
-                if (since < 0) {
+                if (since < 0 || since > currentTimeMillis() + MAX_FUTURE_SINCE_MS) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Invalid since")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
@@ -386,5 +438,23 @@ class IosSyncServerRouter(
     companion object {
         /** Max body size for sync requests (10 MB). */
         const val MAX_SYNC_BODY_BYTES = 10L * 1024 * 1024
+
+        /** Max challenge length for /auth/verify, matching the JVM cap. */
+        const val MAX_CHALLENGE_LEN = 128
+
+        /** Pull cursors may be at most 1 day in the future (clock skew allowance). */
+        const val MAX_FUTURE_SINCE_MS = 86_400_000L
+    }
+
+    /**
+     * Strict Content-Length pre-check: the request is valid only when it
+     * declares a length AND it fits in [maxBytes]. Missing or chunked bodies
+     * are refused unread, since Ktor receiveText has no size cap and would
+     * otherwise buffer an unbounded body before any check runs.
+     * Mirrors the JVM hasValidContentLength.
+     */
+    private fun hasValidContentLength(call: ApplicationCall, maxBytes: Long): Boolean {
+        val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: return false
+        return declared in 1..maxBytes
     }
 }

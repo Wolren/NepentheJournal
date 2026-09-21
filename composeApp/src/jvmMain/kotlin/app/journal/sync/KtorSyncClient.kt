@@ -95,9 +95,19 @@ class KtorSyncClient(
             }
             val result = response.body<PairingResultResponse>()
             if (result.success) {
+                // Prefer the token-wrapped secret: it crossed the LAN
+                // encrypted under a key only the token holder derives. Fall
+                // back to the legacy plaintext field for older hosts.
+                val secret = result.encSecretB64?.let { enc ->
+                    try {
+                        SyncAuthenticator.decryptPairingSecret(token, clientDeviceId, enc)
+                    } catch (_: Exception) {
+                        result.sharedSecret ?: ""
+                    }
+                } ?: (result.sharedSecret ?: "")
                 Result.success(DevicePairingResult(
                     deviceId = result.deviceId ?: "",
-                    sharedSecret = result.sharedSecret ?: "",
+                    sharedSecret = secret,
                     hostDeviceId = result.hostDeviceId ?: "",
                     hostDeviceName = result.hostDeviceName ?: "",
                     hostFingerprint = result.hostFingerprint ?: ""

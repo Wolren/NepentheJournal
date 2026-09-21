@@ -6,15 +6,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.security.MessageDigest
 import java.security.SecureRandom
-import java.security.spec.KeySpec
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
@@ -230,7 +226,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         val decryptedPeers = raw.peers.map { peer ->
             val secret = peer.sharedSecret
             if (secret.isEmpty()) return@map peer
-            decryptToPlaintext(secret, storeSalt)?.let { peer.copy(sharedSecret = it) } ?: peer
+            peer.copy(sharedSecret = decryptToPlaintext(secret))
         }
         return raw.copy(salt = storeSalt, peers = decryptedPeers)
     }
@@ -275,9 +271,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
      * The key used to encrypt the store on disk: the random at-rest key file.
      * Key-file-only writer: when the key file cannot be created (ACL cannot
      * be hardened), creation fails closed instead of silently falling back to
-     * a derivable constant password. Reads still accept legacy PBKDF2 and
-     * SHA-256 ciphertext for migration, and re-encrypt with the key file on
-     * the next save.
+     * a derivable constant password.
      */
     private fun encryptionKey(salt: String): SecretKey {
         atRestKey.loadOrNull()?.let { return SecretKeySpec(it, "AES") }
@@ -286,81 +280,38 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     }
 
     /**
-     * Try to decrypt a secret to plaintext. Attempts the at-rest key file
-     * first, then PBKDF2 (legacy), then falls back to treating it as
-     * already plaintext (pre-encryption migration).
-     *
-     * @return decrypted plaintext, or null if already plaintext
+     * Decrypt a stored secret to plaintext with the at-rest key file.
+     * Fail closed: anything that does not decrypt under the current scheme
+     * throws, and the store load aborts. The legacy PBKDF2-constant and
+     * SHA-256 fallbacks plus the plaintext passthrough were removed after
+     * the migration release: they let anyone with file read plus source
+     * knowledge recover every secret, which defeats at-rest encryption.
      */
-    private fun decryptToPlaintext(encrypted: String, storeSalt: String): String? {
-        // If not valid Base64, it's already plaintext (legacy, pre-encryption)
-        val raw = try { Base64.getDecoder().decode(encrypted) } catch (_: Exception) { return null }
-        if (raw.size < 13) return null  // GCM IV (12) + tag (min 1) = at least 13 bytes
-
-        // Try the at-rest key file first (current scheme)
+    private fun decryptToPlaintext(encrypted: String): String {
+        // Non-Base64 content is not a ciphertext of this scheme: fail closed.
+        try {
+            Base64.getDecoder().decode(encrypted)
+        } catch (_: Exception) {
+            throw IllegalStateException("Trust store entry is not valid ciphertext")
+        }
         atRestKey.loadOrNull()?.let { key ->
             try {
                 return decrypt(SecretKeySpec(key, "AES"), encrypted)
-            } catch (_: Exception) { /* fall through */ }
+            } catch (e: Exception) {
+                throw IllegalStateException("Trust store entry failed to decrypt", e)
+            }
         }
-
-        // Try PBKDF2-derived key (legacy)
-        if (storeSalt.isNotBlank()) {
-            try {
-                return decrypt(deriveKey(storeSalt), encrypted)
-            } catch (_: Exception) { /* fall through */ }
-        }
-
-        // Try legacy SHA-256-derived key
-        try {
-            return decrypt(oldDeriveKey(), encrypted)
-        } catch (_: Exception) { /* fall through */ }
-
-        // Not decryptable — return null, caller keeps plaintext as-is
-        return null
+        throw IllegalStateException("No at-rest key available to decrypt trust store")
     }
-
-    // ---- PBKDF2 key derivation ----
 
     companion object {
         /** Cap on the trust-store file so a corrupt file can never OOM the reader. */
         const val MAX_TRUST_FILE_BYTES = 10L * 1024 * 1024
 
-        /**
-         * PBKDF2 iterations for key derivation.
-         * Production: 100,000  (strong, takes ~10ms per operation).
-         * Tests may override via setProperty or env var.
-         */
-        var pbkdf2Iterations: Int = System.getProperty("nepenthe.pbkdf2.iterations")?.toIntOrNull()
-            ?: 100_000
-
-        private const val KEY_LENGTH = 256
-
         private fun generateSalt(): String {
             val bytes = ByteArray(16)
             SecureRandom().nextBytes(bytes)
             return bytes.joinToString("") { "%02x".format(it) }
-        }
-
-        private fun deriveKey(salt: String): SecretKey {
-            val spec: KeySpec = PBEKeySpec(
-                "nepenthe-truststore-v2".toCharArray(),
-                salt.toByteArray(Charsets.UTF_8),
-                pbkdf2Iterations,
-                KEY_LENGTH
-            )
-            val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-            return SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
-        }
-
-        /** Legacy key derivation (SHA-256 of user.home + os.name + salt). */
-        private fun oldDeriveKey(): SecretKey {
-            val seed = System.getProperty("user.home", "unknown") +
-                       System.getProperty("os.name", "unknown")
-            val md = MessageDigest.getInstance("SHA-256")
-            md.update(seed.toByteArray())
-            md.update("::nepenthe-truststore-key::".toByteArray())
-            return SecretKeySpec(md.digest(), "AES")
         }
 
         private fun encrypt(key: SecretKey, plaintext: String): String {

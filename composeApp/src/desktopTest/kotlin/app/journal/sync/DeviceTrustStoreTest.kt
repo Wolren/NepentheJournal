@@ -8,11 +8,6 @@ class DeviceTrustStoreTest {
     private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-trust-${System.nanoTime()}")
     private val store = DeviceTrustStore(testDir.absolutePath)
 
-    init {
-        // Use fast PBKDF2 for tests (1k instead of 100k iterations)
-        DeviceTrustStore.pbkdf2Iterations = 1000
-    }
-
     @AfterTest
     fun cleanup() {
         store.clearAll()
@@ -257,16 +252,16 @@ class DeviceTrustStoreTest {
     }
 
     @Test
-    fun plaintextMigrationSurvives() {
-        // Simulate a pre-encryption file: write plaintext secret directly
+    fun plaintextFileFailsClosed() {
+        // A pre-encryption file with a plaintext secret must NOT load: the
+        // legacy passthrough was removed, and fail-closed rejects it.
         testDir.mkdirs()
         val oldJson = """{"version":1,"peers":[{"deviceId":"legacy-dev","displayName":"Old Peer","fingerprint":"fp-old","sharedSecret":"old-plaintext-secret","pairedAt":1000}]}"""
         File(testDir, "trusted-devices.json").writeText(oldJson)
 
-        val store2 = DeviceTrustStore(testDir.absolutePath)
-        assertEquals("old-plaintext-secret", store2.getSharedSecret("legacy-dev"),
-            "plaintext secrets from before encryption should still load")
-        assertEquals(1, store2.count())
+        assertFailsWith<IllegalStateException> {
+            DeviceTrustStore(testDir.absolutePath).getSharedSecret("legacy-dev")
+        }
     }
 
     @Test

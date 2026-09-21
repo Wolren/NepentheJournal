@@ -48,6 +48,16 @@ jobs:
           test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_slim.json)" = "$(sha256sum < composeApp/src/iosMain/resources/dosewiki_slim.json)"
           test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_slim.json)" = "$(sha256sum < composeApp/src/androidMain/assets/dosewiki_slim.json)"
           echo "DOSEWIKI IDENTICAL: all four dosewiki_slim.json copies match."
+          sha256sum composeApp/src/desktopMain/resources/dosewiki_taxonomy.json \
+            composeApp/src/desktopTest/resources/dosewiki_taxonomy.json \
+            composeApp/src/jvmMain/resources/dosewiki_taxonomy.json \
+            composeApp/src/iosMain/resources/dosewiki_taxonomy.json \
+            composeApp/src/androidMain/assets/dosewiki_taxonomy.json
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_taxonomy.json)" = "$(sha256sum < composeApp/src/desktopTest/resources/dosewiki_taxonomy.json)"
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_taxonomy.json)" = "$(sha256sum < composeApp/src/jvmMain/resources/dosewiki_taxonomy.json)"
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_taxonomy.json)" = "$(sha256sum < composeApp/src/iosMain/resources/dosewiki_taxonomy.json)"
+          test "$(sha256sum < composeApp/src/desktopMain/resources/dosewiki_taxonomy.json)" = "$(sha256sum < composeApp/src/androidMain/assets/dosewiki_taxonomy.json)"
+          echo "TAXONOMY IDENTICAL: all five dosewiki_taxonomy.json copies match."
 
       - name: Compile common + desktop sources
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
@@ -114,7 +124,6 @@ jobs:
           retention-days: 7
 
   ios-build:
-    if: false
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7

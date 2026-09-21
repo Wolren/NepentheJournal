@@ -14,6 +14,7 @@ import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
 import app.journal.log.initLogging
 import app.journal.ui.App
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,15 +36,23 @@ fun main() {
 
     // Global uncaught exception handler -- writes to a separate file so crash
     // details survive even if the rolling log writer is mid-flush during a crash.
+    // Always chains to the previous handler so the crash is still reported
+    // instead of being silently swallowed.
+    val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-        val crashDir = java.io.File(appDataDir, "crashlogs")
-        crashDir.mkdirs()
-        val crashFile = java.io.File(crashDir, "crash-${System.currentTimeMillis()}.dump")
-        crashFile.writeText(
-            "Thread: ${thread.name}\n${throwable.stackTraceToString()}"
-        )
+        try {
+            val crashDir = java.io.File(appDataDir, "crashlogs")
+            crashDir.mkdirs()
+            val crashFile = java.io.File(crashDir, "crash-${System.currentTimeMillis()}.dump")
+            crashFile.writeText(
+                "Thread: ${thread.name}\n${throwable.stackTraceToString()}"
+            )
+        } catch (_: Exception) { /* best effort: crash dump must not block chaining */ }
         // Also try to flush via the logging system
-        app.journal.log.Log.withTag("JVM").e(throwable) { "Uncaught exception on ${thread.name}" }
+        try {
+            app.journal.log.Log.withTag("JVM").e(throwable) { "Uncaught exception on ${thread.name}" }
+        } catch (_: Exception) { /* logging unavailable during crash */ }
+        previousHandler?.uncaughtException(thread, throwable)
     }
 
     // Flush in-memory data on JVM shutdown (Ctrl+C, taskkill, kill).
@@ -60,8 +69,13 @@ fun main() {
         }
     })
 
-    // Scope for debounced auto-save (lives as long as the app)
-    val autoSaveScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    // Scope for debounced auto-save (lives as long as the app).
+    // CoroutineExceptionHandler logs failures instead of dropping them silently.
+    val autoSaveScope = CoroutineScope(
+        Dispatchers.Default + SupervisorJob() + CoroutineExceptionHandler { _, e ->
+            app.journal.log.Log.withTag("JVM").e(e) { "Uncaught coroutine exception in autoSaveScope" }
+        }
+    )
 
     // Heavy init (megabytes of seed plus DoseWiki JSON) runs off the main
     // thread; the window opens immediately and App gates on

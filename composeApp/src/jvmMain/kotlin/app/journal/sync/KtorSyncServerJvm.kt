@@ -788,14 +788,19 @@ class SyncServerRouter(
             val plaintext = decryptBody(base64Decode(text), key)
             val msg = wsJson.decodeFromString<WsMessage>(plaintext)
             return msg
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            Log.withTag("KtorSyncServer").d { "WS frame is not decryptable ciphertext, trying cleartext control frames" }
+        }
         // Cleartext fallback for control frames only. A plaintext WsDelta is
         // refused (returns null): on a keyed connection every delta must be
         // encrypted, otherwise a LAN observer could inject unsigned batches.
         return try {
             when (val msg = wsJson.decodeFromString<WsMessage>(text)) {
                 is WsPing, is WsPong, is WsAck -> msg
-                is WsDelta -> null
+                is WsDelta -> {
+                    Log.withTag("KtorSyncServer").d { "WS cleartext delta refused, deltas must be encrypted" }
+                    null
+                }
             }
         } catch (_: Exception) { null }
     }

@@ -2,6 +2,7 @@ package app.journal.sync
 
 import app.journal.data.AppJson
 import app.journal.data.JournalRepository
+import app.journal.data.JournalStore
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.util.PlatformLock
@@ -87,7 +88,10 @@ class IosSyncTransport(
                 onConnection = { msg ->
                     _status.update { it.copy(lastError = msg) }
                 },
-                isRateLimited = ::isPairingRateLimited
+                isRateLimited = ::isPairingRateLimited,
+                // Durability: flush the journal to disk after every accepted
+                // push and before the ack goes out (mirrors JVM factories).
+                persistAfterApply = { JournalStore(repo).save(fullBackup = false) }
             )
             pairingManager.generatePairingToken()
             val now = currentTimeMillis()
@@ -289,7 +293,15 @@ class IosSyncTransport(
             val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
             if (!result.success) return Result.failure(Exception(result.error ?: "Pairing failed"))
 
-            val sharedSecret = result.sharedSecret ?: return Result.failure(Exception("No secret returned"))
+            // C2 unwrap: try the encrypted field first (key derived from the
+            // user-entered token and our own client deviceId), fall back to
+            // the legacy plaintext field the server keeps populated.
+            val sharedSecret = IosPairingSecretCrypto.resolveSecret(
+                token = tokenStr,
+                clientDeviceId = deviceId,
+                encSecretB64 = result.encSecretB64,
+                sharedSecret = result.sharedSecret
+            ) ?: return Result.failure(Exception("No secret returned"))
             val hostId = result.hostDeviceId ?: return Result.failure(Exception("No host id returned"))
             trustStore.addPeer(
                 IosDeviceTrustStore.IosTrustedPeer(

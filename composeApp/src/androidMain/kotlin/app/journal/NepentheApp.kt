@@ -22,13 +22,22 @@ class NepentheApp : Application() {
 
         // Global uncaught exception handler -- writes crash to a separate file
         // so it survives even if the rolling log writer is mid-flush.
+        // Always chains to the previous handler so the platform still
+        // reports the crash instead of silently swallowing it.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            val crashDir = java.io.File(filesDir, "crashlogs")
-            crashDir.mkdirs()
-            val crashFile = java.io.File(crashDir, "crash-${System.currentTimeMillis()}.dump")
-            crashFile.writeText(
-                "Thread: ${thread.name}\n${throwable.stackTraceToString()}"
-            )
+            try {
+                val crashDir = java.io.File(filesDir, "crashlogs")
+                crashDir.mkdirs()
+                val crashFile = java.io.File(crashDir, "crash-${System.currentTimeMillis()}.dump")
+                crashFile.writeText(
+                    "Thread: ${thread.name}\n${throwable.stackTraceToString()}"
+                )
+            } catch (e: Exception) {
+                Log.withTag("NepentheApp").e(e) { "Failed to write crash dump" }
+            } finally {
+                previousHandler?.uncaughtException(thread, throwable)
+            }
         }
     }
 

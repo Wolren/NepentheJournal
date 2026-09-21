@@ -10,11 +10,22 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
+ * Typed failure for Android zip export.
+ *
+ * Thrown instead of returning 0 so callers can distinguish a failed export
+ * (exception) from an empty one (a valid 0 or small count).
+ */
+class ZipExportException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+/**
  * Android actual for ZipExporter.
  *
  * Handles both filesystem paths (for internal use) and content:// URIs
  * (for user-picked save locations). Content URI support works by writing
  * the zip to a temp file first, then copying via ContentResolver.
+ *
+ * Every export throws [ZipExportException] on failure and never returns 0
+ * to signal an error, so a 0 count always means an empty export.
  */
 actual object ZipExporter {
 
@@ -53,8 +64,12 @@ actual object ZipExporter {
         file.parentFile?.mkdirs()
         return try {
             buildAllZip(repo, filter, FileOutputStream(file))
+            Log.withTag("ZipExporter").i { "Exported all data to $outputPath" }
             5
-        } catch (_: Exception) { 0 }
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export all data to $outputPath" }
+            throw ZipExportException("Failed to export all data to $outputPath: ${e.message}", e)
+        }
     }
 
     private fun exportSessionsFile(
@@ -66,8 +81,12 @@ actual object ZipExporter {
         file.parentFile?.mkdirs()
         return try {
             buildSessionsZip(repo, filter, FileOutputStream(file))
+            Log.withTag("ZipExporter").i { "Exported sessions to $outputPath" }
             1
-        } catch (_: Exception) { 0 }
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export sessions to $outputPath" }
+            throw ZipExportException("Failed to export sessions to $outputPath: ${e.message}", e)
+        }
     }
 
     // ---- Content URI export (write to temp, copy to URI) ----
@@ -83,8 +102,12 @@ actual object ZipExporter {
         return try {
             val count = buildAllZip(repo, filter, FileOutputStream(tmpFile))
             copyToUri(tmpFile, outputPath)
+            Log.withTag("ZipExporter").i { "Exported all data to $outputPath" }
             count
-        } catch (_: Exception) { 0 } finally {
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export all data to $outputPath" }
+            throw ZipExportException("Failed to export all data to $outputPath: ${e.message}", e)
+        } finally {
             tmpFile.delete()
         }
     }
@@ -100,15 +123,21 @@ actual object ZipExporter {
         return try {
             val count = buildSessionsZip(repo, filter, FileOutputStream(tmpFile))
             copyToUri(tmpFile, outputPath)
+            Log.withTag("ZipExporter").i { "Exported sessions to $outputPath" }
             count
-        } catch (_: Exception) { 0 } finally {
+        } catch (e: Exception) {
+            Log.withTag("ZipExporter").e(e) { "Failed to export sessions to $outputPath" }
+            throw ZipExportException("Failed to export sessions to $outputPath: ${e.message}", e)
+        } finally {
             tmpFile.delete()
         }
     }
 
     private fun copyToUri(source: File, uriString: String) {
         val uri = Uri.parse(uriString)
-        NepentheApp.appContext.contentResolver.openOutputStream(uri)?.use { os ->
+        val out = NepentheApp.appContext.contentResolver.openOutputStream(uri)
+            ?: throw IllegalStateException("Cannot open output stream for export destination")
+        out.use { os ->
             source.inputStream().use { `is` ->
                 `is`.copyTo(os)
             }

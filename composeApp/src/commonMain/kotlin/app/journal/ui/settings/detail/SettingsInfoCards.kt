@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import app.journal.ui.components.*
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.launch
 
 @Composable
@@ -132,7 +133,9 @@ internal fun DeveloperCardContent(
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             AppOutlinedButton(onClick = {
-                scope.launch {
+                scope.launch(CoroutineExceptionHandler { _, e ->
+                    app.journal.log.Log.withTag("Settings").e(e) { "Diagnostics export failed" }
+                }) {
                     try {
                         val appDir = app.journal.util.PlatformFile.dataDir()
                         val logs = app.journal.log.collectLogs(appDir)
@@ -154,7 +157,7 @@ internal fun DeveloperCardContent(
             crashLogStatus?.let { msg ->
                 Spacer(Modifier.height(4.dp))
                 Text(msg, style = MaterialTheme.typography.labelSmall,
-                    color = if (msg.startsWith("Export") || msg.startsWith("Logs")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                    color = if (msg.startsWith("Logs exported")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
             }
         }
     }
