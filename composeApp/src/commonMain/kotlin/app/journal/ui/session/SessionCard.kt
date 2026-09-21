@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -44,7 +43,6 @@ fun SessionCard(
     substanceNameMap: Map<String, String>,
     timeDisplayMode: TimeDisplayMode,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
     onEdit: () -> Unit,
     onToggleFavorite: () -> Unit = { JournalRepository.instance.toggleFavorite(session.id) }
 ) {
@@ -146,11 +144,6 @@ fun SessionCard(
                         IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete",
-                                tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp))
                         }
                     }

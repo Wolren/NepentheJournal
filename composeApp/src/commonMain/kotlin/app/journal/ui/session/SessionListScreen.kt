@@ -53,7 +53,6 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
     val allSubstances by repo.substances.collectAsState()
     val dosesBySession = remember(allDoses) { allDoses.groupBy { it.sessionId } }
     val substanceNameMap = remember(allSubstances) { allSubstances.associate { it.id to it.name } }
-    var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
     var substanceDropdownExpanded by remember { mutableStateOf(false) }
@@ -201,7 +200,6 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                                 substanceNameMap = substanceNameMap,
                                 timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
-                                onDelete = { showDeleteConfirm = session.id },
                                 onEdit = { onEditSession(session.id) }
                             )
                         }
@@ -277,22 +275,6 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
         )
     }
 
-    if (showDeleteConfirm != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = null },
-            title = { Text("Delete session?") },
-            text = { Text("This will also remove all doses, notes, and timeline events for this session.") },
-            confirmButton = {
-                AppTextButton(onClick = {
-                    showDeleteConfirm?.let { viewModel.repo.deleteSession(it) }
-                    showDeleteConfirm = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                AppTextButton(onClick = { showDeleteConfirm = null }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 /**

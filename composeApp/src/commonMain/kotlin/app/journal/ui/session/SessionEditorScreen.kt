@@ -269,6 +269,30 @@ fun SessionEditorScreen(
         )
     }
 
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    // Delete confirmation dialog (delete lives here, inside the open
+    // session, never on the list card)
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete session?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                AppTextButton(onClick = {
+                    sessionToEdit?.let { repo.deleteSession(it.id) }
+                    showDeleteConfirm = false
+                    onBack()
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                AppTextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     // Main layout
     ScreenScaffold(
         title = if (isEditing) "Edit Session" else "New Session",
@@ -281,6 +305,12 @@ fun SessionEditorScreen(
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary
                            else MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (isEditing) {
+                IconButton(onClick = { showDeleteConfirm = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.error)
+                }
             }
             AppButton(onClick = ::saveSession) { Text("Save") }
         }
