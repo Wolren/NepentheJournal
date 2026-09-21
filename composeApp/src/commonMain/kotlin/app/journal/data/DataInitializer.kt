@@ -1,13 +1,18 @@
 package app.journal.data
 
 import app.journal.ingest.DoseWikiIngestor
+import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.sync.sha256
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
 import app.journal.util.readBundledResource
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Orchestrates data initialization on startup.
@@ -33,10 +38,19 @@ object DataInitializer {
     private var initialized = false
     private var autoSaveJob: Job? = null
 
+    private val _initializedFlow = MutableStateFlow(false)
+    /**
+     * True once [ensureInitialized] has fully completed. The UI shows a
+     * loading gate until then so slow first-launch ingests never present
+     * a blank screen.
+     */
+    val initializedFlow: StateFlow<Boolean> = _initializedFlow.asStateFlow()
+
     /** Reset internal state so the next [ensureInitialized] call re-runs initialization. */
     internal fun reset() {
         initialized = false
         autoSaveJob = null
+        _initializedFlow.value = false
     }
 
     private const val SEED_RESOURCE = "/psychonautwiki_seed.json"
@@ -57,22 +71,44 @@ object DataInitializer {
         // Step 1: Load user data from disk first (to check for old IDs)
         store.load()
 
-        // Step 2: Load bundled PW seed (substances + interactions) as the
-        // fallback base. Always done to refresh substance data on startup.
-        val seedLoaded = tryLoadSeed(repo)
+        // Step 2: Load bundled PW seed + DoseWiki ingest, unless the
+        // persisted library already matches the bundled resources. Parsing
+        // and ingesting megabytes of JSON on every launch is what kept slow
+        // devices on a blank screen for minutes; the fingerprint makes the
+        // steady state a plain disk load.
+        val bundledFingerprint = seedBundledFingerprint()
+        val libraryFresh = bundledFingerprint != null &&
+            repo.seedFingerprint.value == bundledFingerprint &&
+            repo.substances.value.isNotEmpty()
+        if (libraryFresh) {
+            Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
+        } else {
+            val seedLoaded = tryLoadSeed(repo)
 
-        // Step 3: Ingest DoseWiki data as the PRIMARY entity (overwrites
-        // matched seed rows, creates dw:{slug} rows for the rest).
-        DoseWikiIngestor.ensureIngested(repo)
+            // Step 3: Ingest DoseWiki data as the PRIMARY entity (overwrites
+            // matched seed rows, creates dw:{slug} rows for the rest).
+            DoseWikiIngestor.ensureIngested(repo)
 
-        // Step 4: Migrate old session/dose references if ID scheme changed.
-        if (seedLoaded) {
-            migrateOldIds(repo)
+            // Step 4: Migrate old session/dose references if ID scheme changed.
+            if (seedLoaded) {
+                migrateOldIds(repo)
+            }
+            if (bundledFingerprint != null) {
+                repo.setSeedFingerprint(bundledFingerprint)
+            }
             store.save()
         }
 
         val subCount = repo.substances.value.size
         val sessionCount = repo.sessions.value.size
+
+        // Curated DoseWiki taxonomy tags. Cheap and idempotent: steady-state
+        // launches change nothing and skip the save.
+        val taggedCount = DosewikiTaxonomy.applyTags(repo)
+        if (taggedCount > 0) {
+            store.save()
+            Log.withTag("DataInit").i { "Saved curated taxonomy tags ($taggedCount substances)" }
+        }
 
         // Purge legacy pause/resume marker notes. Pause used to write NOTE
         // "Paused"/"Resumed" events; timer state lives on Session now, so the
@@ -120,6 +156,7 @@ object DataInitializer {
         if (subCount > 0 || sessionCount > 0) {
         Log.withTag("DataInit").i { "Initialized: $subCount substances, $sessionCount sessions" }
         }
+        _initializedFlow.value = true
     }
 
     /**
@@ -173,6 +210,20 @@ object DataInitializer {
         }
 
         Log.withTag("DataInit").i { "  Patched $patchedDoses doses, $patchedInteractions interactions" }
+    }
+
+    /**
+     * Fingerprint of the bundled resources: lengths plus SHA-256 over the
+     * raw seed and DoseWiki texts. Null when either resource is missing,
+     * which fails open into a full re-ingest. Raw text reads are cheap;
+     * the parse plus ingest they gate is what stalls slow devices.
+     */
+    private fun seedBundledFingerprint(): String? {
+        val seedText = readBundledResource(SEED_RESOURCE) ?: return null
+        val doseText = DoseWikiIngestor.bundledText() ?: return null
+        val hex = sha256((seedText + doseText).encodeToByteArray())
+            .joinToString("") { it.toInt().and(0xFF).toString(16).padStart(2, '0') }
+        return "${seedText.length}:${doseText.length}:$hex"
     }
 
     private fun tryLoadSeed(repo: IJournalRepository): Boolean {

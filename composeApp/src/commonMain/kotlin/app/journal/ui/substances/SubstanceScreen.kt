@@ -1,7 +1,6 @@
 package app.journal.ui.substances
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,9 +9,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
@@ -41,20 +39,25 @@ fun SubstanceScreen(
 ) {
     val substances by viewModel.realSubstances.collectAsState(initial = emptyList())
     val results by viewModel.results.collectAsState(initial = emptyList())
-    val allCategories by viewModel.allCategories.collectAsState(initial = emptyList())
+    val broadOptions by viewModel.broadOptions.collectAsState(initial = emptyList())
+    val specificOptions by viewModel.specificOptions.collectAsState(initial = emptyList())
     val themeManager = remember { ThemeManager.instance }
     val isDark = themeManager.isDarkTheme()
     val substanceDoseStats = viewModel.substanceDoseStats
 
     val query by viewModel.query.collectAsState()
-    val activeCategories by viewModel.activeCategories.collectAsState()
+    val activeBroad by viewModel.activeBroad.collectAsState()
+    val activeSpecifics by viewModel.activeSpecifics.collectAsState()
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
     val scrollState = rememberLazyListState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
             // Search bar with category filter as trailing icon
-            Box {
+            BoxWithConstraints {
+                // Wide windows get broads and specifics side by side;
+                // narrow ones stack the panes so nothing overflows.
+                val wideFilterMenu = maxWidth > 700.dp
                 OutlinedTextField(
                     value = query,
                     onValueChange = { viewModel.query.value = it },
@@ -71,7 +74,7 @@ fun SubstanceScreen(
                                 Icon(
                                     Icons.Default.Label,
                                     contentDescription = "Filter by category",
-                                    tint = if (activeCategories.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                    tint = if (activeBroad != null) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -84,55 +87,108 @@ fun SubstanceScreen(
                 DropdownMenu(
                     expanded = categoryDropdownExpanded,
                     onDismissRequest = { categoryDropdownExpanded = false },
-                    offset = DpOffset(0.dp, 0.dp)
+                    offset = DpOffset(0.dp, 0.dp),
                 ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text("All categories",
-                                fontWeight = if (activeCategories.isEmpty()) FontWeight.Bold else FontWeight.Normal)
-                        },
-                        onClick = { viewModel.activeCategories.value = emptySet(); categoryDropdownExpanded = false },
-                        leadingIcon = {
-                            if (activeCategories.isEmpty()) {
-                                Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
-                                }
-                            } else Box(Modifier.size(18.dp))
-                        }
-                    )
-                    if (allCategories.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No categories", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = { categoryDropdownExpanded = false },
-                            enabled = false
-                        )
-                    } else {
-                        allCategories.forEach { category ->
-                            val isSelected = category in activeCategories
+                    // One menu, shared panes: broads on the left, the active
+                    // broad's specifics on the right. A single popup means
+                    // picking specifics never dismisses the menu and there
+                    // is no offset math to drift. Narrow windows stack the
+                    // panes instead of overflowing the screen.
+                    val wideMenu = wideFilterMenu
+                    @Composable
+                    fun BroadPane() {
+                        Column(modifier = Modifier.width(300.dp)) {
                             DropdownMenuItem(
                                 text = {
-                                    Text(category,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                    Text("All categories",
+                                        fontWeight = if (activeBroad == null) FontWeight.Bold else FontWeight.Normal)
                                 },
-                                onClick = {
-                                    viewModel.activeCategories.value = if (isSelected) activeCategories - category
-                                        else activeCategories + category
-                                },
+                                onClick = { viewModel.selectBroad(null); categoryDropdownExpanded = false },
                                 leadingIcon = {
-                                    if (isSelected) {
-                                        Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
-                                        }
-                                    } else Box(Modifier.size(18.dp))
+                                    Checkbox(
+                                        checked = activeBroad == null,
+                                        onCheckedChange = null,
+                                    )
                                 }
                             )
+                            if (broadOptions.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No categories", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                    onClick = { categoryDropdownExpanded = false },
+                                    enabled = false
+                                )
+                            } else {
+                                broadOptions.forEach { broad ->
+                                    val isSelected = broad.id == activeBroad
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("${broad.label} (${broad.count})",
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                        },
+                                        onClick = {
+                                            viewModel.selectBroad(if (isSelected) null else broad.id)
+                                        },
+                                        leadingIcon = {
+                                            Checkbox(
+                                                checked = isSelected,
+                                                onCheckedChange = null,
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            Icon(
+                                                Icons.Default.KeyboardArrowRight,
+                                                contentDescription = "Show specifics",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        },
+                                    )
+                                }
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Done", fontWeight = FontWeight.Bold) },
+                                    onClick = { categoryDropdownExpanded = false },
+                                )
+                            }
                         }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Done", fontWeight = FontWeight.Bold) },
-                            onClick = { categoryDropdownExpanded = false },
-                            leadingIcon = { Box(Modifier.size(18.dp)) }
-                        )
+                    }
+                    @Composable
+                    fun SpecificPane() {
+                        Column(modifier = Modifier.width(300.dp)) {
+                            specificOptions.forEach { specific ->
+                                val specificSelected = specific.label in activeSpecifics
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("${specific.label} (${specific.count})",
+                                            fontWeight = if (specificSelected) FontWeight.Bold else FontWeight.Normal,
+                                            style = MaterialTheme.typography.bodyMedium)
+                                    },
+                                    onClick = { viewModel.toggleSpecific(specific.label) },
+                                    leadingIcon = {
+                                        Checkbox(
+                                            checked = specificSelected,
+                                            onCheckedChange = null,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    if (wideMenu) {
+                        Row {
+                            BroadPane()
+                            if (activeBroad != null) {
+                                VerticalDivider()
+                                SpecificPane()
+                            }
+                        }
+                    } else {
+                        Column {
+                            BroadPane()
+                            if (activeBroad != null) {
+                                HorizontalDivider()
+                                SpecificPane()
+                            }
+                        }
                     }
                 }
             }

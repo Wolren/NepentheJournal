@@ -3,10 +3,17 @@ package app.journal.ui.substances
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.model.Substance
+import app.journal.model.SubstanceTaxonomy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+
+/** Broad category option with the number of matching substances. */
+data class BroadOption(val id: String, val label: String, val count: Int)
+
+/** Specific (raw class) option under the active broad, with match count. */
+data class SpecificOption(val label: String, val count: Int)
 
 /**
  * ViewModel for [SubstanceScreen].
@@ -29,16 +36,45 @@ class SubstanceScreenViewModel(
         }
     }
 
-    /** All unique substance classes across real substances, sorted. */
-    val allCategories: Flow<List<String>> = realSubstances.map { list ->
-        list.flatMap { it.substanceClass }.distinct().sorted()
+    /**
+     * Level one: broad categories present in the data, in taxonomy order,
+     * each with its substance count.
+     */
+    val broadOptions: Flow<List<BroadOption>> = realSubstances.map { list ->
+        val counts = mutableMapOf<String, Int>()
+        list.forEach { sub ->
+            vmBroads(sub).forEach { id ->
+                counts[id] = (counts[id] ?: 0) + 1
+            }
+        }
+        SubstanceTaxonomy.broads.mapNotNull { broad ->
+            counts[broad.id]?.let { BroadOption(broad.id, broad.label, it) }
+        }
     }
+
+    /** Active level-one broad filter, or null for all substances. */
+    val activeBroad = MutableStateFlow<String?>(null)
+
+    /**
+     * Level two: raw class labels under the active broad, most common
+     * first, each with its count within the broad.
+     */
+    val specificOptions: Flow<List<SpecificOption>> =
+        combine(realSubstances, activeBroad) { list, broad ->
+            if (broad == null) return@combine emptyList()
+            list.asSequence()
+                .filter { broad in vmBroads(it) }
+                .flatMap { vmSpecifics(it, broad) }
+                .groupingBy { it }.eachCount()
+                .map { (label, count) -> SpecificOption(label, count) }
+                .sortedByDescending { it.count }
+        }
+
+    /** Active level-two refinements within the active broad. */
+    val activeSpecifics = MutableStateFlow<Set<String>>(emptySet())
 
     /** Current search query. */
     val query = MutableStateFlow("")
-
-    /** Active category filters. */
-    val activeCategories = MutableStateFlow<Set<String>>(emptySet())
 
     /** Precomputed dose stats from repository. */
     val substanceDoseStats: Map<String, Pair<Int, Long>>
@@ -46,14 +82,21 @@ class SubstanceScreenViewModel(
 
     /** Filtered + searched results. */
     val results: Flow<List<Substance>> = combine(
-        realSubstances, query, activeCategories
-    ) { all, q, cats ->
+        realSubstances, query, activeBroad, activeSpecifics
+    ) { all, q, broad, specs ->
         var result = all
 
-        // Category filter
-        if (cats.isNotEmpty()) {
+        // Broad filter: a substance matches when ANY of its classes maps there
+        // (or its IUPHAR data shows KOR agonism for Dysdelic).
+        if (broad != null) {
             result = result.filter { sub ->
-                sub.substanceClass.any { it in cats }
+                broad in vmBroads(sub)
+            }
+            // Specific refinement within the broad.
+            if (specs.isNotEmpty()) {
+                result = result.filter { sub ->
+                    vmSpecifics(sub, broad).any { it in specs }
+                }
             }
         }
 
@@ -70,17 +113,44 @@ class SubstanceScreenViewModel(
         result
     }
 
-    fun toggleCategory(cat: String) {
-        activeCategories.value = if (cat in activeCategories.value) {
-            activeCategories.value - cat
-        } else {
-            activeCategories.value + cat
+    fun selectBroad(id: String?) {
+        if (activeBroad.value != id) {
+            activeBroad.value = id
+            activeSpecifics.value = emptySet()
         }
     }
 
+    fun toggleSpecific(label: String) {
+        activeSpecifics.value = if (label in activeSpecifics.value) {
+            activeSpecifics.value - label
+        } else {
+            activeSpecifics.value + label
+        }
+    }
+
+    /** All broads for one substance, including Dysdelic from IUPHAR data. */
+    private fun vmBroads(sub: Substance): Set<String> =
+        SubstanceTaxonomy.broadsFor(
+            sub.substanceClass,
+            sub.iupharData?.interactions ?: emptyList(),
+            sub.name,
+            sub.curatedSections,
+        )
+
+    /** Level-two labels of one substance under one broad. */
+    private fun vmSpecifics(sub: Substance, broad: String): List<String> =
+        SubstanceTaxonomy.specificsFor(
+            broad,
+            sub.substanceClass,
+            sub.iupharData?.interactions ?: emptyList(),
+            sub.name,
+            sub.curatedSections,
+        )
+
     fun clearFilters() {
         query.value = ""
-        activeCategories.value = emptySet()
+        activeBroad.value = null
+        activeSpecifics.value = emptySet()
     }
 
     companion object {

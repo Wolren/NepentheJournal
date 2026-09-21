@@ -220,18 +220,20 @@ class JournalRepositoryTest {
     // ==================== Preferences ====================
 
     @Test
-    fun shulginRatingDefaultsFalse() {
+    fun ratingScaleDefaultsOff() {
         val repo = JournalRepository()
-        assertFalse(repo.useShulginRating.value)
+        assertEquals(RatingScaleMode.OFF, repo.ratingScaleMode.value)
     }
 
     @Test
-    fun shulginRatingTogglePersists() {
+    fun ratingScaleModePersists() {
         val repo = JournalRepository()
-        repo.setShulginRating(true)
-        assertTrue(repo.useShulginRating.value)
-        repo.setShulginRating(false)
-        assertFalse(repo.useShulginRating.value)
+        repo.setRatingScaleMode(RatingScaleMode.SHULGIN)
+        assertEquals(RatingScaleMode.SHULGIN, repo.ratingScaleMode.value)
+        repo.setRatingScaleMode(RatingScaleMode.NUMERIC)
+        assertEquals(RatingScaleMode.NUMERIC, repo.ratingScaleMode.value)
+        repo.setRatingScaleMode(RatingScaleMode.OFF)
+        assertEquals(RatingScaleMode.OFF, repo.ratingScaleMode.value)
     }
 
     @Test
@@ -254,7 +256,7 @@ class JournalRepositoryTest {
         assertTrue(repo.substances.value.isEmpty())
         assertTrue(repo.doses.value.isEmpty())
         assertTrue(repo.notes.value.isEmpty())
-        assertFalse(repo.useShulginRating.value)
+        assertEquals(RatingScaleMode.OFF, repo.ratingScaleMode.value)
         assertTrue(repo.useSubstanceColors.value)
     }
 
@@ -275,7 +277,7 @@ class JournalRepositoryTest {
         assertEquals(1, repo.sessions.value.size)
         assertEquals(1, repo.substances.value.size)
         assertEquals(1, repo.doses.value.size)
-        assertTrue(repo.useShulginRating.value)
+        assertEquals(RatingScaleMode.SHULGIN, repo.ratingScaleMode.value)
         assertFalse(repo.useSubstanceColors.value)
     }
 

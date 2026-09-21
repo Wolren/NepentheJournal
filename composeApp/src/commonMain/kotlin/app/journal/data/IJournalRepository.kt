@@ -30,9 +30,16 @@ interface IJournalRepository {
     val effects: StateFlow<List<Effect>>
     val customUnits: StateFlow<List<CustomUnit>>
 
-    val useShulginRating: StateFlow<Boolean>
+    val ratingScaleMode: StateFlow<RatingScaleMode>
     val useSubstanceColors: StateFlow<Boolean>
     val welcomeCompleted: StateFlow<Boolean>
+    /**
+     * Fingerprint of the bundled seed + DoseWiki resources the substance
+     * library was last ingested from. When it matches the bundled resources
+     * at startup, the expensive re-parse and re-ingest is skipped and the
+     * persisted library is used as is.
+     */
+    val seedFingerprint: StateFlow<String?>
     val toleranceVersion: StateFlow<Int>
     val mutationCount: StateFlow<Long>
 
@@ -65,6 +72,8 @@ interface IJournalRepository {
     // ---- Sessions ----
     fun upsertSession(session: Session)
     fun getSession(id: String): Session?
+    /** Flips the favorite flag, no-op for unknown ids. */
+    fun toggleFavorite(sessionId: String)
     fun deleteSession(id: String)
 
     // ---- Individuals (device-local, never synced) ----
@@ -101,9 +110,10 @@ interface IJournalRepository {
     fun customUnitsForSubstance(substanceId: String): List<CustomUnit>
 
     // ---- Preferences ----
-    fun setShulginRating(enabled: Boolean)
+    fun setRatingScaleMode(mode: RatingScaleMode)
     fun setSubstanceColors(enabled: Boolean)
     fun setWelcomeCompleted(completed: Boolean)
+    fun setSeedFingerprint(fingerprint: String?)
 
     // ---- Notes ----
     fun upsertNote(note: Note)

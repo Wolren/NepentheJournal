@@ -16,6 +16,9 @@ object AndroidFilePickerBridge {
     /** Callback invoked to launch an "open document" picker with mime type filters. */
     var launchOpenDocument: ((mimeTypes: Array<String>) -> Unit)? = null
 
+    /** Callback invoked to launch a folder picker (ACTION_OPEN_DOCUMENT_TREE). */
+    var launchOpenFolder: (() -> Unit)? = null
+
     /** Continuation to resume with the picked content URI string (or null on cancel). */
     @Volatile
     var continuation: kotlin.coroutines.Continuation<String?>? = null

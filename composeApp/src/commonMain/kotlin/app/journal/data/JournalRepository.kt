@@ -66,14 +66,17 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val personsStore = EntityStore(Person::id)
 
     // ---- Preferences ----
-    private val _useShulginRating = MutableStateFlow(false)
-    override val useShulginRating: StateFlow<Boolean> = _useShulginRating.asStateFlow()
+    private val _ratingScaleMode = MutableStateFlow(RatingScaleMode.OFF)
+    override val ratingScaleMode: StateFlow<RatingScaleMode> = _ratingScaleMode.asStateFlow()
 
     private val _useSubstanceColors = MutableStateFlow(true)
     override val useSubstanceColors: StateFlow<Boolean> = _useSubstanceColors.asStateFlow()
 
     private val _welcomeCompleted = MutableStateFlow(false)
     override val welcomeCompleted: StateFlow<Boolean> = _welcomeCompleted.asStateFlow()
+
+    private val _seedFingerprint = MutableStateFlow<String?>(null)
+    override val seedFingerprint: StateFlow<String?> = _seedFingerprint.asStateFlow()
 
     // ---- Obsidian vault config ----
     private val _obsidianVaultPath = MutableStateFlow("")
@@ -321,7 +324,10 @@ class JournalRepository internal constructor() : IJournalRepository {
         customUnitsStore.putAll(snapshot.customUnits)
         personsStore.putAll(snapshot.persons)
         rebuildAllIndices()
-        setShulginRating(snapshot.useShulginRating)
+        setRatingScaleMode(
+            snapshot.ratingScaleMode
+                ?: if (snapshot.useShulginRating) RatingScaleMode.SHULGIN else RatingScaleMode.OFF,
+        )
         setSubstanceColors(snapshot.useSubstanceColors)
         setWelcomeCompleted(snapshot.welcomeCompleted)
     }
@@ -418,6 +424,17 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
 
     override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
+
+    override fun toggleFavorite(sessionId: String) = lock.withLock {
+        val session = sessionsStore.get(sessionId) ?: return@withLock
+        val oldSession = sessionsStore.put(
+            session.copy(isFavorite = !session.isFavorite, updatedAt = currentTimeMillis()),
+        )
+        if (oldSession != null) removeSessionFromIndices(oldSession)
+        addSessionToIndices(sessionsStore.get(sessionId)!!)
+        bumpMutationCount()
+        rebuildSearchIndexLocked()
+    }
 
     override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id); rebuildSearchIndexLocked() }
 
@@ -686,8 +703,8 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Preferences
     // ========================
 
-    override fun setShulginRating(enabled: Boolean) = lock.withLock {
-        _useShulginRating.value = enabled
+    override fun setRatingScaleMode(mode: RatingScaleMode) = lock.withLock {
+        _ratingScaleMode.value = mode
         bumpMutationCount()
     }
 
@@ -697,6 +714,11 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun setWelcomeCompleted(completed: Boolean) = lock.withLock {
         _welcomeCompleted.value = completed
+        bumpMutationCount()
+    }
+
+    override fun setSeedFingerprint(fingerprint: String?) = lock.withLock {
+        _seedFingerprint.value = fingerprint
         bumpMutationCount()
     }
 
@@ -954,9 +976,10 @@ class JournalRepository internal constructor() : IJournalRepository {
         _substanceDoseStats.clear()
         _doseStatsSessionIds.clear()
         rebuildSearchIndexLocked()
-        _useShulginRating.value = false
+        _ratingScaleMode.value = RatingScaleMode.OFF
         _useSubstanceColors.value = true
         _welcomeCompleted.value = false
+        _seedFingerprint.value = null
         bumpToleranceVersion()
         bumpMutationCount()
     }

@@ -225,7 +225,10 @@ internal fun PharmacologySection(substance: Substance) {
                 )
                 Spacer(Modifier.height(8.dp))
 
-                groups.forEach { (target, entries) ->
+                groups.forEach { (groupKey, entries) ->
+                    // Group key is the gene-style aggregation id (htr1A);
+                    // display the human-readable label carried on the entries.
+                    val target = entries.firstOrNull()?.first ?: groupKey
                     val allSpecies = entries.flatMap { (_, a) -> a.species }.toSet()
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

@@ -40,4 +40,14 @@ actual object FilePicker {
             chooser.selectedFile.absolutePath
         } else null
     }
+
+    actual suspend fun openFolder(): String? = withContext(Dispatchers.IO) {
+        val chooser = JFileChooser().apply {
+            dialogTitle = "Select folder"
+            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        }
+        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+            chooser.selectedFile.absolutePath
+        } else null
+    }
 }

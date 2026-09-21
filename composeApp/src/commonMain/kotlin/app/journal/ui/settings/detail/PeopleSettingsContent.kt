@@ -96,23 +96,28 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
                     if (index < persons.size - 1) HorizontalDivider()
                 }
                 Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = { creating = true },
-                    modifier = Modifier.heightIn(min = 48.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add individual")
-                }
-                if (!hasSelf) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { creatingProfile = true },
+                    Button(
+                        onClick = { creating = true },
                         modifier = Modifier.heightIn(min = 48.dp)
                     ) {
-                        Icon(Icons.Default.Person, null)
+                        Icon(Icons.Default.Add, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Create profile")
+                        Text("Add individual")
+                    }
+                    if (!hasSelf) {
+                        OutlinedButton(
+                            onClick = { creatingProfile = true },
+                            modifier = Modifier.heightIn(min = 48.dp)
+                        ) {
+                            Icon(Icons.Default.Person, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Create your profile")
+                        }
                     }
                 }
             }
@@ -123,7 +128,7 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
         PersonEditorDialog(
             initial = editing,
             onDismiss = { creating = false; creatingProfile = false; editing = null },
-            dialogTitle = if (creatingProfile) "Create profile" else null,
+            dialogTitle = if (creatingProfile) "Create your profile" else null,
             onSave = { person ->
                 if (creatingProfile) {
                     persons.filter { it.isSelf && it.id != person.id }.forEach {

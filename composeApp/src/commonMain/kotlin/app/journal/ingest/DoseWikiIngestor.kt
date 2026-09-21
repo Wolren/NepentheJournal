@@ -51,6 +51,10 @@ object DoseWikiIngestor {
         ingested = false
     }
 
+    /** Raw bundled DoseWiki text, exposed so startup can fingerprint the
+     * resources without paying for a full parse. */
+    internal fun bundledText(): String? = readBundledResource(RESOURCE_PATH)
+
     /**
      * Load and ingest DoseWiki data. Safe to call multiple times —
      * second call is a no-op.

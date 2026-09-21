@@ -217,6 +217,8 @@ data class Substance(
     val aliases: List<String> = emptyList(),
     val summary: String? = null,
     val substanceClass: List<String> = emptyList(),
+    /** Curated DoseWiki taxonomy tags (category + section) from the manual index. */
+    val curatedSections: List<CuratedSection> = emptyList(),
     val routesOfAdministration: List<String> = emptyList(),
     val dosageBands: Map<String, String> = emptyMap(),
     val durationProfile: Map<String, String> = emptyMap(),

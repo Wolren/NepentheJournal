@@ -67,7 +67,7 @@ class JournalStoreTest {
             sessionId = "s:1", substanceId = "sub:1",
             routeOfAdministration = "Oral", amount = 120.0, unit = "mg", timestamp = 1000L
         ))
-        repo.setShulginRating(true)
+        repo.setRatingScaleMode(RatingScaleMode.NUMERIC)
         repo.setObsidianAutoExport(true)
 
         JournalStore(repo).save()
@@ -77,7 +77,7 @@ class JournalStoreTest {
         assertEquals(1, repo2.substances.value.size)
         assertEquals(1, repo2.sessions.value.size)
         assertEquals(1, repo2.doses.value.size)
-        assertTrue(repo2.useShulginRating.value)
+        assertEquals(RatingScaleMode.NUMERIC, repo2.ratingScaleMode.value)
         assertTrue(repo2.obsidianAutoExport.value)
     }
 

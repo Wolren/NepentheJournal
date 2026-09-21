@@ -16,6 +16,8 @@ import app.journal.export.obsidian.ObsidianExportManager
 import app.journal.export.obsidian.ObsidianVaultOps
 import app.journal.ui.components.AppOutlinedButton
 import app.journal.ui.components.AppTonalButton
+import app.journal.util.FilePicker
+import app.journal.util.defaultVaultPath
 import kotlinx.coroutines.launch
 
 @Composable
@@ -40,10 +42,11 @@ fun ObsidianSettingsCard(
     var isExporting by remember { mutableStateOf(false) }
     var isImporting by remember { mutableStateOf(false) }
 
-    // Load saved values when expanding
+    // Load saved values when expanding; suggest the device default location
+    // when nothing was saved yet.
     LaunchedEffect(obsidianExpanded) {
         if (obsidianExpanded) {
-            vaultPath = repo.obsidianVaultPath.value
+            vaultPath = repo.obsidianVaultPath.value.ifBlank { defaultVaultPath() }
             subfolder = repo.obsidianSubfolder.value
             autoExport = repo.obsidianAutoExport.value
             fileOrg = repo.obsidianFileOrganization.value
@@ -100,11 +103,27 @@ fun ObsidianSettingsCard(
                     OutlinedTextField(
                         value = vaultPath,
                         onValueChange = { vaultPath = it; vaultChecked = false },
-                        placeholder = { Text("C:/Users/.../Obsidian Vault") },
+                        placeholder = { Text(defaultVaultPath()) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(8.dp)
                     )
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                val picked = FilePicker.openFolder()
+                                if (picked != null) {
+                                    vaultPath = picked
+                                    vaultChecked = false
+                                }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            Icons.Default.FolderOpen,
+                            contentDescription = "Browse for vault folder",
+                        )
+                    }
                     if (vaultChecked) {
                         Icon(
                             if (vaultIsValid) Icons.Default.CheckCircle else Icons.Default.Error,

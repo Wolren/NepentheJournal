@@ -66,8 +66,7 @@ class SessionListViewModelTest {
         ))
         repo.upsertSession(Session(
             id = "s:4", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
-            title = "Archived Session", startTime = 2000L,
-            isArchived = true
+            title = "Old Session", startTime = 2000L,
         ))
         // Cannabis substance must have a dose: allSessionSubstances derives
         // from doses joined against substances, so a substance with no dose
@@ -84,7 +83,6 @@ class SessionListViewModelTest {
     @Test
     fun `all sessions are returned initially`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = true  // include archived by default
         val filtered = vm.filteredSessions.first()
         assertEquals(4, filtered.size)
     }
@@ -92,7 +90,6 @@ class SessionListViewModelTest {
     @Test
     fun `allSessionSubstances extracts distinct substances`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = true
         // combine may need a dispatch; wait for substance count
         val items = vm.allSessionSubstances.first { it.size == 3 }
         assertEquals(3, items.size)
@@ -135,9 +132,33 @@ class SessionListViewModelTest {
     }
 
     @Test
+    fun `toggling favorite updates the favorites filter`() = runBlocking {
+        val repo = makeRepo()
+        val vm = SessionListViewModel(repo)
+        vm.showFavoritesOnly.value = true
+        assertEquals(1, vm.filteredSessions.first().size)
+        repo.toggleFavorite("s:2")
+        assertEquals(
+            setOf("Deep Meditation", "LSD Trip"),
+            vm.filteredSessions.first().map { it.title }.toSet(),
+        )
+        repo.toggleFavorite("s:1")
+        assertEquals(
+            listOf("LSD Trip"),
+            vm.filteredSessions.first().map { it.title },
+        )
+    }
+
+    @Test
+    fun `toggle favorite on unknown id is a no-op`() {
+        val repo = makeRepo()
+        repo.toggleFavorite("s:nope")
+        assertEquals(4, repo.sessions.value.size)
+    }
+
+    @Test
     fun `search filters by title`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = true
         vm.searchQuery.value = "LSD"
         val filtered = vm.filteredSessions.first()
         assertEquals(1, filtered.size)
@@ -147,7 +168,6 @@ class SessionListViewModelTest {
     @Test
     fun `search filters by intention`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = true
         vm.searchQuery.value = "introspection"
         val filtered = vm.filteredSessions.first()
         assertEquals(1, filtered.size)
@@ -157,13 +177,12 @@ class SessionListViewModelTest {
     @Test
     fun `clearFilters resets all filters`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        vm.showArchived.value = true
         vm.filterSubstanceIds.value = setOf("sub:mdma")
         vm.searchQuery.value = "test"
         vm.showFavoritesOnly.value = true
         vm.clearFilters()
         val filtered = vm.filteredSessions.first()
-        // After clear: archived off, favorites off, no substance filter, no search
-        assertEquals(3, filtered.size) // s:4 is archived, hidden
+        // After clear: favorites off, no substance filter, no search
+        assertEquals(4, filtered.size)
     }
 }

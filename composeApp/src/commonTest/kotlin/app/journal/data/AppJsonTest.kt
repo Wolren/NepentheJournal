@@ -27,7 +27,7 @@ class AppJsonTest {
         repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
         repo.upsertSession(sampleSession("s:1"))
         repo.upsertDose(sampleDose("d:1", "s:1", "sub:1"))
-        repo.setShulginRating(true)
+        repo.setRatingScaleMode(RatingScaleMode.SHULGIN)
         repo.setObsidianAutoExport(true)
         repo.setObsidianSubfolder("Subfolder")
 
@@ -36,7 +36,7 @@ class AppJsonTest {
         assertEquals(1, snap.substances.size)
         assertEquals(1, snap.sessions.size)
         assertEquals(1, snap.doses.size)
-        assertTrue(snap.useShulginRating)
+        assertEquals(RatingScaleMode.SHULGIN, snap.ratingScaleMode)
         assertTrue(snap.obsidianAutoExport)
         assertEquals("Subfolder", snap.obsidianSubfolder)
     }
@@ -54,7 +54,7 @@ class AppJsonTest {
         assertTrue(snap.interactions.isEmpty())
         assertTrue(snap.effects.isEmpty())
         assertTrue(snap.customUnits.isEmpty())
-        assertFalse(snap.useShulginRating)
+        assertEquals(RatingScaleMode.OFF, snap.ratingScaleMode)
         assertTrue(snap.useSubstanceColors)
     }
 
@@ -80,8 +80,18 @@ class AppJsonTest {
         assertEquals(1, repo.doses.value.size)
         assertEquals(1, repo.notes.value.size)
         assertEquals(1, repo.timelineEvents.value.size)
-        assertTrue(repo.useShulginRating.value)
+        assertEquals(RatingScaleMode.SHULGIN, repo.ratingScaleMode.value)
         assertFalse(repo.useSubstanceColors.value)
+    }
+
+    @Test
+    fun applyMigratesLegacyShulginFlag() {
+        val repo = JournalRepository()
+        AppJson.apply(repo, JournalSnapshot(savedAt = 0L, useShulginRating = true))
+        assertEquals(RatingScaleMode.SHULGIN, repo.ratingScaleMode.value)
+        val repo2 = JournalRepository()
+        AppJson.apply(repo2, JournalSnapshot(savedAt = 0L))
+        assertEquals(RatingScaleMode.OFF, repo2.ratingScaleMode.value)
     }
 
     @Test
@@ -93,7 +103,7 @@ class AppJsonTest {
         repo.upsertSession(sampleSession("s:2"))
         repo.upsertDose(sampleDose("d:1", "s:1", "sub:1"))
         repo.upsertDose(sampleDose("d:2", "s:1", "sub:2"))
-        repo.setShulginRating(true)
+        repo.setRatingScaleMode(RatingScaleMode.SHULGIN)
 
         val snap = AppJson.snapshot(repo)
         val repo2 = JournalRepository()
@@ -104,7 +114,7 @@ class AppJsonTest {
         assertEquals(2, repo2.doses.value.size)
         assertEquals("LSD", repo2.getSubstance("sub:1")?.name)
         assertEquals("MDMA", repo2.getSubstance("sub:2")?.name)
-        assertTrue(repo2.useShulginRating.value)
+        assertEquals(RatingScaleMode.SHULGIN, repo2.ratingScaleMode.value)
     }
 
     @Test

@@ -56,6 +56,23 @@ actual object FilePicker {
         }
     }
 
+    actual suspend fun openFolder(): String? = withContext(Dispatchers.Main) {
+        try {
+            val folderType = UTType.typeWithIdentifier("public.folder")
+            val controller = UIDocumentPickerViewController(
+                forOpeningContentTypes = listOf(folderType),
+                asCopy = true
+            )
+            var resultUrl: String? = null
+            controller.delegate = SaveFileDelegate { url -> resultUrl = url }
+            presentViewController(controller)
+            resultUrl
+        } catch (e: Exception) {
+            Log.withTag("FilePicker").e(e) { "Failed to open folder dialog" }
+            null
+        }
+    }
+
     private fun presentViewController(controller: UIViewController) {
         val rootVC = UIApplication.sharedApplication.keyWindow?.rootViewController
         rootVC?.presentViewController(controller, animated = true, completion = null)

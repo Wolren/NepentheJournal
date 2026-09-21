@@ -38,7 +38,8 @@ fun SessionEditorScreen(
 ) {
     val substances by repo.substances.collectAsState()
     val substanceNameById = remember(substances) { substances.associate { it.id to it.name } }
-    val useShulgin by repo.useShulginRating.collectAsState()
+    val ratingMode by repo.ratingScaleMode.collectAsState()
+    val useShulgin = ratingMode == RatingScaleMode.SHULGIN
     val isEditing = sessionToEdit != null
 
     // Reactive interactions: refresh warnings when the store changes.
@@ -59,6 +60,7 @@ fun SessionEditorScreen(
     var outcome by remember { mutableStateOf(sessionToEdit?.outcome ?: "") }
     var notes by remember { mutableStateOf(sessionToEdit?.notes ?: "") }
     var tags by remember { mutableStateOf(sessionToEdit?.tags?.joinToString(", ") ?: "") }
+    var isFavorite by remember { mutableStateOf(sessionToEdit?.isFavorite ?: false) }
     var rating by remember { mutableStateOf(sessionToEdit?.rating?.toString() ?: "") }
     var shulginRating by remember {
         mutableStateOf(sessionToEdit?.shulginRating ?: "")
@@ -175,6 +177,8 @@ fun SessionEditorScreen(
             } else rating.toIntOrNull()?.coerceIn(1, 10),
             shulginRating = if (useShulgin) shulginRating.ifBlank { null } else null,
             checkins = sessionToEdit?.checkins ?: emptyList(),
+            isFavorite = isFavorite,
+            isArchived = sessionToEdit?.isArchived ?: false,
             profile = buildProfile(),
             createdAt = sessionToEdit?.createdAt ?: now,
             updatedAt = now,
@@ -291,6 +295,14 @@ fun SessionEditorScreen(
         title = if (isEditing) "Edit Session" else "New Session",
         onBack = ::handleBack,
         actions = {
+            IconButton(onClick = { isFavorite = !isFavorite }) {
+                Icon(
+                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Toggle favorite",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary
+                           else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (isEditing) {
                 IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete",
@@ -349,15 +361,17 @@ fun SessionEditorScreen(
             )
         }
 
-        // Rating
-        item {
-            SessionRatingSection(
-                useShulgin = useShulgin,
-                shulginRating = shulginRating,
-                onShulginRatingChange = { shulginRating = it },
-                rating = rating,
-                onRatingChange = { rating = it }
-            )
+        // Rating (hidden entirely when the scale is off in settings)
+        if (ratingMode != RatingScaleMode.OFF) {
+            item {
+                SessionRatingSection(
+                    useShulgin = useShulgin,
+                    shulginRating = shulginRating,
+                    onShulginRatingChange = { shulginRating = it },
+                    rating = rating,
+                    onRatingChange = { rating = it }
+                )
+            }
         }
 
         // Set & Setting, Intention, Outcome, Notes

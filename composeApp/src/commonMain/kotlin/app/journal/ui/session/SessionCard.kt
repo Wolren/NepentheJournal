@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -225,13 +226,16 @@ fun SessionCard(
                     }
                 }
 
-                if (session.isFavorite) {
-                    Spacer(Modifier.height(4.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(
+                        onClick = { repo.toggleFavorite(session.id) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
                         Icon(
-                            Icons.Default.Favorite,
-                            contentDescription = "Favorite",
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                            if (session.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Toggle favorite",
+                            tint = if (session.isFavorite) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(16.dp)
                         )
                     }

@@ -57,7 +57,6 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
     val filterSubstanceIds by viewModel.filterSubstanceIds.collectAsState()
     val consumerFilter by viewModel.consumerFilter.collectAsState()
     val showFavs by viewModel.showFavoritesOnly.collectAsState()
-    val showArch by viewModel.showArchived.collectAsState()
     val allSessionSubstances by viewModel.allSessionSubstances.collectAsState(initial = emptyList())
     val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
     val scrollState = rememberLazyListState()
@@ -298,9 +297,7 @@ object SessionListScreen {
     @OptIn(ExperimentalMaterial3Api::class)
     fun TopActions(
         showFavoritesOnly: Boolean,
-        showArchived: Boolean,
         onToggleFavorites: () -> Unit,
-        onToggleArchived: () -> Unit,
         onCalendarClick: () -> Unit,
         timeDisplayMode: TimeDisplayMode,
         onCycleTimeDisplay: () -> Unit
@@ -325,18 +322,6 @@ object SessionListScreen {
                         contentDescription = "Favorites",
                         modifier = Modifier.size(20.dp),
                         tint = if (showFavoritesOnly) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            val tipState3 = rememberTooltipState()
-            TooltipBox(state = tipState3, positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text("Archived") } }) {
-                IconButton(onClick = onToggleArchived, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Default.Archive,
-                        contentDescription = "Archived",
-                        modifier = Modifier.size(20.dp),
-                        tint = if (showArchived) MaterialTheme.colorScheme.primary
                                else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

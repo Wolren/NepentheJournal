@@ -34,4 +34,15 @@ actual object FilePicker {
             cont.resume(null)
         }
     }
+
+    actual suspend fun openFolder(): String? = suspendCancellableCoroutine { cont ->
+        AndroidFilePickerBridge.continuation = cont
+        val launcher = AndroidFilePickerBridge.launchOpenFolder
+        if (launcher != null) {
+            launcher()
+        } else {
+            AndroidFilePickerBridge.continuation = null
+            cont.resume(null)
+        }
+    }
 }

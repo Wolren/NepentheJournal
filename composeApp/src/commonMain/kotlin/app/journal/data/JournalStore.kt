@@ -25,9 +25,21 @@ data class JournalSnapshot(
     val customUnits: List<CustomUnit> = emptyList(),
     val persons: List<Person> = emptyList(),
     val tombstones: Map<String, Long> = emptyMap(),
+    /**
+     * Rating scale mode. Null means an old file predating the mode:
+     * fall back to [useShulginRating].
+     */
+    val ratingScaleMode: RatingScaleMode? = null,
+    /** Legacy pre-mode flag, kept for reading old files. Always written false. */
     val useShulginRating: Boolean = false,
     val useSubstanceColors: Boolean = true,
     val welcomeCompleted: Boolean = false,
+    /**
+     * Fingerprint of the bundled resources the substance library was last
+     * ingested from (see IJournalRepository.seedFingerprint). Null means
+     * unknown: ingest unconditionally.
+     */
+    val seedFingerprint: String? = null,
     val obsidianVaultPath: String = "",
     val obsidianAutoExport: Boolean = false,
     val obsidianSubfolder: String = "Nepenthe",
@@ -111,9 +123,11 @@ object AppJson {
             customUnits = repo.customUnits.value,
             persons = repo.persons.value,
             tombstones = repo.exportTombstones(),
-            useShulginRating = repo.useShulginRating.value,
+            ratingScaleMode = repo.ratingScaleMode.value,
+            useShulginRating = false,
             useSubstanceColors = repo.useSubstanceColors.value,
             welcomeCompleted = repo.welcomeCompleted.value,
+            seedFingerprint = repo.seedFingerprint.value,
             obsidianVaultPath = repo.obsidianVaultPath.value,
             obsidianAutoExport = repo.obsidianAutoExport.value,
             obsidianSubfolder = repo.obsidianSubfolder.value,
@@ -137,9 +151,13 @@ object AppJson {
             customUnits = snapshot.customUnits
         )
         repo.importTombstones(snapshot.tombstones)
-        repo.setShulginRating(snapshot.useShulginRating)
+        repo.setRatingScaleMode(
+            snapshot.ratingScaleMode
+                ?: if (snapshot.useShulginRating) RatingScaleMode.SHULGIN else RatingScaleMode.OFF,
+        )
         repo.setSubstanceColors(snapshot.useSubstanceColors)
         repo.setWelcomeCompleted(snapshot.welcomeCompleted)
+        repo.setSeedFingerprint(snapshot.seedFingerprint)
         repo.setObsidianVaultPath(snapshot.obsidianVaultPath)
         repo.setObsidianAutoExport(snapshot.obsidianAutoExport)
         repo.setObsidianSubfolder(snapshot.obsidianSubfolder)

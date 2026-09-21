@@ -72,7 +72,7 @@ fun PersonPickerSection(
                     Button(
                         onClick = { showCreate = true },
                         modifier = Modifier.heightIn(min = 48.dp)
-                    ) { Text("Create profile") }
+                    ) { Text("Create your profile") }
                 }
             }
         } else {

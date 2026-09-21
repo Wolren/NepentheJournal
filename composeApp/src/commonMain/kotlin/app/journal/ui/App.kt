@@ -137,7 +137,6 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember(concreteRepo) { createSyncEngine(concreteRepo) }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
-    val showArch by sessionListViewModel.showArchived.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
 
@@ -195,7 +194,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                         )
                     },
                     confirmButton = {
-                        TextButton(onClick = { showProfileEditor = true }) { Text("Create profile") }
+                        TextButton(onClick = { showProfileEditor = true }) { Text("Create your profile") }
                     },
                     dismissButton = {
                         TextButton(onClick = { repo.setWelcomeCompleted(true) }) { Text("Skip") }
@@ -206,7 +205,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                 PersonEditorDialog(
                     initial = null,
                     onDismiss = { showProfileEditor = false },
-                    dialogTitle = "Create profile",
+                    dialogTitle = "Create your profile",
                     onSave = { person ->
                         repo.upsertPerson(person.copy(isSelf = true))
                         showProfileEditor = false
@@ -448,9 +447,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
                                                     when (selectedScreen) {
                                                         Screen.SESSIONS -> SessionListScreen.TopActions(
                                                                 showFavoritesOnly = showFavs,
-                                                                showArchived = showArch,
                                                                 onToggleFavorites = { sessionListViewModel.showFavoritesOnly.value = !showFavs },
-                                                                onToggleArchived = { sessionListViewModel.showArchived.value = !showArch },
                                                                 onCalendarClick = { showCalendar = true },
                                                                 timeDisplayMode = timeDisplayMode,
                                                                 onCycleTimeDisplay = {

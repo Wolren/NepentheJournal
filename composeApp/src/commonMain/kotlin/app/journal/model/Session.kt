@@ -28,6 +28,12 @@ data class CheckIn(
 
 /** Conflict: FIELD_LEVEL_MERGE */
 /** Shulgin rating scale: +/- (not sure), + (mild), ++ (moderate), +++ (strong), ++++ (very strong) */
+@Serializable
+enum class RatingScaleMode(val label: String, val description: String) {
+    OFF("Off", "No rating asked on sessions"),
+    NUMERIC("Numeric", "1-10 chips"),
+    SHULGIN("Shulgin", "+/-, +, ++, +++, ++++")
+}
 enum class ShulginRating(val label: String, val numericValue: Int) {
     PLUS_MINUS("+/-", 1),
     PLUS("+", 3),
