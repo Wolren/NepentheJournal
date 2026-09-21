@@ -78,7 +78,7 @@ fun DoseTimelineChart(
                     StatItem(
                         "Last",
                         if (daysAgo == 0L) "Today" else "${daysAgo}d ago",
-                        MaterialTheme.colorScheme.error
+                        MaterialTheme.colorScheme.secondary
                     )
                 }
             }
