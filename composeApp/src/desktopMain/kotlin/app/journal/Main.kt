@@ -32,6 +32,13 @@ fun main() {
     System.setProperty("skiko.renderApi", "SOFTWARE")
     // Initialize logging
     val appDataDir = System.getProperty("user.home")?.let { "$it/.nepenthe" }
+    if (appDataDir != null) {
+        // Belt to initLogging's suspenders: the dir must exist before any
+        // writer, crash dump, or store file touches it on first launch.
+        try {
+            java.io.File(appDataDir).mkdirs()
+        } catch (_: Exception) { /* initLogging still adds the console writer */ }
+    }
     initLogging(appDataDir)
 
     // Global uncaught exception handler -- writes to a separate file so crash

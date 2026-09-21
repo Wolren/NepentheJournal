@@ -12,6 +12,12 @@ actual fun initLogging(appDir: String?) {
     )
 
     if (appDir != null) {
+        // The dir may not exist on first launch (fresh product dir after a
+        // rename): RollingFileLogWriter does not create it and throws
+        // FileNotFoundException, which used to kill startup before any window.
+        try {
+            java.io.File(appDir).mkdirs()
+        } catch (_: Exception) { /* fall through: file writer just stays off */ }
         writers.add(
             RollingFileLogWriter(
                 config = RollingFileLogWriterConfig(
