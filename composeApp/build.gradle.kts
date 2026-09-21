@@ -200,6 +200,10 @@ play {
 compose.desktop {
     application {
         mainClass = "app.journal.MainKt"
+        // Empty assistive_technologies: a stale system-wide Java Access Bridge
+        // registration makes AWT abort startup (AWTError, no window). Empty
+        // means load no legacy bridge; native accessibility is unaffected.
+        jvmArgs("-Djavax.accessibility.assistive_technologies=")
         nativeDistributions {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
