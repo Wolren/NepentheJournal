@@ -65,7 +65,19 @@ object DataInitializer {
     fun ensureInitialized(repo: IJournalRepository, scope: CoroutineScope? = null) {
         if (initialized) return
         initialized = true
+        try {
+            runInitialization(repo, scope)
+        } finally {
+            _initializedFlow.value = true
+        }
+    }
 
+    /**
+     * Body of [ensureInitialized]. Every exit funnels through the caller's
+     * finally block so [initializedFlow] always opens the UI gate, even
+     * when a corrupt snapshot or failing resource throws mid-init.
+     */
+    private fun runInitialization(repo: IJournalRepository, scope: CoroutineScope?) {
         val store = JournalStore(repo as JournalRepository)
 
         // Step 1: Load user data from disk first (to check for old IDs)
@@ -83,7 +95,7 @@ object DataInitializer {
         if (libraryFresh) {
             Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
         } else {
-            val seedLoaded = tryLoadSeed(repo)
+            val seedLoaded = tryLoadSeedWithRetry(repo)
 
             // Step 3: Ingest DoseWiki data as the PRIMARY entity (overwrites
             // matched seed rows, creates dw:{slug} rows for the rest).
@@ -93,7 +105,9 @@ object DataInitializer {
             if (seedLoaded) {
                 migrateOldIds(repo)
             }
-            if (bundledFingerprint != null) {
+            // Stamp the fingerprint only on success: a failed seed load must
+            // retry next launch instead of looking fresh with a stale library.
+            if (seedLoaded && bundledFingerprint != null) {
                 repo.setSeedFingerprint(bundledFingerprint)
             }
             store.save()
@@ -154,9 +168,8 @@ object DataInitializer {
         // from DoseWikiIngestor and migrateOldIds maintain them.)
 
         if (subCount > 0 || sessionCount > 0) {
-        Log.withTag("DataInit").i { "Initialized: $subCount substances, $sessionCount sessions" }
+            Log.withTag("DataInit").i { "Initialized: $subCount substances, $sessionCount sessions" }
         }
-        _initializedFlow.value = true
     }
 
     /**
@@ -224,6 +237,16 @@ object DataInitializer {
         val hex = sha256((seedText + doseText).encodeToByteArray())
             .joinToString("") { it.toInt().and(0xFF).toString(16).padStart(2, '0') }
         return "${seedText.length}:${doseText.length}:$hex"
+    }
+
+    /**
+     * Seed load with one retry: a transient read or parse failure on first
+     * launch must not leave a fresh install with an empty library.
+     */
+    private fun tryLoadSeedWithRetry(repo: IJournalRepository): Boolean {
+        if (tryLoadSeed(repo)) return true
+        Log.withTag("DataInit").w { "Seed load failed, retrying once" }
+        return tryLoadSeed(repo)
     }
 
     private fun tryLoadSeed(repo: IJournalRepository): Boolean {

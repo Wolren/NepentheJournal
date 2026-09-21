@@ -361,11 +361,14 @@ class KtorSyncClient(
         if (!canSign) throw IllegalStateException("No shared secret — pair this device first")
 
         val authHeader = authenticateRequest(callerDeviceId, "ws")
-        // Header auth is preferred long term, but Ktor 3.5.1 webSocketSession
-        // has no request lambda, so ship the query form (server reads headers
-        // first, query as fallback).
-        val wsUrl = "ws://$host:$port/sync/ws?deviceId=$callerDeviceId&auth=$authHeader"
-        return client.webSocketSession(wsUrl)
+        // Header-only auth: query strings leak into access logs and crash
+        // reports. webSocketSession takes a request builder, so headers ride
+        // the handshake instead of the URL.
+        return client.webSocketSession({
+            url("ws://$host:$port/sync/ws")
+            header(SyncAuthenticator.DEVICE_ID_HEADER, callerDeviceId)
+            header(SyncAuthenticator.AUTH_HEADER, authHeader)
+        })
     }
 
     suspend fun sendDelta(session: WebSocketSession, delta: WsDelta) {

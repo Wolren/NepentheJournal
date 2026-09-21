@@ -47,7 +47,12 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
     onCycleTimeDisplay: () -> Unit = {}
 ) {
     val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
-    val allSessions by viewModel.sessions.collectAsState(initial = emptyList())
+    // Doses and substance names are collected once here and passed down to
+    // cards, so no card performs repository lookups of its own.
+    val allDoses by repo.doses.collectAsState()
+    val allSubstances by repo.substances.collectAsState()
+    val dosesBySession = remember(allDoses) { allDoses.groupBy { it.sessionId } }
+    val substanceNameMap = remember(allSubstances) { allSubstances.associate { it.id to it.name } }
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
@@ -192,6 +197,8 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                         AnimatedListItem {
                             SessionCard(
                                 session = session,
+                                doses = dosesBySession[session.id] ?: emptyList(),
+                                substanceNameMap = substanceNameMap,
                                 timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
                                 onDelete = { showDeleteConfirm = session.id },

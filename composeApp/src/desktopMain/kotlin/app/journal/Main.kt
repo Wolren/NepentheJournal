@@ -17,6 +17,7 @@ import app.journal.ui.App
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
 
 private fun loadAppIcon(): Painter {
@@ -61,10 +62,16 @@ fun main() {
 
     // Scope for debounced auto-save (lives as long as the app)
     val autoSaveScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    application {
-        val repo = JournalRepository.instance
-        DataInitializer.ensureInitialized(repo, autoSaveScope)
 
+    // Heavy init (megabytes of seed plus DoseWiki JSON) runs off the main
+    // thread; the window opens immediately and App gates on
+    // DataInitializer.initializedFlow with a loading screen.
+    val repo = JournalRepository.instance
+    autoSaveScope.launch {
+        DataInitializer.ensureInitialized(repo, autoSaveScope)
+    }
+
+    application {
         val icon = remember { loadAppIcon() }
         val windowState = rememberWindowState(
             size = DpSize(1100.dp, 820.dp),

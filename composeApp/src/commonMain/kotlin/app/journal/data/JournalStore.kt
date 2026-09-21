@@ -148,7 +148,10 @@ object AppJson {
             timelineEvents = snapshot.timelineEvents,
             interactions = snapshot.interactions,
             effects = snapshot.effects,
-            customUnits = snapshot.customUnits
+            customUnits = snapshot.customUnits,
+            // Persons are device-local snapshot data (never synced): snapshot loads
+            // must restore them, while sync deltas leave the default empty.
+            persons = snapshot.persons
         )
         repo.importTombstones(snapshot.tombstones)
         repo.setRatingScaleMode(

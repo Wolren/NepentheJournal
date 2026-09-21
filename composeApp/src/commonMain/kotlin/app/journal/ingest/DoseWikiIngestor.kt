@@ -107,6 +107,10 @@ object DoseWikiIngestor {
 
         // Pass 1: substances plus effects (creates dw: rows, overwrites
         // matched seed rows). Collect (entry, substanceId) for pass 2.
+        // Writes accumulate and flush once per phase: per-item upserts paid
+        // a lock plus a full index rebuild per row.
+        val substancesToWrite = mutableListOf<Substance>()
+        val effectsToWrite = mutableListOf<Effect>()
         val ingestedPairs = mutableListOf<Pair<DoseWikiSubstance, String>>()
         for (dw in substances) {
             val name = dw.title
@@ -116,24 +120,34 @@ object DoseWikiIngestor {
             val effectNames = mutableListOf<String>()
             if (existing == null) {
                 val id = idFor(dw)
-                totalEffectCount += ingestAllEffects(repo, dw, id, now, effectNames)
+                totalEffectCount += ingestAllEffects(dw, id, now, effectNames, effectsToWrite)
                 val created = buildPrimarySubstance(dw, id, effectNames, now)
-                repo.upsertSubstance(created)
+                substancesToWrite.add(created)
                 register(lookupByName, created)
                 substanceCreateCount++
                 ingestedPairs.add(dw to id)
             } else {
-                totalEffectCount += ingestAllEffects(repo, dw, existing.id, now, effectNames)
+                totalEffectCount += ingestAllEffects(dw, existing.id, now, effectNames, effectsToWrite)
                 val updated = applyPrimaryFields(existing, dw, effectNames, now)
-                repo.upsertSubstance(updated)
+                substancesToWrite.add(updated)
+                register(lookupByName, updated)
                 substanceUpdateCount++
                 ingestedPairs.add(dw to existing.id)
             }
         }
+        if (substancesToWrite.isNotEmpty() || effectsToWrite.isNotEmpty()) {
+            repo.applyBatch(substances = substancesToWrite, effects = effectsToWrite)
+            repo.rebuildIndices()
+        }
 
         // Pass 2: interactions, now that every endpoint ID is registered.
+        val interactionsToWrite = mutableListOf<Interaction>()
         for ((dw, id) in ingestedPairs) {
-            interactionCount += ingestInteractions(repo, lookupByName, dw, id, now)
+            interactionCount += ingestInteractions(lookupByName, dw, id, now, interactionsToWrite)
+        }
+        if (interactionsToWrite.isNotEmpty()) {
+            repo.applyBatch(interactions = interactionsToWrite)
+            repo.rebuildIndices()
         }
 
         ingested = true
@@ -347,16 +361,16 @@ object DoseWikiIngestor {
     // ------------------------------------------------------------------
 
     private fun ingestAllEffects(
-        repo: IJournalRepository,
         dw: DoseWikiSubstance,
         substanceId: String,
         now: Long,
         effectNames: MutableList<String>,
+        effectsOut: MutableList<Effect>,
     ): Int {
         var count = 0
         val se = dw.subjective_effects ?: return 0
-        count += ingestEffectCategory(repo, se.cognitive, "cognitive", substanceId, now, effectNames)
-        count += ingestEffectCategory(repo, se.physical, "physical", substanceId, now, effectNames)
+        count += ingestEffectCategory(se.cognitive, "cognitive", substanceId, now, effectNames, effectsOut)
+        count += ingestEffectCategory(se.physical, "physical", substanceId, now, effectNames, effectsOut)
         se.sensory?.let { sensory ->
             listOfNotNull(
                 sensory.auditory, sensory.gustatory, sensory.tactile,
@@ -365,7 +379,7 @@ object DoseWikiIngestor {
                 cat.subcategories?.forEach { (_, group) ->
                     group.effects?.forEach { eff ->
                         effectNames.add(eff.name)
-                        upsertEffect(repo, eff, "sensory", substanceId, now)
+                        effectsOut.add(buildEffect(eff, "sensory", substanceId, now))
                         count++
                     }
                 }
@@ -407,27 +421,27 @@ object DoseWikiIngestor {
      * guidance, so sources keep both tags.
      */
     private fun ingestInteractions(
-        repo: IJournalRepository,
         lookup: Map<String, Substance>,
         dw: DoseWikiSubstance,
         sourceId: String,
         now: Long,
+        interactionsOut: MutableList<Interaction>,
     ): Int {
         val lists = dw.interactions ?: return 0
         var count = 0
-        count += ingestInteractionList(repo, lookup, lists.dangerous, InteractionRisk.DANGEROUS, sourceId, now)
-        count += ingestInteractionList(repo, lookup, lists.unsafe, InteractionRisk.UNSAFE, sourceId, now)
-        count += ingestInteractionList(repo, lookup, lists.caution, InteractionRisk.UNCERTAIN, sourceId, now)
+        count += ingestInteractionList(lookup, lists.dangerous, InteractionRisk.DANGEROUS, sourceId, now, interactionsOut)
+        count += ingestInteractionList(lookup, lists.unsafe, InteractionRisk.UNSAFE, sourceId, now, interactionsOut)
+        count += ingestInteractionList(lookup, lists.caution, InteractionRisk.UNCERTAIN, sourceId, now, interactionsOut)
         return count
     }
 
     private fun ingestInteractionList(
-        repo: IJournalRepository,
         lookup: Map<String, Substance>,
         entries: List<String>?,
         risk: InteractionRisk,
         sourceId: String,
         now: Long,
+        interactionsOut: MutableList<Interaction>,
     ): Int {
         var count = 0
         entries.orEmpty().forEach { raw ->
@@ -436,7 +450,7 @@ object DoseWikiIngestor {
             val target = lookup[targetName.lowercase()] ?: return@forEach
             if (target.id == sourceId) return@forEach
             val sorted = listOf(sourceId, target.id).sorted()
-            repo.upsertInteraction(
+            interactionsOut.add(
                 Interaction(
                     id = interactionId(sourceId, target.id),
                     substanceAId = sorted[0],
@@ -497,18 +511,18 @@ object DoseWikiIngestor {
      * Returns the number of effects ingested.
      */
     private fun ingestEffectCategory(
-        repo: IJournalRepository,
         effects: Map<String, DoseWikiEffectGroup>?,
         category: String,
         substanceId: String,
         now: Long,
         effectNames: MutableList<String>,
+        effectsOut: MutableList<Effect>,
     ): Int {
         var count = 0
         effects?.forEach { (_, group) ->
             group.effects?.forEach { eff ->
                 effectNames.add(eff.name)
-                upsertEffect(repo, eff, category, substanceId, now)
+                effectsOut.add(buildEffect(eff, category, substanceId, now))
                 count++
             }
         }
@@ -516,17 +530,16 @@ object DoseWikiIngestor {
     }
 
     /**
-     * Upsert an Effect document from a DoseWiki effect entry.
+     * Build an Effect document from a DoseWiki effect entry.
      */
-    private fun upsertEffect(
-        repo: IJournalRepository,
+    private fun buildEffect(
         eff: DoseWikiEffect,
         category: String,
         substanceId: String,
         now: Long,
-    ) {
+    ): Effect {
         val id = "effect:dw:${substanceId}:${eff.name.hashCode().toLong() and 0x7FFFFFFF}"
-        val effect = Effect(
+        return Effect(
             id = id,
             name = eff.name,
             description = eff.description?.takeIf { it.isNotBlank() },
@@ -537,6 +550,5 @@ object DoseWikiIngestor {
             updatedAt = now,
             deviceOrigin = "system",
         )
-        repo.upsertEffect(effect)
     }
 }

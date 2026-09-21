@@ -171,6 +171,10 @@ interface IJournalRepository {
     )
 
     // ---- Bulk apply (sync deltas, seed load) ----
+    /**
+     * Bulk-apply entities. Snapshot loads pass [persons]; sync deltas leave the
+     * default empty so device-local persons are never overwritten by peers.
+     */
     fun applyBatch(
         sessions: List<Session> = emptyList(),
         doses: List<Dose> = emptyList(),
@@ -180,6 +184,7 @@ interface IJournalRepository {
         notes: List<Note> = emptyList(),
         timelineEvents: List<TimelineEvent> = emptyList(),
         customUnits: List<CustomUnit> = emptyList(),
+        persons: List<Person> = emptyList(),
         lastWriterWins: Boolean = false,
         deletedSessionIds: List<String> = emptyList(),
         deletedDoseIds: List<String> = emptyList(),

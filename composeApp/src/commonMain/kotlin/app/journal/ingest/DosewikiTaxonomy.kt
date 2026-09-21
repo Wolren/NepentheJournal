@@ -3,6 +3,7 @@ package app.journal.ingest
 import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.CuratedSection
+import app.journal.model.Substance
 import app.journal.util.readBundledResource
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -93,7 +94,9 @@ object DosewikiTaxonomy {
     /**
      * Tags every substance in the repo from the bundled index. Returns the
      * number of substances whose tags changed. Idempotent: steady-state
-     * launches change nothing and skip the save.
+     * launches change nothing and skip the write. Changed rows accumulate
+     * and flush with a single applyBatch plus one index rebuild instead of
+     * one upsert per substance.
      */
     fun applyTags(repo: IJournalRepository): Int {
         val text = readBundledResource(RESOURCE_PATH)
@@ -107,17 +110,18 @@ object DosewikiTaxonomy {
             Log.withTag("DoseWiki").w { "Failed to parse $RESOURCE_PATH: ${e.message}" }
             return 0
         }
-        var changed = 0
+        val updated = mutableListOf<Substance>()
         repo.substances.value.forEach { sub ->
             val tags = tagsFor(sub.id, sub.name, sub.aliases, index)
             if (tags != sub.curatedSections) {
-                repo.upsertSubstance(sub.copy(curatedSections = tags))
-                changed++
+                updated.add(sub.copy(curatedSections = tags))
             }
         }
-        if (changed > 0) {
-            Log.withTag("DoseWiki").i { "Applied curated taxonomy tags to $changed substances" }
+        if (updated.isNotEmpty()) {
+            repo.applyBatch(substances = updated)
+            repo.rebuildIndices()
+            Log.withTag("DoseWiki").i { "Applied curated taxonomy tags to ${updated.size} substances" }
         }
-        return changed
+        return updated.size
     }
 }

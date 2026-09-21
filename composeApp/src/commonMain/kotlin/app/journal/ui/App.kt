@@ -50,6 +50,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
@@ -100,14 +101,21 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 
+    // Startup gate: heavy init (seed plus DoseWiki JSON) runs on a background
+    // scope from the platform launcher. Show a loading screen until
+    // DataInitializer.initializedFlow opens, never a blank window.
+    val ready by DataInitializer.initializedFlow.collectAsState()
+
     // ── Data integrity: startup recovery dialog ──
     val concreteRepo = remember(repo) { (repo as? JournalRepository) ?: JournalRepository.instance }
     val journalStore = remember(concreteRepo) { JournalStore(concreteRepo) }
     var showRecoveryDialog by remember { mutableStateOf(false) }
     var recoveryMessage by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        // Check after the first render cycle to let the UI settle
+    LaunchedEffect(ready) {
+        // Check after the first render cycle to let the UI settle. Gated on
+        // ready so the check runs against the loaded store, not an empty one.
+        if (!ready) return@LaunchedEffect
         kotlinx.coroutines.delay(100)
         if (journalStore.lastLoadHadIssues) {
             recoveryMessage = journalStore.lastLoadIssueSummary
@@ -139,6 +147,25 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
+
+    if (!ready) {
+        val splashColors = themeManager.colorScheme(themeManager.isDarkTheme())
+        MaterialTheme(colorScheme = splashColors) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Loading journal...")
+                    }
+                }
+            }
+        }
+        return
+    }
 
     CompositionLocalProvider(LocalThemeConfig provides themeConfig) {
         val isDark = themeManager.isDarkTheme()

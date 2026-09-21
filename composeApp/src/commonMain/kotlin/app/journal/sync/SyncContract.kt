@@ -30,8 +30,10 @@ object SyncEndpoints {
     const val INFO = "/info"
     const val PAIRING_START = "/pairing/start"
     const val PAIRING_VERIFY = "/pairing/verify"
+    const val AUTH_VERIFY = "/auth/verify"
     const val SYNC_PUSH = "/sync/push"
     const val SYNC_PULL = "/sync/pull"
+    const val SYNC_WS = "/sync/ws"
 }
 
 // ========== Auth header constants ==========
@@ -202,6 +204,30 @@ data class SyncPushRequest(
             return SyncPushRequest(body, auth, deviceId)
         }
     }
+}
+
+/**
+ * C2 pairing-secret wrap. SHARED JVM/iOS CONTRACT: both platforms must
+ * implement these exact steps so the bytes are identical.
+ *
+ * Wrap (server, after minting the pairing secret):
+ * 1. key = PBKDF2WithHmacSHA256(password = pairing token UTF-8 bytes,
+ *    salt = effective client deviceId UTF-8 bytes, iterations = 100000,
+ *    output = 256 bit).
+ * 2. nonce = 12 fresh random bytes (CSPRNG); encrypt the shared secret
+ *    UTF-8 bytes with AES-256-GCM under key and nonce.
+ * 3. payload = nonce || ciphertext || tag (the 16 byte GCM tag appended by
+ *    the cipher); field = standard base64 of payload.
+ *
+ * Unwrap (client): derive the same key from the user-entered token and its
+ * own client deviceId, base64-decode, split off the first 12 bytes as the
+ * nonce, AES-GCM decrypt. Any failure falls back to the legacy plaintext
+ * sharedSecret field, which the server keeps populated.
+ */
+object PairingSecretCrypto {
+    const val PBKDF2_ITERATIONS = 100_000
+    const val KEY_LENGTH_BITS = 256
+    const val GCM_NONCE_BYTES = 12
 }
 
 /**

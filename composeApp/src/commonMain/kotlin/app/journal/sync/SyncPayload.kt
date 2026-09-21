@@ -79,6 +79,11 @@ data class PairingVerifyRequest(
 /**
  * Response to a pairing verification request.
  * On success, contains the shared secret for HMAC auth.
+ *
+ * C2 encrypted secret: [encSecretB64] carries base64(nonce || ciphertext || tag)
+ * where the AES-256-GCM key is PBKDF2WithHmacSHA256(token, salt=clientDeviceId,
+ * 100000 iterations, 256 bit). Clients must try [encSecretB64] first and fall
+ * back to the legacy [sharedSecret] field, which stays populated.
  */
 @Serializable
 data class PairingResultResponse(
@@ -86,6 +91,7 @@ data class PairingResultResponse(
     val error: String? = null,
     val deviceId: String? = null,
     val sharedSecret: String? = null,
+    val encSecretB64: String? = null,
     val hostDeviceId: String? = null,
     val hostDeviceName: String? = null,
     val hostFingerprint: String? = null

@@ -96,6 +96,23 @@ class SyncTransport(
     fun revokeDevice(deviceId: String) {
         trustStore.revokeDevice(deviceId)
         activePeers.removeAll { it.deviceId == deviceId }
+        // Drop the client-side WS connection, if any, using the same
+        // teardown as stopContinuousSync (suspending close runs off-thread:
+        // revoke is called from UI event handlers, never suspend).
+        wsConnections.remove(deviceId)?.let { conn ->
+            conn.mutationJob.cancel()
+            conn.heartbeatJob?.cancel()
+            conn.incomingJob?.cancel()
+            backgroundScope.launch {
+                try { conn.session.close() } catch (_: Exception) {}
+                try { conn.client.close() } catch (_: Exception) {}
+            }
+        }
+        // Drop live server-side WS sessions for the revoked device, so an
+        // open /sync/ws cannot keep pushing after revocation.
+        backgroundScope.launch {
+            try { server?.closeDeviceSessions(deviceId) } catch (_: Exception) {}
+        }
         updateStatus()
     }
 

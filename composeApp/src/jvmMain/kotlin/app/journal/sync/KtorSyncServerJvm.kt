@@ -36,6 +36,7 @@ class KtorSyncServer(
     private val persistAfterApply: (() -> Unit)? = null
 ) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+    private var router: SyncServerRouter? = null
 
     private val fingerprint: String by lazy { tlsIdentity.ensureIdentity() }
     val deviceId: String by lazy { "device-${fingerprint.take(16)}" }
@@ -59,6 +60,7 @@ class KtorSyncServer(
                 fingerprint = fp,
                 persistAfterApply = persistAfterApply
             )
+            this.router = router
 
             server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
                 router.installRouting(this)
@@ -77,6 +79,17 @@ class KtorSyncServer(
     fun stop() {
         server?.stop(1000, 2000)
         server = null
+        router = null
+    }
+
+    /**
+     * Close every live server-side WebSocket session for [deviceId].
+     * Called on revocation so a revoked device is dropped immediately,
+     * including idle connections with no frames in flight (the per-frame
+     * trust recheck covers connections with traffic).
+     */
+    suspend fun closeDeviceSessions(deviceId: String) {
+        router?.closeDeviceSessions(deviceId)
     }
 
     val isRunning: Boolean get() = server != null
@@ -104,6 +117,21 @@ class SyncServerRouter(
 
     private val json = AppJson.json
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
+
+    // Per-IP throttles for the authenticated sync surface (buckets are
+    // per-endpoint so a pull drain can never starve pairing, etc.).
+    private val pushThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
+    private val pullThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
+    private val verifyThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
+    private val MAX_PUSH_PER_WINDOW = 120
+    private val PUSH_WINDOW_MS = 60_000L
+    private val MAX_PULL_PER_WINDOW = 200
+    private val PULL_WINDOW_MS = 60_000L
+    private val MAX_VERIFY_PER_WINDOW = 30
+    private val VERIFY_WINDOW_MS = 60_000L
+
+    /** Live server-side WS sessions per device, so revocation can drop them. */
+    private val wsSessions = ConcurrentHashMap<String, MutableSet<DefaultWebSocketServerSession>>()
 
     /** Per-connection WS sequence state: highest accepted seq plus a small reorder buffer. */
     private val wsSeqState = ConcurrentHashMap<String, WsSeqState>()
@@ -146,16 +174,29 @@ class SyncServerRouter(
             }
 
             get("/auth/verify") {
+                val clientIp = call.request.local.remoteHost
+                evictStaleThrottle(verifyThrottle, VERIFY_WINDOW_MS)
+                if (isThrottled(verifyThrottle, clientIp, MAX_VERIFY_PER_WINDOW, VERIFY_WINDOW_MS)) {
+                    warnAuth(call, null, "/auth/verify", "rate limited")
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                    )
+                    return@get
+                }
                 val deviceIdParam = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
                     ?: call.request.queryParameters["deviceId"]
                 val challengeRaw = call.request.headers["X-Sync-Challenge"]
                     ?: call.request.queryParameters["challenge"]
                 val challenge = challengeRaw?.take(MAX_CHALLENGE_LEN)
+                // Uniform failure code: missing params, overlong challenges,
+                // and unknown devices all return 401 with the same body, so
+                // the endpoint is not a device-existence oracle.
                 if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
                     warnAuth(call, deviceIdParam, "/auth/verify", "missing device or challenge")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                     )
                     return@get
                 }
@@ -163,7 +204,7 @@ class SyncServerRouter(
                     warnAuth(call, deviceIdParam, "/auth/verify", "challenge over 128 chars")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                     )
                     return@get
                 }
@@ -172,7 +213,7 @@ class SyncServerRouter(
                     warnAuth(call, deviceIdParam, "/auth/verify", "unknown device")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                     )
                     return@get
                 }
@@ -205,8 +246,8 @@ class SyncServerRouter(
                     return@post
                 }
 
-                if (!checkContentLength(call, MAX_PAIRING_BODY_BYTES)) {
-                    warnAuth(call, null, "/pairing/verify", "pairing body over 4KB")
+                if (!hasValidContentLength(call, MAX_PAIRING_BODY_BYTES)) {
+                    warnAuth(call, null, "/pairing/verify", "pairing body missing length or over 4KB")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Body too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
@@ -271,11 +312,22 @@ class SyncServerRouter(
                 // Also ensure the host has its own record (same shared secret or separate)
                 hostSecret() // ensures host peer exists
 
+                // C2 wrap: the same secret encrypted under a key derived from
+                // the pairing token, so a LAN observer of this response learns
+                // nothing. The legacy field stays populated this wave.
+                val encSecretB64 = try {
+                    SyncAuthenticator.encryptPairingSecret(verifyReq.token, clientDeviceId, sharedSecret)
+                } catch (e: Exception) {
+                    Log.withTag("KtorSyncServer").w { "pairing secret wrap failed, sending legacy field only" }
+                    null
+                }
+
                 call.respondText(
                     json.encodeToString(PairingResultResponse(
                         success = true,
                         deviceId = clientDeviceId,
                         sharedSecret = sharedSecret,
+                        encSecretB64 = encSecretB64,
                         hostDeviceId = deviceId,
                         hostDeviceName = deviceName,
                         hostFingerprint = fingerprint
@@ -287,6 +339,26 @@ class SyncServerRouter(
             }
 
             post("/sync/push") {
+                val pushIp = call.request.local.remoteHost
+                evictStaleThrottle(pushThrottle, PUSH_WINDOW_MS)
+                if (isThrottled(pushThrottle, pushIp, MAX_PUSH_PER_WINDOW, PUSH_WINDOW_MS)) {
+                    warnAuth(call, null, "/sync/push", "rate limited")
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Too many requests")),
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                    )
+                    return@post
+                }
+                // Declared length is enforced BEFORE the body is buffered:
+                // missing, chunked, or oversized bodies are refused unread.
+                if (!hasValidContentLength(call, MAX_BODY_BYTES)) {
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/push", "missing or oversized content length")
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Payload too large")),
+                        ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
+                    )
+                    return@post
+                }
                 val auth = verifyRequest(call)
                 if (auth == null) {
                     warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/push", "authentication failed")
@@ -298,9 +370,7 @@ class SyncServerRouter(
                 }
                 val (callerDeviceId, encryptedBody) = auth
 
-                if (!checkContentLength(call, MAX_BODY_BYTES) ||
-                    encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES
-                ) {
+                if (encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
                     warnAuth(call, callerDeviceId, "/sync/push", "payload too large")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
@@ -377,6 +447,16 @@ class SyncServerRouter(
             }
 
             get("/sync/pull") {
+                val pullIp = call.request.local.remoteHost
+                evictStaleThrottle(pullThrottle, PULL_WINDOW_MS)
+                if (isThrottled(pullThrottle, pullIp, MAX_PULL_PER_WINDOW, PULL_WINDOW_MS)) {
+                    warnAuth(call, null, "/sync/pull", "rate limited")
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Too many requests")),
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                    )
+                    return@get
+                }
                 val auth = verifyRequest(call)
                 if (auth == null) {
                     warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/pull", "authentication failed")
@@ -418,13 +498,11 @@ class SyncServerRouter(
             }
 
             webSocket("/sync/ws") {
-                // Handshake auth travels in headers (query strings leak into
-                // logs and caches); query params stay accepted for one release
-                // so already-paired older clients keep connecting.
-                val headerDevice = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
-                val headerAuth = call.request.headers[SyncAuthenticator.AUTH_HEADER]
-                val callerDeviceId = headerDevice ?: call.request.queryParameters["deviceId"]
-                val authHeader = headerAuth ?: call.request.queryParameters["auth"]
+                // Header-only auth: query strings leak into logs, caches, and
+                // history. Older query-based clients are rejected, not
+                // downgraded.
+                val callerDeviceId = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
+                val authHeader = call.request.headers[SyncAuthenticator.AUTH_HEADER]
                 if (callerDeviceId == null || authHeader == null) {
                     close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Missing deviceId or auth"))
                     return@webSocket
@@ -449,7 +527,20 @@ class SyncServerRouter(
                     return@webSocket
                 }
 
+                // Track this live session so revocation can drop it immediately.
+                // Indentation inside the try is intentionally flat: Kotlin does
+                // not care, and this keeps the diff reviewable.
+                val serverSession: DefaultWebSocketServerSession = this
+                wsSessions.getOrPut(callerDeviceId) { ConcurrentHashMap.newKeySet() }.add(serverSession)
+                try {
                 for (frame in incoming) {
+                    // Revocation takes effect on live connections: a device
+                    // revoked mid-session is closed on its next frame, and
+                    // closeDeviceSessions handles idle connections.
+                    if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
+                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Device revoked"))
+                        return@webSocket
+                    }
                     if (frame is Frame.Text) {
                         val text = frame.readText()
                         if (text.length > WS_MAX_FRAME_BYTES) {
@@ -519,6 +610,9 @@ class SyncServerRouter(
                         }
                     }
                 }
+                } finally {
+                    wsSessions[callerDeviceId]?.remove(serverSession)
+                }
             }
         }
     }
@@ -539,6 +633,65 @@ class SyncServerRouter(
     private fun evictStaleBuckets() {
         val now = System.currentTimeMillis()
         pairingAttempts.entries.removeIf { now - it.value.second > 120_000 }
+    }
+
+    /**
+     * Drop entries of a per-endpoint throttle whose window expired.
+     * Generic form of [evictStaleBuckets] for the push/pull/verify maps.
+     */
+    private fun evictStaleThrottle(
+        throttle: ConcurrentHashMap<String, Pair<Int, Long>>,
+        windowMs: Long
+    ) {
+        val now = System.currentTimeMillis()
+        throttle.entries.removeIf { now - it.value.second > windowMs }
+    }
+
+    /**
+     * Generic per-IP throttle. Returns true when [ip] exceeded [max] requests
+     * in the current window. Atomic via ConcurrentHashMap.compute, same as
+     * the pairing limiter. Allows exactly [max], blocks the max+1th.
+     */
+    private fun isThrottled(
+        throttle: ConcurrentHashMap<String, Pair<Int, Long>>,
+        ip: String,
+        max: Int,
+        windowMs: Long
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val state = throttle.compute(ip) { _, current ->
+            val (count, windowStart) = current ?: Pair(0, now)
+            if (now - windowStart > windowMs) Pair(1, now) // new window
+            else Pair(count + 1, windowStart)
+        } ?: Pair(1, now)
+        return state.first > max
+    }
+
+    /**
+     * Strict Content-Length pre-check: the request is valid only when it
+     * declares a length AND it fits in [maxBytes]. Missing or chunked bodies
+     * are refused unread, since Ktor receiveText has no size cap and would
+     * otherwise buffer an unbounded body before any check runs.
+     */
+    private fun hasValidContentLength(call: ApplicationCall, maxBytes: Long): Boolean {
+        val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: return false
+        return declared in 1..maxBytes
+    }
+
+    /**
+     * Close every live server-side WebSocket session for [deviceId].
+     * Called on revocation so a revoked device drops immediately, including
+     * idle connections with no frames in flight (the per-frame trust recheck
+     * in the WS route covers connections with traffic).
+     */
+    suspend fun closeDeviceSessions(deviceId: String) {
+        val sessions = wsSessions.remove(deviceId) ?: return
+        for (session in sessions.toList()) {
+            try {
+                session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Device revoked"))
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /**

@@ -50,7 +50,6 @@ import io.github.koalaplot.core.xygraph.VerticalLineAnnotation
 import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.rememberAxisContent
 import io.github.koalaplot.core.xygraph.rememberFloatLinearAxisModel
-import kotlin.math.abs
 
 /** Saturated phase colors for the ribbon: readable labels on dark and light themes. */
 private val SATURATED_PHASE = mapOf(
@@ -135,8 +134,13 @@ internal fun TimelineBar(
     val totalDuration = (endTime ?: now) - startTime
     val rangeMs = totalDuration.coerceAtLeast(1L)
 
-    val substanceNames = remember(doses) {
-        doses.map { d -> repo.getSubstance(d.substanceId)?.name ?: d.substanceId }.distinct()
+    // Batch-resolve substance names once per dose list; dose marks reuse the
+    // same map instead of hitting the repository a second time.
+    val substanceNameMap = remember(doses) {
+        doses.associate { d -> d.substanceId to (repo.getSubstance(d.substanceId)?.name ?: d.substanceId) }
+    }
+    val substanceNames = remember(substanceNameMap) {
+        substanceNameMap.values.distinct()
     }
     // Plain vals: getComposeColor is @Composable, so this stays out of remember.
     val fallbackPrimary = MaterialTheme.colorScheme.primary
@@ -212,12 +216,20 @@ internal fun TimelineBar(
     }
     val dense = remember(samples, spanMin) { densify(samples, (spanMin / 120f).coerceAtLeast(1f)) }
 
-    val doseMarks = remember(doses, samples, windowStart, subColors) {
+    val doseMarks = remember(doses, samples, windowStart, subColors, substanceNameMap) {
         doses.map { dose ->
             val x = toMin(dose.timestamp)
-            val name = repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId
+            val name = substanceNameMap[dose.substanceId] ?: dose.substanceId
             Triple(x, intensityAt(samples, x, 8f), subColors[name] ?: fallbackPrimary)
         }
+    }
+    // Precomputed point triples and color lookup: the symbol lambda below runs
+    // per frame, so it must not scan the mark list with minByOrNull.
+    val dosePoints = remember(doseMarks) {
+        doseMarks.map { (x, y, _) -> DefaultPoint(x, y) }
+    }
+    val doseColorByX = remember(doseMarks) {
+        doseMarks.associate { it.first to it.third }
     }
 
     val primary = MaterialTheme.colorScheme.primary
@@ -316,13 +328,12 @@ internal fun TimelineBar(
                         },
                     )
                 }
-                if (doseMarks.isNotEmpty()) {
+                if (dosePoints.isNotEmpty()) {
                     LinePlot(
-                        data = doseMarks.map { (x, y, _) -> DefaultPoint(x, y) },
+                        data = dosePoints,
                         lineStyle = null,
                         symbol = { point ->
-                            val markColor = doseMarks.minByOrNull { abs(it.first - point.x) }
-                                ?.third ?: primary
+                            val markColor = doseColorByX[point.x] ?: primary
                             Box(Modifier.size(11.dp).background(markColor, CircleShape)
                                 .padding(2.5.dp)
                                 .background(MaterialTheme.colorScheme.surface, CircleShape))

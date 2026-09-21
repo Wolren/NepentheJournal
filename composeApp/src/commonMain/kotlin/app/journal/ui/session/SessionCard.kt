@@ -40,20 +40,15 @@ import kotlinx.coroutines.delay
 @Composable
 fun SessionCard(
     session: Session,
+    doses: List<Dose>,
+    substanceNameMap: Map<String, String>,
     timeDisplayMode: TimeDisplayMode,
     onClick: () -> Unit,
     onDelete: () -> Unit,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onToggleFavorite: () -> Unit = { JournalRepository.instance.toggleFavorite(session.id) }
 ) {
-    val repo = remember { JournalRepository.instance }
     val isDark = isDarkTheme()
-    val doses = remember(session.id) { repo.dosesForSession(session.id) }
-
-    val substanceNameMap = remember(doses) {
-        doses.associate { dose ->
-            dose.substanceId to (repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId)
-        }
-    }
     // Card accent follows the session's actual substances, falling back to the
     // title only for doseless sessions, so every card carries its own color.
     val accentSource = remember(substanceNameMap, doses, session.title) {
@@ -228,7 +223,7 @@ fun SessionCard(
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     IconButton(
-                        onClick = { repo.toggleFavorite(session.id) },
+                        onClick = onToggleFavorite,
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(

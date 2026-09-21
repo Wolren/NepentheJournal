@@ -37,13 +37,14 @@ fun SubstanceScreen(
     onSubstanceClick: (String) -> Unit = {},
     onNewSubstance: () -> Unit = {}
 ) {
-    val substances by viewModel.realSubstances.collectAsState(initial = emptyList())
     val results by viewModel.results.collectAsState(initial = emptyList())
     val broadOptions by viewModel.broadOptions.collectAsState(initial = emptyList())
     val specificOptions by viewModel.specificOptions.collectAsState(initial = emptyList())
     val themeManager = remember { ThemeManager.instance }
     val isDark = themeManager.isDarkTheme()
-    val substanceDoseStats = viewModel.substanceDoseStats
+    // Repository getter hits a lock; read it only when the result list changes,
+    // not on every recomposition.
+    val substanceDoseStats = remember(results) { viewModel.substanceDoseStats }
 
     val query by viewModel.query.collectAsState()
     val activeBroad by viewModel.activeBroad.collectAsState()

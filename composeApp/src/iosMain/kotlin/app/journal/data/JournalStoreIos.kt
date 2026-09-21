@@ -132,6 +132,9 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             val success = fileManager.copyItemAtPath(backup, toPath = dataPath(), error = null)
             if (success) {
                 Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
+                // The backup is authoritative: clear live state first so entities
+                // created after the backup was taken are not merged back on top.
+                repo.clearAll()
                 load()
                 true
             } else {
@@ -144,10 +147,18 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         }
     }
 
+    /**
+     * Best-effort recovery when the whole-file parse fails: decode each top-level
+     * field on its own so one malformed record only drops that record, not the
+     * whole file. Tombstones, persons, and prefs are recovered the same way so a
+     * partial load never silently wipes them.
+     */
     private fun recoverSnapshot(text: String): JournalSnapshot {
+        val root: JsonObject =
+            runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()
+                ?: return JournalSnapshot(savedAt = currentTimeMillis())
         fun <T : Any> decodeList(key: String, serializer: KSerializer<T>): List<T> {
             return try {
-                val root = Json.parseToJsonElement(text).jsonObject
                 val arr = root[key]?.jsonArray ?: return emptyList()
                 arr.mapNotNull { element ->
                     runCatching {
@@ -156,6 +167,28 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
                 }
             } catch (_: Exception) { emptyList() }
         }
+        fun decodeBoolean(key: String, default: Boolean): Boolean =
+            runCatching { root[key]?.jsonPrimitive?.boolean ?: default }.getOrDefault(default)
+        fun decodeString(key: String, default: String): String =
+            runCatching {
+                val el = root[key] ?: return@runCatching default
+                if (el is JsonNull) default else el.jsonPrimitive.content
+            }.getOrDefault(default)
+        fun decodeNullableString(key: String): String? =
+            runCatching {
+                val el = root[key] ?: return@runCatching null
+                if (el is JsonNull) null else el.jsonPrimitive.content
+            }.getOrNull()
+        val tombstones: Map<String, Long> = runCatching {
+            root["tombstones"]?.jsonObject?.entries?.mapNotNull { (k, v) ->
+                runCatching { k to v.jsonPrimitive.long }.getOrNull()
+            }?.toMap() ?: emptyMap()
+        }.getOrDefault(emptyMap())
+        val ratingScaleMode: RatingScaleMode? = runCatching {
+            val el = root["ratingScaleMode"] ?: return@runCatching null
+            if (el is JsonNull) null
+            else AppJson.json.decodeFromJsonElement(RatingScaleMode.serializer(), el)
+        }.getOrNull()
         val sessions = decodeList("sessions", Session.serializer())
         val substances = decodeList("substances", Substance.serializer())
         val doses = decodeList("doses", Dose.serializer())
@@ -164,10 +197,12 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
         val interactions = decodeList("interactions", Interaction.serializer())
         val effects = decodeList("effects", Effect.serializer())
         val customUnits = decodeList("customUnits", CustomUnit.serializer())
+        val persons = decodeList("persons", Person.serializer())
         Log.withTag("JournalStore").i {
             "Recovered journal: ${sessions.size} sessions, ${substances.size} substances, " +
             "${doses.size} doses, ${notes.size} notes, ${timelineEvents.size} events, " +
-            "${interactions.size} interactions, ${effects.size} effects, ${customUnits.size} units"
+            "${interactions.size} interactions, ${effects.size} effects, ${customUnits.size} units, " +
+            "${persons.size} persons, ${tombstones.size} tombstones"
         }
         return JournalSnapshot(
             savedAt = currentTimeMillis(),
@@ -178,7 +213,19 @@ actual class JournalStore actual constructor(private val repo: JournalRepository
             timelineEvents = timelineEvents,
             interactions = interactions,
             effects = effects,
-            customUnits = customUnits
+            customUnits = customUnits,
+            persons = persons,
+            tombstones = tombstones,
+            ratingScaleMode = ratingScaleMode,
+            useShulginRating = decodeBoolean("useShulginRating", false),
+            useSubstanceColors = decodeBoolean("useSubstanceColors", true),
+            welcomeCompleted = decodeBoolean("welcomeCompleted", false),
+            seedFingerprint = decodeNullableString("seedFingerprint"),
+            obsidianVaultPath = decodeString("obsidianVaultPath", ""),
+            obsidianAutoExport = decodeBoolean("obsidianAutoExport", false),
+            obsidianSubfolder = decodeString("obsidianSubfolder", "Nepenthe"),
+            obsidianFileOrganization = decodeString("obsidianFileOrganization", "flat"),
+            showSessionsTrendChart = decodeBoolean("showSessionsTrendChart", false)
         )
     }
 

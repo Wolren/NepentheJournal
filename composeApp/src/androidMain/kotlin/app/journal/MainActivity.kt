@@ -17,6 +17,8 @@ import app.journal.util.AndroidFilePickerBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
@@ -90,9 +92,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize repository + load data + wire auto-save
+        // Initialize repository off the main thread: megabytes of seed plus
+        // DoseWiki JSON would stall first frame and risk an ANR. The UI
+        // gates on DataInitializer.initializedFlow with a loading screen.
         val repo = JournalRepository.instance
-        DataInitializer.ensureInitialized(repo, activityScope)
+        activityScope.launch {
+            DataInitializer.ensureInitialized(repo, activityScope)
+        }
 
         // Wire up the FilePicker bridge so FilePickerAndroid can launch dialogs
         AndroidFilePickerBridge.launchCreateDocument = { _, defaultName ->
@@ -113,5 +119,6 @@ class MainActivity : ComponentActivity() {
         AndroidFilePickerBridge.launchCreateDocument = null
         AndroidFilePickerBridge.launchOpenDocument = null
         AndroidFilePickerBridge.launchOpenFolder = null
+        activityScope.cancel()
     }
 }

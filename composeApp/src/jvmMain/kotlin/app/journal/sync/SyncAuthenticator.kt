@@ -1,7 +1,12 @@
 package app.journal.sync
 
 import java.security.SecureRandom
+import java.util.Base64
+import javax.crypto.Cipher
 import javax.crypto.Mac
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
@@ -200,5 +205,55 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
 
         /** Max body size for sync requests (10 MB). */
         const val MAX_SYNC_BODY_BYTES = 10L * 1024 * 1024
+
+        /**
+         * Wrap a freshly minted pairing secret for the C2 encrypted field.
+         * Implements the shared PairingSecretCrypto contract (see commonMain):
+         * PBKDF2WithHmacSHA256 over the pairing token, salted with the
+         * effective client deviceId, then AES-256-GCM with a random 12 byte
+         * nonce; returns standard base64 of nonce || ciphertext || tag.
+         */
+        fun encryptPairingSecret(token: String, clientDeviceId: String, sharedSecret: String): String {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(pairingKey(token, clientDeviceId), "AES"))
+            val nonce = cipher.iv
+            require(nonce.size == PairingSecretCrypto.GCM_NONCE_BYTES) { "GCM nonce must be 12 bytes" }
+            val ciphertext = cipher.doFinal(sharedSecret.toByteArray(Charsets.UTF_8))
+            return Base64.getEncoder().encodeToString(nonce + ciphertext)
+        }
+
+        /**
+         * Unwrap the C2 encrypted pairing secret. Throws on any failure
+         * (bad base64, wrong length, GCM tag mismatch); callers fall back
+         * to the legacy plaintext field.
+         */
+        fun decryptPairingSecret(token: String, clientDeviceId: String, encSecretB64: String): String {
+            val raw = Base64.getDecoder().decode(encSecretB64)
+            require(raw.size >= PairingSecretCrypto.GCM_NONCE_BYTES + 16 + 1) { "Wrapped secret too short" }
+            val nonce = raw.copyOfRange(0, PairingSecretCrypto.GCM_NONCE_BYTES)
+            val ciphertext = raw.copyOfRange(PairingSecretCrypto.GCM_NONCE_BYTES, raw.size)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                SecretKeySpec(pairingKey(token, clientDeviceId), "AES"),
+                GCMParameterSpec(128, nonce)
+            )
+            return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+        }
+
+        private fun pairingKey(token: String, clientDeviceId: String): ByteArray {
+            val spec = PBEKeySpec(
+                token.toCharArray(),
+                clientDeviceId.toByteArray(Charsets.UTF_8),
+                PairingSecretCrypto.PBKDF2_ITERATIONS,
+                PairingSecretCrypto.KEY_LENGTH_BITS
+            )
+            try {
+                val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+                return factory.generateSecret(spec).encoded
+            } finally {
+                spec.clearPassword()
+            }
+        }
     }
 }

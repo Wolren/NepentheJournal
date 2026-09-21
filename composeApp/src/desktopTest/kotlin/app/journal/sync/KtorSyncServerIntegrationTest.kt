@@ -172,7 +172,9 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             application { installRouter() }
             val resp = client.get("/auth/verify?deviceId=unknown&challenge=abc")
-            assertEquals(HttpStatusCode.Forbidden, resp.status)
+            // Uniform 401: missing params, overlong challenges, and unknown
+            // devices share one code so the endpoint is not an oracle.
+            assertEquals(HttpStatusCode.Unauthorized, resp.status)
         }
     }
 
@@ -180,7 +182,7 @@ class KtorSyncServerIntegrationTest {
     fun `auth verify rejects missing params`() {
         testApplication {
             application { installRouter() }
-            assertEquals(HttpStatusCode.BadRequest, client.get("/auth/verify").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/auth/verify").status)
         }
     }
 
@@ -288,7 +290,10 @@ class KtorSyncServerIntegrationTest {
             val authValue = authenticator.signRequest("ws-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
-            wsClient.webSocket("/sync/ws?deviceId=ws-client&auth=$authValue") {
+            wsClient.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "ws-client")
+                header(SyncAuthenticator.AUTH_HEADER, authValue)
+            }) {
                 val delta = WsDelta(
                     seq = 7L,
                     sessions = listOf(Session(
@@ -327,7 +332,10 @@ class KtorSyncServerIntegrationTest {
             val authValue = authenticator.signRequest("ws-plain-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
-            wsClient.webSocket("/sync/ws?deviceId=ws-plain-client&auth=$authValue") {
+            wsClient.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "ws-plain-client")
+                header(SyncAuthenticator.AUTH_HEADER, authValue)
+            }) {
                 val delta = WsDelta(
                     seq = 11L,
                     sessions = listOf(Session(
@@ -360,7 +368,10 @@ class KtorSyncServerIntegrationTest {
             val authValue = authenticator.signRequest("ws-enc-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
-            wsClient.webSocket("/sync/ws?deviceId=ws-enc-client&auth=$authValue") {
+            wsClient.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "ws-enc-client")
+                header(SyncAuthenticator.AUTH_HEADER, authValue)
+            }) {
                 val delta = WsDelta(
                     seq = 9L,
                     doses = listOf(Dose(

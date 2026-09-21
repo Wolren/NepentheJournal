@@ -126,7 +126,12 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
 @Composable
 internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJournalRepository, sessionStart: Long) {
     val isDark = ThemeManager.instance.isDarkTheme()
-    val grouped = doses.groupBy { it.substanceId }
+    val grouped = remember(doses) { doses.groupBy { it.substanceId } }
+    // Batch-resolve names once per dose list instead of one repository lookup
+    // per group on every recomposition.
+    val substanceNameMap = remember(grouped) {
+        grouped.keys.associateWith { id -> repo.getSubstance(id)?.name ?: id }
+    }
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(12.dp),
@@ -136,8 +141,8 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
     ) {
         Column(Modifier.padding(14.dp)) {
             grouped.entries.forEachIndexed { idx, (substanceId, substanceDoses) ->
-                val substance = repo.getSubstance(substanceId)
-                val color = AdaptiveColors.colorFor(substance?.name ?: substanceId).getComposeColor(isDark)
+                val substanceName = substanceNameMap[substanceId] ?: substanceId
+                val color = AdaptiveColors.colorFor(substanceName).getComposeColor(isDark)
                 if (idx > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -150,7 +155,7 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
                     ) {}
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(substance?.name ?: substanceId,
+                        Text(substanceName,
                             style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         substanceDoses.forEach { dose ->
                             Row(
@@ -185,11 +190,13 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
 
 @Composable
 internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journal.data.IJournalRepository) {
-    val allScores = session.checkins
-        .flatMap { c -> c.effectScores.entries.map { it.key to it.value } }
-        .groupBy({ it.first }, { it.second })
-        .mapValues { (_, scores) -> scores.average().toFloat() }
-        .entries.sortedByDescending { it.value }
+    val allScores = remember(session.checkins) {
+        session.checkins
+            .flatMap { c -> c.effectScores.entries.map { it.key to it.value } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, scores) -> scores.average().toFloat() }
+            .entries.sortedByDescending { it.value }
+    }
     if (allScores.isEmpty()) return
 
     val isDark = ThemeManager.instance.isDarkTheme()
@@ -232,7 +239,9 @@ internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journa
 internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long) {
     val now = currentTimeMillis()
     val rangeMs = now - startTime
-    val intensityEvents = events.filter { it.intensity != null }.sortedBy { it.timestamp }
+    val intensityEvents = remember(events) {
+        events.filter { it.intensity != null }.sortedBy { it.timestamp }
+    }
     if (intensityEvents.size < 2) return
 
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),

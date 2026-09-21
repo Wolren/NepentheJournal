@@ -243,6 +243,8 @@ class JournalRepository internal constructor() : IJournalRepository {
      * true: without it, a replayed response or a stale peer push silently rolls back newer
      * local data (audit M3). Seed loading and backup restore keep the default false so
      * "Reset to defaults" / restore remain authoritative.
+     * @param persons device-local snapshot-only entities (never synced, no tombstones).
+     * Sync deltas leave this empty; snapshot loads pass the stored list.
      */
     override fun applyBatch(
         sessions: List<Session>,
@@ -253,6 +255,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         notes: List<Note>,
         timelineEvents: List<TimelineEvent>,
         customUnits: List<CustomUnit>,
+        persons: List<Person>,
         lastWriterWins: Boolean,
         deletedSessionIds: List<String>,
         deletedDoseIds: List<String>,
@@ -286,6 +289,9 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (notesToPut.isNotEmpty()) notesStore.putAll(notesToPut)
         if (timelineEventsToPut.isNotEmpty()) timelineEventsStore.putAll(timelineEventsToPut)
         if (customUnitsToPut.isNotEmpty()) customUnitsStore.putAll(customUnitsToPut)
+        // Persons are device-local (never synced, no tombstones): snapshot loads only.
+        val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt })
+        if (personsToPut.isNotEmpty()) personsStore.putAll(personsToPut)
         val tombstonesChanged = applyTombstonesLocked(
             DeletedIds(
                 deletedSessionIds, deletedDoseIds, deletedNoteIds, deletedSubstanceIds,
@@ -295,7 +301,9 @@ class JournalRepository internal constructor() : IJournalRepository {
         )
         // Rebuild all indices after bulk upsert to handle updates to existing entities
         // where old index entries (dates, per-session children) need to be replaced.
-        if (sessionsToPut.isNotEmpty() || dosesToPut.isNotEmpty() || effectsToPut.isNotEmpty() ||
+        // Persons need no rebuild: they back no query index.
+        if (sessionsToPut.isNotEmpty() || dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty() ||
+            effectsToPut.isNotEmpty() || interactionsToPut.isNotEmpty() ||
             notesToPut.isNotEmpty() || timelineEventsToPut.isNotEmpty() || customUnitsToPut.isNotEmpty() ||
             tombstonesChanged
         ) {
@@ -833,7 +841,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    override fun rebuildIndices() { rebuildAllIndices() }
+    override fun rebuildIndices() = lock.withLock { rebuildAllIndices() }
 
     // ========================
     //  DataFrame export

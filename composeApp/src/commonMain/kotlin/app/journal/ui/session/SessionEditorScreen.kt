@@ -54,6 +54,7 @@ fun SessionEditorScreen(
     var consumerName by remember { mutableStateOf(sessionToEdit?.consumerName ?: "") }
     var personId by remember { mutableStateOf(sessionToEdit?.personId) }
     val persons by repo.persons.collectAsState()
+    val customUnits by repo.customUnits.collectAsState()
     var set by remember { mutableStateOf(sessionToEdit?.set ?: "") }
     var setting by remember { mutableStateOf(sessionToEdit?.setting ?: "") }
     var intention by remember { mutableStateOf(sessionToEdit?.intention ?: "") }
@@ -222,8 +223,9 @@ fun SessionEditorScreen(
         onBack()
     }
 
-    // Compute interaction warnings from current doses
-    val interactionCheckResult = remember(sessionDoses) {
+    // Compute interaction warnings from current doses; keyed on both inputs so
+    // store updates also refresh the warnings.
+    val interactionCheckResult = remember(sessionDoses, allInteractions) {
         if (sessionDoses.size >= 2) {
             val substanceIds = sessionDoses.map { it.substanceId }.distinct()
             InteractionChecker.checkPairwise(substanceIds, allInteractions)
@@ -256,7 +258,7 @@ fun SessionEditorScreen(
             sessionStartTime = startTime,
             initialDose = editingDose,
             onDismiss = { showDoseDialog = false; editingDose = null },
-            customUnits = repo.customUnits.value,
+            customUnits = customUnits,
             onSave = { dose ->
                 sessionDoses = if (sessionDoses.any { it.id == dose.id })
                     sessionDoses.map { if (it.id == dose.id) dose else it }

@@ -87,7 +87,9 @@ fun DoseTimelineChart(
         Spacer(Modifier.height(8.dp))
 
         if (recentDoses.size >= 3) {
-            val sorted = recentDoses.sortedBy { it.timestamp }
+            // Remembered before LaunchedEffect so the chart model transaction
+            // does not restart on every recomposition.
+            val sorted = remember(recentDoses) { recentDoses.sortedBy { it.timestamp } }
             val dailyEntries = remember(sorted) {
                 sorted.groupBy { dose ->
                     Instant.fromEpochMilliseconds(dose.timestamp)
@@ -97,9 +99,11 @@ fun DoseTimelineChart(
                     .entries.map { (date, ds) -> date to ds.sumOf { it.amount } }
             }
 
-            val values = dailyEntries.map { it.second }
-            val labels = dailyEntries.map { (date, _) ->
-                "${date.month.name.lowercase().take(3).replaceFirstChar { it.uppercase() }} ${date.day}"
+            val values = remember(dailyEntries) { dailyEntries.map { it.second } }
+            val labels = remember(dailyEntries) {
+                dailyEntries.map { (date, _) ->
+                    "${date.month.name.lowercase().take(3).replaceFirstChar { it.uppercase() }} ${date.day}"
+                }
             }
 
             val bottomFormatter = remember(labels) {
