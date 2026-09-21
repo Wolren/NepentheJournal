@@ -146,6 +146,14 @@ fun SessionCard(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp))
                         }
+                        IconButton(onClick = onToggleFavorite, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                if (session.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Toggle favorite",
+                                tint = if (session.isFavorite) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
 
@@ -214,20 +222,6 @@ fun SessionCard(
                     }
                 }
 
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    IconButton(
-                        onClick = onToggleFavorite,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            if (session.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Toggle favorite",
-                            tint = if (session.isFavorite) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
             }
         }
     }
