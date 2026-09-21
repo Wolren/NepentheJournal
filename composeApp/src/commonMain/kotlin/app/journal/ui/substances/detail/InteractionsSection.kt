@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.journal.data.InteractionDedupe
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.model.Interaction
@@ -24,12 +25,17 @@ internal fun InteractionsSection(
     onOpenSubstance: (String) -> Unit = {},
 ) {
     val repo = remember { JournalRepository.instance }
-    val dangerous = interactions.filter { it.riskLevel == InteractionRisk.DANGEROUS }
-    val unsafe = interactions.filter { it.riskLevel == InteractionRisk.UNSAFE }
-    val uncertain = interactions.filter {
+    // Cross-source duplicates (seed class placeholder vs real substance id)
+    // render under the same name: collapse to one row per pair, richer wins.
+    val shown = remember(interactions) {
+        InteractionDedupe.dedupe(interactions) { interactionSubstanceName(repo, it) }
+    }
+    val dangerous = shown.filter { it.riskLevel == InteractionRisk.DANGEROUS }
+    val unsafe = shown.filter { it.riskLevel == InteractionRisk.UNSAFE }
+    val uncertain = shown.filter {
         it.riskLevel == InteractionRisk.UNCERTAIN || it.riskLevel == InteractionRisk.UNKNOWN
     }
-    val low = interactions.filter { it.riskLevel == InteractionRisk.LOW }
+    val low = shown.filter { it.riskLevel == InteractionRisk.LOW }
 
     if (dangerous.isEmpty() && unsafe.isEmpty() && uncertain.isEmpty() && low.isEmpty()) return
 

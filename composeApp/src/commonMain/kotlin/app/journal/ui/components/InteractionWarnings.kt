@@ -25,30 +25,51 @@ fun InteractionWarnings(
 ) {
     if (!result.hasIssues && result.uncertain.isEmpty()) return
 
+    // Same cross-source duplicates as the detail list: one pair can arrive
+    // under two id schemes (seed placeholder vs real substance) and render
+    // the same name twice. Dangerous wins over unsafe over uncertain.
+    val shown = remember(result, substanceNameLookup) {
+        val seen = mutableSetOf<Pair<String, String>>()
+        fun dedupe(pairs: List<Pair<String, String>>): List<Pair<String, String>> =
+            pairs.filter { (a, b) ->
+                val key = listOf(
+                    substanceNameLookup(a).lowercase(),
+                    substanceNameLookup(b).lowercase()
+                ).sorted().let { it[0] to it[1] }
+                seen.add(key)
+            }
+        Triple(
+            dedupe(result.dangerous),
+            dedupe(result.unsafe),
+            dedupe(result.uncertain)
+        )
+    }
+    val (dangerous, unsafe, uncertain) = shown
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (result.dangerous.isNotEmpty()) {
+        if (dangerous.isNotEmpty()) {
             InteractionGroup(
                 title = "Dangerous Combinations",
-                pairs = result.dangerous,
+                pairs = dangerous,
                 riskLevel = InteractionRisk.DANGEROUS,
                 substanceNameLookup = substanceNameLookup
             )
         }
-        if (result.unsafe.isNotEmpty()) {
+        if (unsafe.isNotEmpty()) {
             InteractionGroup(
                 title = "Unsafe Combinations",
-                pairs = result.unsafe,
+                pairs = unsafe,
                 riskLevel = InteractionRisk.UNSAFE,
                 substanceNameLookup = substanceNameLookup
             )
         }
-        if (result.uncertain.isNotEmpty()) {
+        if (uncertain.isNotEmpty()) {
             InteractionGroup(
                 title = "Uncertain Combinations",
-                pairs = result.uncertain,
+                pairs = uncertain,
                 riskLevel = InteractionRisk.UNCERTAIN,
                 substanceNameLookup = substanceNameLookup
             )

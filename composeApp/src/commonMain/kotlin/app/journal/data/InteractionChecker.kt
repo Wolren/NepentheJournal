@@ -2,6 +2,7 @@ package app.journal.data
 
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
+import app.journal.log.Log
 
 /**
  * Results of checking a set of substance IDs for known interactions.
@@ -37,7 +38,20 @@ object InteractionChecker {
         val map = mutableMapOf<InteractionKey, Interaction>()
         for (interaction in allInteractions) {
             val key = InteractionKey.of(interaction.substanceAId, interaction.substanceBId)
-            if (key !in map) map[key] = interaction
+            val prev = map[key]
+            if (prev == null) {
+                map[key] = interaction
+            } else {
+                // Same id pair from two sources: keep the richer row and say
+                // so, instead of silently keeping whichever arrived first.
+                val winner = InteractionDedupe.richer(prev, interaction)
+                if (winner !== prev) {
+                    map[key] = winner
+                    Log.withTag("InteractionChecker").w {
+                        "Replacing info-poor duplicate interaction ${interaction.id}"
+                    }
+                }
+            }
         }
         cachedInteractionHash = hash
         cachedIndex = map
