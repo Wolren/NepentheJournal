@@ -210,6 +210,10 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
             val welcomeCompleted by repo.welcomeCompleted.collectAsState()
             var showProfileEditor by remember { mutableStateOf(false) }
             if (!welcomeCompleted && persons.isEmpty()) {
+                // Shown once per install: mark completed on first display, not
+                // on button press. Closing the window with the dialog open
+                // otherwise persists nothing and the prompt returns forever.
+                LaunchedEffect(Unit) { repo.setWelcomeCompleted(true) }
                 AlertDialog(
                     onDismissRequest = { repo.setWelcomeCompleted(true) },
                     title = { Text("Welcome to Nepenthe Journal") },
