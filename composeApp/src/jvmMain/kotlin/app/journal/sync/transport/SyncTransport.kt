@@ -234,160 +234,180 @@ class SyncTransport(
 
     override suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> =
         withContext(Dispatchers.IO) {
-            syncLock.withLock {
+            syncLock.withLock { syncWithLocked(peer, continuous) }
+        }
+
+    /**
+     * The real sync cycle: trust-store lookup, pairing, push/pull.
+     *
+     * [syncLock] has exactly ONE acquisition site, the public [syncWith]
+     * wrapper above, and it covers the WHOLE cycle including the two
+     * post-pairing re-dispatches (the fingerprint-proven reconnect and the
+     * pairWithPeer success path) which recurse into THIS function instead
+     * of back into [syncWith]: a kotlinx.coroutines Mutex is not reentrant,
+     * so the old `return@withLock syncWith(...)` waited on the lock the
+     * same coroutine already held and connectManually never returned
+     * (measured 120s hang by SyncTransportLifecycleTest before the fix).
+     * Because the recursion runs while the single holder still owns the
+     * lock, no interleaving window exists: a second concurrent syncWith
+     * parks in [syncWith] until the first cycle, including its nested
+     * re-dispatch, has finished. connectManually keeps calling the public
+     * [syncWith] (it holds no lock itself), so every external entry point
+     * acquires exactly one lock per cycle.
+     */
+    private suspend fun syncWithLocked(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> {
+        return try {
+            val fp = deviceFingerprint // ensure identity
+
+            // Try to find an existing trusted peer by fingerprint or deviceId
+            val existingPeer = peer.fingerprint?.let { trustStore.getPeer(it) }
+                ?: (peer.deviceId?.let { trustStore.getPeerById(it) })
+
+            if (existingPeer != null) {
+                appendDebug("Found trusted peer: ${existingPeer.displayName} (fp=${existingPeer.fingerprint.take(8)}...)")
+                val secret = existingPeer.sharedSecret
+                val client = KtorSyncClient(
+                    repo = repo,
+                    tlsIdentity = tlsIdentity,
+                    deviceId = deviceId,
+                    deviceFingerprint = deviceFingerprint,
+                    deviceName = deviceDisplayName,
+                    sharedSecret = secret,
+                    trustedFingerprint = existingPeer.fingerprint,
+                    persistAfterApply = persistAfterApply
+                )
                 try {
-                    val fp = deviceFingerprint // ensure identity
+                    val since = lastSyncTime ?: 0L
+                    appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since")
+                    val exchange = client.pushChanges(
+                        host = peer.host, port = peer.port,
+                        deviceId = deviceId, deviceName = deviceDisplayName, since = since
+                    )
+                    if (exchange.isFailure) {
+                        val error = exchange.exceptionOrNull()
+                        appendDebug("Push failed: ${error?.message}")
+                        _status.value = _status.value.copy(lastError = error?.message)
+                        return Result.failure(error ?: Exception("Sync exchange failed"))
+                    }
 
-                    // Try to find an existing trusted peer by fingerprint or deviceId
-                    val existingPeer = peer.fingerprint?.let { trustStore.getPeer(it) }
-                        ?: (peer.deviceId?.let { trustStore.getPeerById(it) })
+                    // Contract d pin_deviation_flag: the ONLY wall-clock
+                    // value allowed to become the cursor is
+                    // ChunkedPushResult.cycleStart, captured BEFORE the
+                    // batch was built, and it is applied exclusively
+                    // through advanceCursorIfAllSucceeded over the real
+                    // per-slice acks. A partial push keeps the old cursor
+                    // so the unconfirmed remainder is resent next cycle.
+                    val push = exchange.getOrThrow()
+                    lastSyncTime = advanceCursorIfAllSucceeded(since, push.cycleStart, push.acks)
+                    trustStore.updateLastSeen(existingPeer.deviceId)
+                    val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
+                    if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)
+                    updateStatus()
+                    appendDebug("Sync with ${existingPeer.displayName} succeeded")
 
-                    if (existingPeer != null) {
-                        appendDebug("Found trusted peer: ${existingPeer.displayName} (fp=${existingPeer.fingerprint.take(8)}...)")
-                        val secret = existingPeer.sharedSecret
-                        val client = KtorSyncClient(
+                    if (continuous) {
+                        try {
+                            startContinuousSync(peer)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) { }
+                    }
+                    Result.success(Unit)
+                } finally {
+                    client.close()
+                }
+            } else {
+                appendDebug("No existing peer by fingerprint/deviceId for ${peer.host}:${peer.port}")
+
+                // If no pairing token was provided, try to identify the host by fingerprint
+                if (peer.pairingToken.isNullOrBlank()) {
+                    appendDebug("No pairing token: attempting fingerprint-based re-connect")
+                    try {
+                        val probeClient = KtorSyncClient(
                             repo = repo,
                             tlsIdentity = tlsIdentity,
-                            deviceId = deviceId,
-                            deviceFingerprint = deviceFingerprint,
-                            deviceName = deviceDisplayName,
-                            sharedSecret = secret,
-                            trustedFingerprint = existingPeer.fingerprint,
+                            trustedFingerprint = null,
                             persistAfterApply = persistAfterApply
                         )
                         try {
-                            val since = lastSyncTime ?: 0L
-                            appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since")
-                            val exchange = client.pushChanges(
-                                host = peer.host, port = peer.port,
-                                deviceId = deviceId, deviceName = deviceDisplayName, since = since
-                            )
-                            if (exchange.isFailure) {
-                                val error = exchange.exceptionOrNull()
-                                appendDebug("Push failed: ${error?.message}")
-                                _status.value = _status.value.copy(lastError = error?.message)
-                                return@withLock Result.failure(error ?: Exception("Sync exchange failed"))
-                            }
-
-                            // Contract d pin_deviation_flag: the ONLY wall-clock
-                            // value allowed to become the cursor is
-                            // ChunkedPushResult.cycleStart, captured BEFORE the
-                            // batch was built, and it is applied exclusively
-                            // through advanceCursorIfAllSucceeded over the real
-                            // per-slice acks. A partial push keeps the old cursor
-                            // so the unconfirmed remainder is resent next cycle.
-                            val push = exchange.getOrThrow()
-                            lastSyncTime = advanceCursorIfAllSucceeded(since, push.cycleStart, push.acks)
-                            trustStore.updateLastSeen(existingPeer.deviceId)
-                            val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
-                            if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)
-                            updateStatus()
-                            appendDebug("Sync with ${existingPeer.displayName} succeeded")
-
-                            if (continuous) {
-                                try {
-                                    startContinuousSync(peer)
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (_: Exception) { }
-                            }
-                            Result.success(Unit)
-                        } finally {
-                            client.close()
-                        }
-                    } else {
-                        appendDebug("No existing peer by fingerprint/deviceId for ${peer.host}:${peer.port}")
-
-                        // If no pairing token was provided, try to identify the host by fingerprint
-                        if (peer.pairingToken.isNullOrBlank()) {
-                            appendDebug("No pairing token: attempting fingerprint-based re-connect")
-                            try {
-                                val probeClient = KtorSyncClient(
-                                    repo = repo,
-                                    tlsIdentity = tlsIdentity,
-                                    trustedFingerprint = null,
-                                    persistAfterApply = persistAfterApply
-                                )
-                                try {
-                                    val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
-                                    if (hostInfo.isSuccess) {
-                                        val info = hostInfo.getOrThrow()
-                                        appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
-                                        discoveryOps.warnOnProtocolMismatch(info, "first sync probe")
-                                        val knownPeer = trustStore.getPeer(info.fingerprint)
-                                        if (knownPeer != null) {
-                                            // Challenge the host before re-using the stored secret:
-                                            // mDNS is unauthenticated and fingerprints are public,
-                                            // so a spoofed host must prove it knows the secret.
-                                            val hostProven = probeClient.verifyHostIdentity(
-                                                peer.host, peer.port, deviceId, knownPeer.sharedSecret
-                                            )
-                                            if (hostProven) {
-                                                appendDebug("Host identity verified (challenge-response): re-using stored secret for ${knownPeer.displayName}")
-                                                val trustedPeer = DiscoveredPeer(
-                                                    deviceId = knownPeer.deviceId,
-                                                    displayName = knownPeer.displayName,
-                                                    host = peer.host,
-                                                    port = peer.port,
-                                                    isTrusted = true,
-                                                    fingerprint = knownPeer.fingerprint
-                                                )
-                                                return@withLock syncWith(trustedPeer, continuous)
-                                            }
-                                            appendDebug("Host failed identity challenge: NOT re-using stored secret, needs re-pairing")
-                                        } else {
-                                            appendDebug("Host fingerprint not in trust store: needs pairing")
-                                        }
-                                    } else {
-                                        appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
+                            val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
+                            if (hostInfo.isSuccess) {
+                                val info = hostInfo.getOrThrow()
+                                appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
+                                discoveryOps.warnOnProtocolMismatch(info, "first sync probe")
+                                val knownPeer = trustStore.getPeer(info.fingerprint)
+                                if (knownPeer != null) {
+                                    // Challenge the host before re-using the stored secret:
+                                    // mDNS is unauthenticated and fingerprints are public,
+                                    // so a spoofed host must prove it knows the secret.
+                                    val hostProven = probeClient.verifyHostIdentity(
+                                        peer.host, peer.port, deviceId, knownPeer.sharedSecret
+                                    )
+                                    if (hostProven) {
+                                        appendDebug("Host identity verified (challenge-response): re-using stored secret for ${knownPeer.displayName}")
+                                        val trustedPeer = DiscoveredPeer(
+                                            deviceId = knownPeer.deviceId,
+                                            displayName = knownPeer.displayName,
+                                            host = peer.host,
+                                            port = peer.port,
+                                            isTrusted = true,
+                                            fingerprint = knownPeer.fingerprint
+                                        )
+                                        return syncWithLocked(trustedPeer, continuous)
                                     }
-                                } finally {
-                                    probeClient.close()
+                                    appendDebug("Host failed identity challenge: NOT re-using stored secret, needs re-pairing")
+                                } else {
+                                    appendDebug("Host fingerprint not in trust store: needs pairing")
                                 }
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                appendDebug("Fingerprint probe failed: ${e.message}")
+                            } else {
+                                appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
                             }
+                        } finally {
+                            probeClient.close()
                         }
-
-                        // Standard pairing flow
-                        val pairResult = peerOps.pairWithPeer(peer)
-                        if (pairResult.isFailure) {
-                            val error = pairResult.exceptionOrNull()
-                            appendDebug("Pairing failed: ${error?.message}")
-                            _status.value = _status.value.copy(lastError = error?.message)
-                            return@withLock Result.failure(error ?: Exception("Pairing failed"))
-                        }
-                        appendDebug("Pairing succeeded")
-                        val nowTrusted = trustStore.getPeerById(pairResult.getOrThrow().hostDeviceId)
-                        if (nowTrusted != null) {
-                            val trustedPeer = DiscoveredPeer(
-                                deviceId = nowTrusted.deviceId,
-                                displayName = nowTrusted.displayName,
-                                host = peer.host,
-                                port = peer.port,
-                                isTrusted = true,
-                                fingerprint = nowTrusted.fingerprint
-                            )
-                            appendDebug("Re-syncing with trusted peer ${nowTrusted.displayName}")
-                            return@withLock syncWith(trustedPeer, continuous)
-                        }
-                        appendDebug("CRITICAL: Peer stored during pairing but not found by hostDeviceId")
-                        Result.failure(Exception("Pairing completed but device not found in trust store"))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        appendDebug("Fingerprint probe failed: ${e.message}")
                     }
-                } catch (e: CancellationException) {
-                    // Cancellation must propagate: it may never become a
-                    // Result.failure (or a clobbered lastError) on a
-                    // cancelled coroutine.
-                    throw e
-                } catch (e: Exception) {
-                    appendDebug("syncWith exception: ${e.message}")
-                    _status.value = _status.value.copy(lastError = e.message)
-                    Result.failure(e)
                 }
+
+                // Standard pairing flow
+                val pairResult = peerOps.pairWithPeer(peer)
+                if (pairResult.isFailure) {
+                    val error = pairResult.exceptionOrNull()
+                    appendDebug("Pairing failed: ${error?.message}")
+                    _status.value = _status.value.copy(lastError = error?.message)
+                    return Result.failure(error ?: Exception("Pairing failed"))
+                }
+                appendDebug("Pairing succeeded")
+                val nowTrusted = trustStore.getPeerById(pairResult.getOrThrow().hostDeviceId)
+                if (nowTrusted != null) {
+                    val trustedPeer = DiscoveredPeer(
+                        deviceId = nowTrusted.deviceId,
+                        displayName = nowTrusted.displayName,
+                        host = peer.host,
+                        port = peer.port,
+                        isTrusted = true,
+                        fingerprint = nowTrusted.fingerprint
+                    )
+                    appendDebug("Re-syncing with trusted peer ${nowTrusted.displayName}")
+                    return syncWithLocked(trustedPeer, continuous)
+                }
+                appendDebug("CRITICAL: Peer stored during pairing but not found by hostDeviceId")
+                Result.failure(Exception("Pairing completed but device not found in trust store"))
             }
+        } catch (e: CancellationException) {
+            // Cancellation must propagate: it may never become a
+            // Result.failure (or a clobbered lastError) on a
+            // cancelled coroutine.
+            throw e
+        } catch (e: Exception) {
+            appendDebug("syncWith exception: ${e.message}")
+            _status.value = _status.value.copy(lastError = e.message)
+            Result.failure(e)
         }
+    }
 
     override suspend fun disconnectFrom(deviceId: String) {
         stopContinuousSync(deviceId)

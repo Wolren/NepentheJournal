@@ -6,10 +6,12 @@ import app.journal.model.SyncConfig
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Socket
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -141,24 +143,18 @@ class SyncTransportLifecycleTest {
         val token = hostTransport.observeStatus().first().pairingToken
         assertTrue(token != null, "host must publish a pairing token while hosting")
 
-        // Manual-IP entry point: syncWith -> pairWithPeer -> syncWith(trusted).
-        //
-        // OBSERVED PRODUCTION DEFECT, characterized here rather than fixed
-        // (this wave may not touch production source): pairing DOES complete
-        // (the trust stores are written first), then the post-pairing
-        // re-dispatch in SyncTransport.syncWith re-enters syncWith while the
-        // same coroutine still holds the NON-REENTRANT syncLock, so
-        // connectManually never returns. The call is therefore bounded by a
-        // timeout instead of asserted for success, and pairing is asserted
-        // through the trust store instead of through the return value. This
-        // assertion shape also stays green once the re-dispatch is fixed.
-        val manual = withTimeoutOrNull(25_000) {
+        // Manual-IP entry point: syncWith -> pairWithPeer ->
+        // syncWithLocked(trusted). The wave4 production defect (the
+        // post-pairing re-dispatch re-entered the non-reentrant syncLock
+        // from the same coroutine, so connectManually never returned) is
+        // FIXED: the call must return and the full cycle must complete.
+        // The old 25s withTimeoutOrNull workaround is gone: a hang now
+        // fails this test instead of passing silently.
+        val manual = withTimeout(120_000) {
             clientTransport.connectManually("127.0.0.1", bound, token)
         }
-        if (manual != null) {
-            assertTrue(manual.isSuccess,
-                "when connectManually does return it must have paired and synced: ${manual.exceptionOrNull()?.message}")
-        }
+        assertTrue(manual.isSuccess,
+            "connectManually must pair and complete a full sync cycle: ${manual.exceptionOrNull()?.message}")
 
         assertTrue(clientTransport.trustedDevices().isNotEmpty(),
             "pairing must leave the host in the client trust store")
@@ -213,5 +209,76 @@ class SyncTransportLifecycleTest {
         assertTrue(canConnect(bound), "the replacement listener must accept connections")
 
         withTimeout(10_000) { second.stopHosting() }
+    }
+
+    /**
+     * Mutual-exclusion regression for the syncLock re-entrancy fix: TWO
+     * coroutines must both serialize behind the transport's single
+     * non-reentrant Mutex.
+     *
+     * Deterministic shape: the test grabs the private syncLock reflectively
+     * and holds it while both sync calls are launched. A syncWith that did
+     * NOT acquire the lock would finish its localhost cycle inside this
+     * window (that would be concurrent execution, which must not happen);
+     * one that re-acquires it re-entrantly can never finish (the wave4
+     * 120s hang). So while the lock is held both must still be parked, and
+     * after the release both must RETURN.
+     */
+    @Test
+    fun concurrentSyncCallsSerializeOnTheSingleNonReentrantLock() = runBlocking {
+        val hostRepo = JournalRepository()
+        hostRepo.upsertSession(session("s:host", "HostSession"))
+        val hostTransport = SyncTransport(hostRepo, hostDir.absolutePath)
+        host = hostTransport
+        val info = withTimeout(60_000) { hostTransport.startHosting(config(0, "host")) }
+        assertTrue(info.isSuccess, "host must come up: ${info.exceptionOrNull()?.message}")
+        val bound = info.getOrThrow().port
+        assertTrue(canConnect(bound), "host must be reachable before the client dials")
+        val token = hostTransport.observeStatus().first().pairingToken
+        assertTrue(token != null, "host must publish a pairing token while hosting")
+
+        val clientTransport = SyncTransport(JournalRepository(), clientDir.absolutePath)
+        client = clientTransport
+        assertTrue(clientTransport.trustedDevices().isEmpty(),
+            "the client starts with no trusted peer")
+
+        // syncLock is private: reach it reflectively so the test can hold it
+        // from the outside and prove both public entry points take it before
+        // doing any work.
+        val lock = SyncTransport::class.java
+            .getDeclaredField("syncLock")
+            .apply { isAccessible = true }
+            .get(clientTransport) as Mutex
+        assertFalse(lock.isLocked, "fixture: syncLock must start free")
+
+        lock.lock()
+        val first = async {
+            clientTransport.connectManually("127.0.0.1", bound, token)
+        }
+        val second = async {
+            clientTransport.connectManually("127.0.0.1", bound, token)
+        }
+        delay(1_500)
+        assertFalse(first.isCompleted,
+            "the first concurrent sync must block on syncLock, not run unlocked")
+        assertFalse(second.isCompleted,
+            "the second concurrent sync must block on syncLock, not run unlocked")
+        lock.unlock()
+
+        val a = withTimeout(120_000) { first.await() }
+        val b = withTimeout(120_000) { second.await() }
+        // Whichever coroutine won the lock consumes the pairing token; the
+        // loser may fail pairing cleanly, but BOTH must return (the old
+        // re-entrant code could never return at all).
+        assertTrue(a.isSuccess || b.isSuccess,
+            "the lock winner must pair and complete a full sync cycle: a=$a b=$b")
+        assertTrue(clientTransport.trustedDevices().isNotEmpty(),
+            "pairing must land in the client trust store")
+        assertTrue(hostTransport.trustedDevices().isNotEmpty(),
+            "pairing must land in the host trust store")
+        assertTrue(hostRepo.sessions.value.any { it.id == "s:host" },
+            "the host fixture must still be intact after the serialized cycles")
+
+        withTimeout(10_000) { hostTransport.stopHosting() }
     }
 }
