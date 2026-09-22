@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.model.rules
 
 import app.journal.log.Log
 import app.journal.model.Interaction

@@ -1,6 +1,6 @@
-package app.journal.model
+package app.journal.data
 
-import app.journal.data.JournalRepository
+import app.journal.model.*
 import kotlin.test.*
 
 class ToleranceCalculatorTest {

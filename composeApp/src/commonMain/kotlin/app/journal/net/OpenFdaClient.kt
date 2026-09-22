@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.net
 
 import io.ktor.client.*
 import io.ktor.client.call.*

@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.model.rules
 
 /**
  * Scan all unique pairs in [items] with a [matcher] callback.

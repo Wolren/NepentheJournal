@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.model.rules
 
 import app.journal.model.InteractionClasses
 import app.journal.model.Substance

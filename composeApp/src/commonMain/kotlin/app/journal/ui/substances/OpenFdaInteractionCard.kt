@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
-import app.journal.data.OpenFdaClient
-import app.journal.util.createHttpClient
+import app.journal.net.OpenFdaClient
+import app.journal.net.createHttpClient
 import io.ktor.client.*
 import kotlinx.coroutines.launch
 

@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.model.rules.InteractionChecker
 import kotlin.test.*
 
 class InteractionCheckerTest {

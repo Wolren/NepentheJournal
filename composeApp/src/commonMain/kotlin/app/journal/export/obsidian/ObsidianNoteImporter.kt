@@ -4,7 +4,7 @@ import app.journal.serde.AppJson
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.model.*
-import app.journal.util.ExportImport
+import app.journal.export.ExportImport
 import app.journal.util.currentTimeMillis
 
 /**

@@ -1,6 +1,8 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.model.rules.ClassInteractionChecker
+import app.journal.model.rules.InteractionWarningLevel
 import kotlin.test.*
 
 class ClassInteractionCheckerTest {

@@ -23,9 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
-import app.journal.model.ToleranceCalculator
-import app.journal.model.ToleranceInfo
-import app.journal.model.ToleranceLevel
+import app.journal.data.ToleranceCalculator
+import app.journal.data.ToleranceInfo
+import app.journal.data.ToleranceLevel
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import app.journal.ui.dashboard.ActivityHeatmap

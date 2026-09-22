@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.model.rules.InteractionDedupe
 import kotlin.test.*
 
 class InteractionDedupeTest {

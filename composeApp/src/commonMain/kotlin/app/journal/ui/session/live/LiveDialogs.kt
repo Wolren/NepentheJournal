@@ -12,8 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.data.ClassBasedWarning
-import app.journal.data.InteractionWarningLevel
+import app.journal.model.rules.ClassBasedWarning
+import app.journal.model.rules.InteractionWarningLevel
 import app.journal.ui.components.*
 
 @Composable

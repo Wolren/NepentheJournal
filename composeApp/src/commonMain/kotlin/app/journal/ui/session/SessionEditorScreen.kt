@@ -12,8 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.journal.data.InteractionCheckResult
-import app.journal.data.InteractionChecker
+import app.journal.model.rules.InteractionCheckResult
+import app.journal.model.rules.InteractionChecker
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.log.Log

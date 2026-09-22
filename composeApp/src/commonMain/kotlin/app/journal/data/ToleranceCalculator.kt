@@ -1,7 +1,6 @@
-package app.journal.model
+package app.journal.data
 
 import androidx.compose.runtime.Immutable
-import app.journal.data.IJournalRepository
 import app.journal.util.currentTimeMillis
 
 /**

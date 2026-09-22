@@ -1,4 +1,4 @@
-package app.journal.util
+package app.journal.export
 
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository

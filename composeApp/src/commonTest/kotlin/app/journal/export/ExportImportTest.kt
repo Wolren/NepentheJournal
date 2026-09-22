@@ -1,7 +1,8 @@
-package app.journal.util
+package app.journal.export
 
 import app.journal.data.*
 import app.journal.model.*
+import app.journal.util.currentTimeMillis
 import kotlin.test.*
 
 class ExportImportTest {

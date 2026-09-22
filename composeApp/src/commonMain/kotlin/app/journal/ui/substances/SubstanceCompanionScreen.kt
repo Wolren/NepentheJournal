@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
+import app.journal.data.ToleranceCalculator
 import app.journal.ui.LocalJournalRepository
 import app.journal.model.*
 import app.journal.ui.charts.ChartTheme

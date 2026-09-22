@@ -3,7 +3,7 @@ package app.journal.data
 import app.journal.model.*
 import app.journal.serde.AppJson
 import app.journal.sync.EntityTimePolicy
-import app.journal.util.ExportImport
+import app.journal.export.ExportImport
 import kotlinx.serialization.encodeToString
 import kotlin.test.*
 

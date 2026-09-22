@@ -13,7 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.data.ClassInteractionChecker
+import app.journal.model.rules.ClassInteractionChecker
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.model.*

@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.model.rules
 
 /**
  * Normalized key for a pairwise interaction lookup.

@@ -1,6 +1,6 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 
-package app.journal.util
+package app.journal.export
 
 import app.journal.data.JournalRepository
 import app.journal.serde.AppJson

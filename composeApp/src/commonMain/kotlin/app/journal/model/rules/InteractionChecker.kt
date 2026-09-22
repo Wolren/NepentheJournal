@@ -1,4 +1,4 @@
-package app.journal.data
+package app.journal.model.rules
 
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk

@@ -1,4 +1,4 @@
-package app.journal.util
+package app.journal.export
 
 /**
  * Generic CSV table with headers and row mapping.

@@ -1,4 +1,4 @@
-package app.journal.util
+package app.journal.export
 
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
@@ -8,6 +8,7 @@ import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.serde.AppJson
 import app.journal.sync.EntityTimePolicy
+import app.journal.util.currentTimeMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
