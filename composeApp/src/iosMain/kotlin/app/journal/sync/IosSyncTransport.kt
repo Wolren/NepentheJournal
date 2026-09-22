@@ -53,7 +53,18 @@ class IosSyncTransport(
 ) : SyncEngine {
 
     private val json = AppJson.json
-    private var hostingJob: Job? = null
+    /**
+     * The live embedded server, retained instead of discarded after start.
+     *
+     * Audit HIGH "iOS embedded server fire-and-forget": the engine used to
+     * be built inside a fire-and-forget `scope.launch` whose result was
+     * dropped, so stopHosting only cancelled an already completed Job, the
+     * listener kept its port bound for the life of the process, and a later
+     * startHosting failed with "address already in use". Holding the
+     * reference is what lets stopHosting and dispose really stop the engine
+     * and release the port.
+     */
+    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
     private val continuousSyncJobs = mutableMapOf<String, Job>()
 
     private val _status = MutableStateFlow(SyncStatusSnapshot(
@@ -111,31 +122,123 @@ class IosSyncTransport(
                     pairedDeviceCount = trustStore.count()
                 )
             }
-            hostingJob = scope.launch {
-                Log.withTag("IosSync").i { "Starting iOS sync server on port $port" }
-                try {
-                    embeddedServer(CIO, port = port) {
-                        router.installRouting(this)
-                    }.start(wait = false)
-                    Log.withTag("IosSync").i { "iOS sync server started on :$port" }
-                } catch (e: Exception) {
-                    Log.withTag("IosSync").e(e) { "Failed to start iOS sync server" }
-                }
+            // Restart parity with the JVM host: release a port we already
+            // hold before rebinding, otherwise the rebind fails with
+            // "address already in use".
+            server?.let { previous ->
+                stopQuietly(previous)
+                server = null
             }
-            _status.update { it.copy(isHosting = true, hostAddress = "0.0.0.0:$port") }
-            Result.success(HostingInfo("0.0.0.0", port, deviceFingerprint))
+            val srv = embeddedServer(CIO, port = port) {
+                router.installRouting(this)
+            }
+            // Retain BEFORE starting, so every failure path below can stop
+            // the engine and give the port back.
+            server = srv
+            try {
+                // startSuspend returns only after the engine finished its
+                // startup, and a bind failure (port taken, permission
+                // denied) reaches the caller as an exception. Nothing below
+                // this line claims hosting until that has happened: the old
+                // code flipped isHosting and reported "0.0.0.0" while the
+                // bind was still running in a discarded coroutine.
+                srv.startSuspend(wait = false)
+            } catch (e: CancellationException) {
+                // Outer handler stops the engine and lets cancellation
+                // propagate; never swallow it into a status update.
+                throw e
+            } catch (e: Exception) {
+                server = null
+                stopQuietly(srv)
+                throw e
+            }
+            Log.withTag("IosSync").i { "iOS sync server bound on :$port" }
+            // Advertised address stays the wildcard bind: iosMain has no
+            // LAN IP resolver (resolveLocalIpV4 is jvmMain only, there is
+            // no expect/actual local-address API and no Network framework
+            // usage in this repo to reuse, and inventing getifaddrs C
+            // interop here could not be compiled on the host that owns this
+            // file). Peers pair against the address the user types.
+            _status.update { it.copy(isHosting = true, hostAddress = "$BIND_ADDRESS:$port") }
+            Result.success(HostingInfo(BIND_ADDRESS, port, deviceFingerprint))
+        } catch (e: CancellationException) {
+            // A cancelled start leaves neither a listener nor a claim: the
+            // engine is stopped under NonCancellable, then the cancellation
+            // is rethrown untouched.
+            val srv = server
+            server = null
+            if (srv != null) stopQuietly(srv)
+            throw e
         } catch (e: Exception) {
             Log.withTag("IosSync").e(e) { "startHosting failed: ${e.message}" }
-            _status.update { it.copy(lastError = e.message) }
+            // Failure travels through the status mechanism this file already
+            // uses (lastError), and no hosting claim survives it: isHosting,
+            // the address and the just published pairing token are withdrawn
+            // because nothing is listening.
+            _status.update {
+                it.copy(
+                    isHosting = false,
+                    hostAddress = null,
+                    pairingToken = null,
+                    tokenExpiresAt = null,
+                    lastError = e.message
+                )
+            }
             Result.failure(e)
         }
     }
 
     override suspend fun stopHosting() {
-        hostingJob?.cancel()
-        hostingJob = null
+        val srv = server
+        if (srv != null) {
+            try {
+                // Really stop the engine: stopSuspend shuts it down and
+                // releases the listener port. The previous implementation
+                // only cancelled an already completed Job, so the port stayed
+                // bound for the rest of the process lifetime.
+                srv.stopSuspend(SHUTDOWN_GRACE_MS, SHUTDOWN_TIMEOUT_MS)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Do not report "stopped": the reference and the hosting
+                // flag stay as they are and the failure goes out through
+                // lastError, so the snapshot keeps telling the truth about
+                // a port that may still be bound.
+                Log.withTag("IosSync").e(e) { "stopHosting failed" }
+                _status.update { it.copy(lastError = "Sync server stop failed: ${e.message}") }
+                return
+            }
+            server = null
+            Log.withTag("IosSync").i { "iOS sync server stopped, port released" }
+        }
         pairingManager.clearPendingPairing()
-        _status.update { it.copy(isHosting = false, hostAddress = null, pairingToken = null) }
+        _status.update {
+            it.copy(
+                isHosting = false,
+                hostAddress = null,
+                pairingToken = null,
+                tokenExpiresAt = null
+            )
+        }
+    }
+
+    /**
+     * Stop [srv] so its listener port is released, on every path that can
+     * own it: normal stop, failed start, cancelled start. Runs under
+     * NonCancellable so a cancelled startHosting still gets its port back.
+     * Best effort by design: failures are logged and reported by the caller,
+     * never thrown out of a cleanup path.
+     */
+    private suspend fun stopQuietly(
+        srv: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>
+    ) {
+        try {
+            withContext(NonCancellable) {
+                srv.stopSuspend(SHUTDOWN_GRACE_MS, SHUTDOWN_TIMEOUT_MS)
+            }
+        } catch (e: Exception) {
+            Log.withTag("IosSync").w { "Embedded sync server stop failed: ${e.message}" }
+        }
     }
 
     /**
@@ -453,7 +556,21 @@ class IosSyncTransport(
     override fun observeStatus(): Flow<SyncStatusSnapshot> = _status.asStateFlow()
 
     fun dispose() {
-        hostingJob?.cancel()
+        // dispose() is the only teardown hook this transport exposes (it is
+        // not suspend, so the blocking stop is used, same shape as the JVM
+        // KtorSyncServer.stop). Without this the listener survived
+        // scope.cancel() and kept its port bound for the rest of the
+        // process, which is what made a later restart impossible.
+        val srv = server
+        server = null
+        if (srv != null) {
+            try {
+                srv.stop(SHUTDOWN_GRACE_MS, SHUTDOWN_TIMEOUT_MS)
+                Log.withTag("IosSync").i { "iOS sync server stopped (dispose)" }
+            } catch (e: Exception) {
+                Log.withTag("IosSync").e(e) { "dispose could not stop the sync server" }
+            }
+        }
         continuousSyncJobs.values.forEach { it.cancel() }
         continuousSyncJobs.clear()
         scope.cancel()
@@ -484,5 +601,26 @@ class IosSyncTransport(
         internal const val MAX_PAIRING_ATTEMPTS = 5
         internal const val PAIRING_RATE_WINDOW_MS = 120_000L
         internal const val PAIRING_TOKEN_TTL_MS = 120_000L
+
+        /**
+         * Wildcard bind address, also the address startHosting advertises.
+         *
+         * The JVM host advertises resolveLocalIpV4() instead (first site
+         * local IPv4, then any non loopback address). That helper lives in
+         * jvmMain only: there is no expect/actual local address API in this
+         * project and no existing Network framework usage in iosMain to
+         * build on, and the only remaining route (new C interop over
+         * platform.darwin.getifaddrs plus sockaddr_in) cannot be compiled
+         * on the host that maintains this file, so it is deliberately not
+         * invented here. Bind stays on all interfaces; the address a user
+         * pairs with is typed by hand.
+         */
+        private const val BIND_ADDRESS = "0.0.0.0"
+
+        /** Grace period handed to the engine stop before connections are cut. */
+        private const val SHUTDOWN_GRACE_MS = 1000L
+
+        /** Hard cap on waiting for a graceful stop, so stopping cannot hang. */
+        private const val SHUTDOWN_TIMEOUT_MS = 2000L
     }
 }
