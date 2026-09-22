@@ -6,7 +6,7 @@ import platform.Foundation.*
 
 /**
  * iOS vault operations using NSFileManager.
- * Vault files are accessed via the filesystem directly — iOS can see
+ * Vault files are accessed via the filesystem directly. iOS can see
  * files in the Obsidian vault iCloud folder if the user grants access.
  */
 @OptIn(ExperimentalForeignApi::class)
@@ -70,7 +70,7 @@ actual object ObsidianVaultOps {
             NSFileManager.defaultManager.removeItemAtPath(path, null)
             true
         } catch (e: Exception) {
-            Log.withTag("Obsidian").w { "deleteFile failed: $path — ${e.message}" }
+            Log.withTag("Obsidian").w { "deleteFile failed: $path, ${e.message}" }
             false
         }
     }

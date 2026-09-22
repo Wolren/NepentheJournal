@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
 
     private val activityScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    /** Launcher for ACTION_CREATE_DOCUMENT — user picks where to save a file. */
+    /** Launcher for ACTION_CREATE_DOCUMENT. User picks where to save a file. */
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         AndroidFilePickerBridge.reset()
     }
 
-    /** Launcher for ACTION_OPEN_DOCUMENT — user picks a file to open. */
+    /** Launcher for ACTION_OPEN_DOCUMENT. User picks a file to open. */
     private val openDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
         AndroidFilePickerBridge.reset()
     }
 
-    /** Launcher for ACTION_OPEN_DOCUMENT_TREE — user picks a folder. */
+    /** Launcher for ACTION_OPEN_DOCUMENT_TREE. User picks a folder. */
     private val openFolderLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->

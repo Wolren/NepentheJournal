@@ -54,7 +54,7 @@ actual class LanDiscovery {
 
         awaitClose {
             mdns.removeServiceListener(serviceType, listener)
-            // JmDNS is NOT closed here — keep it alive for service registration.
+            // JmDNS is NOT closed here: keep it alive for service registration.
             // Call stop() to fully shut down.
         }
     }

@@ -56,7 +56,7 @@ actual object ObsidianVaultOps {
             val resolvedPath = file.canonicalPath
             val parentDir = file.parentFile?.canonicalPath ?: ""
 
-            // H1: Normalization containment check — reject files outside the expected scope
+            // H1: Normalization containment check: reject files outside the expected scope
             Log.withTag("Obsidian").d { "writeFile: normalized $path → $resolvedPath" }
 
             file.parentFile?.mkdirs()

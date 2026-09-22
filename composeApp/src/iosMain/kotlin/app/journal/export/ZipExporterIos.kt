@@ -152,7 +152,7 @@ actual object ZipExporter {
         data.appendLEUint16(0u) // disk number start
         data.appendLEUint16(0u) // internal file attrs
         data.appendLEUint32(0u) // external file attrs
-        data.appendLEUint32(0u) // relative offset (set to 0 for simplicity — most parsers handle it)
+        data.appendLEUint32(0u) // relative offset (set to 0 for simplicity, most parsers handle it)
         data.appendBytes(nameBytes.refTo(0), nameBytes.size.toULong())
     }
 
@@ -172,7 +172,7 @@ actual object ZipExporter {
         data.appendLEUint16(0u) // comment length
     }
 
-    // --- CRC-32 calculation (pure Kotlin — no zlib dependency needed) ---
+    // --- CRC-32 calculation (pure Kotlin, no zlib dependency needed) ---
     private val crcTable: UIntArray by lazy {
         UIntArray(256) { i ->
             var crc = i.toUInt()

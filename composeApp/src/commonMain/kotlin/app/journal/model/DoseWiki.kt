@@ -110,7 +110,7 @@ data class DoseWikiStage(
 )
 
 /**
- * Per-substance subjective effects — the PRIMARY data source for Nepenthe's
+ * Per-substance subjective effects, the PRIMARY data source for Nepenthe's
  * local wiki. Each substance has effects organized by domain (cognitive,
  * physical, sensory) with names, descriptions, and category notes.
  */

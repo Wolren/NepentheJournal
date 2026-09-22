@@ -45,7 +45,7 @@ object DoseWikiIngestor {
 
     private var ingested = false
 
-    /** Reset the ingested flag — only needed for testing. */
+    /** Reset the ingested flag, only needed for testing. */
     internal fun reset() {
         ingested = false
     }
@@ -55,7 +55,7 @@ object DoseWikiIngestor {
     internal fun bundledText(): String? = readBundledResource(RESOURCE_PATH)
 
     /**
-     * Load and ingest DoseWiki data. Safe to call multiple times —
+     * Load and ingest DoseWiki data. Safe to call multiple times:
      * second call is a no-op.
      */
     fun ensureIngested(repo: IJournalRepository) {

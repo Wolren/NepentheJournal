@@ -28,5 +28,5 @@ actual fun initLogging(appDir: String?) {
     }
 
     Logger.setLogWriters(writers)
-    Logger.i("Logging initialized (Android) — dir: ${appDir}")
+    Logger.i("Logging initialized (Android), dir: ${appDir}")
 }

@@ -1,5 +1,5 @@
 /*
- * Nepenthe Journal — GPLv3
+ * Nepenthe Journal, GPLv3
  * Copyright (C) 2026 Wolren
  *
  * Derived from PsychonautWiki Journal (GPL-3.0-or-later)

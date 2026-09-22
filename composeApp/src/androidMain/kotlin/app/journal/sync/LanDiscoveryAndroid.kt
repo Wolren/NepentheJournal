@@ -67,7 +67,7 @@ actual class LanDiscovery {
 
         awaitClose {
             nsd.stopServiceDiscovery(listener)
-            // NsdManager kept alive — call stop() to fully shut down
+            // NsdManager kept alive: call stop() to fully shut down
         }
     }
 

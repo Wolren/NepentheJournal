@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * OpenFDA drug interaction data — fetched from the FDA drug label endpoint.
+ * OpenFDA drug interaction data, fetched from the FDA drug label endpoint.
  *
  * Covers substances that are FDA-approved drugs (ketamine, diazepam,
  * amphetamine, modafinil, etc.). Supplements the SMW/TripSit interaction data.
@@ -42,7 +42,7 @@ object OpenFdaClient {
 
     /**
      * Fetch interaction data for a substance by its generic name.
-     * Uses Ktor client — works on all platforms.
+     * Uses Ktor client, works on all platforms.
      */
     suspend fun fetchInteractions(
         genericName: String,

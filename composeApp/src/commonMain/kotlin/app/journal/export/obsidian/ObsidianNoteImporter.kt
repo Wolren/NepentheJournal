@@ -13,7 +13,7 @@ import app.journal.util.currentTimeMillis
  * For each .md file in the vault subfolder:
  * 1. Check for the ```nepenthe canonical data block
  * 2. Parse the serialized ObsidianCanonicalBlock
- * 3. Match existing session by (startTime, title) — vault content wins
+ * 3. Match existing session by (startTime, title): vault content wins
  * 4. Create or update session + children
  * 5. Notes without the fenced block are skipped (hand-written notes untouched)
  */
@@ -45,7 +45,7 @@ object ObsidianNoteImporter {
         // H1: Reject ".." in vault directory path to prevent path traversal
         if (vaultDir.contains("..")) {
             return ObsidianImportResult(errors = listOf(
-                "Vault directory path contains '..' — rejecting for security: $vaultDir"
+                "Vault directory path contains '..', rejecting for security: $vaultDir"
             ))
         }
 
@@ -88,7 +88,7 @@ object ObsidianNoteImporter {
                 val matched = findMatchingSession(repo, session.startTime, session.title)
 
                 if (matched != null) {
-                    // Update existing session — vault version wins
+                    // Update existing session: vault version wins
                     val updatedSession = session.copy(
                         id = matched.id,
                         createdAt = matched.createdAt,
@@ -188,7 +188,7 @@ object ObsidianNoteImporter {
 
     /**
      * Extract the JSON content inside the first ```nepenthe ... ``` block.
-     * Returns null if no such block exists (hand-written note — skip).
+     * Returns null if no such block exists (hand-written note: skip).
      * Handles both Unix (\n) and Windows (\r\n) line endings.
      */
     internal fun extractCanonicalBlock(text: String): String? {
