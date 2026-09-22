@@ -424,14 +424,6 @@
         "bindingdbData": {
           "$ref": "#/$defs/BindingdbData"
         },
-        "erowidUrl": {
-          "type": "string",
-          "description": "Erowid experience vault URL for this substance. From TripSit data.",
-          "default": "",
-          "examples": [
-            "https://www.erowid.org/experiences/subs/exp-LSD.shtml"
-          ]
-        },
         "sources": {
           "type": "array",
           "description": "Data source provenance tags. Each entry identifies which source contributed data for this substance. Possible values: 'psychonautwiki', 'pubchem', 'tripsit', 'wikidata', 'chembl', 'iuphar', 'pdsp', 'bindingdb'.",
@@ -462,14 +454,6 @@
           "examples": [
             "pwiki-smw-v2"
           ]
-        },
-        "userAnnotations": {
-          "type": "object",
-          "description": "User-editable key-value annotations on this substance. Preserved across sync conflicts (REMOTE_SOURCE_WINS + preserve userAnnotations strategy).",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "default": {}
         },
         "curatedSections": {
           "type": "array",

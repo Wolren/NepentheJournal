@@ -193,18 +193,28 @@ object DataInitializer {
 
         Log.withTag("DataInit").i { "Migrating ${idMap.size} substance ID mappings..." }
 
-        // Patch doses that reference old IDs
+        // Collect first, apply once (audit row "DataInitializer.kt:201,215"):
+        // the old loop upserted dose-by-dose and interaction-by-interaction,
+        // which ran a full mutation pass (indices, tolerance bump, store
+        // emission) per entity at startup. One applyBatch emits once per
+        // store, rebuilds the query indices once, bumps tolerance once and
+        // bumps the mutation counter once for the whole remap. Semantics are
+        // unchanged: applyBatch's default lastWriterWins = false is the same
+        // authoritative blind put the per-entity upserts performed, and the
+        // final store/index state is identical (DataMigrationTest pins it).
         var patchedDoses = 0
+        val remappedDoses = mutableListOf<Dose>()
         for (dose in repo.doses.value) {
             val newId = idMap[dose.substanceId]
             if (newId != null && newId != dose.substanceId) {
-                repo.upsertDose(dose.copy(substanceId = newId))
+                remappedDoses.add(dose.copy(substanceId = newId))
                 patchedDoses++
             }
         }
 
         // Patch interactions that reference old IDs
         var patchedInteractions = 0
+        val remappedInteractions = mutableListOf<Interaction>()
         for (interaction in repo.interactions.value) {
             val newA = idMap[interaction.substanceAId] ?: interaction.substanceAId
             val newB = idMap[interaction.substanceBId] ?: interaction.substanceBId
@@ -212,7 +222,7 @@ object DataInitializer {
                 val sortedIds = listOf(newA, newB).sorted()
                 // Preserve the original interaction ID: it's just a unique key,
                 // the canonical pairing is defined by the substanceAId/substanceBId fields.
-                repo.upsertInteraction(
+                remappedInteractions.add(
                     interaction.copy(
                         substanceAId = sortedIds[0],
                         substanceBId = sortedIds[1]
@@ -220,6 +230,10 @@ object DataInitializer {
                 )
                 patchedInteractions++
             }
+        }
+
+        if (remappedDoses.isNotEmpty() || remappedInteractions.isNotEmpty()) {
+            repo.applyBatch(doses = remappedDoses, interactions = remappedInteractions)
         }
 
         Log.withTag("DataInit").i { "  Patched $patchedDoses doses, $patchedInteractions interactions" }

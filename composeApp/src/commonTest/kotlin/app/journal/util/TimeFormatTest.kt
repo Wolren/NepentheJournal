@@ -70,4 +70,100 @@ class TimeFormatTest {
         assertEquals("T+45m", formatElapsedSinceStart(1_000L, 1_000L + 45 * 60_000L), "minutes arm")
         assertEquals("T+1:03", formatElapsedSinceStart(1_000L, 1_000L + 3_780_000L), "hours arm pads minutes")
     }
+
+    // ==================== DurationStyle parity (wave4 helper dedup) ====================
+
+    /**
+     * Verbatim copy of the pre-dedup ui/session/timeline formatDuration body.
+     * The single renderer must stay byte-for-byte identical to it for every
+     * input: rendered duration text is user-visible and exported.
+     */
+    private fun oldTimelineFormatDuration(millis: Long): String {
+        val totalSec = millis / 1000
+        val hours = totalSec / 3600
+        val mins = (totalSec % 3600) / 60
+        return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+    }
+
+    /** Verbatim copy of the pre-dedup ObsidianNoteRenderer.formatDuration body. */
+    private fun oldObsidianFormatDuration(start: Long, end: Long?): String? {
+        if (end == null) return null
+        val diffMs = end - start
+        if (diffMs < 0) return null
+        val totalMinutes = diffMs / 60_000
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        return when {
+            hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+            hours > 0 -> "${hours}h"
+            minutes > 0 -> "${minutes}m"
+            else -> "<1m"
+        }
+    }
+
+    /** Verbatim copy of the pre-dedup util/TimeFormat formatDuration body. */
+    private fun oldUiFormatDuration(start: Long, end: Long): String {
+        val diff = end - start
+        if (diff < 0) return "0m"
+        val totalSeconds = diff / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        return when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            minutes > 0 -> "${minutes}m"
+            else -> "${totalSeconds}s"
+        }
+    }
+
+    private val spanCorpus = longArrayOf(
+        -7_261_000, -7_200_001, -60_000, -1, 0, 1, 30_000, 45_000, 59_999,
+        60_000, 1_799_999, 1_800_000, 3_599_999, 3_600_000, 3_660_000,
+        5_000_000, 7_200_000, 9_000_000, 90_061_000
+    )
+
+    @Test
+    fun uiStyleIsByteForByteIdenticalToPreDedupBody() {
+        for (span in spanCorpus) {
+            assertEquals(
+                oldUiFormatDuration(1_000L, 1_000L + span), formatDuration(1_000L, 1_000L + span),
+                "UI duration for span $span must not change"
+            )
+        }
+    }
+
+    @Test
+    fun obsidianStyleIsByteForByteIdenticalToPreDedupBody() {
+        // Non-negative spans only: the Obsidian wrapper maps null/negative to
+        // null BEFORE reaching the core (that policy is pinned by
+        // ObsidianNoteRendererTest.formatDurationTests).
+        for (span in spanCorpus) {
+            if (span < 0) continue
+            assertEquals(
+                oldObsidianFormatDuration(1_000L, 1_000L + span),
+                formatDurationCore(span, DurationStyle.OBSIDIAN_EXPORT),
+                "Obsidian duration for span $span must not change"
+            )
+        }
+        assertEquals("<1m", formatDurationCore(30_000, DurationStyle.OBSIDIAN_EXPORT))
+        assertEquals("1h", formatDurationCore(3_600_000, DurationStyle.OBSIDIAN_EXPORT))
+        assertEquals("2h 30m", formatDurationCore(9_000_000, DurationStyle.OBSIDIAN_EXPORT))
+        assertEquals("30m", formatDurationCore(1_800_000, DurationStyle.OBSIDIAN_EXPORT))
+    }
+
+    @Test
+    fun timelineStyleIsByteForByteIdenticalToPreDedupBody() {
+        for (span in spanCorpus) {
+            assertEquals(
+                oldTimelineFormatDuration(span),
+                formatDurationCore(span, DurationStyle.TIMELINE_PHASE),
+                "timeline duration for span $span must not change"
+            )
+        }
+        // Explicit historic pins: seconds arm dropped, zero minutes KEPT,
+        // negatives render raw.
+        assertEquals("0m", formatDurationCore(45_000, DurationStyle.TIMELINE_PHASE))
+        assertEquals("5h 0m", formatDurationCore(18_000_000, DurationStyle.TIMELINE_PHASE))
+        assertEquals("30m", formatDurationCore(1_800_000, DurationStyle.TIMELINE_PHASE))
+        assertEquals("-1m", formatDurationCore(-60_000, DurationStyle.TIMELINE_PHASE))
+    }
 }

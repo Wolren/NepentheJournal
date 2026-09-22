@@ -66,9 +66,14 @@ object DosewikiTaxonomy {
         return out
     }
 
-    /** DoseWiki slug form: lowercase, non-alphanumerics collapse to hyphens. */
+    /**
+     * DoseWiki slug form: lowercase, non-alphanumerics collapse to hyphens.
+     * Zero-logic delegate to the single util/Slug.kt implementation
+     * (asciiOnly = true preserves this form byte-for-byte: "cafe" with an
+     * accent strips to ASCII, empty stays "" so callers can filter empties).
+     */
     internal fun slugify(name: String): String =
-        name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+        app.journal.util.slugify(name, asciiOnly = true, fallback = "")
 
     /**
      * Tags for one substance: direct dw:{slug} id match first, then

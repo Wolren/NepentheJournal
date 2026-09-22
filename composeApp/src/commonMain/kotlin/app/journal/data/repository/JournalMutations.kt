@@ -168,6 +168,13 @@ internal class JournalMutations(
      * not-yet-saved session) are re-parented here. Final state is equivalent to
      * looping [upsertDose] / [upsertTimelineEvent], proven by
      * JournalRepositoryTest.sessionChildrenBatchMatchesPerItemUpserts.
+     *
+     * Search freshness: this path must flip the dirty bit itself (it writes
+     * stores directly instead of going through the per-entity upserts that
+     * already do). The flip is the F1 O(1) mechanism, so a batch save costs
+     * one flag set for search, not a re-tokenization; the next query rebuilds
+     * lazily. Before wave4 this flag was never set here, so a search right
+     * after a batch save silently missed the new children.
      */
     fun upsertSessionChildren(
         sessionId: String,
@@ -186,5 +193,6 @@ internal class JournalMutations(
         indices.rebuildAllIndices()
         if (reparentedDoses.isNotEmpty()) bumpToleranceVersion()
         bumpMutationCount()
+        markSearchIndexDirtyLocked()
     }
 }

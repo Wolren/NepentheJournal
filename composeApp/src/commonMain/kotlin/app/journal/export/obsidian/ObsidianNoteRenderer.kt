@@ -259,22 +259,8 @@ fun renderSessionToObsidianNote(
 
 // ---- Helpers ----
 
-/** Slugify a string for use in filenames. */
-internal fun slugify(s: String): String {
-    val out = StringBuilder()
-    var prevDash = false
-    for (ch in s) {
-        if (ch.isLetterOrDigit()) {
-            out.append(ch.lowercaseChar())
-            prevDash = false
-        } else if (!prevDash && out.isNotEmpty()) {
-            out.append('-')
-            prevDash = true
-        }
-    }
-    while (out.endsWith('-')) out.deleteAt(out.length - 1)
-    return if (out.isEmpty()) "untitled" else out.toString()
-}
+/** Slugify a string for use in filenames. Zero-logic delegate: the single implementation lives in util/Slug.kt (the package-local name stays because ObsidianNoteRendererTest calls slugify() unqualified). */
+internal fun slugify(s: String): String = app.journal.util.slugify(s)
 
 /** Strip non-filename-safe chars from a session ID for use in filenames. */
 internal fun sanitizeIdForFilename(id: String): String {
@@ -304,20 +290,17 @@ internal fun formatTime(timestamp: Long): String {
     return "${pad2(dt.hour)}:${pad2(dt.minute)}"
 }
 
-/** Format duration between two epoch-millis timestamps as human-readable string. */
+/**
+ * Format duration between two epoch-millis timestamps as human-readable string.
+ * Zero-logic delegate: all duration rendering lives in util/TimeFormat.kt
+ * (DurationStyle.OBSIDIAN_EXPORT); this wrapper keeps only the historic
+ * null-end / negative-span -> null policy that the export format requires.
+ */
 internal fun formatDuration(start: Long, end: Long?): String? {
     if (end == null) return null
     val diffMs = end - start
     if (diffMs < 0) return null
-    val totalMinutes = diffMs / 60_000
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
-        hours > 0 -> "${hours}h"
-        minutes > 0 -> "${minutes}m"
-        else -> "<1m"
-    }
+    return app.journal.util.formatDurationCore(diffMs, app.journal.util.DurationStyle.OBSIDIAN_EXPORT)
 }
 
 /** Format duration as decimal hours. */

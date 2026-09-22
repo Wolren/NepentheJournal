@@ -42,11 +42,21 @@ internal class JournalSearch(
      */
     private var searchIndexDirty = true
 
-    fun search(query: String): List<SearchResult> = lock.withLock {
-        // Rebuild-if-dirty before querying: mutations only flip the flag, so a
-        // search right after an upsert/delete can never see a stale index.
-        if (searchIndexDirty) rebuildSearchIndexLocked()
-        searchIndex.search(query)
+    /**
+     * Rebuild-if-dirty AND the index snapshot both happen under [lock]; the
+     * scoring pass runs AFTER the lock is released, on that snapshot (wave4:
+     * single-pass scoring outside the repo lock). Freshness is unchanged:
+     * the rebuild still precedes the snapshot inside the same critical
+     * section, so a search right after an upsert/delete never sees a stale
+     * index, while ranking can no longer block a concurrent mutation or be
+     * blocked by one. Ordering semantics live in scoreSearchSnapshot.
+     */
+    fun search(query: String): List<SearchResult> {
+        val snapshot = lock.withLock {
+            if (searchIndexDirty) rebuildSearchIndexLocked()
+            searchIndex.snapshotIndex()
+        }
+        return scoreSearchSnapshot(query, snapshot)
     }
 
     /** Rebuild the search index only when a mutation dirtied it. */

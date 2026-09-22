@@ -92,15 +92,76 @@ fun formatElapsedSinceStart(sessionStartMs: Long, nowMs: Long = currentTimeMilli
 /**
  * Human-readable duration, e.g. "1h 23m", "45m", "12s".
  */
-fun formatDuration(startMs: Long, endMs: Long = currentTimeMillis()): String {
-    val diff = endMs - startMs
-    if (diff < 0) return "0m"
-    val totalSeconds = diff / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    return when {
-        hours > 0 -> "${hours}h ${minutes}m"
-        minutes > 0 -> "${minutes}m"
-        else -> "${totalSeconds}s"
+fun formatDuration(startMs: Long, endMs: Long = currentTimeMillis()): String =
+    formatDurationCore(endMs - startMs, DurationStyle.UI)
+
+/**
+ * Output contracts for [formatDurationCore] (wave4 helper dedup: three
+ * historic `formatDuration` bodies were unified into this one renderer).
+ *
+ * Every style pins its pre-dedup text byte-for-byte: rendered duration
+ * strings are a user-visible/exported contract, so any output change is a
+ * bug, not a cleanup. Parity against verbatim copies of the old bodies is
+ * asserted in TimeFormatTest; the pre-existing TimeFormatTest and
+ * ObsidianNoteRendererTest expectations additionally pin each style's
+ * historic outputs directly.
+ */
+enum class DurationStyle {
+    /** UI form: "1h 23m", "45m", "45s"; a negative span clamps to "0m". */
+    UI,
+
+    /**
+     * Obsidian export form: "2h 30m", "1h", "30m", "<1m" at minute
+     * resolution. Callers pass only non-negative spans: the Obsidian wrapper
+     * maps a null end or a negative span to null itself, as it always has.
+     */
+    OBSIDIAN_EXPORT,
+
+    /**
+     * Timeline phase form: "5h 0m", "30m", "0m"; the seconds arm is dropped
+     * and negative spans render raw (e.g. "-1m"), exactly like the old
+     * ui/session/timeline copy.
+     */
+    TIMELINE_PHASE,
+}
+
+/**
+ * Single duration renderer behind every `formatDuration` in the app. Pure
+ * span -> text; callers own start/end/null policy. Style arms are verbatim
+ * translations of the three pre-dedup bodies (see [DurationStyle]).
+ */
+internal fun formatDurationCore(diffMs: Long, style: DurationStyle): String = when (style) {
+    DurationStyle.UI -> {
+        if (diffMs < 0) {
+            "0m"
+        } else {
+            val totalSeconds = diffMs / 1000
+            val hours = totalSeconds / 3600
+            val minutes = (totalSeconds % 3600) / 60
+            when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes > 0 -> "${minutes}m"
+                else -> "${totalSeconds}s"
+            }
+        }
+    }
+
+    DurationStyle.OBSIDIAN_EXPORT -> {
+        val totalMinutes = diffMs / 60_000
+        val hours = totalMinutes / 60
+        val minutes = totalMinutes % 60
+        when {
+            hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+            hours > 0 -> "${hours}h"
+            minutes > 0 -> "${minutes}m"
+            else -> "<1m"
+        }
+    }
+
+    DurationStyle.TIMELINE_PHASE -> {
+        val totalSec = diffMs / 1000
+        val hours = totalSec / 3600
+        val mins = (totalSec % 3600) / 60
+        if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
     }
 }

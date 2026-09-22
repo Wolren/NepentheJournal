@@ -52,7 +52,9 @@ data class ChemblData(
 )
 
 /**
- * Conflict: REMOTE_SOURCE_WINS + preserve userAnnotations.
+ * Conflict: REMOTE_SOURCE_WINS (note bodies keep their losers as
+ * ConflictSibling; the old Substance.userAnnotations field had zero readers
+ * and was removed in the wave4 dead-field cleanup).
  *
  * Primary identifier strategy:
  * - Pure compounds use "cid:{PubChem CID}" as ID (e.g. "cid:5761" for LSD)
@@ -230,10 +232,8 @@ data class Substance(
     val bindingdbData: BindingdbData? = null,
     // --- Wikipedia pharmacology data ---
     val wikipediaData: WikipediaData? = null,
-    val erowidUrl: String = "",
     /** Source attributions: "psychonautwiki", "dosewiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
     val sources: List<String> = emptyList(),
     val cachedAt: Long,
     val sourceVersion: String,
-    val userAnnotations: Map<String, String> = emptyMap(),
 ) : VaultDocument

@@ -40,12 +40,21 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         val target = File(dataPath())
         val tmp = File(tempPath())
 
+        if (!target.exists()) {
+            // Audit C3 mirror (the iOS JournalStoreIos.load recovery): a crash
+            // inside save()'s backup rotation can leave the main file missing
+            // while .bak / .tmp still hold complete copies. Recover
+            // automatically instead of starting the session blank.
+            recoverMissingMainFile(tmp)
+            return@withLock
+        }
+
+        // Clean the orphaned temp file only now that the main file is known to exist.
         if (tmp.exists()) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             tmp.delete()
         }
 
-        if (!target.exists()) return@withLock
         if (target.length() > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
             return@withLock
@@ -63,6 +72,55 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
         }
+    }
+
+    /**
+     * Called by [load] when the main journal file does not exist: try .bak
+     * first, then .tmp, before giving up and starting empty. Mirrors
+     * JournalStoreIos.recoverMissingMainFile exactly (audit C3): a candidate
+     * that decodes as a whole file is used as-is; only when every candidate
+     * is corrupt does the per-field recovery salvage what it can. Decoding
+     * goes through the shared SnapshotRecovery helpers so Android's salvage
+     * rules cannot drift from desktop/iOS. [tmp] is passed in because the
+     * caller's orphan cleanup must not run before recovery gets its chance.
+     */
+    private fun recoverMissingMainFile(tmp: File) {
+        val candidates = listOf(File(backupPath()) to ".bak", tmp to ".tmp")
+        var partialText: String? = null
+        var partialLabel: String? = null
+        for ((file, label) in candidates) {
+            if (!file.exists()) continue
+            val size = file.length()
+            if (size < 0 || size > 50_000_000) continue
+            val text = try {
+                file.readText()
+            } catch (e: Exception) {
+                Log.withTag("JournalStore").w { "Unreadable $label candidate: ${e.message}" }
+                continue
+            }
+            val clean = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }.getOrNull()
+            if (clean != null) {
+                Log.withTag("JournalStore").w { "Journal file missing; recovered from $label backup" }
+                lastLoadHadIssues = true
+                lastLoadIssueSummary = "Main journal file was missing; restored from $label"
+                AppJson.apply(repo, clean)
+                return
+            }
+            if (partialText == null) {
+                partialText = text
+                partialLabel = label
+            }
+        }
+        if (partialText != null) {
+            Log.withTag("JournalStore").w { "Journal file missing; partially recovering from $partialLabel" }
+            val decoded = decodeSnapshotWithRecovery(partialText)
+            lastLoadHadIssues = true
+            lastLoadIssueSummary =
+                "Main journal file was missing; partially recovered from $partialLabel: ${decoded.parseError ?: "ok"}"
+            AppJson.apply(repo, decoded.snapshot)
+            return
+        }
+        Log.withTag("JournalStore").w { "Journal file missing and no usable .bak/.tmp backup found; starting empty" }
     }
 
     actual fun save(fullBackup: Boolean) = saveLock.withLock {

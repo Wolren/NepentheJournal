@@ -50,12 +50,13 @@ internal fun phaseLabel(elapsedMs: Long, totalMs: Long): String? {
     }
 }
 
-internal fun formatDuration(millis: Long): String {
-    val totalSec = millis / 1000
-    val hours = totalSec / 3600
-    val mins = (totalSec % 3600) / 60
-    return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
-}
+/**
+ * Zero-logic delegate to the single duration renderer in util/TimeFormat.kt
+ * (DurationStyle.TIMELINE_PHASE). Signature and rendered text are unchanged:
+ * "5h 0m", "30m", "0m"; seconds dropped, negatives raw.
+ */
+internal fun formatDuration(millis: Long): String =
+    app.journal.util.formatDurationCore(millis, app.journal.util.DurationStyle.TIMELINE_PHASE)
 
 data class PhaseRange(
     val label: String,
