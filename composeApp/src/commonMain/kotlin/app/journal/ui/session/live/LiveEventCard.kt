@@ -9,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
@@ -87,7 +86,7 @@ internal fun LiveEventCard(
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
                 Surface(modifier = Modifier.size(36.dp), shape = CircleShape,
                     color = when (event.eventType) {
-                        TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> Color(0xFFD32F2F).copy(alpha = 0.15f)
+                        TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> InteractionColors.dangerous.copy(alpha = 0.15f)
                         TimelineEventType.OBSERVATION, TimelineEventType.NOTE -> MaterialTheme.colorScheme.primaryContainer
                         else -> MaterialTheme.colorScheme.secondaryContainer
                     }) {

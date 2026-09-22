@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.unit.dp
 import app.journal.model.SyncConfig
+import app.journal.ui.LocalJournalRepository
 import app.journal.sync.*
 import app.journal.ui.components.*
 import app.journal.ui.components.sync.*
@@ -27,6 +28,13 @@ internal fun SyncSettingsContent(
     formatTimestamp: (Long) -> String,
     userMessage: (String) -> String,
 ) {
+    // Contract (HARDENING-CONTRACTS-2026-09, section c item 7): note conflicts
+    // have to be visible somewhere. Quiet count line on the card that already
+    // reports sync state; the sibling bodies are readable on the note's own
+    // card in search results.
+    val repo = LocalJournalRepository.current
+    val pendingNoteConflicts by repo.pendingConflictCount.collectAsState(initial = 0)
+
     Card(modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
@@ -38,6 +46,15 @@ internal fun SyncSettingsContent(
                     Text("Device Sync", style = MaterialTheme.typography.titleMedium)
                 }
                 AppTonalButton(onClick = { callbacks.onSyncExpanded() }) { Text(if (state.syncExpanded) "Hide" else "Manage") }
+            }
+            if (pendingNoteConflicts > 0) {
+                Text(
+                    if (pendingNoteConflicts == 1) "1 note has a conflicting version to review"
+                    else "$pendingNoteConflicts notes have conflicting versions to review",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
             if (state.syncExpanded) {
                 Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))

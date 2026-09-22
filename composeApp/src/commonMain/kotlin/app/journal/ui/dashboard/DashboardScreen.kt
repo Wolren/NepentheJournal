@@ -57,20 +57,24 @@ fun DashboardScreen(
     val totalSessions = sessions.size
     val totalSubstances = substances.size
 
-    val substanceSessionPairs = remember(doses, substances) {
+    // One id -> name map per emission instead of repo.getSubstance (a repo
+    // lock acquire) once per dose, twice over the whole journal.
+    val substanceNames = remember(substances) { substances.associate { it.id to it.name } }
+
+    val substanceSessionPairs = remember(doses, substanceNames) {
         doses.mapNotNull { dose ->
-            val sub = repo.getSubstance(dose.substanceId)
-            if (sub != null) sub.name to dose.sessionId else null
+            val name = substanceNames[dose.substanceId]
+            if (name != null) name to dose.sessionId else null
         }
     }
 
-    val substancesByDate = remember(doses, repo) {
+    val substancesByDate = remember(doses, substanceNames) {
         val map = mutableMapOf<LocalDate, MutableSet<String>>()
         val tz = TimeZone.currentSystemDefault()
         for (dose in doses) {
             val date = Instant.fromEpochMilliseconds(dose.timestamp)
                 .toLocalDateTime(tz).date
-            val name = repo.getSubstance(dose.substanceId)?.name ?: dose.substanceId
+            val name = substanceNames[dose.substanceId] ?: dose.substanceId
             map.getOrPut(date) { mutableSetOf() }.add(name)
         }
         map.mapValues { (_, names) -> names.sorted() }

@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
@@ -16,6 +15,7 @@ import app.journal.data.IJournalRepository
 import app.journal.model.Session
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
+import app.journal.ui.components.PhaseColors
 import androidx.compose.ui.semantics.Role
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
@@ -23,13 +23,7 @@ import app.journal.util.platformDeviceOrigin
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PhaseChip(label: String, eventType: TimelineEventType, session: Session, repo: IJournalRepository) {
-    val phaseColor = when (eventType) {
-        TimelineEventType.ONSET -> Color(0xFF80CBC4)
-        TimelineEventType.COMEUP -> Color(0xFFA5D6A7)
-        TimelineEventType.PEAK -> Color(0xFFFFAB91)
-        TimelineEventType.OFFSET -> Color(0xFFFFF59D)
-        else -> MaterialTheme.colorScheme.primary
-    }
+    val phaseColor = PhaseColors.color(eventType) ?: MaterialTheme.colorScheme.primary
     val chipColor = phaseColor.copy(alpha = 0.15f)
     val textColor = phaseColor.copy(alpha = 0.9f)
     var showNoteDialog by remember { mutableStateOf(false) }

@@ -25,6 +25,7 @@ import app.journal.model.Dose
 import app.journal.model.StomachFullness
 import app.journal.model.Substance
 import app.journal.util.currentTimeMillis
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 val ROA_OPTIONS = listOf(
@@ -115,6 +116,27 @@ fun DoseEditDialog(
         mutableStateOf(initialDose?.timestamp ?: sessionStartTime)
     }
 
+    // Substance filter: debounced and remembered so it recomputes only when the
+    // search term or the substance list changes. It used to run inside the
+    // LazyColumn content lambda, which re-executes on every keystroke in any
+    // other field (amount, unit, timestamp, ...).
+    var substanceQuery by remember { mutableStateOf("") }
+    LaunchedEffect(substanceSearch) {
+        if (substanceSearch.isBlank()) {
+            substanceQuery = ""
+        } else {
+            delay(200)
+            substanceQuery = substanceSearch
+        }
+    }
+    val filtered = remember(substanceQuery, substances) {
+        if (substanceQuery.isBlank()) emptyList()
+        else substances.filter {
+            it.name.contains(substanceQuery, ignoreCase = true) ||
+                it.aliases.any { a -> a.contains(substanceQuery, ignoreCase = true) }
+        }
+    }
+
     fun buildDose(): Dose? {
         val amt = amount.toDoubleOrNull() ?: return null
         if (selectedSubstanceId.isBlank()) return null
@@ -182,13 +204,9 @@ fun DoseEditDialog(
                         singleLine = true
                     )
                 }
-                // Search results - inline, same window, no popup
-                val filtered = if (substanceSearch.isBlank()) emptyList()
-                else substances.filter {
-                    it.name.contains(substanceSearch, ignoreCase = true) ||
-                    it.aliases.any { a -> a.contains(substanceSearch, ignoreCase = true) }
-                }
-                if (selectedSubstanceId.isEmpty() && substanceSearch.isNotBlank()) {
+                // Search results - inline, same window, no popup. `filtered`
+                // is computed (debounced) in the dialog scope above, not here.
+                if (selectedSubstanceId.isEmpty() && substanceQuery.isNotBlank()) {
                     if (filtered.isEmpty()) {
                         item {
                             Text("No substances match",

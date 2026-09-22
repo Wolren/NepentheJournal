@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.data.SearchResult
+import app.journal.model.Note
 import app.journal.ui.components.DesktopScrollbar
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,7 +36,25 @@ fun SearchOverlay(
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var hasSearched by remember { mutableStateOf(false) }
+    val notes by repo.notes.collectAsState()
     val scrollState = rememberLazyListState()
+
+    // Debounce: repo.search scores under the repository lock, so a full search
+    // must not run on every keystroke. Restarting the effect per query change
+    // also cancels the search that has not fired yet.
+    LaunchedEffect(query) {
+        if (query.length >= 2) {
+            delay(200)
+            results = repo.search(query)
+            hasSearched = true
+        } else {
+            results = emptyList()
+            hasSearched = false
+        }
+    }
+
+    // Grouped once per result set instead of on every recomposition.
+    val groupedResults = remember(results) { results.groupBy { it.entityType } }
 
     Scaffold(
         topBar = {
@@ -60,16 +80,7 @@ fun SearchOverlay(
             item {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { q ->
-                        query = q
-                        if (q.length >= 2) {
-                            results = repo.search(q)
-                            hasSearched = true
-                        } else {
-                            results = emptyList()
-                            hasSearched = false
-                        }
-                    },
+                    onValueChange = { query = it },
                     placeholder = { Text("Search sessions, substances, notes...") },
                     singleLine = true,
                     leadingIcon = {
@@ -78,7 +89,7 @@ fun SearchOverlay(
                     },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = ""; results = emptyList(); hasSearched = false }) {
+                            IconButton(onClick = { query = "" }) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear",
                                     modifier = Modifier.size(18.dp))
                             }
@@ -102,7 +113,7 @@ fun SearchOverlay(
                 }
             }
 
-            if (results.isEmpty() && query.length >= 2) {
+            if (hasSearched && results.isEmpty() && query.length >= 2) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
@@ -122,8 +133,7 @@ fun SearchOverlay(
             }
 
             if (results.isNotEmpty()) {
-                val grouped = results.groupBy { it.entityType }
-                for ((type, typeResults) in grouped) {
+                for ((type, typeResults) in groupedResults) {
                     item {
                         Spacer(Modifier.height(4.dp))
                         Row(
@@ -151,6 +161,8 @@ fun SearchOverlay(
                     items(typeResults, key = { "${it.entityType}:${it.entityId}" }) { result ->
                         SearchResultCard(
                             result = result,
+                            note = if (result.entityType == "note")
+                                notes.find { it.id == result.entityId } else null,
                             onSessionClick = onSessionClick,
                             onSubstanceClick = onSubstanceClick
                         )
@@ -168,6 +180,7 @@ fun SearchOverlay(
 @Composable
 private fun SearchResultCard(
     result: SearchResult,
+    note: Note? = null,
     onSessionClick: (String) -> Unit,
     onSubstanceClick: (String) -> Unit,
 ) {
@@ -213,12 +226,73 @@ private fun SearchResultCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                NoteConflictBanner(note = note)
             }
             Text(
                 result.entityType,
                 style = MaterialTheme.typography.labelSmall,
                 color = colorForType(result.entityType).copy(alpha = 0.6f)
             )
+        }
+    }
+}
+
+
+/**
+ * Contract banner (HARDENING-CONTRACTS-2026-09, section c item 7): a note that
+ * lost a sync conflict keeps the losing body as a sibling, and the UI has to
+ * say so. Shows the sibling count; expanding reveals the sibling bodies so the
+ * other version can actually be read.
+ */
+@Composable
+private fun NoteConflictBanner(note: Note?) {
+    if (note == null || note.conflictSiblings.isEmpty()) return
+    var expanded by remember(note.id, note.updatedAt) { mutableStateOf(false) }
+    val siblingCount = note.conflictSiblings.size
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                Icons.Default.Warning, null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                if (siblingCount == 1) "1 conflicting version kept for this note"
+                else "$siblingCount conflicting versions kept for this note",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = { expanded = !expanded },
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    if (expanded) "Hide" else "Review",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+        if (expanded) {
+            note.conflictSiblings.forEach { sibling ->
+                Column(Modifier.fillMaxWidth().padding(start = 20.dp, bottom = 6.dp)) {
+                    Text(
+                        "Version from " + sibling.deviceOrigin.ifBlank { "another device" },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        sibling.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }

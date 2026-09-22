@@ -39,14 +39,14 @@ fun SubstanceCompanionScreen(
     onBack: () -> Unit,
     onSessionClick: (String) -> Unit,
 ) {
-    val substances by repo.substances.collectAsState()
     val sessions by repo.sessions.collectAsState()
-    val doses by repo.doses.collectAsState()
+    val toleranceVersion by repo.toleranceVersion.collectAsState()
     val calculator = remember { ToleranceCalculator(repo) }
-
-    val substance = remember(substanceId, substances) {
-        substances.find { it.id == substanceId }
-    }
+    // Substance lookup from the repo's id -> substance flow; the store fallback
+    // keeps the first frame correct before the flow's first emission, and a
+    // genuinely missing id still reaches the not-found box below.
+    val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
+    val substance = substancesById[substanceId] ?: repo.getSubstance(substanceId)
 
     if (substance == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -56,9 +56,15 @@ fun SubstanceCompanionScreen(
         return
     }
 
-    // Filter doses and sessions for this substance
-    val dosesForSubstance = remember(substanceId, doses) {
-        doses.filter { it.substanceId == substanceId }
+    // Doses of this substance only: the repo flow is deduplicated, so edits to
+    // other substances stop invalidating this screen. Seeded synchronously so
+    // the first frame and a substanceId switch never render an empty or stale
+    // list while the flow's first emission is in flight.
+    var dosesForSubstance by remember(repo, substanceId) {
+        mutableStateOf(repo.doses.value.filter { it.substanceId == substanceId })
+    }
+    LaunchedEffect(repo, substanceId) {
+        repo.dosesForSubstance(substanceId).collect { dosesForSubstance = it }
     }
 
     val sessionIdsWithSubstance = remember(dosesForSubstance) {
@@ -80,7 +86,7 @@ fun SubstanceCompanionScreen(
     }
 
     // Tolerance info
-    val toleranceInfo = remember(substanceId, doses) {
+    val toleranceInfo = remember(substanceId, toleranceVersion) {
         calculator.calculate()
             .find { it.substanceId == substanceId }
     }

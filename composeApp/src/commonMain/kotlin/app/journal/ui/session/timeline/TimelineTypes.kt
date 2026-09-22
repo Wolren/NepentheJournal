@@ -3,6 +3,7 @@ package app.journal.ui.session.timeline
 import androidx.compose.ui.graphics.Color
 import app.journal.model.TimelineEventType
 import app.journal.model.TimelineEvent
+import app.journal.ui.components.PhaseColors
 import kotlin.math.pow
 
 sealed class TimelineItem {
@@ -10,14 +11,12 @@ sealed class TimelineItem {
     data class PhaseHeader(val label: String) : TimelineItem()
 }
 
-val phaseColors = mapOf(
-    TimelineEventType.ONSET to Color(0xFF80CBC4),
-    TimelineEventType.COMEUP to Color(0xFFA5D6A7),
-    TimelineEventType.PEAK to Color(0xFFFFAB91),
-    TimelineEventType.PLATEAU to Color(0xFFCE93D8),
-    TimelineEventType.OFFSET to Color(0xFFFFF59D),
-    TimelineEventType.AFTERGLOW to Color(0xFF80DEEA),
-)
+/**
+ * Canonical phase palette, delegated to [PhaseColors] so the timeline, the
+ * session chart ribbon, the duration bars and the live phase chips read one
+ * set of values instead of carrying their own forks.
+ */
+val phaseColors: Map<TimelineEventType, Color> = PhaseColors.byType
 
 val phases = listOf(
     TimelineEventType.ONSET to "Onset",
@@ -38,15 +37,7 @@ internal fun phaseLabelForEntry(type: TimelineEventType): String = when (type) {
 }
 
 /** Canonical phase color for a display label (e.g. "Offset" always yellow). */
-internal fun phaseColorForLabel(label: String): Color? = when (label) {
-    "Onset" -> phaseColors[TimelineEventType.ONSET]
-    "Comeup" -> phaseColors[TimelineEventType.COMEUP]
-    "Peak" -> phaseColors[TimelineEventType.PEAK]
-    "Plateau" -> phaseColors[TimelineEventType.PLATEAU]
-    "Offset" -> phaseColors[TimelineEventType.OFFSET]
-    "Afterglow" -> phaseColors[TimelineEventType.AFTERGLOW]
-    else -> null
-}
+internal fun phaseColorForLabel(label: String): Color? = PhaseColors.color(label)
 
 internal fun phaseLabel(elapsedMs: Long, totalMs: Long): String? {
     if (totalMs <= 0) return null

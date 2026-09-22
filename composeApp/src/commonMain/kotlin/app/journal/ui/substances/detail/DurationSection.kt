@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.model.DoseWikiDuration
 import app.journal.model.DoseWikiStage
+import app.journal.ui.components.PhaseColors
 import kotlin.math.roundToInt
 
 private data class DurationPhase(
@@ -216,13 +217,8 @@ internal fun DurationTimelineSection(
     val barPhases = phases.filter { it.label != "Afterglow" }
     val afterglow = phases.find { it.label == "Afterglow" }
 
-    val phaseColors = mapOf(
-        "Onset" to Color(0xFF66BB6A),
-        "Comeup" to Color(0xFF42A5F5),
-        "Peak" to Color(0xFFEF5350),
-        "Offset" to Color(0xFFFFA726),
-        "Afterglow" to Color(0xFFAB47BC)
-    )
+    // Canonical phase palette; this section used to carry its own value set.
+    val phaseColors = PhaseColors.byLabel
 
     val timelineSpan = maxOf(totalMax, barPhases.maxOfOrNull { it.maxMinutes } ?: 1.0)
 

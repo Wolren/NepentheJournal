@@ -7,21 +7,31 @@ import app.journal.model.InteractionRisk
 
 /**
  * Display colors for interaction risk levels.
- * Centralized to avoid duplication across InteractionGroup and InlineInteractionWarning.
+ * Centralized to avoid duplication across InteractionGroup, InlineInteractionWarning
+ * and the live warning banner/cards, which read the raw values below directly.
  */
 object InteractionColors {
 
+    /**
+     * Non-composable palette for callers that only need a raw Color: warning
+     * banners, card surfaces and icons outside a risk-level branch. The
+     * composable entry points below delegate to these, so there is still one
+     * value per risk level.
+     */
+    val dangerous: Color = Color(0xFFD32F2F)
+    val unsafe: Color = Color(0xFFFF9800)
+
     @Composable
     fun color(risk: InteractionRisk): Color = when (risk) {
-        InteractionRisk.DANGEROUS -> Color(0xFFD32F2F)
-        InteractionRisk.UNSAFE -> Color(0xFFFF9800)
+        InteractionRisk.DANGEROUS -> dangerous
+        InteractionRisk.UNSAFE -> unsafe
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     @Composable
     fun backgroundColor(risk: InteractionRisk): Color = when (risk) {
-        InteractionRisk.DANGEROUS -> Color(0xFFD32F2F).copy(alpha = 0.1f)
-        InteractionRisk.UNSAFE -> Color(0xFFFF9800).copy(alpha = 0.1f)
+        InteractionRisk.DANGEROUS -> dangerous.copy(alpha = 0.1f)
+        InteractionRisk.UNSAFE -> unsafe.copy(alpha = 0.1f)
         else -> Color.Transparent
     }
 }

@@ -92,10 +92,12 @@ fun LiveSessionScreen(
             dismissButton = { AppTextButton(onClick = { deletingLiveEvent = null }) { Text("Cancel") } })
     }
 
-    // Unified timeline
-    val mergedTimeline = remember(sessionEvents, sessionDoses, allSubstances) {
+    // Unified timeline: one id -> substance map instead of a linear find per
+    // dose (O(doses x substances) per emission).
+    val substancesById = remember(allSubstances) { allSubstances.associateBy { it.id } }
+    val mergedTimeline = remember(sessionEvents, sessionDoses, substancesById) {
         val eventItems = sessionEvents.map { LiveTimelineItem.Event(it) as LiveTimelineItem }
-        val doseItems = sessionDoses.map { d -> LiveTimelineItem.Dosage(d, allSubstances.find { s -> s.id == d.substanceId }) as LiveTimelineItem }
+        val doseItems = sessionDoses.map { d -> LiveTimelineItem.Dosage(d, substancesById[d.substanceId]) as LiveTimelineItem }
         (eventItems + doseItems).sortedBy { when (it) { is LiveTimelineItem.Event -> it.event.timestamp; is LiveTimelineItem.Dosage -> it.dose.timestamp } }.reversed()
     }
 

@@ -34,6 +34,7 @@ import app.journal.model.Dose
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.charts.ChartCard
+import app.journal.ui.components.PhaseColors
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.isDarkTheme
 import app.journal.ui.theme.foregroundFor
@@ -50,16 +51,6 @@ import io.github.koalaplot.core.xygraph.VerticalLineAnnotation
 import io.github.koalaplot.core.xygraph.XYGraph
 import io.github.koalaplot.core.xygraph.rememberAxisContent
 import io.github.koalaplot.core.xygraph.rememberFloatLinearAxisModel
-
-/** Saturated phase colors for the ribbon: readable labels on dark and light themes. */
-private val SATURATED_PHASE = mapOf(
-    "Onset" to Color(0xFF26A69A),
-    "Comeup" to Color(0xFF66BB6A),
-    "Peak" to Color(0xFFEF5350),
-    "Plateau" to Color(0xFFAB47BC),
-    "Offset" to Color(0xFFFFCA28),
-    "Afterglow" to Color(0xFF26C6DA),
-)
 
 private data class RibbonSegment(
     val label: String,
@@ -188,20 +179,20 @@ internal fun TimelineBar(
                 if (endF > startF) {
                     val label = phaseLabelFor(ev.eventType)
                     segs.add(RibbonSegment(
-                        label, SATURATED_PHASE[label] ?: phaseColors[ev.eventType]
+                        label, PhaseColors.saturated(label) ?: phaseColors[ev.eventType]
                             ?: fallbackPrimary,
                         startF, endF))
                 }
             }
             segs.ifEmpty {
                 fallback.map { (label, type, r) ->
-                    RibbonSegment(label, SATURATED_PHASE[label] ?: phaseColors[type]
+                    RibbonSegment(label, PhaseColors.saturated(label) ?: phaseColors[type]
                         ?: fallbackPrimary, r.first, r.second)
                 }
             }
         } else {
             fallback.map { (label, type, r) ->
-                RibbonSegment(label, SATURATED_PHASE[label] ?: phaseColors[type]
+                RibbonSegment(label, PhaseColors.saturated(label) ?: phaseColors[type]
                     ?: fallbackPrimary, r.first, r.second)
             }
         }

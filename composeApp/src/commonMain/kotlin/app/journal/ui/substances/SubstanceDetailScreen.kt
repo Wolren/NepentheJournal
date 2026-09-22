@@ -62,19 +62,19 @@ fun SubstanceDetailScreen(
     onOpenSubstance: (String) -> Unit = {},
 ) {
     val allInteractions by repo.interactions.collectAsState()
-    val allDoses by repo.doses.collectAsState()
-    val allSubstances by repo.substances.collectAsState()
     val allSessions by repo.sessions.collectAsState()
-    val substance = remember(substanceId, allSubstances) {
-        allSubstances.find { it.id == substanceId } ?: repo.getSubstance(substanceId)
-    }
+    // Substance lookups come from the repo's id -> substance flow. The store
+    // fallback keeps the first frame correct before that flow emits and
+    // preserves the not-found box for ids missing from both.
+    val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
+    val substance = substancesById[substanceId] ?: repo.getSubstance(substanceId)
     val sessionById = remember(allSessions) { allSessions.associateBy { it.id } }
     // Name lookup for cross-tolerance chips: exact match first, then
     // case-insensitive, so resolvable chips navigate to that substance.
-    val substanceIdByName = remember(allSubstances) {
+    val substanceIdByName = remember(substancesById) {
         buildMap {
-            allSubstances.forEach { put(it.name, it.id) }
-            allSubstances.forEach { putIfAbsent(it.name.lowercase(), it.id) }
+            substancesById.values.forEach { put(it.name, it.id) }
+            substancesById.values.forEach { putIfAbsent(it.name.lowercase(), it.id) }
         }
     }
     val themeManager = remember { ThemeManager.instance }
@@ -97,8 +97,14 @@ fun SubstanceDetailScreen(
         }
     }
 
-    val allDosesForSubstance = remember(allDoses, substanceId) {
-        allDoses.filter { it.substanceId == substanceId }
+    // Substance-scoped dose flow: edits to other substances no longer
+    // invalidate this screen. Seeded synchronously so the first frame and a
+    // substanceId switch never render an empty or stale list.
+    var allDosesForSubstance by remember(repo, substanceId) {
+        mutableStateOf(repo.doses.value.filter { it.substanceId == substanceId })
+    }
+    LaunchedEffect(repo, substanceId) {
+        repo.dosesForSubstance(substanceId).collect { allDosesForSubstance = it }
     }
     val sortedDosesForSubstance = remember(allDosesForSubstance) {
         allDosesForSubstance.sortedByDescending { it.timestamp }

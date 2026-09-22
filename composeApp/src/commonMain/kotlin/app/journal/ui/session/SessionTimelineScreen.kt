@@ -34,9 +34,16 @@ fun SessionTimelineScreen(
     sessionId: String,
     onBack: () -> Unit,
 ) {
-    val session = remember(sessionId) { repo.getSession(sessionId) }
-    val events = remember(sessionId) { repo.eventsForSession(sessionId) }
-    val doses = remember(sessionId) { repo.dosesForSession(sessionId) }
+    // Reactive reads: this screen mutates the repository itself (AddEventDialog
+    // confirm, delete confirm), so one-shot reads keyed only on sessionId never
+    // showed the change until the screen was re-entered. Same pattern as
+    // LiveSessionScreen: collect the flows, then filter per session.
+    val allSessions by repo.sessions.collectAsState()
+    val allEvents by repo.timelineEvents.collectAsState()
+    val allDoses by repo.doses.collectAsState()
+    val session = remember(allSessions, sessionId) { allSessions.find { it.id == sessionId } }
+    val events = remember(allEvents, sessionId) { allEvents.filter { it.sessionId == sessionId } }
+    val doses = remember(allDoses, sessionId) { allDoses.filter { it.sessionId == sessionId } }
 
     val sortedEvents = remember(events) { events.sortedBy { it.timestamp } }
     val sessionDuration = remember(session) { (session?.endTime ?: currentTimeMillis()) - (session?.startTime ?: 0L) }

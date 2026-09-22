@@ -9,7 +9,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.rules.ClassBasedWarning
@@ -23,22 +22,22 @@ internal fun InteractionWarningsBanner(warnings: List<ClassBasedWarning>) {
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (dangerWarnings.isNotEmpty()) {
-            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFD32F2F).copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
+            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = InteractionColors.dangerous.copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = Color(0xFFD32F2F), modifier = Modifier.size(18.dp))
-                        Text("Dangerous Combinations", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                        Icon(Icons.Default.Warning, null, tint = InteractionColors.dangerous, modifier = Modifier.size(18.dp))
+                        Text("Dangerous Combinations", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = InteractionColors.dangerous)
                     }
                     dangerWarnings.forEach { w -> Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 24.dp, top = 4.dp)) }
                 }
             }
         }
         if (cautionWarnings.isNotEmpty()) {
-            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
+            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = InteractionColors.unsafe.copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = Color(0xFFFF9800), modifier = Modifier.size(18.dp))
-                        Text("Caution", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFFFF9800))
+                        Icon(Icons.Default.Warning, null, tint = InteractionColors.unsafe, modifier = Modifier.size(18.dp))
+                        Text("Caution", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = InteractionColors.unsafe)
                     }
                     cautionWarnings.forEach { w -> Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 24.dp, top = 4.dp)) }
                 }
