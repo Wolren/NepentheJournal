@@ -287,6 +287,8 @@ class SyncTransport(
                             if (continuous) {
                                 try {
                                     startContinuousSync(peer)
+                                } catch (e: CancellationException) {
+                                    throw e
                                 } catch (_: Exception) { }
                             }
                             Result.success(Unit)
@@ -342,6 +344,8 @@ class SyncTransport(
                                 } finally {
                                     probeClient.close()
                                 }
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
                                 appendDebug("Fingerprint probe failed: ${e.message}")
                             }
@@ -372,6 +376,11 @@ class SyncTransport(
                         appendDebug("CRITICAL: Peer stored during pairing but not found by hostDeviceId")
                         Result.failure(Exception("Pairing completed but device not found in trust store"))
                     }
+                } catch (e: CancellationException) {
+                    // Cancellation must propagate: it may never become a
+                    // Result.failure (or a clobbered lastError) on a
+                    // cancelled coroutine.
+                    throw e
                 } catch (e: Exception) {
                     appendDebug("syncWith exception: ${e.message}")
                     _status.value = _status.value.copy(lastError = e.message)

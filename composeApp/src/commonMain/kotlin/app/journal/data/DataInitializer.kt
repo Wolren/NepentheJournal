@@ -5,7 +5,7 @@ import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
-import app.journal.sync.sha256
+import app.journal.util.crypto.sha256
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
 import app.journal.util.readBundledResource

@@ -2,76 +2,22 @@ package app.journal.sync
 
 import kotlinx.cinterop.*
 import platform.CommonCrypto.*
-import platform.Foundation.NSData
-import platform.Foundation.create
 import platform.Security.SecRandomCopyBytes
-import platform.posix.memcpy
 
 /**
- * iOS actual implementations for SyncCrypto using CommonCrypto and Foundation.
+ * iOS actual implementations for the sync-specific expect funs declared in
+ * commonMain SyncCrypto.kt (aesEncryptionKey, encryptBody, decryptBody)
+ * using CommonCrypto and Security.
  *
- * SHA-256       → CommonCrypto CC_SHA256
- * Base64        → Foundation NSData
- * PBKDF2 key    → CommonCrypto CCKeyDerivationPBKDF
- * AES-256-GCM   → CommonCrypto CCCryptorGCMOneshot (iOS 10+)
+ * PBKDF2 key    -> CommonCrypto CCKeyDerivationPBKDF
+ * AES-256-GCM   -> CommonCrypto CCCryptorGCMOneshot (iOS 10+)
  *
- * All functions match the `expect` declarations in commonMain SyncCrypto.kt
- * and produce identical output to the JVM implementations in SyncCryptoJvm.kt.
+ * The generic primitives (secureRandomBytes, sha256, base64Encode,
+ * base64Decode) were relocated to util/crypto/CryptoIos.kt (package
+ * app.journal.util.crypto). All functions match their `expect`
+ * declarations and produce identical output to the JVM implementations in
+ * SyncCryptoJvm.kt.
  */
-
-// ========================================================================
-// Secure random
-// ========================================================================
-
-/** Cryptographically secure random bytes via SecRandomCopyBytes. */
-actual fun secureRandomBytes(size: Int): ByteArray {
-    val bytes = ByteArray(size)
-    if (bytes.isNotEmpty()) {
-        bytes.usePinned { pinned ->
-            check(SecRandomCopyBytes(null, size.toULong(), pinned.addressOf(0)) == 0) {
-                "SecRandomCopyBytes failed"
-            }
-        }
-    }
-    return bytes
-}
-
-// ========================================================================
-// SHA-256
-// ========================================================================
-
-actual fun sha256(data: ByteArray): ByteArray {
-    val digest = ByteArray(CC_SHA256_DIGEST_LENGTH)
-    data.usePinned { src ->
-        digest.usePinned { dst ->
-            CC_SHA256(src.addressOf(0), data.size.toUInt(), dst.addressOf(0))
-        }
-    }
-    return digest
-}
-
-// ========================================================================
-// Base64
-// ========================================================================
-
-actual fun base64Encode(data: ByteArray): String {
-    val nsData = data.usePinned { pinned ->
-        NSData.create(bytes = pinned.addressOf(0), length = data.size.toULong())
-    }
-    return nsData.base64EncodedStringWithOptions(0u)
-}
-
-actual fun base64Decode(str: String): ByteArray {
-    val nsData = NSData.create(base64EncodedString = str, options = 0u)
-        ?: throw IllegalArgumentException("Invalid Base64 string: $str")
-    val result = ByteArray(nsData.length.toInt())
-    if (result.isNotEmpty()) {
-        result.usePinned { dest ->
-            memcpy(dest.addressOf(0), nsData.bytes, nsData.length)
-        }
-    }
-    return result
-}
 
 // ========================================================================
 // PBKDF2 key derivation

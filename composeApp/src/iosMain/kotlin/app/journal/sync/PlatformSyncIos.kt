@@ -35,6 +35,6 @@ actual fun generateSelfSignedP12(
     //   SecKeyGeneratePair → SecCertificateCreateWithData → SecPKCS12Export
     // For now, create a marker file to indicate TLS is not supported.
     app.journal.log.Log.withTag("Sync").w {
-        "iOS: TLS cert generation not implemented — sync uses plain HTTP + HMAC"
+        "iOS: TLS cert generation not implemented - sync uses plain HTTP + HMAC"
     }
 }

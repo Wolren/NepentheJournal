@@ -87,6 +87,10 @@ internal class SyncPeerOps(
                 } finally {
                     client.close()
                 }
+            } catch (e: CancellationException) {
+                // Cancellation must propagate: it may never become a
+                // Result.failure on a cancelled coroutine.
+                throw e
             } catch (e: Exception) {
                 appendDebug("pairWithPeer exception: ${e.message}")
                 Result.failure(e)

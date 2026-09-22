@@ -100,17 +100,20 @@ internal class JournalTombstones(
     }
 
     /**
-     * Apply incoming tombstones. Deletes each listed local entity unless the
-     * local copy is newer than [cutoff] (a concurrent update wins; pass 0 to
-     * delete unconditionally for live deltas). Returns true if anything was
-     * deleted. Callers must hold [lock].
+     * Apply incoming tombstones. Deletes each listed local entity only when
+     * NO local copy exists for that id or the local copy is not newer than
+     * [cutoff] (contract section b: a concurrent update wins). [cutoff] is
+     * the SENDER's cursor; 0 means the sender cursor is unknown and takes
+     * the CONSERVATIVE path (an existing local copy always survives; the
+     * legacy unconditional "cutoff == 0 deletes everything" rule is gone).
+     * Returns true if anything was deleted. Callers must hold [lock].
      */
     internal fun applyTombstonesLocked(deleted: DeletedIds, cutoff: Long): Boolean {
         var changed = false
         fun <T> applyIds(ids: List<String>, get: (String) -> T?, updatedAt: (T) -> Long, delete: (String) -> Unit) {
             for (id in ids) {
                 val existing = get(id) ?: continue
-                if (cutoff == 0L || updatedAt(existing) <= cutoff) {
+                if (updatedAt(existing) <= cutoff) {
                     delete(id)
                     changed = true
                 }

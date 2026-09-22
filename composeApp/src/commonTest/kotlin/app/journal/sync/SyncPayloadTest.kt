@@ -47,13 +47,11 @@ class SyncPayloadTest {
         val response = SyncResponse(
             success = true,
             sessions = listOf(session("s:1")),
-            doses = listOf(dose("d:1", "s:1")),
-            conflictsCreated = 2
+            doses = listOf(dose("d:1", "s:1"))
         )
         val encoded = json.encodeToString(response)
         val decoded = json.decodeFromString<SyncResponse>(encoded)
         assertTrue(decoded.success)
-        assertEquals(2, decoded.conflictsCreated)
         assertEquals(1, decoded.sessions.size)
     }
 

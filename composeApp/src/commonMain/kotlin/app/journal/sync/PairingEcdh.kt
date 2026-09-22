@@ -1,5 +1,9 @@
 package app.journal.sync
 
+import app.journal.util.crypto.base64Decode
+import app.journal.util.crypto.base64Encode
+import app.journal.util.crypto.sha256
+
 /**
  * ECDH pairing key agreement (commonMain side of contract section g).
  *

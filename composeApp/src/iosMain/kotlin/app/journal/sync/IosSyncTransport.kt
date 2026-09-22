@@ -10,8 +10,8 @@ import app.journal.util.currentTimeMillis
 import app.journal.sync.aesEncryptionKey
 import app.journal.sync.encryptBody
 import app.journal.sync.decryptBody
-import app.journal.sync.base64Encode
-import app.journal.sync.base64Decode
+import app.journal.util.crypto.base64Encode
+import app.journal.util.crypto.base64Decode
 import io.ktor.client.*
 import io.ktor.client.engine.darwin.*
 import io.ktor.client.request.*

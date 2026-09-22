@@ -20,8 +20,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import app.journal.sync.aesEncryptionKey
-import app.journal.sync.base64Decode
-import app.journal.sync.base64Encode
+import app.journal.util.crypto.base64Decode
+import app.journal.util.crypto.base64Encode
 import app.journal.sync.decryptBody
 import app.journal.sync.encryptBody
 import java.util.concurrent.ConcurrentHashMap

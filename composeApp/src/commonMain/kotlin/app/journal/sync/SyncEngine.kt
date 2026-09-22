@@ -77,7 +77,14 @@ data class SyncStatusSnapshot(
     /** Epoch milliseconds when [pairingToken] expires. Null if no token is active. */
     val tokenExpiresAt: Long? = null,
     val pairedDeviceCount: Int = 0,
-    val continuousPeers: Int = 0
+    val continuousPeers: Int = 0,
+    /**
+     * Non-fatal warning (e.g. a protocol version mismatch). Kept separate
+     * from [lastError] so a mere warning can never mask, replace, or be
+     * mistaken for an actual sync failure. Cleared never implicitly; new
+     * warnings overwrite it.
+     */
+    val lastWarning: String? = null
 )
 
 data class ConnectedPeer(val deviceId: String, val displayName: String, val direction: SyncDirection)

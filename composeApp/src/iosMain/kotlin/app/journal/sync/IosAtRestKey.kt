@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import app.journal.util.crypto.secureRandomBytes
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope

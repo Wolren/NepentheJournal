@@ -1,15 +1,10 @@
 package app.journal.sync
 
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
-
-private val secureRandom = SecureRandom()
 
 /**
  * Derived AES key cache (audit: PBKDF2 at 600k iterations used to run on
@@ -20,8 +15,7 @@ private val secureRandom = SecureRandom()
  * secret, so once a device is revoked or re-paired its old secret is never
  * queried again and the stale entry is unreachable;
  * [clearAesKeyCache] purges everything immediately (wired into
- * SyncTransport.revokeDevice). The pairing wrap keeps its own separate
- * PBKDF2 (PairingSecretCrypto, 100k iterations) and is never cached here.
+ * SyncTransport.revokeDevice).
  */
 private val aesKeyCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
 private const val MAX_CACHED_AES_KEYS = 64
@@ -30,21 +24,6 @@ private const val MAX_CACHED_AES_KEYS = 64
 fun clearAesKeyCache() {
     aesKeyCache.clear()
 }
-
-/** Cryptographically secure random bytes via java.security.SecureRandom. */
-actual fun secureRandomBytes(size: Int): ByteArray =
-    ByteArray(size).also { secureRandom.nextBytes(it) }
-
-/** SHA-256 via java.security.MessageDigest. */
-actual fun sha256(data: ByteArray): ByteArray =
-    MessageDigest.getInstance("SHA-256").digest(data)
-
-/** Standard (non-URL-safe) Base64 via java.util.Base64. */
-actual fun base64Encode(data: ByteArray): String =
-    Base64.getEncoder().encodeToString(data)
-
-actual fun base64Decode(str: String): ByteArray =
-    Base64.getDecoder().decode(str)
 
 /**
  * Derives a 32-byte AES key from [password] using PBKDF2-HMAC-SHA256.

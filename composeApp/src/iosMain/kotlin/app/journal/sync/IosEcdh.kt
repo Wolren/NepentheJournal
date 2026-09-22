@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.util.crypto.base64Encode
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UInt8Var

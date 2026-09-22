@@ -20,6 +20,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import app.journal.util.crypto.base64Decode
+import app.journal.util.crypto.base64Encode
 import java.io.IOException
 
 /**

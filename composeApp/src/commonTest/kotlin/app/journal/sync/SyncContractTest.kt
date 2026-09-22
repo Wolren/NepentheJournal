@@ -236,13 +236,13 @@ class SyncContractTest {
     fun `PairingResultResponse is serializable`() {
         val resp = PairingResultResponse(
             success = true, deviceId = "device-1",
-            sharedSecret = "sec123", hostDeviceId = "host-1",
+            ecdhSecretB64 = "sec123", hostDeviceId = "host-1",
             hostDeviceName = "Desktop", hostFingerprint = "fp456"
         )
         val jsonStr = json.encodeToString(resp)
         val decoded = json.decodeFromString<PairingResultResponse>(jsonStr)
         assertTrue(decoded.success)
-        assertEquals("sec123", decoded.sharedSecret)
+        assertEquals("sec123", decoded.ecdhSecretB64)
     }
 
     @Test
@@ -309,5 +309,29 @@ class SyncContractTest {
 
         assertNull(peer.getSession("s9"), "stale copy loses to the delete")
         assertNotNull(peer.getSession("s10"), "concurrent update newer than cursor survives")
+    }
+
+    @Test
+    fun `applySyncResponse with sender cursor 0 keeps the local copy`() {
+        // Contract section b: cursor 0 means the sender cursor is unknown
+        // (older senders) and takes the CONSERVATIVE rule. An existing local
+        // copy must survive; a tombstone for an id with no local entity is a
+        // no-op. This pins the fix for the legacy "cutoff == 0 deletes
+        // unconditionally" divergence in JournalTombstones.
+        val peer = JournalRepository()
+        peer.upsertSession(Session(
+            id = "s11", title = "Local", createdAt = now, updatedAt = 900L,
+            deviceOrigin = "local", startTime = now
+        ))
+
+        applySyncResponse(peer, SyncResponse(
+            success = true,
+            deletedSessionIds = listOf("s11", "s12")
+        ), since = 0L)
+
+        assertNotNull(peer.getSession("s11"),
+            "cutoff 0 is conservative: the local copy survives the remote delete")
+        assertNull(peer.getSession("s12"),
+            "a tombstone for an id with no local entity leaves it absent")
     }
 }

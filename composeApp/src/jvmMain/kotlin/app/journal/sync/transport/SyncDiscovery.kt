@@ -33,6 +33,10 @@ internal class SyncDiscovery(
             val info = probe.requestHostInfo(peer.host, peer.port).getOrNull()
             if (info != null) warnOnProtocolMismatch(info, "capability probe")
             info
+        } catch (e: CancellationException) {
+            // Cancellation must propagate: it may never become a null probe
+            // result on a cancelled coroutine.
+            throw e
         } catch (_: Exception) {
             null
         } finally {
@@ -42,7 +46,9 @@ internal class SyncDiscovery(
 
     /**
      * Contract task 9: a protocol version mismatch WARNs through the debug
-     * log and surfaces as a lastError-style status line. It never rejects
+     * log and surfaces in the [SyncStatusSnapshot.lastWarning] status field.
+     * [SyncStatusSnapshot.lastError] stays reserved for real failures, so a
+     * warning can never mask one or be mistaken for one. It never rejects
      * the connection: warn vs hard-reject was not pinned by the contract and
      * SYNC-JVM chose warn so an older peer keeps working while the user is
      * told to upgrade both ends.
@@ -54,7 +60,7 @@ internal class SyncDiscovery(
                     "v$SYNC_PROTOCOL_VERSION; continuing (update recommended)"
             )
             _status.value = _status.value.copy(
-                lastError = "Protocol version mismatch: host v${info.protocolVersion}, local v$SYNC_PROTOCOL_VERSION"
+                lastWarning = "Protocol version mismatch: host v${info.protocolVersion}, local v$SYNC_PROTOCOL_VERSION"
             )
         }
     }

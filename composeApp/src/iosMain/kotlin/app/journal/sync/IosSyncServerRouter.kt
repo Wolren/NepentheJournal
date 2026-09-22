@@ -6,6 +6,8 @@ import app.journal.log.Log
 import app.journal.model.Note
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
+import app.journal.util.crypto.base64Decode
+import app.journal.util.crypto.base64Encode
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*

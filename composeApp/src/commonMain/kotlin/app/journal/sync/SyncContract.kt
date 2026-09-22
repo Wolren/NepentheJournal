@@ -5,6 +5,7 @@ import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.util.crypto.secureRandomBytes
 import app.journal.util.currentTimeMillis
 import kotlinx.serialization.encodeToString
 
@@ -30,9 +31,9 @@ import kotlinx.serialization.encodeToString
  * Wire protocol version this build speaks and serves. Both hosts advertise
  * it in HostInfo.protocolVersion; clients compare it at pairing and first
  * sync. A mismatch is WARN-ONLY on the JVM client (appendDebug warning plus
- * a lastError-style status line, never a hard reject): warn vs reject was
- * not pinned by the contract, and SYNC-JVM chose warn so an older peer
- * keeps working while the user is told to upgrade.
+ * a lastWarning status line, never lastError and never a hard reject): warn
+ * vs reject was not pinned by the contract, and SYNC-JVM chose warn so an
+ * older peer keeps working while the user is told to upgrade.
  */
 const val SYNC_PROTOCOL_VERSION = 2
 
@@ -261,26 +262,3 @@ data class SyncPushRequest(
     }
 }
 
-/**
- * C2 pairing-secret wrap. SHARED JVM/iOS CONTRACT: both platforms must
- * implement these exact steps so the bytes are identical.
- *
- * Wrap (server, after minting the pairing secret):
- * 1. key = PBKDF2WithHmacSHA256(password = pairing token UTF-8 bytes,
- *    salt = effective client deviceId UTF-8 bytes, iterations = 100000,
- *    output = 256 bit).
- * 2. nonce = 12 fresh random bytes (CSPRNG); encrypt the shared secret
- *    UTF-8 bytes with AES-256-GCM under key and nonce.
- * 3. payload = nonce || ciphertext || tag (the 16 byte GCM tag appended by
- *    the cipher); field = standard base64 of payload.
- *
- * Unwrap (client): derive the same key from the user-entered token and its
- * own client deviceId, base64-decode, split off the first 12 bytes as the
- * nonce, AES-GCM decrypt. Any failure falls back to the legacy plaintext
- * sharedSecret field, which the server keeps populated.
- */
-object PairingSecretCrypto {
-    const val PBKDF2_ITERATIONS = 100_000
-    const val KEY_LENGTH_BITS = 256
-    const val GCM_NONCE_BYTES = 12
-}

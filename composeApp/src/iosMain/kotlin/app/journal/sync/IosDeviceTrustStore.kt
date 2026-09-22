@@ -4,6 +4,8 @@ import app.journal.log.Log
 import app.journal.util.PlatformFile
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
+import app.journal.util.crypto.base64Decode
+import app.journal.util.crypto.base64Encode
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString

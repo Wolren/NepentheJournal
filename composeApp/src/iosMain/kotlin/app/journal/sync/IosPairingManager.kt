@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.util.crypto.secureRandomBytes
 import app.journal.util.currentTimeMillis
 import kotlin.random.Random
 

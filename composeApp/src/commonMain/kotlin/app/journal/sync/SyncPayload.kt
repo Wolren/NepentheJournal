@@ -50,7 +50,6 @@ data class SyncResponse(
     val deletedInteractionIds: List<String> = emptyList(),
     val deletedTimelineEventIds: List<String> = emptyList(),
     val deletedCustomUnitIds: List<String> = emptyList(),
-    val conflictsCreated: Int = 0,
     /** True when per-type caps cut this page; the client must keep pulling. */
     val truncated: Boolean = false,
     /** Low-water cursor for the next page. Valid only when [truncated]. */
@@ -102,33 +101,18 @@ data class PairingVerifyRequest(
 
 /**
  * Response to a pairing verification request.
- * On success, contains the shared secret for HMAC auth.
- *
- * C2 encrypted secret: [encSecretB64] carries base64(nonce || ciphertext || tag)
- * where the AES-256-GCM key is PBKDF2WithHmacSHA256(token, salt=clientDeviceId,
- * 100000 iterations, 256 bit). Clients must try [encSecretB64] first and fall
- * back to the legacy [sharedSecret] field, which stays populated.
+ * On success, the shared secret for HMAC auth travels ONLY in
+ * [ecdhSecretB64]: base64(encryptBody(secret, wrapKey)) where wrapKey is
+ * the ECDH-derived key (PairingEcdh). The legacy plaintext sharedSecret
+ * and PBKDF2-wrapped encSecretB64 fields were deleted under contract
+ * section g once both platform hosts stopped emitting them: a LAN observer
+ * of this response must never learn the permanent sync secret.
  */
 @Serializable
 data class PairingResultResponse(
     val success: Boolean,
     val error: String? = null,
     val deviceId: String? = null,
-    /**
-     * LEGACY plaintext sharedSecret. Contract section g: hosts stop
-     * populating this field and clients stop accepting it; it is deleted from
-     * this DTO once both platform phases have removed their reads/writes.
-     * Never emit it: a LAN observer of the pairing response must not learn
-     * the permanent sync secret.
-     */
-    val sharedSecret: String? = null,
-    /**
-     * LEGACY token-wrapped secret (PBKDF2 over the pairing token). Superseded
-     * by [ecdhSecretB64]: the unwrap key (the token) travels in the same
-     * cleartext request body, so this field cannot resist a sniffer. Kept
-     * only for wire compatibility until both platform phases drop it.
-     */
-    val encSecretB64: String? = null,
     val hostDeviceId: String? = null,
     val hostDeviceName: String? = null,
     val hostFingerprint: String? = null,

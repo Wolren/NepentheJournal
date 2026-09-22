@@ -7,7 +7,7 @@ import app.journal.model.InteractionRisk
 import app.journal.model.Session
 import app.journal.sync.DeviceTrustStore.TrustedPeer
 import app.journal.sync.aesEncryptionKey
-import app.journal.sync.base64Encode
+import app.journal.util.crypto.base64Encode
 import app.journal.sync.encryptBody
 import kotlinx.coroutines.runBlocking
 import io.ktor.client.HttpClient
