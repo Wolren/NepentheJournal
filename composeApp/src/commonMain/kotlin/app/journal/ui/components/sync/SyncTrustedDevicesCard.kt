@@ -93,14 +93,15 @@ fun SyncTrustedDevicesCard(
 }
 
 /**
- * Event and debug log viewer. Accepts log lines as strings with
- * prefix convention: "+" for success, "!" for error, "-" for info.
- * Single render copy for the prefix convention; producers live in
- * SyncSettingsContent via SyncSettingsCallbacks.onLogLine.
+ * Event and debug log viewer, and the single render site for sync log
+ * lines: producers in SyncSettingsContent emit [SyncLogEntry] values via
+ * SyncSettingsCallbacks.onLogLine. The glyph drawn per entry is the old
+ * "+" (success) / "!" (error) / "-" (info) prefix character, so the
+ * rendered output is unchanged.
  */
 @Composable
 fun SyncEventLogCard(
-    logLines: List<String>,
+    logLines: List<SyncLogEntry>,
     debugLines: List<String> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
@@ -126,30 +127,24 @@ fun SyncEventLogCard(
             }
             Spacer(Modifier.height(6.dp))
 
-            logLines.take(15).forEach { line ->
-                val prefix = when {
-                    line.startsWith("+") -> '+'
-                    line.startsWith("!") -> '!'
-                    else -> '-'
-                }
-                val displayText = line.removePrefix("+").removePrefix("!").removePrefix("-")
-                val color = when (prefix) {
-                    '+' -> MaterialTheme.colorScheme.primary
-                    '!' -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+            logLines.take(15).forEach { entry ->
+                val color = when (entry) {
+                    is SyncLogEntry.Success -> MaterialTheme.colorScheme.primary
+                    is SyncLogEntry.Error -> MaterialTheme.colorScheme.error
+                    is SyncLogEntry.Info -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Row(
                     modifier = Modifier.padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "$prefix",
+                        text = "${entry.glyph}",
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.labelSmall,
                         color = color
                     )
                     Text(
-                        text = displayText,
+                        text = entry.text,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

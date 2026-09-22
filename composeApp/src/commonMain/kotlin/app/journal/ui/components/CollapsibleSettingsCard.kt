@@ -44,7 +44,7 @@ fun CollapsibleSettingsCard(
     ) {
         Column(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(CardContentPadding)
                 .then(
                     if (isDesktopPlatform()) Modifier.animateContentSize(
                         animationSpec = spring(dampingRatio = 1f, stiffness = 2000f)

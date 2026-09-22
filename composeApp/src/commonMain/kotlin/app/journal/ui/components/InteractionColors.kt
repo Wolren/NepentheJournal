@@ -21,6 +21,14 @@ object InteractionColors {
     val dangerous: Color = Color(0xFFD32F2F)
     val unsafe: Color = Color(0xFFFF9800)
 
+    /**
+     * Non-composable severe-tier red used where a full [dangerous] red is
+     * too dark: the "heavy" dosage band on the substance detail screen and
+     * the timeline-event marker in search results. Value pinned to the
+     * literal those sites used, so rendering is unchanged.
+     */
+    val severe: Color = Color(0xFFEF5350)
+
     @Composable
     fun color(risk: InteractionRisk): Color = when (risk) {
         InteractionRisk.DANGEROUS -> dangerous

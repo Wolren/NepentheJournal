@@ -41,7 +41,6 @@ import app.journal.util.isDesktopPlatform
 import app.journal.util.PlatformFile
 import app.journal.ui.settings.detail.SyncSettingsCallbacks
 import app.journal.ui.settings.detail.SyncSettingsUiState
-import kotlinx.coroutines.launch
 import app.journal.ui.settings.detail.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,17 +94,21 @@ fun SettingsScreen(
     var legalExpanded by remember { mutableStateOf(false) }
     var privacyExpanded by remember { mutableStateOf(false) }
     var libraryExpanded by remember { mutableStateOf(false) }
-    var logLines by remember { mutableStateOf(listOf("Sync engine ready")) }
+    var logLines by remember {
+        mutableStateOf(listOf<SyncLogEntry>(SyncLogEntry.Info("Sync engine ready")))
+    }
     var trustedDevices by remember { mutableStateOf(syncEngine.trustedDevices()) }
-    var dataStatus by remember { mutableStateOf<String?>(null) }
+
+    // Seed reload, test data and every export/import/backup operation live in
+    // the view model; this screen only reads status and calls its methods.
+    val dataViewModel = remember(repo, scope) { DataSettingsViewModel.create(repo, scope) }
+    val fetchStatus by dataViewModel.fetchStatus.collectAsState()
+    val isFetching by dataViewModel.isFetching.collectAsState()
 
     LaunchedEffect(status.pairedDeviceCount, status.isHosting) {
         trustedDevices = syncEngine.trustedDevices()
     }
 
-    var fetchStatus by remember { mutableStateOf<String?>(null) }
-    var isFetching by remember { mutableStateOf(false) }
-    var crashLogStatus by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberLazyListState()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -200,10 +203,9 @@ fun SettingsScreen(
         // ================ DATA ================
         item {
             DataSettingsContent(
-                repo = repo, sessionCount = sessionCount, substanceCount = substanceCount,
-                statusText = dataStatus, dataExpanded = dataExpanded,
-                scope = scope, onDataExpanded = { dataExpanded = !dataExpanded },
-                onStatusChange = { dataStatus = it }
+                vm = dataViewModel, sessionCount = sessionCount, substanceCount = substanceCount,
+                dataExpanded = dataExpanded,
+                onDataExpanded = { dataExpanded = !dataExpanded }
             )
         }
 
@@ -244,16 +246,8 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppButton(onClick = {
-                        scope.launch {
-                            isFetching = true; fetchStatus = "Reloading seed data..."
-                            try {
-                                app.journal.data.DataInitializer.reloadDefaultSubstances(repo)
-                                fetchStatus = "Reloaded ${repo.substances.value.size} substances from seed"
-                            } catch (e: Exception) { fetchStatus = userMessage("Settings", "Reload failed", e) }
-                            isFetching = false
-                        }
-                    }, enabled = !isFetching, modifier = Modifier.weight(1f)) {
+                    AppButton(onClick = { dataViewModel.reloadDefaultSubstances() },
+                        enabled = !isFetching, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp)); Text("Reset to defaults")
                     }
@@ -278,11 +272,7 @@ fun SettingsScreen(
 
         // ================ DEVELOPER ================
         item {
-            DeveloperCardContent(
-                repo = repo, crashLogStatus = crashLogStatus, scope = scope,
-                onCrashLogStatusChange = { crashLogStatus = it },
-                onDataStatusChange = { dataStatus = it }
-            )
+            DeveloperCardContent(vm = dataViewModel)
         }
 
         // ================ FOOTER ================

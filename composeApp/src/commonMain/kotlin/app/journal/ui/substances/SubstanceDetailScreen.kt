@@ -48,7 +48,7 @@ private val DosageBandColors = mapOf(
     "light" to Color(0xFF66BB6A),
     "common" to Color(0xFF42A5F5),
     "strong" to Color(0xFFFFA726),
-    "heavy" to Color(0xFFEF5350)
+    "heavy" to InteractionColors.severe
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -606,27 +606,5 @@ fun SubstanceDetailScreen(
                 AppTextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
             }
         )
-    }
-}
-
-/**
- * Class-based reagent suggestions for the Drug Testing card.
- * General principles only: reagent names are informational, no medical claims.
- * Empty for classes where reagent testing is not applicable (e.g. cannabis).
- */
-private fun reagentSuggestions(substance: app.journal.model.Substance): List<String> {
-    val cls = substance.substanceClass.joinToString(" ").lowercase()
-    return when {
-        cls.contains("tryptamine") || cls.contains("lysergamide") -> listOf("Ehrlich", "Marquis", "Mecke")
-        cls.contains("phenethylamine") -> listOf("Marquis", "Mecke", "Froehde", "Simon's")
-        cls.contains("psychedelic") || cls.contains("hallucinogen") -> listOf("Ehrlich", "Marquis", "Mecke")
-        cls.contains("empathogen") || cls.contains("entactogen") -> listOf("Marquis", "Simon's", "Mecke", "Froehde")
-        cls.contains("stimulant") -> listOf("Marquis", "Mecke", "Simon's")
-        cls.contains("opioid") || cls.contains("opiate") -> listOf("Marquis", "Mecke")
-        cls.contains("dissociative") -> listOf("Mecke", "Marquis")
-        cls.contains("benzodiazepine") || cls.contains("z-drug") -> listOf("Marquis")
-        cls.contains("cathinone") -> listOf("Marquis", "Mecke", "Simon's")
-        cls.contains("cannabinoid") || cls.contains("cannabis") -> emptyList()
-        else -> listOf("Marquis", "Mecke", "Froehde")
     }
 }

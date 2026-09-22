@@ -13,8 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import app.journal.ui.components.*
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun AboutCardContent(aboutExpanded: Boolean, onToggle: () -> Unit) {
@@ -97,13 +95,8 @@ internal fun PrivacyCardContent(privacyExpanded: Boolean, onToggle: () -> Unit) 
 }
 
 @Composable
-internal fun DeveloperCardContent(
-    repo: app.journal.data.IJournalRepository,
-    crashLogStatus: String?,
-    scope: kotlinx.coroutines.CoroutineScope,
-    onCrashLogStatusChange: (String?) -> Unit,
-    onDataStatusChange: (String?) -> Unit,
-) {
+internal fun DeveloperCardContent(vm: app.journal.ui.settings.DataSettingsViewModel) {
+    val crashLogStatus by vm.crashLogStatus.collectAsState()
     Card(modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
@@ -116,14 +109,7 @@ internal fun DeveloperCardContent(
             Text("Load demo/test data with varied sessions, substance combos, and timeline events for UI debugging.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            AppOutlinedButton(onClick = {
-                scope.launch {
-                    try {
-                        app.journal.data.DataInitializer.resetWithTestData(repo)
-                        onDataStatusChange("Test data loaded (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)")
-                    } catch (e: Exception) { onDataStatusChange(userMessage("Settings", "Test data failed", e)) }
-                }
-            }, modifier = Modifier.fillMaxWidth()) {
+            AppOutlinedButton(onClick = { vm.resetWithTestData() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp)); Text("Load test data")
             }
@@ -132,24 +118,7 @@ internal fun DeveloperCardContent(
             Text("Export the app's rolling crash log for debugging.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            AppOutlinedButton(onClick = {
-                scope.launch(CoroutineExceptionHandler { _, e ->
-                    app.journal.log.Log.withTag("Settings").e(e) { "Diagnostics export failed" }
-                }) {
-                    try {
-                        val appDir = app.journal.util.PlatformFile.dataDir()
-                        val logs = app.journal.log.collectLogs(appDir)
-                        val path = app.journal.util.FilePicker.saveFile("nepenthe-crash-${app.journal.util.currentTimeMillis()}.log", "Log files", listOf("log", "txt"))
-                        if (path != null) {
-                            app.journal.util.PlatformFile.writeText(path, logs)
-                            app.journal.log.Log.withTag("Settings").i { "Crash logs exported to $path" }
-                            onCrashLogStatusChange("Logs exported (${logs.length} chars)")
-                        }
-                    } catch (e: Exception) {
-                        onCrashLogStatusChange(userMessage("Settings", "Export failed", e))
-                    }
-                }
-            }, modifier = Modifier.fillMaxWidth()) {
+            AppOutlinedButton(onClick = { vm.exportCrashLogs() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp)); Text("Export crash logs")
             }

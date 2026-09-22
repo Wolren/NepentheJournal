@@ -23,6 +23,7 @@ import app.journal.ui.LocalJournalRepository
 import app.journal.data.SearchResult
 import app.journal.model.Note
 import app.journal.ui.components.DesktopScrollbar
+import app.journal.ui.components.InteractionColors
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -312,7 +313,7 @@ private fun colorForType(type: String): Color = when (type) {
     "substance" -> Color(0xFFAB47BC)
     "note" -> Color(0xFF66BB6A)
     "dose" -> Color(0xFFFFA726)
-    "event" -> Color(0xFFEF5350)
+    "event" -> InteractionColors.severe
     "effect" -> Color(0xFF7E57C2)
     else -> Color(0xFF888888)
 }

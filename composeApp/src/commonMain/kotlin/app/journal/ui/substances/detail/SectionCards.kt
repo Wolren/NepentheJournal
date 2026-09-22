@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.journal.ui.components.CardContentPadding
 import app.journal.ui.components.routeColor
 
 @Composable
@@ -27,7 +28,7 @@ internal fun SectionCard(
         ),
         modifier = modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(CardContentPadding)) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,

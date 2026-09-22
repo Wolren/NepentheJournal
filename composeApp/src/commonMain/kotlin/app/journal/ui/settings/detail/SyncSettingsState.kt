@@ -1,6 +1,7 @@
 package app.journal.ui.settings.detail
 
 import app.journal.sync.TrustedDeviceInfo
+import app.journal.ui.components.SyncLogEntry
 
 /**
  * UI state for the sync settings panel.
@@ -15,7 +16,7 @@ data class SyncSettingsUiState(
     val syncExpanded: Boolean = false,
     val isStartingHost: Boolean = false,
     val isStoppingHost: Boolean = false,
-    val logLines: List<String> = emptyList(),
+    val logLines: List<SyncLogEntry> = emptyList(),
     val trustedDevices: List<TrustedDeviceInfo> = emptyList(),
 ) {
     val hostError: String? get() =
@@ -39,7 +40,7 @@ class SyncSettingsCallbacks(
     val onManualTokenChange: (String) -> Unit,
     val onContinuousSyncChange: (Boolean) -> Unit,
     val onSyncExpanded: () -> Unit,
-    val onLogLine: (String) -> Unit,
+    val onLogLine: (SyncLogEntry) -> Unit,
     val onTrustedDevicesChange: (List<TrustedDeviceInfo>) -> Unit,
     val onIsSyncingChange: (Boolean) -> Unit,
     val onIsStartingHostChange: (Boolean) -> Unit,

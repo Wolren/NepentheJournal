@@ -84,9 +84,9 @@ internal fun SyncSettingsContent(
                                     deviceId = "desktop-main", displayName = "Windows Desktop",
                                     listenerPort = state.manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT, continuousSync = state.continuousSync, enableDeltaSync = true)
                                 syncEngine.startHosting(cfg).fold(
-                                    onSuccess = { callbacks.onLogLine("+Hosting on port ${it.port}") },
-                                    onFailure = { callbacks.onLogLine("!${syncUserMessage("Host start failed", it)}") })
-                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Host start failed", e)}") }
+                                    onSuccess = { callbacks.onLogLine(SyncLogEntry.Success("Hosting on port ${it.port}")) },
+                                    onFailure = { callbacks.onLogLine(SyncLogEntry.Error(syncUserMessage("Host start failed", it))) })
+                            } catch (e: Exception) { callbacks.onLogLine(SyncLogEntry.Error(syncUserMessage("Host start failed", e))) }
                             finally { callbacks.onIsStartingHostChange(false) }
                         }
                     },
@@ -95,14 +95,14 @@ internal fun SyncSettingsContent(
                         scope.launch {
                             try {
                                 syncEngine.stopHosting()
-                                callbacks.onLogLine("-Stopped hosting")
-                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Stop failed", e)}") }
+                                callbacks.onLogLine(SyncLogEntry.Info("Stopped hosting"))
+                            } catch (e: Exception) { callbacks.onLogLine(SyncLogEntry.Error(syncUserMessage("Stop failed", e))) }
                             finally { callbacks.onIsStoppingHostChange(false) }
                         }
                     },
                     onCopyToken = {
                         clipboard.setText(androidx.compose.ui.text.AnnotatedString(status.pairingToken ?: ""))
-                        callbacks.onLogLine("+Token copied to clipboard")
+                        callbacks.onLogLine(SyncLogEntry.Success("Token copied to clipboard"))
                     },
                     onContinuousSyncChange = { callbacks.onContinuousSyncChange(it) },
                 )
@@ -126,16 +126,16 @@ internal fun SyncSettingsContent(
                     onSync = {
                         scope.launch {
                             val host = state.manualHost.trim(); val port = state.manualPort.toIntOrNull()
-                            if (host.isEmpty()) { callbacks.onLogLine("!Enter a host IP address"); return@launch }
-                            if (port == null || port !in 1..65535) { callbacks.onLogLine("!Enter a valid port (1-65535)"); return@launch }
+                            if (host.isEmpty()) { callbacks.onLogLine(SyncLogEntry.Error("Enter a host IP address")); return@launch }
+                            if (port == null || port !in 1..65535) { callbacks.onLogLine(SyncLogEntry.Error("Enter a valid port (1-65535)")); return@launch }
                             callbacks.onIsSyncingChange(true)
                             try {
                                 val peer = DiscoveredPeer(deviceId = null, displayName = host, host = host, port = port,
                                     isTrusted = false, fingerprint = null, pairingToken = state.manualToken.ifBlank { null })
                                 syncEngine.syncWith(peer, state.continuousSync).fold(
-                                    onSuccess = { callbacks.onLogLine("+Connected to $host:$port") },
-                                    onFailure = { callbacks.onLogLine("!${syncUserMessage("Sync failed", it)}") })
-                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Sync failed", e)}") }
+                                    onSuccess = { callbacks.onLogLine(SyncLogEntry.Success("Connected to $host:$port")) },
+                                    onFailure = { callbacks.onLogLine(SyncLogEntry.Error(syncUserMessage("Sync failed", it))) })
+                            } catch (e: Exception) { callbacks.onLogLine(SyncLogEntry.Error(syncUserMessage("Sync failed", e))) }
                             finally { callbacks.onIsSyncingChange(false) }
                         }
                     },
@@ -143,9 +143,9 @@ internal fun SyncSettingsContent(
                         callbacks.onManualHostChange(it.host)
                         callbacks.onManualPortChange(it.port.toString())
                         if (it.pairingToken != null) callbacks.onManualTokenChange(it.pairingToken)
-                        callbacks.onLogLine("-Selected ${it.displayName} (${it.host}:${it.port})")
+                        callbacks.onLogLine(SyncLogEntry.Info("Selected ${it.displayName} (${it.host}:${it.port})"))
                     },
-                    onScanEnd = { callbacks.onLogLine("-Scan complete") },
+                    onScanEnd = { callbacks.onLogLine(SyncLogEntry.Info("Scan complete")) },
                 )
 
                 SyncTrustedDevicesCard(
@@ -155,7 +155,7 @@ internal fun SyncSettingsContent(
                         scope.launch {
                             syncEngine.revokeTrustedDevice(deviceId)
                             callbacks.onTrustedDevicesChange(syncEngine.trustedDevices())
-                            callbacks.onLogLine("-Revoked device")
+                            callbacks.onLogLine(SyncLogEntry.Info("Revoked device"))
                         }
                     },
                 )
