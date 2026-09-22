@@ -80,14 +80,7 @@ fun SubstanceDetailScreen(
     val themeManager = remember { ThemeManager.instance }
 
     if (substance == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Substance not found", style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp))
-                AppButton(onClick = onBack) { Text("Go back") }
-            }
-        }
+        NotFoundBox("Substance not found", onBack = onBack)
         return
     }
 

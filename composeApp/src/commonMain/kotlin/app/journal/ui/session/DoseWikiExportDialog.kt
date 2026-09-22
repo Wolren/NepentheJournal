@@ -22,6 +22,7 @@ import app.journal.export.DoseWikiTripReport
 import app.journal.export.buildDoseWikiReport
 import app.journal.export.check
 import app.journal.export.toJsonString
+import app.journal.ui.components.userMessage
 import app.journal.util.FilePicker
 import app.journal.util.PlatformFile
 import kotlinx.coroutines.CoroutineScope
@@ -121,7 +122,7 @@ fun DoseWikiExportDialog(
                                 onStatus("Trip report exported")
                             }
                         } catch (e: Exception) {
-                            onStatus("Export failed: ${e.message}")
+                            onStatus(userMessage("DoseWiki", "Export failed", e))
                         } finally {
                             onDismiss()
                         }

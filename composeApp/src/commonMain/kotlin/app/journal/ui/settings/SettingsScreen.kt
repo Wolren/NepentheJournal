@@ -103,18 +103,6 @@ fun SettingsScreen(
         trustedDevices = syncEngine.trustedDevices()
     }
 
-    fun userMessage(msg: String): String = when {
-        msg.contains("Connection refused") -> "Device not reachable. Check IP and port."
-        msg.contains("timed out") -> "Connection timed out. Device may be offline."
-        msg.contains("Certificate pinning failed") -> "Device certificate changed. Re-pair required."
-        msg.contains("Invalid or expired token") -> "Pairing token expired or wrong. Generate a new one."
-        msg.contains("Authentication failed") -> "Sync auth failed. Try re-pairing."
-        msg.contains("Not paired") -> "Not paired with this device. Enter a pairing token."
-        msg.contains("keytool") || msg.contains("Certificate") -> "TLS setup failed. Restart the app."
-        msg.contains("port") && msg.contains("available") -> "Port already in use. Try a different port."
-        else -> msg
-    }
-
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var crashLogStatus by remember { mutableStateOf<String?>(null) }
@@ -242,7 +230,6 @@ fun SettingsScreen(
                     onIsStoppingHostChange = { syncState = syncState.copy(isStoppingHost = it) },
                 ),
                 scope = scope, clipboard = clipboard, formatTimestamp = ::formatRelativeTime,
-                userMessage = { userMessage(it) },
             )
         }
 
@@ -263,7 +250,7 @@ fun SettingsScreen(
                             try {
                                 app.journal.data.DataInitializer.reloadDefaultSubstances(repo)
                                 fetchStatus = "Reloaded ${repo.substances.value.size} substances from seed"
-                            } catch (e: Exception) { fetchStatus = "Reload failed: ${e.message}" }
+                            } catch (e: Exception) { fetchStatus = userMessage("Settings", "Reload failed", e) }
                             isFetching = false
                         }
                     }, enabled = !isFetching, modifier = Modifier.weight(1f)) {
@@ -273,8 +260,8 @@ fun SettingsScreen(
                 }
                 fetchStatus?.let {
                     Spacer(Modifier.height(4.dp)); Text(it, style = MaterialTheme.typography.labelSmall,
-                        color = if (it.startsWith("Loaded")) MaterialTheme.colorScheme.primary
-                        else if (it.startsWith("Fetch failed")) MaterialTheme.colorScheme.error
+                        color = if (it.contains("failed")) MaterialTheme.colorScheme.error
+                        else if (it.startsWith("Reloaded")) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }

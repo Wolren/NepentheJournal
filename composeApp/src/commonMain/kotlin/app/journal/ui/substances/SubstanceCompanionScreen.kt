@@ -49,10 +49,7 @@ fun SubstanceCompanionScreen(
     val substance = substancesById[substanceId] ?: repo.getSubstance(substanceId)
 
     if (substance == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Substance not found", style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        NotFoundBox("Substance not found")
         return
     }
 
@@ -382,23 +379,6 @@ fun SubstanceCompanionScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

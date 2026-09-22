@@ -82,7 +82,7 @@ internal fun DataSettingsContent(
                                     PlatformFile.writeText(path, json)
                                     onStatusChange("Exported ${repo.sessions.value.size} sessions")
                                 } catch (e: Exception) {
-                                    onStatusChange("Export failed: ${e.message}")
+                                    onStatusChange(userMessage("Data", "Export failed", e))
                                 }
                             }
                         }
@@ -111,7 +111,7 @@ internal fun DataSettingsContent(
                                         else "Imported ${result.count} sessions"
                                     )
                                 } catch (e: Exception) {
-                                    onStatusChange("Import failed: ${e.message}")
+                                    onStatusChange(userMessage("Data", "Import failed", e))
                                 }
                             }
                         }
@@ -132,7 +132,7 @@ internal fun DataSettingsContent(
                                     PlatformFile.writeText(path, json)
                                     onStatusChange("Exported full journal backup (backup format; restore with Import backup)")
                                 } catch (e: Exception) {
-                                    onStatusChange("Full JSON export failed: ${e.message}")
+                                    onStatusChange(userMessage("Data", "Full JSON export failed", e))
                                 }
                             }
                         }
@@ -159,7 +159,7 @@ internal fun DataSettingsContent(
                                             "${result.substances} substances, ${result.doses} doses"
                                     )
                                 } catch (e: Exception) {
-                                    onStatusChange("Import failed: ${e.message}")
+                                    onStatusChange(userMessage("Data", "Import failed", e))
                                 }
                             }
                         }
@@ -171,11 +171,13 @@ internal fun DataSettingsContent(
                 }
                 if (statusText != null) {
                     Spacer(Modifier.height(4.dp))
+                    // Failures all read "... failed"; everything else here is a
+                    // success line, so color off the word instead of the prefix
+                    // (which "Export failed" and "Import failed" both match).
                     Text(statusText, style = MaterialTheme.typography.labelSmall,
-                        color = if (statusText.startsWith("Import") || statusText.startsWith("Export") ||
-                            statusText.startsWith("Backup saved"))
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error)
+                        color = if (statusText.contains("failed"))
+                            MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                 Text("CSV Export (analysis)", style = MaterialTheme.typography.labelLarge)
@@ -192,7 +194,7 @@ internal fun DataSettingsContent(
                                     val csv = CsvExporter.exportSessionsCsv(repo)
                                     PlatformFile.writeText(path, csv)
                                     onStatusChange("Exported ${repo.sessions.value.size} sessions as CSV")
-                                } catch (e: Exception) { onStatusChange("CSV export failed: ${e.message}") }
+                                } catch (e: Exception) { onStatusChange(userMessage("Data", "CSV export failed", e)) }
                             }
                         }
                     }, modifier = Modifier.weight(1f)) { Text("Sessions CSV", maxLines = 1) }
@@ -204,7 +206,7 @@ internal fun DataSettingsContent(
                                     val csv = CsvExporter.exportDosesCsv(repo)
                                     PlatformFile.writeText(path, csv)
                                     onStatusChange("Exported doses as CSV")
-                                } catch (e: Exception) { onStatusChange("CSV export failed: ${e.message}") }
+                                } catch (e: Exception) { onStatusChange(userMessage("Data", "CSV export failed", e)) }
                             }
                         }
                     }, modifier = Modifier.weight(1f)) { Text("Doses CSV", maxLines = 1) }
@@ -219,7 +221,7 @@ internal fun DataSettingsContent(
                                     val csv = CsvExporter.exportSubstancesCsv(repo)
                                     PlatformFile.writeText(path, csv)
                                     onStatusChange("Exported ${repo.substances.value.size} substances as CSV")
-                                } catch (e: Exception) { onStatusChange("CSV export failed: ${e.message}") }
+                                } catch (e: Exception) { onStatusChange(userMessage("Data", "CSV export failed", e)) }
                             }
                         }
                     }, modifier = Modifier.weight(1f)) { Text("Substances CSV", maxLines = 1) }
@@ -230,7 +232,7 @@ internal fun DataSettingsContent(
                                 try {
                                     val count = ZipExporter.exportAll(repo as JournalRepository, path)
                                     onStatusChange("Exported $count CSV files as zip")
-                                } catch (e: Exception) { onStatusChange("ZIP export failed: ${e.message}") }
+                                } catch (e: Exception) { onStatusChange(userMessage("Data", "ZIP export failed", e)) }
                             }
                         }
                     }, modifier = Modifier.weight(1f)) { Text("All (Zip)", maxLines = 1) }
@@ -246,7 +248,7 @@ internal fun DataSettingsContent(
                                 store.save()
                                 onStatusChange("Backup saved to ${store.dataPath()}")
                             } catch (e: Exception) {
-                                onStatusChange("Backup failed: ${e.message}")
+                                onStatusChange(userMessage("Data", "Backup failed", e))
                             }
                         }
                     }, modifier = Modifier.weight(1f)) {

@@ -71,7 +71,7 @@ fun SessionTimelineScreen(
     var deletingEvent by remember { mutableStateOf<TimelineEvent?>(null) }
 
     if (session == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Session not found") }
+        NotFoundBox("Session not found")
         return
     }
 
@@ -140,7 +140,7 @@ fun SessionTimelineScreen(
         if (phaseRanges.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("Phases", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    SectionHeader("Phases")
                 }
             }
             phaseRanges.forEach { phase ->
@@ -231,7 +231,7 @@ fun SessionTimelineScreen(
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()) {
-                    Text("Timeline Events", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    SectionHeader("Timeline Events")
                     FilledTonalIconButton(onClick = { showAddEventDialog = true }) {
                         Icon(Icons.Default.Add, "Add event", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -288,7 +288,7 @@ fun SessionTimelineScreen(
 
         // Substances / Dosage Table
         if (doses.isNotEmpty()) {
-            item { Text("Substances", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+            item { SectionHeader("Substances") }
             item { DosageSummaryTable(doses = doses, repo = repo, sessionStart = session.startTime) }
         }
 

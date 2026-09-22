@@ -95,7 +95,8 @@ fun SyncTrustedDevicesCard(
 /**
  * Event and debug log viewer. Accepts log lines as strings with
  * prefix convention: "+" for success, "!" for error, "-" for info.
- * Shared between standalone sync screen and settings panel.
+ * Single render copy for the prefix convention; producers live in
+ * SyncSettingsContent via SyncSettingsCallbacks.onLogLine.
  */
 @Composable
 fun SyncEventLogCard(

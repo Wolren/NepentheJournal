@@ -16,6 +16,7 @@ import app.journal.log.Log
 import app.journal.model.Dose
 import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.AppTonalButton
+import app.journal.ui.components.SectionHeader
 import app.journal.ui.components.routeColor
 import app.journal.util.formatDateShort
 import kotlinx.datetime.Instant
@@ -39,8 +40,7 @@ fun SessionDoseSection(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Substances & Doses",
-            style = MaterialTheme.typography.titleMedium)
+        SectionHeader("Substances & Doses")
         AppTonalButton(onClick = onAddDose) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))

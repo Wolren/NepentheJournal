@@ -26,7 +26,6 @@ internal fun SyncSettingsContent(
     scope: kotlinx.coroutines.CoroutineScope,
     clipboard: ClipboardManager,
     formatTimestamp: (Long) -> String,
-    userMessage: (String) -> String,
 ) {
     // Contract (HARDENING-CONTRACTS-2026-09, section c item 7): note conflicts
     // have to be visible somewhere. Quiet count line on the card that already
@@ -86,8 +85,8 @@ internal fun SyncSettingsContent(
                                     listenerPort = state.manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT, continuousSync = state.continuousSync, enableDeltaSync = true)
                                 syncEngine.startHosting(cfg).fold(
                                     onSuccess = { callbacks.onLogLine("+Hosting on port ${it.port}") },
-                                    onFailure = { callbacks.onLogLine("!Host start failed: ${userMessage(it.message ?: "")}") })
-                            } catch (e: Exception) { callbacks.onLogLine("!Error: ${userMessage(e.message ?: "")}") }
+                                    onFailure = { callbacks.onLogLine("!${syncUserMessage("Host start failed", it)}") })
+                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Host start failed", e)}") }
                             finally { callbacks.onIsStartingHostChange(false) }
                         }
                     },
@@ -97,7 +96,7 @@ internal fun SyncSettingsContent(
                             try {
                                 syncEngine.stopHosting()
                                 callbacks.onLogLine("-Stopped hosting")
-                            } catch (e: Exception) { callbacks.onLogLine("!Stop failed: ${userMessage(e.message ?: "")}") }
+                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Stop failed", e)}") }
                             finally { callbacks.onIsStoppingHostChange(false) }
                         }
                     },
@@ -135,8 +134,8 @@ internal fun SyncSettingsContent(
                                     isTrusted = false, fingerprint = null, pairingToken = state.manualToken.ifBlank { null })
                                 syncEngine.syncWith(peer, state.continuousSync).fold(
                                     onSuccess = { callbacks.onLogLine("+Connected to $host:$port") },
-                                    onFailure = { callbacks.onLogLine("!Sync failed: ${userMessage(it.message ?: "")}") })
-                            } catch (e: Exception) { callbacks.onLogLine("!Error: ${userMessage(e.message ?: "")}") }
+                                    onFailure = { callbacks.onLogLine("!${syncUserMessage("Sync failed", it)}") })
+                            } catch (e: Exception) { callbacks.onLogLine("!${syncUserMessage("Sync failed", e)}") }
                             finally { callbacks.onIsSyncingChange(false) }
                         }
                     },

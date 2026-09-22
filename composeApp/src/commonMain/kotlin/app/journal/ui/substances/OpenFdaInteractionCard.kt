@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.net.OpenFdaClient
 import app.journal.net.createHttpClient
+import app.journal.ui.components.userMessage
 import io.ktor.client.*
 import kotlinx.coroutines.launch
 
@@ -97,7 +98,7 @@ fun OpenFdaInteractionCard(
         fetchResult.onSuccess {
             result = it
         }.onFailure {
-            error = it.message
+            error = userMessage("Fda", "Could not load FDA data", it)
         }
         loading = false
     }
@@ -175,9 +176,10 @@ fun OpenFdaInteractionCard(
                 }
             }
 
-            if (error != null) {
+            val fetchErrorMessage = error
+            if (fetchErrorMessage != null) {
                 Text(
-                    text = "Could not load FDA data",
+                    text = fetchErrorMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)

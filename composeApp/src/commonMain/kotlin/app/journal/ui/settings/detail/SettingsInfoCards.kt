@@ -121,7 +121,7 @@ internal fun DeveloperCardContent(
                     try {
                         app.journal.data.DataInitializer.resetWithTestData(repo)
                         onDataStatusChange("Test data loaded (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)")
-                    } catch (e: Exception) { onDataStatusChange("Test data failed: ${e.message}") }
+                    } catch (e: Exception) { onDataStatusChange(userMessage("Settings", "Test data failed", e)) }
                 }
             }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
@@ -146,8 +146,7 @@ internal fun DeveloperCardContent(
                             onCrashLogStatusChange("Logs exported (${logs.length} chars)")
                         }
                     } catch (e: Exception) {
-                        onCrashLogStatusChange("Export failed: ${e.message}")
-                        app.journal.log.Log.withTag("Settings").e(e) { "Crash log export failed" }
+                        onCrashLogStatusChange(userMessage("Settings", "Export failed", e))
                     }
                 }
             }, modifier = Modifier.fillMaxWidth()) {

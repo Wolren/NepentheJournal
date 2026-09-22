@@ -14,6 +14,7 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.AppTextButton
 import app.journal.ui.components.AppTonalButton
+import app.journal.ui.components.SectionHeader
 import app.journal.util.currentTimeMillis
 
 @Composable
@@ -32,8 +33,7 @@ fun SessionEventsSection(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("Timeline Events",
-            style = MaterialTheme.typography.titleMedium)
+        SectionHeader("Timeline Events")
         AppTonalButton(onClick = {
             val now = currentTimeMillis()
             val newEvent = TimelineEvent(

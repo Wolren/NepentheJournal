@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.model.Dose
 import app.journal.ui.charts.ChartTheme
+import app.journal.ui.components.StatItem
 import app.journal.ui.charts.integerFormatter
 import app.journal.ui.charts.themedStartAxis
 import app.journal.ui.theme.AdaptiveColors
@@ -67,18 +68,20 @@ fun DoseTimelineChart(
                 modifier = Modifier.padding(12.dp).fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                StatItem("Total", "${doses.size}", MaterialTheme.colorScheme.primary)
+                StatItem("Total", "${doses.size}", valueStyle = MaterialTheme.typography.titleSmall, valueColor = MaterialTheme.colorScheme.primary)
                 StatItem(
                     "30d",
                     "$totalDoseLast30 ${lastDose?.unit ?: "u"}",
-                    MaterialTheme.colorScheme.tertiary
+                    valueStyle = MaterialTheme.typography.titleSmall,
+                    valueColor = MaterialTheme.colorScheme.tertiary
                 )
                 if (lastDose != null) {
                     val daysAgo = (now - lastDose.timestamp) / dayMs
                     StatItem(
                         "Last",
                         if (daysAgo == 0L) "Today" else "${daysAgo}d ago",
-                        MaterialTheme.colorScheme.secondary
+                        valueStyle = MaterialTheme.typography.titleSmall,
+                        valueColor = MaterialTheme.colorScheme.secondary
                     )
                 }
             }
@@ -247,17 +250,4 @@ fun DoseTimelineChart(
     }
 }
 
-@Composable
-private fun StatItem(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            value, style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold, color = color
-        )
-        Text(
-            label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
 

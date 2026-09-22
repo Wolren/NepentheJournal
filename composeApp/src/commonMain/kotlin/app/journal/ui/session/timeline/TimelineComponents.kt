@@ -202,7 +202,7 @@ internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journa
     val isDark = ThemeManager.instance.isDarkTheme()
     Column {
         Spacer(Modifier.height(10.dp))
-        Text("Effects Experienced", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        SectionHeader("Effects Experienced")
         Spacer(Modifier.height(8.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             allScores.forEach { (effect, avgScore) ->
