@@ -90,8 +90,14 @@ class ExportImportTest {
     fun exportEmptyReturnsValidJson() {
         val repo = JournalRepository()
         val json = ExportImport.exportSessions(repo)
-        assertTrue(json.contains("sessions"))
-        assertTrue(json.contains("exportedAt"))
+        // Parse the payload (audit C7): substring matching never proved the
+        // document decodes or that the fields hold sensible values.
+        val bundle = app.journal.serde.AppJson.json
+            .decodeFromString<ExportImport.SessionExportBundle>(json)
+        assertTrue(bundle.sessions.isEmpty(), "empty repo must export zero session bundles")
+        assertTrue(bundle.exportedAt > 0L, "exportedAt must carry a real timestamp")
+        assertEquals("Nepenthe Journal", bundle.source)
+        assertTrue(bundle.version >= 1, "bundle version must be set, got ${bundle.version}")
     }
 
     @Test
@@ -110,7 +116,7 @@ class ExportImportTest {
     fun importFixesDoseSessionIdMismatch() {
         val repo = JournalRepository()
         repo.upsertSession(sampleSession("s:1"))
-        // Dose references a session that doesn't exist yet — import should fix via copy(sessionId = ...)
+        // Dose references a session that doesn't exist yet: import should fix via copy(sessionId = ...)
         val bundleJson = """{
             "version": 1,
             "exportedAt": 1000,
@@ -139,7 +145,7 @@ class ExportImportTest {
     @Test
     fun importSkipsFutureTimestamp() {
         val repo = JournalRepository()
-        val farFuture = currentTimeMillis() + 31536000000L * 3  // 3 years — exceeds 2-year margin
+        val farFuture = currentTimeMillis() + 31536000000L * 3  // 3 years: exceeds 2-year margin
         val bundleJson = """{"version":1,"exportedAt":1000,"sessions":[{"session":{"id":"s:2","docType":"session","createdAt":$farFuture,"updatedAt":1000,"deviceOrigin":"test","title":"Future","startTime":2000},"doses":[]}]}"""
         val count = ExportImport.importSessions(repo, bundleJson)
         assertEquals(0, count, "session with excessively future timestamp should be skipped")

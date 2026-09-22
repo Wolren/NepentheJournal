@@ -81,7 +81,7 @@ class FuzzSeedTest {
             deviceOrigin = "system", substanceClass = listOf("Classical Psychedelic"),
             cachedAt = 0L, sourceVersion = "test"
         ))
-        // Only 1 substance — FuzzSeed should skip
+        // Only 1 substance: FuzzSeed should skip
         FuzzSeed.generate(repo)
         assertTrue(repo.sessions.value.isEmpty(), "no sessions should be generated with < 2 substances")
     }

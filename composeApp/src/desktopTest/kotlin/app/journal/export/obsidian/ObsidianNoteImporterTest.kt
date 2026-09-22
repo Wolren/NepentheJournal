@@ -105,7 +105,8 @@ class ObsidianNoteImporterTest {
         val repo = JournalRepository()
         val result = ObsidianNoteImporter.importFromVault(repo, "../etc/passwd")
 
-        assertTrue(result.errors.isNotEmpty(), "should reject path traversal")
+        assertEquals(1, result.errors.size,
+            "exactly one path-traversal error, got: ${result.errors}")
         assertTrue(result.errors.first().contains(".."), "error should mention path traversal")
         assertEquals(0, result.created)
     }

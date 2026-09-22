@@ -9,12 +9,17 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 
 /**
- * Tests for SyncTransport state management.
+ * Tests for SyncTransport state management, batch validation, and WS message
+ * serialization.
  *
- * Server-starting tests (startHosting, syncWith, connectManually) are covered
- * by [KtorSyncServerIntegrationTest] which uses Ktor's in-process testApplication{}
- * , no real server or port binding needed. This class tests only the state
- * management layer of SyncTransport.
+ * HONEST COVERAGE MAP (audit C7): [KtorSyncServerIntegrationTest] exercises
+ * the production SyncServerRouter endpoints (pairing, push, pull, WS) in
+ * process, but NO test in this suite drives SyncTransport.startHosting /
+ * stopHosting / syncWith / pairWithPeer end to end against a live server;
+ * those remain uncovered production paths. Everything asserted here is state
+ * management, shared-validator behavior, and wire serialization only.
+ * KtorSyncClient's retry behavior is covered directly in
+ * KtorSyncClientRetryTest.
  */
 class SyncTransportTest {
 
@@ -38,9 +43,11 @@ class SyncTransportTest {
     }
 
     @Test
-    fun revokeDeviceDoesNotThrowWhenEmpty() {
+    fun revokeUnknownDeviceLeavesTrustStoreEmpty() {
         val transport = SyncTransport(repo, testDir.absolutePath)
         transport.revokeDevice("nonexistent")
+        assertTrue(transport.trustedDevices().isEmpty(),
+            "revoking an unknown id must leave the trust store empty")
     }
 
     @Test
@@ -103,7 +110,10 @@ class SyncTransportTest {
                 title = "Blank ID", startTime = 1_700_000_000_000L
             ))
         )
-        // Blank ID (empty string) is length 0 which is <= 128, so it passes id check
+        // Blank-ID sessions are rejected: SyncValidation.badId rejects any
+        // blank id, so this fixture now must produce an error.
+        assertNotNull(validateSyncBatch(blankIdSession),
+            "session with a blank id must be rejected by validateSyncBatch")
         // Test with negative dose amount
         val negativeDose = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(Dose(
@@ -207,52 +217,4 @@ class SyncTransportTest {
         assertTrue(asMessage is WsDelta, "Decoded WsDelta should be WsDelta when read as WsMessage")
         assertEquals(1L, (asMessage as WsDelta).seq, "Polymorphic roundtrip should preserve seq")
     }
-
-    // ==================== Retry helper ====================
-
-    @Test
-    fun retryOnFailureSucceedsAfterRetries() = runBlocking {
-        var attemptCount = 0
-        val result = retryOnFailure<Int>(maxRetries = 3) {
-            attemptCount++
-            if (attemptCount < 3) {
-                Result.failure(Exception("Attempt $attemptCount failed"))
-            } else {
-                Result.success(attemptCount)
-            }
-        }
-        assertTrue(result.isSuccess, "Result should succeed after retries")
-        assertEquals(3, result.getOrNull(), "Should return value from third attempt")
-        assertEquals(3, attemptCount, "Should have attempted 3 times")
-    }
-
-    @Test
-    fun retryOnFailureExhaustsRetries() = runBlocking {
-        var attemptCount = 0
-        val result = retryOnFailure<Int>(maxRetries = 3) {
-            attemptCount++
-            Result.failure(Exception("Always fails"))
-        }
-        assertTrue(result.isFailure, "Result should be failure after exhausting retries")
-        assertEquals(3, attemptCount, "Should have exhausted all 3 retries")
-    }
-}
-
-/**
- * Simple retry helper used to verify retry-on-failure behavior.
- * Tries the [block] up to [maxRetries] times, returning the first success
- * or the last failure.
- */
-private suspend fun <T> retryOnFailure(
-    maxRetries: Int = 3,
-    block: suspend () -> Result<T>
-): Result<T> {
-    var lastFailure: Result<T> = Result.failure(Exception("No attempts made"))
-    repeat(maxRetries - 1) {
-        val result = block()
-        if (result.isSuccess) return result
-        lastFailure = result
-    }
-    // Last attempt , return whatever comes back
-    return block()
 }

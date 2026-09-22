@@ -24,7 +24,10 @@ class DoseWikiIngestorTest {
         DoseWikiIngestor.ensureIngested(repo)
 
         val effects = repo.effects.value
-        assertTrue(effects.isNotEmpty(), "should ingest effects for TestLSD")
+        // Exact set: TestLSD contributes Euphoria + Stimulation, the
+        // auto-created dw:testmix contributes Clarity (audit C7: isNotEmpty
+        // passed even when ingestion was broken).
+        assertEquals(3, effects.size, "TestLSD (2) + TestMix (1) effects")
         val effectNames = effects.map { it.name }
         assertTrue("Euphoria" in effectNames, "expected Euphoria effect")
         assertTrue("Stimulation" in effectNames, "expected Stimulation effect")
@@ -138,11 +141,16 @@ class DoseWikiIngestorTest {
         repo.upsertSubstance(sub("sub:test1", "TestLSD"))
 
         DoseWikiIngestor.ensureIngested(repo)
-        assertTrue(repo.effects.value.isNotEmpty(), "first call ingests")
+        val countAfterFirst = repo.effects.value.size
+        assertTrue(countAfterFirst > 0, "first call ingests effects")
 
         DoseWikiIngestor.reset()
         DoseWikiIngestor.ensureIngested(repo)
-        assertTrue(repo.effects.value.isNotEmpty(), "after reset should still ingest")
+        // Capture-and-compare (audit C7): the old assertion re-checked
+        // isNotEmpty after reset, which passed even if re-ingestion was a
+        // no-op. The count must be reproduced exactly.
+        assertEquals(countAfterFirst, repo.effects.value.size,
+            "re-ingestion after reset must reproduce the same effect count")
     }
 
     private fun sub(id: String, name: String) = Substance(

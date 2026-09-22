@@ -9,9 +9,15 @@ import app.journal.serde.AppJson
 /**
  * Contract tests for the shared sync protocol.
  *
- * These tests validate that BOTH the JVM and iOS transport produce
- * the same wire format: request bodies, auth headers, endpoint paths.
- * They run entirely on the protocol layer without needing an HTTP server.
+ * HONEST SCOPE (audit C7): these exercise the SHARED commonMain protocol
+ * builders (hmacSha256Hex, buildAuthHeader, buildSyncBatch, SyncPushRequest),
+ * the single implementation both transports call, so JVM/iOS wire-format
+ * identity holds BY CONSTRUCTION. Only the JVM target actually compiles into
+ * a test run on this host: iosMain never compiles here, so no iOS code
+ * executes and iOS parity is not something this file can demonstrate by
+ * running. Production HTTP/WS behavior of the JVM router is covered in
+ * KtorSyncServerIntegrationTest. These tests run entirely on the protocol
+ * layer without needing an HTTP server.
  */
 class SyncContractTest {
 

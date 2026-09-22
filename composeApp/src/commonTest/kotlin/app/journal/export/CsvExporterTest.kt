@@ -2,6 +2,9 @@ package app.journal.export
 
 import app.journal.data.*
 import app.journal.model.*
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.test.*
 
 class CsvExporterTest {
@@ -43,16 +46,33 @@ class CsvExporterTest {
 
         val csv = CsvExporter.exportSessionsCsv(repo)
 
-        // Header present
-        assertTrue(csv.startsWith("id,title,date,"))
-
-        // Session row present
-        assertTrue(csv.contains("s:1"))
-        assertTrue(csv.contains("Session s:1"))
-        // Substance name from dose should appear
-        assertTrue(csv.contains("LSD"))
-        // dose_count should be 1
-        assertTrue(csv.contains(",1"))
+        val lines = csv.trimEnd().split("\n")
+        assertEquals(2, lines.size, "header + exactly one session row, got: $lines")
+        // Exact field-level row (audit C7): substring contains() proved
+        // neither column order nor values. date/start_time mirror the
+        // documented SessionDataRow derivation (ISO from startTime in the
+        // system zone).
+        val dt = Instant.fromEpochMilliseconds(2000L)
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+        assertEquals(
+            listOf(
+                "s:1", "Session s:1", dt.date.toString(), dt.toString(),
+                "", // end_time
+                "", // duration_hours
+                "", // set
+                "", // setting
+                "", // intention
+                "", // outcome
+                "", // rating
+                "", // shulgin_rating
+                "", // consumer
+                "false", "false",
+                "LSD", // substances from the dose
+                "1"    // dose_count
+            ),
+            lines[1].split(","),
+            "session CSV row must match field-for-field"
+        )
     }
 
     @Test
@@ -105,13 +125,19 @@ class CsvExporterTest {
 
         val csv = CsvExporter.exportDosesCsv(repo)
 
-        assertTrue(csv.contains("d:1"))
-        assertTrue(csv.contains("s:1"))
-        assertTrue(csv.contains("sub:1"))
-        assertTrue(csv.contains("LSD"))
-        assertTrue(csv.contains("Oral"))
-        assertTrue(csv.contains("100.0"))
-        assertTrue(csv.contains("mg"))
+        val lines = csv.trimEnd().split("\n")
+        assertEquals(2, lines.size, "header + exactly one dose row, got: $lines")
+        // Exact field-level row (audit C7).
+        assertEquals(
+            listOf(
+                "d:1", "s:1", "sub:1", "LSD", "Oral", "100.0", "mg", "2000",
+                "false", // is_redose
+                "false", // is_estimate
+                ""       // notes
+            ),
+            lines[1].split(","),
+            "dose CSV row must match field-for-field"
+        )
     }
 
     @Test

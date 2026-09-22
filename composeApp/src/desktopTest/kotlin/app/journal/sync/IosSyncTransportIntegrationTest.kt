@@ -16,9 +16,18 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 
 /**
- * Integration tests verifying that the sync protocol (SyncBatch/SyncResponse,
- * HMAC auth, standard endpoints) used by IosSyncTransport is compatible with
- * standard Ktor test server infrastructure.
+ * PROTOCOL-SHAPE tests for the sync wire format used by the iOS transport
+ * (SyncBatch/SyncResponse bodies, HMAC auth headers, standard endpoints).
+ *
+ * Honest scope: [installTestServerRouting] below is a HAND-WRITTEN mirror of
+ * the push handler's expected shape, NOT the production IosSyncServerRouter
+ * (iosMain has no compiler on this host and is never linked into this test
+ * run). Nothing here exercises iOS production routing, pairing, or security
+ * code; it only pins the shared commonMain request/response formats the iOS
+ * transport emits, so a wire-format break shows up even without an iOS run.
+ * Real production-router coverage lives in [KtorSyncServerIntegrationTest]
+ * (JVM SyncServerRouter). Pairing is deliberately NOT tested here: a fake
+ * handler that answers unconditionally proves nothing (deleted as tautological).
  *
  * Uses Ktor's in-process testApplication (no real port binding).
  */
@@ -133,90 +142,6 @@ class IosSyncTransportIntegrationTest {
         }
     }
 
-    // ==========  Pairing protocol  ==========
-
-    @Test
-    fun `pairing start and verify round-trip`() = runBlocking {
-        testApplication {
-            application {
-                routing {
-                    get("/pairing/start") {
-                        call.respondText(
-                            json.encodeToString(HostInfo("host-1", "TestHost", "fp123", 2)),
-                            ContentType.Application.Json
-                        )
-                    }
-                    post("/pairing/verify") {
-                        val body = call.receiveText()
-                        val req = json.decodeFromString<PairingVerifyRequest>(body)
-                        val secret = "paired-secret-${req.clientDeviceId}"
-                        call.respondText(
-                            json.encodeToString(PairingResultResponse(
-                                success = true,
-                                deviceId = "client-1",
-                                sharedSecret = secret,
-                                hostDeviceId = "host-1",
-                                hostDeviceName = "TestHost",
-                                hostFingerprint = "fp123"
-                            )),
-                            ContentType.Application.Json
-                        )
-                    }
-                }
-            }
-
-            // Pairing start
-            val startResp = client.get("/pairing/start")
-            val info = json.decodeFromString<HostInfo>(startResp.bodyAsText())
-            assertEquals("host-1", info.deviceId)
-
-            // Pairing verify
-            val verifyResp = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(PairingVerifyRequest(
-                    token = "ABC123",
-                    clientDeviceId = "client-1",
-                    clientDeviceName = "iPhone",
-                    clientFingerprint = "fp-client"
-                )))
-            }
-            val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
-            assertTrue(result.success)
-            assertEquals("paired-secret-client-1", result.sharedSecret)
-        }
-    }
-
-    @Test
-    fun `pairing verify with invalid token rejected`() = runBlocking {
-        testApplication {
-            application {
-                routing {
-                    post("/pairing/verify") {
-                        val body = call.receiveText()
-                        val req = json.decodeFromString<PairingVerifyRequest>(body)
-                        // Always reject
-                        call.respondText(
-                            json.encodeToString(PairingResultResponse(false, error = "Invalid token")),
-                            ContentType.Application.Json
-                        )
-                    }
-                }
-            }
-
-            val verifyResp = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(PairingVerifyRequest(
-                    token = "BAD",
-                    clientDeviceId = "client-1",
-                    clientDeviceName = "iPhone",
-                    clientFingerprint = "fp-client"
-                )))
-            }
-            val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
-            assertFalse(result.success)
-        }
-    }
-
     // ==========  Wire format compatibility  ==========
 
     @Test
@@ -241,7 +166,8 @@ class IosSyncTransportIntegrationTest {
             }
             val syncResp = json.decodeFromString<SyncResponse>(response.bodyAsText())
             assertTrue(syncResp.success)
-            assertTrue(syncResp.sessions.isNotEmpty())
+            assertEquals(1, syncResp.sessions.size,
+                "the pushed batch carried exactly one session")
             assertEquals("s-exch", syncResp.sessions.first().id)
         }
     }
@@ -249,8 +175,9 @@ class IosSyncTransportIntegrationTest {
     // ==========  Helpers  ==========
 
     /**
-     * Install routing that mirrors the iOS sync server's push handler.
-     * Verifies HMAC using the shared secret, then decodes and processes SyncBatch.
+     * Hand-written MIRROR of the expected push-handler shape (see the class
+     * doc): verifies HMAC using the shared secret, then decodes and processes
+     * SyncBatch. This is deliberately not production iOS code.
      */
     private fun Application.installTestServerRouting(
         repo: JournalRepository,

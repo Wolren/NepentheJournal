@@ -105,7 +105,10 @@ class ObsidianExportManagerTest {
 
         assertTrue(dir.exists(), "directory should exist at ${dir.absolutePath}")
         val actualFiles = dir.listFiles()?.map { it.name } ?: emptyList()
-        assertTrue(actualFiles.isNotEmpty(), "files should exist in ${dir.absolutePath}, got: $actualFiles")
+        // Exact count (audit C7): exportAllSessions reported written=2 above,
+        // so exactly two files must exist in a fresh vault folder.
+        assertEquals(2, actualFiles.size,
+            "exactly two exported files in ${dir.absolutePath}, got: $actualFiles")
 
         // Filename format: YYYY-MM-DD-HH-MM-slug-sanitizedId.md (timezone-dependent)
         val expectedFile1 = expectedFilename(1720800000000L, "LSD Trip", "s:1")
@@ -157,7 +160,7 @@ class ObsidianExportManagerTest {
     @Test
     fun exportSessionWithEmptyContentReturnsNull() {
         val repo = JournalRepository()
-        // Session with no title, no doses, no nothing — renderer might return blank
+        // Session with no title, no doses, no nothing: renderer might return blank
         repo.upsertSession(Session(
             id = "s:blank", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "", startTime = 1720800000000L

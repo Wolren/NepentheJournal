@@ -79,7 +79,7 @@ class ToleranceCalculatorTest {
     @Test
     fun exactBoundaryThreeDaysSingleDoseIsMediumNotHigh() {
         val now = 1_700_000_000_000L
-        // 3 days ago, single dose — need BOTH daysSince <= 3 AND dosesLast30Days >= 2 for HIGH
+        // 3 days ago, single dose: need BOTH daysSince <= 3 AND dosesLast30Days >= 2 for HIGH
         val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 3 * dayMs), now)
         val info = ToleranceCalculator.calculate(repo, now).first()
         assertEquals(ToleranceLevel.MEDIUM, info.level)
@@ -159,7 +159,7 @@ class ToleranceCalculatorTest {
     @Test
     fun dosesOlderThan45DaysAreExcluded() {
         val now = 1_700_000_000_000L
-        // 50 days ago — well beyond the 45-day processing window
+        // 50 days ago: well beyond the 45-day processing window
         val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 50 * dayMs), now)
         val results = ToleranceCalculator.calculate(repo, now)
         assertTrue(results.isEmpty(), "doses older than 45 days should be excluded entirely")
@@ -168,7 +168,7 @@ class ToleranceCalculatorTest {
     @Test
     fun doseAtExact45DayBoundaryIsExcluded() {
         val now = 1_700_000_000_000L
-        // Exactly 45 days ago — the filter uses > cutoff, so the boundary is excluded
+        // Exactly 45 days ago: the filter uses > cutoff, so the boundary is excluded
         val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 45 * dayMs), now)
         val results = ToleranceCalculator.calculate(repo, now)
         assertTrue(results.isEmpty(), "dose at exact 45-day boundary should be excluded")
@@ -177,7 +177,7 @@ class ToleranceCalculatorTest {
     @Test
     fun doseJustInside45DayWindowIsIncluded() {
         val now = 1_700_000_000_000L
-        // 44 days ago — just inside the 45-day window, but outside tolerance thresholds
+        // 44 days ago: just inside the 45-day window, but outside tolerance thresholds
         val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 44 * dayMs), now)
         val info = ToleranceCalculator.calculate(repo, now).first()
         assertEquals(ToleranceLevel.NONE, info.level)

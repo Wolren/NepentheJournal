@@ -86,7 +86,6 @@ class SyncPayloadTest {
             sessions = sessions
         )
         val encoded = json.encodeToString(batch)
-        assertTrue(encoded.length > 1000)
         val decoded = json.decodeFromString<SyncBatch>(encoded)
         assertEquals(500, decoded.sessions.size)
     }

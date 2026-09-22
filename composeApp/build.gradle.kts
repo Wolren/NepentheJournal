@@ -121,14 +121,16 @@ kotlin {
 }
 
 // KMP test tasks (desktopTest) are NOT standard Gradle Test tasks,
-// so tasks.withType<Test>() does not match them. Test selection
-// is done in scripts/run-tests.sh via --tests filters.
+// so tasks.withType<Test>() does not match them. BOTH test entry points
+// (scripts/run-tests.sh and the CI test step in .github/workflows/ci.yml)
+// therefore run the BARE desktopTest task. Hand-inlined --tests filter
+// lists are banned (audit C6): the old FAST/ALL lists drifted from the
+// real test tree and hid live classes from CI. Do not reintroduce them.
 //
 // Usage:
-//   ./scripts/run-tests.sh           -- 21 fast test classes (424 tests: 31 files
-//     total, 10 are integration-only; fast list mirrors ci.yml incl EntityStoreTest)
-//   ./scripts/run-tests.sh --all     -- 31 test classes incl integration (~11s warm)
-//   ./gradlew composeApp:desktopTest --no-daemon --tests "app.journal.data.JournalRepositoryTest"
+//   ./scripts/run-tests.sh           -- whole desktopTest suite (all classes)
+//   ./scripts/run-tests.sh --list    -- list test source files
+//   ./gradlew composeApp:desktopTest --no-daemon   (unfiltered, same as CI)
 //
 // Prerequisites:
 //   - gradle.properties sets org.gradle.daemon=false and in-process Kotlin compiler

@@ -48,17 +48,19 @@ class KtorSyncServerIntegrationTest {
             application { installRouter() }
             val resp = client.get("/info")
             assertEquals(HttpStatusCode.OK, resp.status)
-            val body = resp.bodyAsText()
-            assertTrue(body.contains("Test Device"))
-            assertTrue(body.contains("abc123def456"))
-            assertTrue(body.contains("test-device-abc123"))
+            // Decode the typed payload instead of raw-substring matching
+            // (audit C7): every advertised field is asserted by name.
+            val info = app.journal.serde.AppJson.json.decodeFromString<HostInfo>(resp.bodyAsText())
+            assertEquals("test-device-abc123", info.deviceId)
+            assertEquals("Test Device", info.deviceName)
+            assertEquals("abc123def456", info.fingerprint)
             // Contract g/f: both HostInfo sites advertise the static ECDH
             // public point, serve the pinned protocol version, and keep WS.
-            assertNotNull(extractField(body, "ecdhPublicKeyB64"),
+            assertNotNull(info.ecdhPublicKeyB64,
                 "HostInfo must advertise ecdhPublicKeyB64")
-            assertTrue(body.contains("\"protocolVersion\":$SYNC_PROTOCOL_VERSION"),
+            assertEquals(SYNC_PROTOCOL_VERSION, info.protocolVersion,
                 "HostInfo must serve the pinned protocol version")
-            assertTrue(body.contains("\"wsSupported\":true"))
+            assertTrue(info.wsSupported, "JVM host must advertise wsSupported=true")
         }
     }
 
@@ -569,6 +571,84 @@ class KtorSyncServerIntegrationTest {
             }
         } finally {
             server.stop()
+        }
+    }
+
+    /**
+     * Contract section a TEST obligation: every authenticated WS handshake is
+     * a NEW SEQUENCE EPOCH (KtorSyncServerJvm discards the device's prior
+     * wsSeqState at handshake). Two properties, both proven through the
+     * production router:
+     *  1. within one connection, a replayed seq is rejected with a WsAck
+     *     error while the next fresh seq still succeeds (rejection does not
+     *     desync the window), and
+     *  2. a brand-new connection for the SAME device restarts at seq 1:
+     *     without the handshake reset, that frame would be rejected as
+     *     "Stale or replayed seq" and the client would be stuck forever.
+     */
+    @Test
+    fun `ws handshake starts a fresh seq epoch per connection`() {
+        testApplication {
+            application { installRouter() }
+            val secret = client.pairEcdh("epoch-client", "Client", "cfp")
+            val aesKey = aesEncryptionKey(secret)
+
+            // Connection 1: accept seq 1, reject its replay, accept seq 2.
+            val authValue = sign("epoch-client", "ws", secret)
+            createClient { install(WebSockets) }.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "epoch-client")
+                header(SyncAuthenticator.AUTH_HEADER, authValue)
+            }) {
+                suspend fun sendAndAck(delta: WsDelta): WsAck {
+                    val encoded = wsJson.encodeToString(WsMessage.serializer(), delta)
+                    send(Frame.Text(base64Encode(encryptBody(encoded, aesKey))))
+                    val frame = incoming.receive() as Frame.Text
+                    return wsJson.decodeFromString<WsMessage>(frame.readText()) as WsAck
+                }
+                fun delta(seq: Long, title: String) = WsDelta(
+                    seq = seq,
+                    sessions = listOf(Session(
+                        id = "s:epoch-$seq", title = title, startTime = 1_700_000_000_000L,
+                        createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
+                        deviceOrigin = "test"
+                    ))
+                )
+                val first = sendAndAck(delta(1L, "Epoch one"))
+                assertEquals(1L, first.seq); assertNull(first.error, "seq 1 must be accepted")
+                val replay = sendAndAck(delta(1L, "Epoch replay"))
+                assertNotNull(replay.error, "replayed seq must be rejected")
+                assertTrue(replay.error!!.contains("replayed"), "got: ${replay.error}")
+                val next = sendAndAck(delta(2L, "Epoch two"))
+                assertNull(next.error,
+                    "a rejection must not desync the window: fresh seq 2 still accepted")
+            }
+
+            // Connection 2: same device, fresh handshake, seq 1 again.
+            createClient { install(WebSockets) }.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "epoch-client")
+                header(SyncAuthenticator.AUTH_HEADER, sign("epoch-client", "ws", secret))
+            }) {
+                val encoded = wsJson.encodeToString(WsMessage.serializer(), WsDelta(
+                    seq = 1L,
+                    sessions = listOf(Session(
+                        id = "s:epoch-new", title = "Second connection",
+                        startTime = 1_700_000_000_000L, createdAt = 1_700_000_000_000L,
+                        updatedAt = 1_700_000_000_000L, deviceOrigin = "test"
+                    ))
+                ))
+                send(Frame.Text(base64Encode(encryptBody(encoded, aesKey))))
+                val frame = incoming.receive() as Frame.Text
+                val ack = wsJson.decodeFromString<WsMessage>(frame.readText()) as WsAck
+                assertNull(ack.error,
+                    "the handshake must reset seq state so seq 1 of a NEW " +
+                        "connection is accepted; got error: ${ack.error}")
+            }
+
+            // Both epochs' payloads landed exactly once each.
+            val epochIds = repo.sessions.value.map { it.id }
+                .filter { it.startsWith("s:epoch-") }.toSet()
+            assertEquals(setOf("s:epoch-1", "s:epoch-2", "s:epoch-new"), epochIds,
+                "replayed delta must never double-apply; both epochs must apply")
         }
     }
 
