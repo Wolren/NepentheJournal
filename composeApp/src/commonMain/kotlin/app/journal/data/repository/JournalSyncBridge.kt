@@ -130,7 +130,15 @@ internal class JournalSyncBridge(
         // where old index entries (dates, per-session children) need to be replaced.
         // Persons need no rebuild: they back no query index.
         if (anyIndexedPut || tombstonesChanged) {
+            // Search freshness for sync applies: rebuildAllIndices() below
+            // also rebuilds the search index eagerly (JournalIndices ends
+            // with rebuildSearchIndexLocked), and the explicit dirty flip
+            // keeps the lazily-rebuilt path correct even if that eager
+            // rebuild ever moves or stops covering search. Set under the
+            // same lock as the rest of the bridge (callers hold [lock]);
+            // O(1), never a rebuild by itself.
             indices.rebuildAllIndices()
+            markSearchIndexDirtyLocked()
         }
         // Mirror the per-entity tolerance invalidation exactly once per batch: upsertDose
         // and upsertSubstance bump per item, tombstone deletes already bump through their
@@ -168,7 +176,13 @@ internal class JournalSyncBridge(
             customUnits = snapshot.customUnits,
             persons = snapshot.persons,
         )
-        if (changed) indices.rebuildAllIndices()
+        if (changed) {
+            // Same freshness rule as applyBatch: rebuildAllIndices also
+            // rebuilds search eagerly, and the explicit O(1) dirty flip
+            // (callers hold [lock]) keeps the lazy path correct regardless.
+            indices.rebuildAllIndices()
+            markSearchIndexDirtyLocked()
+        }
     }
 
     /**
