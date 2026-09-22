@@ -42,12 +42,24 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         lastLoadHadIssues = false
         lastLoadIssueSummary = ""
 
+        if (!target.exists()) {
+            // Missing-target recovery (desktop parity with JournalStoreIos
+            // and JournalStoreAndroid.recoverMissingMainFile, audit C3): a
+            // crash inside save()'s backup rotation can leave the main file
+            // missing while .bak / .tmp still hold complete copies. Recover
+            // instead of starting the session blank. Runs BEFORE the orphan
+            // cleanup because .tmp is a recovery candidate here, not an orphan.
+            recoverMissingMainFile(tmp)
+            return@withLock
+        }
+
+        // Clean the orphaned temp file only now that the main file is known
+        // to exist.
         if (tmp.exists()) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             tmp.delete()
         }
 
-        if (!target.exists()) return@withLock
         if (target.length() > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
             return@withLock
@@ -63,6 +75,62 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
         }
+    }
+
+    /**
+     * Called by [load] when the main journal file does not exist: try .bak
+     * first, then .tmp, then the per-field salvage, then empty (the exact
+     * chain JournalStoreIos.recoverMissingMainFile and
+     * JournalStoreAndroid.recoverMissingMainFile implement, sharing the
+     * same SnapshotRecovery decode helpers so the three platforms cannot
+     * drift). [tmp] is passed in because the caller's orphan cleanup must
+     * not run before recovery gets its chance.
+     *
+     * Flag semantics (wave5 task pin, deliberately narrower than the two
+     * mobile stores): a candidate that decodes as a WHOLE file is a
+     * complete restore, so [lastLoadHadIssues] stays FALSE; only a
+     * candidate that needs partial salvage sets the issue flags. With no
+     * usable candidate at all the store starts empty WITHOUT flags, which
+     * is also the first-ever-run shape (no journal, no backups yet) and
+     * must not raise the recovery banner on a fresh install. The mobile
+     * stores flag even a clean backup restore; that divergence is reported,
+     * not hidden.
+     */
+    private fun recoverMissingMainFile(tmp: File) {
+        val candidates = listOf(File(backupPath()) to ".bak", tmp to ".tmp")
+        var partialText: String? = null
+        var partialLabel: String? = null
+        for ((file, label) in candidates) {
+            if (!file.exists()) continue
+            val size = file.length()
+            if (size < 0 || size > 50_000_000) continue
+            val text = try {
+                file.readText()
+            } catch (e: Exception) {
+                Log.withTag("JournalStore").w { "Unreadable $label candidate: ${e.message}" }
+                continue
+            }
+            val clean = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }.getOrNull()
+            if (clean != null) {
+                Log.withTag("JournalStore").w { "Journal file missing; recovered from $label backup" }
+                AppJson.apply(repo, clean)
+                return
+            }
+            if (partialText == null) {
+                partialText = text
+                partialLabel = label
+            }
+        }
+        if (partialText != null) {
+            Log.withTag("JournalStore").w { "Journal file missing; partially recovering from $partialLabel" }
+            val decoded = decodeSnapshotWithRecovery(partialText)
+            lastLoadHadIssues = true
+            lastLoadIssueSummary =
+                "Main journal file was missing; partially recovered from $partialLabel: ${decoded.parseError ?: "ok"}"
+            AppJson.apply(repo, decoded.snapshot)
+            return
+        }
+        Log.withTag("JournalStore").w { "Journal file missing and no usable .bak/.tmp backup found; starting empty" }
     }
 
     actual fun save(fullBackup: Boolean) = saveLock.withLock {

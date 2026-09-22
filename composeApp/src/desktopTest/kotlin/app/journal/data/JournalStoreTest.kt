@@ -564,6 +564,67 @@ class JournalStoreTest {
     }
 
     @Test
+    fun missingMainFileRecoversFromCleanBakWithoutIssueFlags() = withTempHome { _ ->
+        // Clean .bak + missing main (the audit C3 crash shape): the backup
+        // is a complete restore, so the recovery must load it and leave the
+        // issue flags untouched.
+        val source = JournalRepository()
+        source.upsertSession(Session(
+            id = "s:bak", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Bak Survivor", startTime = 4000L
+        ))
+        val backupJson = app.journal.serde.AppJson.json.encodeToString(source.fullSnapshot())
+
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        val path = store.dataPath()
+        File(path).parentFile.mkdirs()
+        File("$path.bak").writeText(backupJson)
+        File(path).delete()
+        assertFalse(File(path).exists(), "fixture: the main file must be missing")
+
+        store.load()
+
+        assertEquals(1, repo.sessions.value.size,
+            "the .bak content must be restored when the main file is missing")
+        assertEquals("Bak Survivor", repo.sessions.value.first().title)
+        assertFalse(store.lastLoadHadIssues,
+            "a clean .bak restore is a complete recovery: flags must stay false")
+        assertTrue(store.lastLoadIssueSummary.isEmpty(),
+            "no issue summary for a clean .bak restore")
+    }
+
+    @Test
+    fun missingMainFileWithGarbageBakSetsPartialRecoveryFlags() = withTempHome { _ ->
+        // Missing main + garbage .bak: nothing decodes, so the salvage path
+        // runs and the issue flags must be set (store stays usable).
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        val path = store.dataPath()
+        File(path).parentFile.mkdirs()
+        File("$path.bak").writeText("NOT VALID JSON {{{ no journal here")
+        assertFalse(File(path).exists(), "fixture: the main file must be missing")
+
+        store.load()
+
+        assertTrue(store.lastLoadHadIssues,
+            "an unusable .bak behind a missing main file must set lastLoadHadIssues")
+        assertTrue(store.lastLoadIssueSummary.isNotEmpty(),
+            "lastLoadIssueSummary must describe what was attempted")
+        assertTrue(repo.sessions.value.isEmpty(),
+            "garbage yields no sessions (partial salvage of a non-JSON body)")
+
+        // The store must remain fully usable after the failed recovery.
+        repo.upsertSession(Session(
+            id = "s:after", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "PostRecovery", startTime = 5000L
+        ))
+        store.save()
+        assertTrue(File(path).readText().contains("PostRecovery"),
+            "the store must be writable after a missing-main recovery")
+    }
+
+    @Test
     fun concurrentSaveDoesNotCorrupt() = withTempHome { _ ->
         val repo = JournalRepository()
         val store = JournalStore(repo)
