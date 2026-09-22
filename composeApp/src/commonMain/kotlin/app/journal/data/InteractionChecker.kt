@@ -27,12 +27,17 @@ data class InteractionCheckResult(
 object InteractionChecker {
 
     // ---- Cached index ----
+    private var cachedBuilt: Boolean = false
     private var cachedInteractionHash: Int = 0
     private var cachedIndex: Map<InteractionKey, Interaction> = emptyMap()
 
+    /** Counts index rebuilds; test observability for cache-hit assertions. */
+    internal var rebuildCount: Int = 0
+        private set
+
     private fun indexInteractions(allInteractions: List<Interaction>): Map<InteractionKey, Interaction> {
         val hash = allInteractions.hashCode()
-        if (hash == cachedInteractionHash && cachedIndex.isNotEmpty()) {
+        if (cachedBuilt && hash == cachedInteractionHash) {
             return cachedIndex
         }
         val map = mutableMapOf<InteractionKey, Interaction>()
@@ -55,6 +60,8 @@ object InteractionChecker {
         }
         cachedInteractionHash = hash
         cachedIndex = map
+        cachedBuilt = true
+        rebuildCount++
         return map
     }
 

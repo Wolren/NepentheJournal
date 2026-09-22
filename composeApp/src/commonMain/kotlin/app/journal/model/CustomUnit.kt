@@ -16,8 +16,6 @@ data class CustomUnit(
     val substanceId: String,
     val name: String,
     val description: String? = null,
-    /** Estimated mg-equivalent for tolerance estimation (nullable = unknown) */
-    val estimatedMgPerUnit: Double? = null,
     /** When true, uses estimated dose display (e.g. "~2 puffs") */
     val isEstimate: Boolean = false
 ) : VaultDocument

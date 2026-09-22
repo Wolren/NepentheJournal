@@ -181,12 +181,10 @@ class ModelSerializationTest {
         val original = CustomUnit(
             id = "unit:1", substanceId = "sub:1",
             name = "Tablet",
-            estimatedMgPerUnit = 10.0,
             createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test"
         )
         val json = AppJson.json.encodeToString(original)
         val restored = AppJson.json.decodeFromString<CustomUnit>(json)
         assertEquals("Tablet", restored.name)
-        assertEquals(10.0, restored.estimatedMgPerUnit!!, 0.001)
     }
 }

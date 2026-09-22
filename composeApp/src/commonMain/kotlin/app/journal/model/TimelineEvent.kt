@@ -19,6 +19,5 @@ data class TimelineEvent(
     val eventType: TimelineEventType,
     val label: String,
     val body: String? = null,
-    val relatedEffectIds: List<String> = emptyList(),
     val intensity: Float? = null
 ) : VaultDocument

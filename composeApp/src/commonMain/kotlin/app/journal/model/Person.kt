@@ -24,7 +24,6 @@ data class Person(
     override val deviceOrigin: String,
     val displayName: String,
     val role: PersonRole = PersonRole.PARTICIPANT,
-    val contactInfo: String? = null,
     val notes: String? = null,
     val linkedSessionIds: List<String> = emptyList(),
     /** Age in years. Rendered as a string on the dose.wiki wire. */

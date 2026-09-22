@@ -23,6 +23,5 @@ data class Note(
     val doseId: String? = null,
     val title: String? = null,
     val body: String,
-    val isPinned: Boolean = false,
     val conflictSiblings: List<ConflictSibling> = emptyList()
 ) : VaultDocument

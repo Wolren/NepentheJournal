@@ -41,7 +41,7 @@ private val canonicalJson = AppJson.pretty
 
 /**
  * Pure function that renders a session + its children into an Obsidian markdown note.
- * No I/O, no side effects — fully testable.
+ * No I/O, no side effects, fully testable.
  *
  * @param session the session to render
  * @param doses all doses belonging to this session
@@ -204,10 +204,6 @@ fun renderSessionToObsidianNote(
             for (note in notes.sortedByDescending { it.createdAt }) {
                 val noteTitle = note.title ?: "Note"
                 appendLine("### ${mdCell(noteTitle)}")
-                if (note.isPinned) {
-                    appendLine("> **Pinned**")
-                    appendLine()
-                }
                 append(note.body)
                 appendLine()
                 appendLine()

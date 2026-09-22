@@ -115,8 +115,6 @@ fun SettingsScreen(
         else -> msg
     }
 
-    fun formatTimestamp(epochMs: Long): String = formatRelativeTime(epochMs)
-
     var fetchStatus by remember { mutableStateOf<String?>(null) }
     var isFetching by remember { mutableStateOf(false) }
     var crashLogStatus by remember { mutableStateOf<String?>(null) }
@@ -243,7 +241,7 @@ fun SettingsScreen(
                     onIsStartingHostChange = { syncState = syncState.copy(isStartingHost = it) },
                     onIsStoppingHostChange = { syncState = syncState.copy(isStoppingHost = it) },
                 ),
-                scope = scope, clipboard = clipboard, formatTimestamp = { formatTimestamp(it) },
+                scope = scope, clipboard = clipboard, formatTimestamp = ::formatRelativeTime,
                 userMessage = { userMessage(it) },
             )
         }

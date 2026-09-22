@@ -19,6 +19,10 @@ object DoseWikiLookup {
     @kotlin.concurrent.Volatile
     private var substances: List<DoseWikiSubstance>? = null
 
+    /** Number of successful cache loads; test observability for reset() proofs. */
+    internal var loadCount: Int = 0
+        private set
+
     private fun ensureLoaded(): List<DoseWikiSubstance>? {
         val cached = substances
         if (cached != null) return cached
@@ -37,8 +41,17 @@ object DoseWikiLookup {
         }
 
         substances = parsed
+        loadCount++
         Log.withTag("DoseWikiLookup").i { "Loaded ${parsed.size} substances" }
         return parsed
+    }
+
+    /**
+     * Clears the parsed-data cache so the next lookup reloads the bundled
+     * resource. Exists so tests cannot leak cache state into each other.
+     */
+    internal fun reset() {
+        substances = null
     }
 
     /**

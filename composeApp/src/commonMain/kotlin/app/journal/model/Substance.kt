@@ -21,22 +21,6 @@ data class ChemicalProperties(
     val hBondAcceptorCount: Int? = null,
 )
 
-/**
- * Cross-database identifiers from Wikidata.
- * Links this substance to ChEMBL, DrugBank, IUPHAR, and other pharmacological databases.
- */
-@Immutable
-@Serializable
-data class WikidataRefs(
-    val qid: String? = null,
-    val chemblId: String? = null,
-    val drugbankId: String? = null,
-    val iupharId: String? = null,
-    val chemspiderId: String? = null,
-    val unii: String? = null,
-    val chebiId: String? = null,
-    val atcCode: String? = null,
-)
 
 /**
  * Single bioactivity measurement from ChEMBL.
