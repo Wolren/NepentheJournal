@@ -14,10 +14,12 @@ import kotlinx.serialization.encodeToString
  *
  * HONEST COVERAGE MAP (audit C7): [KtorSyncServerIntegrationTest] exercises
  * the production SyncServerRouter endpoints (pairing, push, pull, WS) in
- * process, but NO test in this suite drives SyncTransport.startHosting /
- * stopHosting / syncWith / pairWithPeer end to end against a live server;
- * those remain uncovered production paths. Everything asserted here is state
- * management, shared-validator behavior, and wire serialization only.
+ * process. SyncTransport.startHosting / stopHosting / syncWith / pairing
+ * end to end against a LIVE server is now covered by
+ * [SyncTransportLifecycleTest] (real KtorSyncServer on an ephemeral port:
+ * hosting flag vs bind, paired push/pull in both directions, port release
+ * on stopHosting). Everything asserted HERE is state management,
+ * shared-validator behavior, and wire serialization only.
  * KtorSyncClient's retry behavior is covered directly in
  * KtorSyncClientRetryTest.
  */

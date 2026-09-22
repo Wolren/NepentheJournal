@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.android.application)
     alias(libs.plugins.play.publisher)
+    alias(libs.plugins.kover)
 }
 
 // Force latest stable Netty to fix Dependabot vulnerabilities
@@ -65,6 +66,29 @@ kotlin {
                 implementation(libs.ktor.client.cio)
             }
         }
+
+        // wave4: local JVM unit tests for the Android actuals. The
+        // androidUnitTest source set is created by the android target; it is
+        // wired to commonTest by hand because the default hierarchy template
+        // is disabled in this project (same reason iosMain is wired below).
+        // Run with: ./gradlew :composeApp:testDebugUnitTest
+        val androidUnitTest = getByName("androidUnitTest") {
+            dependsOn(commonTest)
+            dependencies { implementation(kotlin("test")) }
+        }
+
+        // Wiring androidUnitTest -> commonTest runs the WHOLE commonTest
+        // suite against the Android actuals in :composeApp:testDebugUnitTest
+        // (409 tests instead of 2: every common test now exercises the
+        // Android actuals, which audit 4 scored as zero-covered).
+        // One class cannot run there and is excluded below: the Android
+        // actual of readBundledResource reads NepentheApp.appContext.assets,
+        // and a local JVM unit test has no AssetManager/Context (AGP's
+        // mockable android.jar stubs every Context method; Robolectric is
+        // deliberately not used here). The class keeps running green in
+        // desktopTest, so excluding it from the Android task loses no
+        // coverage, it only stops a platform-impossible assertion from
+        // failing the gate.
         val desktopMain = getByName("desktopMain") {
             dependencies {
                 implementation(compose.desktop.currentOs)
@@ -80,6 +104,11 @@ kotlin {
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.test.host)
                 implementation(libs.ktor.serialization)
+                // wave4 stretch: compose ui-test infra for the desktop smoke
+                // tests (ComposeScreenSmokeTest); the first ui-test dependency
+                // this project has had (audit 4, item 9). Catalog coordinate,
+                // not compose.uiTest, which is a deprecated accessor.
+                implementation(libs.compose.ui.test)
             }
         }
         iosMain {
@@ -116,6 +145,21 @@ kotlin {
         // Connect iOS leaf targets to iosMain
         listOf(iosArm64(), iosSimulatorArm64()).forEach {
             getByName("${it.name}Main").dependsOn(iosMain)
+        }
+
+        // wave4: intermediate iosTest source set, mirroring the manual
+        // iosMain wiring above (default hierarchy template disabled).
+        // Config-only verification on Windows: this host must never run an
+        // ios compile/test task. Its smoke test (composeApp/src/iosTest)
+        // is compiled and run by mac CI only (iosSimulatorArm64Test), never
+        // here.
+        val iosTest = create("iosTest") {
+            dependsOn(commonTest)
+            dependencies { implementation(kotlin("test")) }
+        }
+        // Connect iOS leaf targets to iosTest
+        listOf(iosArm64(), iosSimulatorArm64()).forEach {
+            getByName("${it.name}Test").dependsOn(iosTest)
         }
     }
 }
@@ -185,6 +229,18 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// wave4: exclusions for AGP local unit test tasks ONLY (name ends with
+// UnitTest, so desktopTest/allTests are untouched and still run everything).
+// See the androidUnitTest comment above: DoseWikiLookupTest needs a real
+// Android Context (assets), which a JVM unit test cannot provide.
+tasks.withType<Test>().configureEach {
+    if (name.endsWith("UnitTest")) {
+        filter {
+            excludeTestsMatching("app.journal.data.DoseWikiLookupTest")
+        }
     }
 }
 

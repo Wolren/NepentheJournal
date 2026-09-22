@@ -78,6 +78,13 @@ jobs:
             -x checkDebugAarMetadata \
             --no-daemon
 
+      # wave4: androidUnitTest source set (local JVM unit tests for the
+      # Android actuals, which audit 4 scored as zero-covered). Unfiltered
+      # task, same rule as the desktop step: a new androidUnitTest class
+      # runs from the moment it exists.
+      - name: Run Android unit tests
+        run: ./gradlew :composeApp:testDebugUnitTest --no-daemon
+
   android-build:
     runs-on: ubuntu-latest
     steps:
