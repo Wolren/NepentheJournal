@@ -65,6 +65,8 @@ class IosSyncTransport(
 
     internal val identityStore = IosDeviceIdentityStore(dataDir)
     internal val trustStore = IosDeviceTrustStore(dataDir)
+    /** Static host ECDH keypair store (contract section g), file-backed beside the identity. */
+    internal val ecdhIdentity = IosEcdhIdentityStore(dataDir)
     internal val pairingManager = IosPairingManager()
     internal val nonceCache = IosNonceReplayCache()
 
@@ -78,6 +80,10 @@ class IosSyncTransport(
 
     override suspend fun startHosting(config: SyncConfig): Result<HostingInfo> {
         return try {
+            // Contract section g: generate (first host start) or load the
+            // STATIC ECDH keypair before any route can advertise it; if the
+            // key cannot be created, hosting fails closed.
+            ecdhIdentity.publicKeyB64()
             val port = config.listenerPort
             val router = IosSyncServerRouter(
                 repo = repo,
@@ -87,6 +93,7 @@ class IosSyncTransport(
                 deviceId = deviceId,
                 deviceName = platformDeviceName(),
                 fingerprint = deviceFingerprint,
+                ecdhIdentity = ecdhIdentity,
                 onConnection = { msg ->
                     _status.update { it.copy(lastError = msg) }
                 },
@@ -131,9 +138,15 @@ class IosSyncTransport(
         _status.update { it.copy(isHosting = false, hostAddress = null, pairingToken = null) }
     }
 
-    /** Pairing rate limiter keyed on socket level identity, 5 attempts per 120s window. */
+    /**
+     * Pairing rate limiter keyed on socket level identity, 5 attempts per
+     * 120s window. Expired buckets are evicted on EVERY call so this owned
+     * map cannot grow without bound.
+     */
     internal fun isPairingRateLimited(clientKey: String): Boolean = pairingAttemptsLock.withLock {
         val now = currentTimeMillis()
+        val expired = pairingAttempts.filterValues { now - it.value.second > PAIRING_RATE_WINDOW_MS }.keys.toList()
+        expired.forEach { pairingAttempts.remove(it) }
         val (count, windowStart) = pairingAttempts[clientKey] ?: Pair(0, now)
         val next = if (now - windowStart > PAIRING_RATE_WINDOW_MS) Pair(1, now) else Pair(count + 1, windowStart)
         pairingAttempts[clientKey] = next
@@ -151,45 +164,85 @@ class IosSyncTransport(
         val aesKey = aesEncryptionKey(secretStr)
         val client = HttpClient(Darwin)
         return try {
+            // Contract section d: capture the candidate cursor BEFORE any
+            // network work. It is written to lastSyncAt ONLY after every push
+            // slice and every pull page has succeeded (audit C2: no silent
+            // cursor move, no success stamp on a failed cycle).
+            val cycleStart = currentTimeMillis()
             val pushSince = _status.value.lastSyncAt ?: 0L
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), pushSince)
             var pushResp: SyncResponse? = null
             if (batch != null) {
-                val batchJson = json.encodeToString(batch)
-                val encrypted = encryptBody(batchJson, aesKey)
-                val bodyStr = base64Encode(encrypted)
-                val time = currentTimeMillis()
-                val nonce = generateNonce()
-                val auth = buildAuthHeader(deviceId, bodyStr, secret, time, nonce)
-                val pushResponse = client.post("http://${peer.host}:${peer.port}${SyncEndpoints.SYNC_PUSH}") {
-                    contentType(ContentType.Application.Json)
-                    header(SyncAuth.DEVICE_ID_HEADER, deviceId)
-                    header(SyncAuth.AUTH_HEADER, auth)
-                    setBody(bodyStr)
-                }
-                val pushBody = pushResponse.bodyAsText()
-                val syncResp = if (pushBody.isNotEmpty()) {
-                    try {
+                // Slice the outgoing batch through the shared chunker so a
+                // first sync against the 2015-interaction seed cannot deadlock
+                // on the 100-interaction cap (audit C1 applies to iOS pushes
+                // too): slices go out sequentially and the cursor advances
+                // only if ALL of them ack success.
+                val slices = buildPushSlices(batch)
+                for (slice in slices) {
+                    val batchJson = json.encodeToString(slice)
+                    val encrypted = encryptBody(batchJson, aesKey)
+                    val bodyStr = base64Encode(encrypted)
+                    val time = currentTimeMillis()
+                    val nonce = generateNonce()
+                    val auth = buildAuthHeader(deviceId, bodyStr, secret, time, nonce)
+                    val pushResponse = client.post("http://${peer.host}:${peer.port}${SyncEndpoints.SYNC_PUSH}") {
+                        contentType(ContentType.Application.Json)
+                        header(SyncAuth.DEVICE_ID_HEADER, deviceId)
+                        header(SyncAuth.AUTH_HEADER, auth)
+                        setBody(bodyStr)
+                    }
+                    val pushBody = pushResponse.bodyAsText()
+                    // A body that cannot be base64-decoded, decrypted, or
+                    // parsed is a FAILED cycle, never a skip: an unverifiable
+                    // ack must not advance any cursor (contract section d).
+                    val syncResp = if (pushBody.isEmpty()) null else try {
                         val encryptedResp = base64Decode(pushBody)
                         val respJson = decryptBody(encryptedResp, aesKey)
                         runCatching { json.decodeFromString<SyncResponse>(respJson) }.getOrNull()
                     } catch (e: Exception) {
                         null
                     }
-                } else null
-                pushResp = syncResp
-                if (syncResp != null) applySyncResponse(repo, syncResp, pushSince)
+                    if (syncResp == null) {
+                        val msg = "Push response could not be decrypted or decoded (HTTP ${pushResponse.status.value})"
+                        _status.update { it.copy(lastError = msg) }
+                        return Result.failure(Exception(msg))
+                    }
+                    // Branch on success BEFORE any cursor move: on false the
+                    // host's own error is surfaced through the status
+                    // snapshot, lastSyncAt is untouched, and the cycle fails.
+                    if (!syncResp.success) {
+                        val msg = syncResp.error ?: "Push rejected by host"
+                        _status.update { it.copy(lastError = msg) }
+                        return Result.failure(Exception(msg))
+                    }
+                    pushResp = syncResp
+                    applySyncResponse(repo, syncResp, pushSince)
+                    persistApplied()
+                }
             }
 
             // Pull: sign the exact target including the since param, same as JVM.
             // Drain while truncated, following the low-water nextSince cursor.
+            // A failed, missing, or undecodable page fails the whole cycle
+            // WITHOUT touching the cursor (contract section d).
             var pullCursor = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
                 pushResp.nextSince else (_status.value.lastSyncAt ?: 0L)
             var pullPages = 0
             while (pullPages < 20) {
                 val pullResp = fetchPullPage(client, peer, deviceId, secret, aesKey, pullCursor)
-                if (pullResp == null) break
-                if (pullResp.success) applySyncResponse(repo, pullResp, pullCursor)
+                if (pullResp == null) {
+                    val msg = "Pull response missing, undecodable, or rejected by host"
+                    _status.update { it.copy(lastError = msg) }
+                    return Result.failure(Exception(msg))
+                }
+                if (!pullResp.success) {
+                    val msg = pullResp.error ?: "Pull rejected by host"
+                    _status.update { it.copy(lastError = msg) }
+                    return Result.failure(Exception(msg))
+                }
+                applySyncResponse(repo, pullResp, pullCursor)
+                persistApplied()
                 if (!pullResp.truncated) break
                 val next = if (pullResp.nextSince > 0L) pullResp.nextSince
                     else maxOf(pullResp.maxUpdatedAt(), pullCursor)
@@ -198,7 +251,9 @@ class IosSyncTransport(
                 pullPages++
             }
 
-            _status.update { it.copy(lastSyncAt = currentTimeMillis()) }
+            // Reached only when every slice and page succeeded, stamped with
+            // the pre-build cycleStart rather than the ack-time clock.
+            _status.update { it.copy(lastSyncAt = cycleStart) }
             Log.withTag("IosSync").i { "Sync with ${peer.displayName} completed" }
             Result.success(Unit)
         } catch (e: Exception) {
@@ -276,10 +331,31 @@ class IosSyncTransport(
 
     override suspend fun connectManually(host: String, port: Int, token: String?): Result<Unit> {
         val pairingClient = HttpClient(Darwin)
+        // EPHEMERAL client keypair: generated below, discarded in finally so
+        // it cannot outlive a single pairing attempt.
+        var ephemeral: IosEcdhEphemeral? = null
         try {
             // Start pairing
             val infoResp = pairingClient.get("http://$host:$port${SyncEndpoints.PAIRING_START}")
             val info = json.decodeFromString<HostInfo>(infoResp.bodyAsText())
+
+            // Contract section g: the host must advertise its STATIC P-256 key.
+            // Fail closed when it is absent (pre-ECDH host) or malformed.
+            val hostEcdhB64 = info.ecdhPublicKeyB64
+                ?: return Result.failure(Exception("Host does not support ECDH pairing; upgrade the host"))
+            val hostEcdhBytes = runCatching { base64Decode(hostEcdhB64) }.getOrNull()
+            if (hostEcdhBytes == null ||
+                hostEcdhBytes.size != PairingEcdh.PUBLIC_KEY_BYTES ||
+                hostEcdhBytes[0] != PairingEcdh.UNCOMPRESSED_PREFIX
+            ) {
+                return Result.failure(Exception("Host ECDH public key is malformed"))
+            }
+
+            val clientEph = IosEcdh.generateEphemeral()
+                ?: return Result.failure(Exception("Could not generate an ECDH key pair"))
+            ephemeral = clientEph
+            val clientEcdhPublicKeyB64 = clientEph.publicKeyB64()
+                ?: return Result.failure(Exception("Could not export the ECDH public key"))
 
             // Complete pairing
             val tokenStr = token ?: return Result.failure(Exception("Pairing token required"))
@@ -289,21 +365,31 @@ class IosSyncTransport(
                     token = tokenStr,
                     clientDeviceId = deviceId,
                     clientDeviceName = platformDeviceName(),
-                    clientFingerprint = deviceFingerprint
+                    clientFingerprint = deviceFingerprint,
+                    clientEcdhPublicKeyB64 = clientEcdhPublicKeyB64
                 )))
             }
             val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
             if (!result.success) return Result.failure(Exception(result.error ?: "Pairing failed"))
 
-            // C2 unwrap: try the encrypted field first (key derived from the
-            // user-entered token and our own client deviceId), fall back to
-            // the legacy plaintext field the server keeps populated.
-            val sharedSecret = IosPairingSecretCrypto.resolveSecret(
-                token = tokenStr,
-                clientDeviceId = deviceId,
-                encSecretB64 = result.encSecretB64,
-                sharedSecret = result.sharedSecret
-            ) ?: return Result.failure(Exception("No secret returned"))
+            // Resolve the secret ONLY from the ECDH-sealed field: agree
+            // first, then unwrap. The legacy sharedSecret and encSecretB64
+            // fields are never read. Absence fails CLOSED; the raw ECDH
+            // output is normalized by unwrapSharedSecret (32-byte X or
+            // 65-byte X9.63 forms from SecKeyCreateKeyExchange). Key
+            // material is never logged.
+            val sealedSecret = result.ecdhSecretB64
+                ?: return Result.failure(Exception("Host does not support ECDH pairing; upgrade the host"))
+            val rawShared = clientEph.agreeWith(hostEcdhBytes)
+                ?: return Result.failure(Exception("ECDH key agreement failed; host key rejected"))
+            val sharedSecret = try {
+                PairingEcdh.unwrapSharedSecret(rawShared, sealedSecret)
+            } catch (e: Exception) {
+                return Result.failure(Exception("Could not unwrap the pairing secret"))
+            }
+            if (sharedSecret.isEmpty()) {
+                return Result.failure(Exception("ECDH key agreement produced an empty secret"))
+            }
             val hostId = result.hostDeviceId ?: return Result.failure(Exception("No host id returned"))
             trustStore.addPeer(
                 IosDeviceTrustStore.IosTrustedPeer(
@@ -333,6 +419,7 @@ class IosSyncTransport(
         } catch (e: Exception) {
             return Result.failure(e)
         } finally {
+            ephemeral?.close()
             pairingClient.close()
         }
     }
@@ -373,6 +460,18 @@ class IosSyncTransport(
     }
 
     // ==========  Private helpers  ==========
+
+    /**
+     * Durability after every applied sync response (push acks and pull
+     * pages): invoke the composition root's persistence callback when one is
+     * supplied, otherwise run a self-built light save, exactly like the
+     * hosting path does for accepted pushes. Without this a moved cursor
+     * could outrun what is actually on disk.
+     */
+    private fun persistApplied() {
+        val callback = persistAfterApply
+        if (callback != null) callback() else JournalStore(repo).save(fullBackup = false)
+    }
 
     private fun constantTimeEquals(a: String, b: String): Boolean {
         if (a.length != b.length) return false

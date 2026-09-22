@@ -122,9 +122,13 @@ actual fun encryptBody(body: String, key: ByteArray): ByteArray {
     val ciphertext = ByteArray(plaintext.size) // GCM output len == plaintext len
     val tag = ByteArray(16) // 128-bit GCM authentication tag
 
-    // Generate random IV via Security framework (crypto-secure random)
+    // Generate random IV via Security framework (crypto-secure random).
+    // Check the status exactly like secureRandomBytes does: an unfilled IV
+    // is all zeros, and reusing one GCM nonce would be catastrophic.
     iv.usePinned { ivPinned ->
-        SecRandomCopyBytes(null, iv.size.toULong(), ivPinned.addressOf(0))
+        check(SecRandomCopyBytes(null, iv.size.toULong(), ivPinned.addressOf(0)) == 0) {
+            "SecRandomCopyBytes failed"
+        }
     }
 
     // Oneshot AES-256-GCM encrypt
@@ -172,7 +176,7 @@ actual fun decryptBody(data: ByteArray, key: ByteArray): String {
     val tag = data.copyOfRange(data.size - 16, data.size)
     val plaintext = ByteArray(ciphertext.size)
 
-    // Oneshot AES-256-GCM decrypt — GCM mode also verifies the tag
+    // Oneshot AES-256-GCM decrypt: GCM mode also verifies the tag
     key.usePinned { keyPinned ->
         iv.usePinned { ivPinned ->
             tag.usePinned { tagPinned ->

@@ -3,6 +3,8 @@ package app.journal.sync
 import app.journal.data.IJournalRepository
 import app.journal.serde.AppJson
 import app.journal.log.Log
+import app.journal.model.Note
+import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -28,6 +30,12 @@ class IosSyncServerRouter(
     private val deviceId: String,
     private val deviceName: String,
     private val fingerprint: String,
+    /**
+     * The host's STATIC P-256 ECDH keypair store (contract section g):
+     * supplies HostInfo.ecdhPublicKeyB64 on both info routes and performs
+     * the /pairing/verify key agreement.
+     */
+    private val ecdhIdentity: IosEcdhIdentityStore,
     private val onConnection: (String) -> Unit = {},
     private val isRateLimited: (String) -> Boolean = { false },
     /**
@@ -40,6 +48,14 @@ class IosSyncServerRouter(
 ) {
     private val json = AppJson.json
 
+    // Per-IP throttles for the authenticated sync surface (one bucket per
+    // endpoint so a pull drain can never starve pairing), mirroring the JVM
+    // KtorSyncServerJvm buckets: push 120/min, pull 200/min, verify 30/min.
+    private val pushThrottle = mutableMapOf<String, Pair<Int, Long>>()
+    private val pullThrottle = mutableMapOf<String, Pair<Int, Long>>()
+    private val verifyThrottle = mutableMapOf<String, Pair<Int, Long>>()
+    private val throttleLock = PlatformLock()
+
     fun installRouting(app: Application) {
         app.routing {
             get(SyncEndpoints.INFO) {
@@ -49,7 +65,10 @@ class IosSyncServerRouter(
                         deviceName = deviceName,
                         fingerprint = fingerprint,
                         protocolVersion = 2,
-                        wsSupported = false
+                        wsSupported = false,
+                        // Static host ECDH key (contract g). Throws fail the
+                        // route, so clients only ever see a real key or an error.
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),
                     ContentType.Application.Json
                 )
@@ -62,37 +81,54 @@ class IosSyncServerRouter(
                         deviceName = deviceName,
                         fingerprint = fingerprint,
                         protocolVersion = 2,
-                        wsSupported = false
+                        wsSupported = false,
+                        // Advertised here too so the client holds the host key
+                        // before the pairing token is entered (contract g).
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),
                     ContentType.Application.Json
                 )
             }
 
             get("/auth/verify") {
-                val deviceIdParam = call.request.queryParameters["deviceId"]
-                val challengeRaw = call.request.queryParameters["challenge"]
-                if (deviceIdParam.isNullOrBlank() || challengeRaw.isNullOrBlank()) {
+                val clientIp = call.request.local.remoteHost
+                if (isThrottled(verifyThrottle, clientIp, MAX_VERIFY_PER_WINDOW, VERIFY_WINDOW_MS)) {
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
                     )
                     return@get
                 }
-                // Cap the challenge like the JVM (MAX_CHALLENGE_LEN): an
-                // unbounded challenge would be signed and stored verbatim.
-                if (challengeRaw.length > MAX_CHALLENGE_LEN) {
+                // Header first with query fallback, same read order as the
+                // JVM route, so header-style and query-style clients both work.
+                val deviceIdParam = call.request.headers[SyncAuth.DEVICE_ID_HEADER]
+                    ?: call.request.queryParameters["deviceId"]
+                val challengeRaw = call.request.headers["X-Sync-Challenge"]
+                    ?: call.request.queryParameters["challenge"]
+                val challenge = challengeRaw?.take(MAX_CHALLENGE_LEN)
+                // Uniform failure code: missing params, overlong challenges, and
+                // unknown devices all answer 401 with the SAME empty body, so
+                // this endpoint is not a device-existence oracle. Mirrors
+                // KtorSyncServerJvm exactly.
+                if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                     )
                     return@get
                 }
-                val challenge = challengeRaw
+                if (challengeRaw != null && challengeRaw.length > MAX_CHALLENGE_LEN) {
+                    call.respondText(
+                        json.encodeToString(HostChallengeResponse(0, "")),
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
+                    )
+                    return@get
+                }
                 val secret = trustStore.getSharedSecret(deviceIdParam)
                 if (secret == null) {
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
-                        ContentType.Application.Json, status = HttpStatusCode.Forbidden
+                        ContentType.Application.Json, status = HttpStatusCode.Unauthorized
                     )
                     return@get
                 }
@@ -159,6 +195,41 @@ class IosSyncServerRouter(
                     return@post
                 }
 
+                // Contract section g: validate the client's EPHEMERAL P-256
+                // key BEFORE the token is consumed, so a malformed key can
+                // never burn a single-use token. Rules match the JVM host:
+                // present, valid base64, 65 bytes, first byte 0x04, and a
+                // point on the curve (SecKeyCreateWithData rejects off-curve
+                // points, so a failed agreement yields null here as well).
+                val clientEcdhB64 = req.clientEcdhPublicKeyB64
+                if (clientEcdhB64 == null) {
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Client ECDH public key required")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+                val clientEcdhBytes = runCatching { base64Decode(clientEcdhB64) }.getOrNull()
+                if (clientEcdhBytes == null ||
+                    clientEcdhBytes.size != PairingEcdh.PUBLIC_KEY_BYTES ||
+                    clientEcdhBytes[0] != PairingEcdh.UNCOMPRESSED_PREFIX
+                ) {
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Invalid client ECDH public key")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+                // ECDH with the STATIC host private key (SecKeyCreateKeyExchange).
+                val ecdhShared = ecdhIdentity.agreeSharedSecret(clientEcdhBytes)
+                if (ecdhShared == null) {
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Invalid client ECDH public key")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
                 // Reject before minting any secret: single use token, 120s TTL.
                 if (!pairingManager.verifyPairingToken(req.token)) {
                     call.respondText(
@@ -172,6 +243,22 @@ class IosSyncServerRouter(
                 val clientDeviceId = req.clientDeviceId.ifBlank {
                     "client-${req.clientFingerprint.take(8)}"
                 }
+                // Contract section g: seal the secret under the ECDH-derived
+                // key BEFORE registering the peer, so every failure above
+                // leaves no trust-store side effect. The plaintext
+                // sharedSecret field and the legacy PBKDF2 encSecretB64 wrap
+                // leave the protocol: a LAN observer of this response must not
+                // learn the permanent sync secret.
+                val ecdhSecretB64 = try {
+                    PairingEcdh.wrapSharedSecret(ecdhShared, secret)
+                } catch (e: Exception) {
+                    Log.withTag("IosSync").e(e) { "pairing ECDH wrap failed" }
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Pairing crypto failed")),
+                        ContentType.Application.Json, status = HttpStatusCode.InternalServerError
+                    )
+                    return@post
+                }
                 trustStore.addPeer(
                     IosDeviceTrustStore.IosTrustedPeer(
                         deviceId = clientDeviceId,
@@ -181,21 +268,11 @@ class IosSyncServerRouter(
                         pairedAt = currentTimeMillis()
                     )
                 )
-                // C2 wrap: the same secret encrypted under a key derived from
-                // the pairing token, so a LAN observer of this response learns
-                // nothing. The legacy field stays populated this wave.
-                val encSecretB64 = try {
-                    IosPairingSecretCrypto.encrypt(req.token, clientDeviceId, secret)
-                } catch (e: Exception) {
-                    Log.withTag("IosSync").w { "pairing secret wrap failed, sending legacy field only" }
-                    null
-                }
                 call.respondText(
                     json.encodeToString(PairingResultResponse(
                         success = true,
                         deviceId = clientDeviceId,
-                        sharedSecret = secret,
-                        encSecretB64 = encSecretB64,
+                        ecdhSecretB64 = ecdhSecretB64,
                         hostDeviceId = deviceId,
                         hostDeviceName = deviceName,
                         hostFingerprint = fingerprint
@@ -206,6 +283,14 @@ class IosSyncServerRouter(
             }
 
             post(SyncEndpoints.SYNC_PUSH) {
+                val pushIp = call.request.local.remoteHost
+                if (isThrottled(pushThrottle, pushIp, MAX_PUSH_PER_WINDOW, PUSH_WINDOW_MS)) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Too many requests")),
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                    )
+                    return@post
+                }
                 // Declared length is enforced BEFORE the body is buffered:
                 // missing, chunked, or oversized bodies are refused unread,
                 // mirroring the JVM push route.
@@ -294,6 +379,14 @@ class IosSyncServerRouter(
             }
 
             get(SyncEndpoints.SYNC_PULL) {
+                val pullIp = call.request.local.remoteHost
+                if (isThrottled(pullThrottle, pullIp, MAX_PULL_PER_WINDOW, PULL_WINDOW_MS)) {
+                    call.respondText(
+                        json.encodeToString(SyncResponse(false, error = "Too many requests")),
+                        ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
+                    )
+                    return@get
+                }
                 val auth = verifyPullAuth(call)
                 if (auth == null) {
                     call.respondText(
@@ -406,28 +499,54 @@ class IosSyncServerRouter(
     }
 
     private fun applySyncBatch(batch: SyncBatch) {
-        // Last writer wins by updatedAt, so a replayed or stale push cannot
-        // roll back newer local data.
+        // Mirror the JVM host push handler (KtorSyncServerJvm.handlePush):
+        // truncate the peer device name to 200 chars, bulk-apply everything
+        // EXCEPT sessions and notes with last-writer-wins and the batch.since
+        // tombstone cutoff, then route those two collections through the
+        // shared conflict-aware repo APIs. A conflicting peer session becomes
+        // a sync-conflict note with deviceOrigin provenance, and notes go
+        // through upsertNoteWithConflict, so identical peer data produces the
+        // same journal on iOS as on the JVM host (contract section c).
+        val tagged = batch.copy(deviceName = batch.deviceName.take(200))
         repo.applyBatch(
-            sessions = batch.sessions,
-            doses = batch.doses,
-            substances = batch.substances,
-            effects = batch.effects,
-            interactions = batch.interactions,
-            notes = batch.notes,
-            timelineEvents = batch.timelineEvents,
-            customUnits = batch.customUnits,
+            substances = tagged.substances,
+            doses = tagged.doses,
+            interactions = tagged.interactions,
+            timelineEvents = tagged.timelineEvents,
+            effects = tagged.effects,
+            customUnits = tagged.customUnits,
             lastWriterWins = true,
-            deletedSessionIds = batch.deletedSessionIds,
-            deletedDoseIds = batch.deletedDoseIds,
-            deletedNoteIds = batch.deletedNoteIds,
-            deletedSubstanceIds = batch.deletedSubstanceIds,
-            deletedEffectIds = batch.deletedEffectIds,
-            deletedInteractionIds = batch.deletedInteractionIds,
-            deletedTimelineEventIds = batch.deletedTimelineEventIds,
-            deletedCustomUnitIds = batch.deletedCustomUnitIds,
-            tombstoneCutoff = batch.since
+            deletedSessionIds = tagged.deletedSessionIds,
+            deletedDoseIds = tagged.deletedDoseIds,
+            deletedNoteIds = tagged.deletedNoteIds,
+            deletedSubstanceIds = tagged.deletedSubstanceIds,
+            deletedEffectIds = tagged.deletedEffectIds,
+            deletedInteractionIds = tagged.deletedInteractionIds,
+            deletedTimelineEventIds = tagged.deletedTimelineEventIds,
+            deletedCustomUnitIds = tagged.deletedCustomUnitIds,
+            tombstoneCutoff = tagged.since
         )
+        tagged.sessions.forEach { session ->
+            if (session.id in tagged.deletedSessionIds) return@forEach
+            val existing = repo.getSession(session.id)
+            if (existing != null && existing.updatedAt > session.updatedAt) {
+                repo.upsertNote(Note(
+                    id = "conflict:${session.id}:${tagged.deviceId}",
+                    sessionId = session.id,
+                    title = "Sync conflict: ${session.title}",
+                    body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
+                    createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
+                    updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
+                    // Conflict notes always carry the pushing device so the
+                    // provenance is never ambiguous.
+                    deviceOrigin = "sync:${tagged.deviceId}"
+                ))
+            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:${tagged.deviceId}" }))
+        }
+        tagged.notes.forEach { note ->
+            if (note.id in tagged.deletedNoteIds) return@forEach
+            repo.upsertNoteWithConflict(note, tagged.deviceId)
+        }
     }
 
     private fun constantTimeEquals(a: String, b: String): Boolean {
@@ -446,6 +565,38 @@ class IosSyncServerRouter(
 
         /** Pull cursors may be at most 1 day in the future (shared EntityTimePolicy margin). */
         const val MAX_FUTURE_SINCE_MS = EntityTimePolicy.FUTURE_MARGIN_MS
+
+        // Per-IP throttle limits, mirroring KtorSyncServerJvm exactly:
+        // 120 pushes, 200 pulls, 30 auth challenges per 60s window.
+        const val MAX_PUSH_PER_WINDOW = 120
+        const val PUSH_WINDOW_MS = 60_000L
+        const val MAX_PULL_PER_WINDOW = 200
+        const val PULL_WINDOW_MS = 60_000L
+        const val MAX_VERIFY_PER_WINDOW = 30
+        const val VERIFY_WINDOW_MS = 60_000L
+    }
+
+    /**
+     * Generic per-IP throttle with stale-bucket eviction, a local
+     * reimplementation of the JVM isThrottled/evictStaleThrottle pair
+     * (iosMain must not import jvmMain). Both steps run under one lock, so
+     * counting is atomic: exactly [max] requests are allowed per
+     * [windowMs] window and the max+1th is blocked. Expired buckets are
+     * dropped on every call, so idle client IPs never accumulate.
+     */
+    private fun isThrottled(
+        throttle: MutableMap<String, Pair<Int, Long>>,
+        clientKey: String,
+        max: Int,
+        windowMs: Long
+    ): Boolean = throttleLock.withLock {
+        val now = currentTimeMillis()
+        val expired = throttle.entries.filter { now - it.value.second > windowMs }.map { it.key }
+        expired.forEach { throttle.remove(it) }
+        val (count, windowStart) = throttle[clientKey] ?: Pair(0, now)
+        val next = if (now - windowStart > windowMs) Pair(1, now) else Pair(count + 1, windowStart)
+        throttle[clientKey] = next
+        next.first > max
     }
 
     /**

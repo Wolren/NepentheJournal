@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.util.currentTimeMillis
+import kotlin.random.Random
 
 /**
  * iOS pairing token manager: single use 6 char token with 120s TTL.
@@ -26,10 +27,13 @@ class IosPairingManager {
 
     /** Generate a 6 char pairing token valid for [ttlSeconds] (default 120s). */
     fun generatePairingToken(ttlSeconds: Long = 120L): String {
-        val bytes = secureRandomBytes(6)
         val sb = StringBuilder(6)
-        for (b in bytes) {
-            sb.append(ALPHABET[(b.toInt() and 0xFF) % ALPHABET.length])
+        // Unbiased selection with kotlin.random.Random.nextInt over the
+        // whole alphabet, mirroring the JVM's alpha[secureRandom.nextInt(...)]
+        // shape: a plain byte modulo leaves 256 mod alphabetLength residual
+        // bias in the lower codes.
+        repeat(6) {
+            sb.append(ALPHABET[Random.nextInt(ALPHABET.length)])
         }
         val token = sb.toString()
         pending = PendingPairing(token, currentTimeMillis(), ttlSeconds)
