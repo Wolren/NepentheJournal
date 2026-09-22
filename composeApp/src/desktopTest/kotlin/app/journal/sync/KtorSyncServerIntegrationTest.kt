@@ -9,6 +9,7 @@ import app.journal.sync.DeviceTrustStore.TrustedPeer
 import app.journal.sync.aesEncryptionKey
 import app.journal.util.crypto.base64Encode
 import app.journal.sync.encryptBody
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
@@ -19,6 +20,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.*
 import java.io.File
 
@@ -252,7 +254,11 @@ class KtorSyncServerIntegrationTest {
      * Pair through the contract-g ECDH flow against the production router:
      * fetch the host's static P-256 key from HostInfo, send an EPHEMERAL
      * public key, and resolve the secret ONLY by unwrapping ecdhSecretB64.
-     * Also proves the legacy plaintext/PBKDF2 fields carry no secret.
+     * Proves the legacy plaintext/PBKDF2 fields carry no secret by decoding
+     * the response STRUCTURALLY (Json object key presence), so the
+     * assertion still fails if those keys ever come back even though the
+     * DTO no longer declares them. No raw substring extraction remains
+     * (the old extractField regex helper is gone).
      */
     private suspend fun HttpClient.pairEcdh(
         clientDeviceId: String,
@@ -260,7 +266,8 @@ class KtorSyncServerIntegrationTest {
         clientFingerprint: String = "cfp"
     ): String {
         val infoBody = get("/pairing/start").bodyAsText()
-        val hostKey = extractField(infoBody, "ecdhPublicKeyB64")
+        val hostKey = app.journal.serde.AppJson.json
+            .decodeFromString<HostInfo>(infoBody).ecdhPublicKeyB64
             ?: error("HostInfo must advertise ecdhPublicKeyB64: $infoBody")
         val ephemeral = EcdhIdentityManager.generateEphemeralKeyPair()
         val myKey = EcdhIdentityManager.uncompressedPointB64(ephemeral.public)
@@ -276,11 +283,13 @@ class KtorSyncServerIntegrationTest {
         }
         val body = resp.bodyAsText()
         assertEquals(HttpStatusCode.OK, resp.status, "ECDH pairing must succeed: $body")
-        assertNull(extractField(body, "sharedSecret"),
+        val result = app.journal.serde.AppJson.json.decodeFromString<PairingResultResponse>(body)
+        val rawFields = app.journal.serde.AppJson.json.parseToJsonElement(body).jsonObject
+        assertFalse("sharedSecret" in rawFields,
             "legacy plaintext sharedSecret must no longer be emitted")
-        assertNull(extractField(body, "encSecretB64"),
+        assertFalse("encSecretB64" in rawFields,
             "legacy PBKDF2 encSecretB64 must no longer be emitted")
-        val sealed = extractField(body, "ecdhSecretB64")
+        val sealed = result.ecdhSecretB64
             ?: error("server must seal the secret in ecdhSecretB64: $body")
         val shared = EcdhIdentityManager.agree(ephemeral.private, hostKey)
         val secret = try {
@@ -742,10 +751,75 @@ class KtorSyncServerIntegrationTest {
         }
     }
 
-    companion object {
-        fun extractField(json: String, field: String): String? {
-            val pattern = "\"$field\"\\s*:\\s*\"([^\"]+)\"".toRegex()
-            return pattern.find(json)?.groupValues?.get(1)
+    /**
+     * Contract section c, JVM HTTP leg of the shared mergeSessionConflict
+     * extraction: the push path must route sessions through the ONE
+     * commonMain function (both orderings pinned by
+     * commonTest SyncSessionConflictMergeTest; the iOS host calls the same
+     * function and is reading-verified only, since iosMain cannot compile
+     * on this host). Fixture: the LOCAL session is newer, so the incoming
+     * session loses, both outcomes survive (local session intact plus a
+     * conflict note), provenance is `sync:<peer>`, and an identical replay
+     * changes nothing (idempotent, deterministic conflict-note id).
+     */
+    @Test
+    fun `HTTP push session conflict routes through shared mergeSessionConflict`() {
+        testApplication {
+            application { installRouter() }
+            val secret = client.pairEcdh("conflict-client", "Client", "cfp")
+
+            // Local copy is NEWER than the peer's incoming session.
+            repo.upsertSession(Session(
+                id = "s:conflict", title = "Local title", startTime = 1_700_000_000_000L,
+                createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_050_000L,
+                deviceOrigin = "local", outcome = "local outcome"
+            ))
+            val plainBody =
+                """{"deviceId":"conflict-client","deviceName":"Client","since":1700000000000,""" +
+                    """"sessions":[{"id":"s:conflict","title":"Remote title","startTime":1700000000000,""" +
+                    """"createdAt":1700000000000,"updatedAt":1700000001000,"deviceOrigin":"",""" +
+                    """"outcome":"remote outcome"}]}"""
+
+            suspend fun pushBatch(): HttpStatusCode {
+                val aesKey = aesEncryptionKey(secret)
+                val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
+                val authValue = sign("conflict-client", encryptedBody, secret)
+                return client.post("/sync/push") {
+                    header("X-Sync-Device", "conflict-client")
+                    header("X-Sync-Auth", authValue)
+                    contentType(ContentType.Application.Json)
+                    setBody(encryptedBody)
+                }.status
+            }
+
+            assertEquals(HttpStatusCode.OK, pushBatch(), "conflicting push must be accepted")
+
+            // The newer LOCAL session survives untouched...
+            val local = repo.getSession("s:conflict")
+            assertNotNull(local, "the newer local session must never be clobbered")
+            assertEquals(1_700_000_050_000L, local.updatedAt, "local updatedAt must not move")
+            assertEquals("local outcome", local.outcome, "local outcome must be preserved")
+
+            // ...and the peer's outcome survives as a conflict note.
+            val conflict = repo.notes.value.single { it.id == "conflict:s:conflict:conflict-client" }
+            assertEquals("s:conflict", conflict.sessionId)
+            assertEquals("Sync conflict: Remote title", conflict.title)
+            assertEquals("Remote: remote outcome\n\nLocal: local outcome", conflict.body)
+            assertEquals("sync:conflict-client", conflict.deviceOrigin)
+            assertEquals(1_700_000_050_000L, conflict.updatedAt,
+                "the conflict note is stamped with the newer of the two timestamps")
+            assertTrue(conflict.conflictSiblings.isEmpty(),
+                "session conflicts are standalone notes, not sibling-carrying note merges")
+            // Contract c5: pendingConflictCount counts sibling-carrying NOTE
+            // merges only, so a session-outcome conflict must not inflate it
+            // (the host banner counts session conflicts separately).
+            assertEquals(0, runBlocking { repo.pendingConflictCount.first() })
+
+            // Idempotent replay: an identical second push changes nothing.
+            assertEquals(HttpStatusCode.OK, pushBatch(), "replayed push must still be accepted")
+            assertEquals(1, repo.notes.value.count { it.id == "conflict:s:conflict:conflict-client" },
+                "replaying the batch must never duplicate the conflict note")
+            assertEquals("local outcome", repo.getSession("s:conflict")?.outcome)
         }
     }
 }

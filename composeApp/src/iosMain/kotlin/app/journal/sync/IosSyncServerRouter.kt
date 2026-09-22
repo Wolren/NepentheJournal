@@ -1,9 +1,9 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.PeerSyncWatermarks
 import app.journal.serde.AppJson
 import app.journal.log.Log
-import app.journal.model.Note
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import app.journal.util.crypto.base64Decode
@@ -501,15 +501,18 @@ class IosSyncServerRouter(
     }
 
     private fun applySyncBatch(batch: SyncBatch) {
-        // Mirror the JVM host push handler (KtorSyncServerJvm.handlePush):
-        // truncate the peer device name to 200 chars, bulk-apply everything
+        // Mirror the JVM host push handler (SyncServerHandlers.handlePush):
+        // truncate the peer device name to 200 chars, record the peer's sync
+        // watermark for peer-aware tombstone retention, bulk-apply everything
         // EXCEPT sessions and notes with last-writer-wins and the batch.since
         // tombstone cutoff, then route those two collections through the
-        // shared conflict-aware repo APIs. A conflicting peer session becomes
-        // a sync-conflict note with deviceOrigin provenance, and notes go
-        // through upsertNoteWithConflict, so identical peer data produces the
-        // same journal on iOS as on the JVM host (contract section c).
+        // shared conflict-aware repo APIs. Sessions go through the ONE
+        // commonMain mergeSessionConflict (contract section c item 4, the
+        // same function the JVM host calls), so identical peer data produces
+        // the same journal on iOS as on the JVM host; notes go through
+        // upsertNoteWithConflict.
         val tagged = batch.copy(deviceName = batch.deviceName.take(200))
+        PeerSyncWatermarks.recordPeerCursor(tagged.deviceId, tagged.since)
         repo.applyBatch(
             substances = tagged.substances,
             doses = tagged.doses,
@@ -528,23 +531,10 @@ class IosSyncServerRouter(
             deletedCustomUnitIds = tagged.deletedCustomUnitIds,
             tombstoneCutoff = tagged.since
         )
-        tagged.sessions.forEach { session ->
-            if (session.id in tagged.deletedSessionIds) return@forEach
-            val existing = repo.getSession(session.id)
-            if (existing != null && existing.updatedAt > session.updatedAt) {
-                repo.upsertNote(Note(
-                    id = "conflict:${session.id}:${tagged.deviceId}",
-                    sessionId = session.id,
-                    title = "Sync conflict: ${session.title}",
-                    body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
-                    createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                    updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                    // Conflict notes always carry the pushing device so the
-                    // provenance is never ambiguous.
-                    deviceOrigin = "sync:${tagged.deviceId}"
-                ))
-            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:${tagged.deviceId}" }))
-        }
+        // Conflict count is intentionally unused on iOS: this host has no
+        // push-connection banner (unchanged behavior; the JVM host reports
+        // it through onConnection).
+        mergeSessionConflict(repo, tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
         tagged.notes.forEach { note ->
             if (note.id in tagged.deletedNoteIds) return@forEach
             repo.upsertNoteWithConflict(note, tagged.deviceId)

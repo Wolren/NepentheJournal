@@ -3,6 +3,7 @@ package app.journal.sync
 import kotlinx.cinterop.*
 import platform.CommonCrypto.*
 import platform.Security.SecRandomCopyBytes
+import app.journal.util.PlatformLock
 
 /**
  * iOS actual implementations for the sync-specific expect funs declared in
@@ -20,16 +21,48 @@ import platform.Security.SecRandomCopyBytes
  */
 
 // ========================================================================
-// PBKDF2 key derivation
+// PBKDF2 key derivation (with the JVM-mirrored derived-key cache)
 // ========================================================================
+
+/**
+ * Derived AES key cache, mirroring jvmMain SyncCryptoJvm byte for byte in
+ * behavior (audit: the 600k-iteration PBKDF2 derivation used to run on
+ * EVERY authenticated push and pull, hundreds of ms of CPU per request).
+ *
+ * Keyed by the exact secret string, bounded at [MAX_CACHED_AES_KEYS]; at
+ * the bound the whole map is cleared (same eviction as the JVM).
+ *
+ * Invalidation story, honestly: iOS has NO purge hook wired today. The
+ * revoke path is IosSyncTransport.revokeTrustedDevice ->
+ * IosDeviceTrustStore.revokeDevice, and IosSyncTransport is outside this
+ * file's ownership scope, so `clearAesKeyCache()` below is provided but
+ * not called yet, unlike the JVM where SyncTransport.revokeDevice calls
+ * it. What keeps this safe in the meantime is the JVM's own argument:
+ * entries are only ever looked up by their OWN secret string, so once a
+ * device is revoked or re-paired its old secret is never queried again
+ * and the stale key is unreachable, and the 64-entry bound caps resident
+ * key material. When the iOS revoke path gains its hook (one line in
+ * IosSyncTransport.revokeTrustedDevice), it must call
+ * [clearAesKeyCache] to match the JVM exactly.
+ */
+private val aesKeyCache = mutableMapOf<String, ByteArray>()
+private val aesKeyCacheLock = PlatformLock()
+private const val MAX_CACHED_AES_KEYS = 64
+
+/** Drop every cached AES key; see [aesKeyCache] for when to call this. */
+fun clearAesKeyCache() {
+    aesKeyCacheLock.withLock { aesKeyCache.clear() }
+}
 
 /**
  * Derives a 32-byte AES key from [password] using PBKDF2-HMAC-SHA256.
  *
  * Salt and iteration count are fixed to match the JVM implementation's
  * constants so both platforms produce the same key for the same password.
+ * Derivation runs only on a cache miss; see [aesKeyCache].
  */
 actual fun aesEncryptionKey(password: String): ByteArray {
+    aesKeyCacheLock.withLock { aesKeyCache[password] }?.let { return it }
     val salt = "NepentheSync!".encodeToByteArray()
     val keyLen = 32UL
     val iterations = 600_000U
@@ -52,6 +85,10 @@ actual fun aesEncryptionKey(password: String): ByteArray {
                 check(status == 0) { "CCKeyDerivationPBKDF failed with status $status" }
             }
         }
+    }
+    aesKeyCacheLock.withLock {
+        if (aesKeyCache.size >= MAX_CACHED_AES_KEYS) aesKeyCache.clear()
+        aesKeyCache[password] = derivedKey
     }
     return derivedKey
 }

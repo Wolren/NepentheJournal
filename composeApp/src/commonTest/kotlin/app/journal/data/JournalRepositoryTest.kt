@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.util.currentTimeMillis
 import kotlin.test.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -1118,5 +1119,107 @@ class JournalRepositoryTest {
         repo.upsertSubstance(sampleSubstance("sub:1", "LSD-2025"))
         assertEquals("LSD-2025", repo.substanceNamesById.first()["sub:1"])
         assertNull(repo.substancesById.first()["gone"])
+    }
+
+    // ==================== Peer-aware tombstone retention ====================
+    //
+    // The prune rule (JournalTombstones.mayPruneTombstone): a tombstone may
+    // be dropped only when it is OLDER than the 30-day window AND at or
+    // below every locally known peer sync watermark (PeerSyncWatermarks,
+    // fed by both host push handlers from SyncBatch.since). With no
+    // watermark ever observed the rule falls back to a time window alone,
+    // extended to 180 days so the map cannot grow without bound. The old
+    // FLAT 30-day window is gone: no pre-existing test in this suite
+    // encoded it (the only tombstone assertions were about seed-apply
+    // preservation of FRESH tombstones, which is unchanged), so no old
+    // expectation needed rewriting; this section is entirely new.
+
+    /** Run a local delete so recordTombstone() executes a prune pass. */
+    private fun triggerTombstonePrune(repo: JournalRepository) {
+        repo.upsertSubstance(sampleSubstance("sub:trigger", "Trigger"))
+        repo.upsertSession(sampleSession("s:trigger"))
+        repo.upsertDose(sampleDose("d:trigger", "sub:trigger", "s:trigger", 1000L))
+        repo.deleteDose("d:trigger")
+    }
+
+    @Test
+    fun freshTombstoneSurvivesPrunePass() {
+        PeerSyncWatermarks.clear()
+        val repo = JournalRepository()
+        triggerTombstonePrune(repo)
+        assertTrue("dose:d:trigger" in repo.exportTombstones(),
+            "a fresh tombstone must survive the prune pass regardless of watermarks")
+    }
+
+    @Test
+    fun olderTombstoneAboveUnknownWatermarkSurvives() {
+        // Unknown watermark: no peer cursor has ever been observed (fresh
+        // process / never-hosted device). The fallback keeps anything
+        // inside the extended 180-day window, so 40 days is well safe.
+        PeerSyncWatermarks.clear()
+        val repo = JournalRepository()
+        val dayMs = 86_400_000L
+        val now = currentTimeMillis()
+        repo.importTombstones(mapOf("dose:old-unknown" to now - 40 * dayMs))
+        assertTrue("dose:old-unknown" in repo.exportTombstones(),
+            "import must keep a 40-day-old tombstone under the 180-day fallback window")
+        triggerTombstonePrune(repo)
+        assertTrue("dose:old-unknown" in repo.exportTombstones(),
+            "past the old 30-day flat window but with unknown watermarks: KEEP (conservative)")
+    }
+
+    @Test
+    fun olderTombstoneAboveBehindPeerWatermarkSurvives() {
+        PeerSyncWatermarks.clear()
+        val repo = JournalRepository()
+        val dayMs = 86_400_000L
+        val now = currentTimeMillis()
+        repo.importTombstones(mapOf("dose:behind-peer" to now - 40 * dayMs))
+        // A peer exists whose cursor is 50 days old: it has NOT drained as
+        // far as this 40-day-old delete, so dropping it would resurrect
+        // the entity on that peer's next stale push.
+        PeerSyncWatermarks.recordPeerCursor("peer-behind", now - 50 * dayMs)
+        triggerTombstonePrune(repo)
+        assertTrue("dose:behind-peer" in repo.exportTombstones(),
+            "older than the window but above a behind peer watermark: KEEP (no resurrection)")
+    }
+
+    @Test
+    fun tombstoneAtOrBelowAllWatermarksPrunes() {
+        PeerSyncWatermarks.clear()
+        val repo = JournalRepository()
+        val dayMs = 86_400_000L
+        val now = currentTimeMillis()
+        repo.importTombstones(mapOf("dose:delivered" to now - 40 * dayMs))
+        assertTrue("dose:delivered" in repo.exportTombstones(),
+            "fixture import (no watermarks yet) must keep the tombstone")
+        // Two peers, both drained PAST the tombstone; the floor is the
+        // MINIMUM (peer-a, 10 days ago), which is still above the
+        // 40-day-old delete.
+        PeerSyncWatermarks.recordPeerCursor("peer-a", now - 10 * dayMs)
+        PeerSyncWatermarks.recordPeerCursor("peer-b", now)
+        triggerTombstonePrune(repo)
+        assertFalse("dose:delivered" in repo.exportTombstones(),
+            "older than the window and at/below every peer watermark must prune")
+        // The same prune pass kept its own fresh tombstone.
+        assertTrue("dose:d:trigger" in repo.exportTombstones(),
+            "the fresh tombstone created by the same pass must survive")
+    }
+
+    @Test
+    fun noWatermarkFallbackDropsOnlyBeyondExtendedWindow() {
+        PeerSyncWatermarks.clear()
+        val repo = JournalRepository()
+        val dayMs = 86_400_000L
+        val now = currentTimeMillis()
+        repo.importTombstones(mapOf(
+            "dose:within-extended" to now - 100 * dayMs,
+            "dose:beyond-extended" to now - 200 * dayMs
+        ))
+        val kept = repo.exportTombstones()
+        assertTrue("dose:within-extended" in kept,
+            "100 days old with no watermark evidence: kept by the 180-day fallback window")
+        assertFalse("dose:beyond-extended" in kept,
+            "200 days old with no watermark ever observed: bounded fallback prunes")
     }
 }

@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.PeerSyncWatermarks
 import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
@@ -34,6 +35,14 @@ internal class SyncServerHandlers(
     fun handlePush(batch: SyncBatch) {
         var conflicts = 0
         val tagged = batch.copy(deviceName = batch.deviceName.take(200))
+        // Peer-aware tombstone retention: batch.since is the SENDER's sync
+        // cursor (contract sections b/d), i.e. this peer's high-water mark
+        // of settled data. Recorded only after the router authenticated the
+        // caller and proved batch.deviceId == caller (SyncServerRouting push
+        // route), so the device id is trustworthy. Recording happens before
+        // apply only as bookkeeping: a stale/low cursor can only make
+        // pruning MORE conservative, never less.
+        PeerSyncWatermarks.recordPeerCursor(tagged.deviceId, tagged.since)
         repo.applyBatch(
             substances = tagged.substances,
             doses = tagged.doses,
@@ -54,44 +63,26 @@ internal class SyncServerHandlers(
         )
         // Sessions and notes are NOT handed to applyBatch: both go through
         // the shared merge routes below, exactly like the WS delta path.
-        conflicts += applySessionsWithConflict(tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
+        // Sessions route through the ONE commonMain mergeSessionConflict
+        // (contract section c item 4); both hosts call it.
+        conflicts += mergeSessionConflict(repo, tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
         conflicts += applyNotesWithConflict(tagged.notes, tagged.deletedNoteIds, tagged.deviceId)
         onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${tagged.deviceName}")
     }
 
     /**
-     * Apply pushed sessions with the session-outcome conflict branch
-     * (contract section c item 4: this branch may stay platform-side until
-     * the shared mergeSessionConflict lands in commonMain). Loser bodies
-     * become conflict notes; device names are truncated by the caller.
+     * Thin forwarder to the shared [mergeSessionConflict]. The logic lives
+     * ONLY in commonMain now (both former platform copies deleted); this
+     * delegate exists solely for the WS delta call site in
+     * SyncServerRouting.kt (a file outside this change's ownership), which
+     * passes discrete delta fields instead of a [SyncBatch].
      * Returns the number of conflicts created.
      */
     fun applySessionsWithConflict(
         sessions: List<Session>,
         deletedIds: List<String>,
         remoteDeviceId: String
-    ): Int {
-        var conflicts = 0
-        sessions.forEach { session ->
-            if (session.id in deletedIds) return@forEach
-            val existing = repo.getSession(session.id)
-            if (existing != null && existing.updatedAt > session.updatedAt) {
-                repo.upsertNote(Note(
-                    id = "conflict:${session.id}:$remoteDeviceId",
-                    sessionId = session.id,
-                    title = "Sync conflict: ${session.title}",
-                    body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
-                    createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                    updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                    // Tag interaction provenance: conflict notes always carry
-                    // the pushing device so the origin is never ambiguous.
-                    deviceOrigin = "sync:$remoteDeviceId"
-                ))
-                conflicts++
-            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" }))
-        }
-        return conflicts
-    }
+    ): Int = mergeSessionConflict(repo, sessions, deletedIds, remoteDeviceId)
 
     /**
      * Apply incoming notes through the SHARED conflict merge
