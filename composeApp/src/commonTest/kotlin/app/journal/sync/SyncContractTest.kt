@@ -10,7 +10,7 @@ import app.journal.data.AppJson
  * Contract tests for the shared sync protocol.
  *
  * These tests validate that BOTH the JVM and iOS transport produce
- * the same wire format — request bodies, auth headers, endpoint paths.
+ * the same wire format: request bodies, auth headers, endpoint paths.
  * They run entirely on the protocol layer without needing an HTTP server.
  */
 class SyncContractTest {
@@ -22,7 +22,7 @@ class SyncContractTest {
     private val testSecret = "KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK".encodeToByteArray()
     private val testDeviceId = "test-device-001"
 
-    private val now = 1000000L
+    private val now = 1_700_000_000_000L
 
     @Test
     fun `hmacSha256Hex produces deterministic output for known input`() {
@@ -140,13 +140,13 @@ class SyncContractTest {
         val response = SyncResponse(
             success = true,
             sessions = listOf(Session(
-                id = "r1", title = "Resp", createdAt = now, updatedAt = 1000L,
+                id = "r1", title = "Resp", createdAt = now, updatedAt = now,
                 deviceOrigin = "remote", startTime = now
             )),
             doses = listOf(Dose(
                 id = "d1", sessionId = "r1", substanceId = "sub1",
                 routeOfAdministration = "oral",
-                amount = 100.0, unit = "mg", timestamp = 1000L,
+                amount = 100.0, unit = "mg", timestamp = now,
                 createdAt = now, updatedAt = now, deviceOrigin = "remote"
             )),
             substances = listOf(Substance(

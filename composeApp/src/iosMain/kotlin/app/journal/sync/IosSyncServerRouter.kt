@@ -48,7 +48,8 @@ class IosSyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2
+                        protocolVersion = 2,
+                        wsSupported = false
                     )),
                     ContentType.Application.Json
                 )
@@ -60,7 +61,8 @@ class IosSyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2
+                        protocolVersion = 2,
+                        wsSupported = false
                     )),
                     ContentType.Application.Json
                 )
@@ -270,7 +272,7 @@ class IosSyncServerRouter(
                     return@post
                 }
 
-                val validationError = IosSyncValidators.validateSyncBatch(batch)
+                val validationError = validateSyncBatch(batch)
                 if (validationError != null) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = validationError)),
@@ -382,14 +384,14 @@ class IosSyncServerRouter(
         }
         return SyncResponse(
             success = true,
-            sessions = page(repo.sessions.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            doses = page(repo.doses.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            substances = page(repo.substances.value, IosSyncValidators.MAX_SUBSTANCES) { it.updatedAt },
-            effects = page(repo.effects.value, IosSyncValidators.MAX_EFFECTS) { it.updatedAt },
-            interactions = page(repo.interactions.value, IosSyncValidators.MAX_INTERACTIONS) { it.updatedAt },
-            notes = page(repo.notes.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            timelineEvents = page(repo.timelineEvents.value, IosSyncValidators.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            customUnits = page(repo.customUnits.value, IosSyncValidators.MAX_CUSTOM_UNITS) { it.updatedAt },
+            sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES) { it.updatedAt },
+            effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS) { it.updatedAt },
+            interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS) { it.updatedAt },
+            notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+            customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS) { it.updatedAt },
             deletedSessionIds = deleted.deletedSessionIds,
             deletedDoseIds = deleted.deletedDoseIds,
             deletedNoteIds = deleted.deletedNoteIds,
@@ -442,8 +444,8 @@ class IosSyncServerRouter(
         /** Max challenge length for /auth/verify, matching the JVM cap. */
         const val MAX_CHALLENGE_LEN = 128
 
-        /** Pull cursors may be at most 1 day in the future (clock skew allowance). */
-        const val MAX_FUTURE_SINCE_MS = 86_400_000L
+        /** Pull cursors may be at most 1 day in the future (shared EntityTimePolicy margin). */
+        const val MAX_FUTURE_SINCE_MS = EntityTimePolicy.FUTURE_MARGIN_MS
     }
 
     /**

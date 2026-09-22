@@ -15,8 +15,8 @@ import kotlinx.serialization.encodeToString
  * Endpoint paths, request construction, response application, and HMAC
  * signing are extracted here so they can be tested in commonTest.
  *
- * Wire format uses SyncBatch (push) and SyncResponse (pull response)
- * — both serializable types already in commonMain.
+ * Wire format uses SyncBatch (push) and SyncResponse (pull response):
+ * both serializable types already in commonMain.
  *
  * Encryption: sync bodies are AES-256-GCM encrypted. The wire body is
  * base64(encryptBody(json, aesKey)). HMAC is computed over the base64
@@ -27,6 +27,13 @@ import kotlinx.serialization.encodeToString
 // ========== Endpoint paths ==========
 
 object SyncEndpoints {
+    /**
+     * URL scheme for every sync endpoint. Pinned to "http" by the ECDH
+     * pairing contract (section g); clients and servers must build endpoint
+     * URLs from this constant so a future TLS phase flips one value instead
+     * of hunting string literals.
+     */
+    const val URL_SCHEME = "http"
     const val INFO = "/info"
     const val PAIRING_START = "/pairing/start"
     const val PAIRING_VERIFY = "/pairing/verify"
@@ -132,30 +139,68 @@ fun buildSyncBatch(
 }
 
 /**
+ * Outcome of applying a SyncResponse locally. Skip counts report invalid
+ * incoming entities and tombstone IDs that the client-response guard
+ * rejected before they could reach the store (contract: client-response
+ * guard). Callers log or surface them; they must NOT advance a cursor past
+ * rejected data without noticing.
+ */
+data class SyncApplyResult(
+    val appliedEntities: Int,
+    val skippedEntities: Int,
+    val skippedTombstones: Int
+)
+
+/**
  * Apply a SyncResponse to the local repository.
  * Merges all returned entities (upsert) with last-writer-wins by updatedAt,
  * so a replayed/stale response cannot roll back newer local data.
+ *
+ * Every incoming entity passes validateSyncResponse first: blank or
+ * over-long ids, over-cap fields, and out-of-range timestamps are skipped
+ * and counted instead of being stored. Tombstone IDs get the same shape
+ * check. Skips are logged through the SyncContract tag.
  */
-fun applySyncResponse(repo: IJournalRepository, response: SyncResponse, since: Long = 0L) {
+fun applySyncResponse(
+    repo: IJournalRepository,
+    response: SyncResponse,
+    since: Long = 0L
+): SyncApplyResult {
+    val filtered = validateSyncResponse(response)
+    if (filtered.skippedEntities > 0 || filtered.skippedTombstones > 0) {
+        Log.withTag("SyncContract").w {
+            "applySyncResponse rejected ${filtered.skippedEntities} invalid entities and " +
+                "${filtered.skippedTombstones} invalid tombstone IDs"
+        }
+    }
+    val clean = filtered.response
     repo.applyBatch(
-        sessions = response.sessions,
-        doses = response.doses,
-        substances = response.substances,
-        effects = response.effects,
-        interactions = response.interactions,
-        notes = response.notes,
-        timelineEvents = response.timelineEvents,
-        customUnits = response.customUnits,
+        sessions = clean.sessions,
+        doses = clean.doses,
+        substances = clean.substances,
+        effects = clean.effects,
+        interactions = clean.interactions,
+        notes = clean.notes,
+        timelineEvents = clean.timelineEvents,
+        customUnits = clean.customUnits,
         lastWriterWins = true,
-        deletedSessionIds = response.deletedSessionIds,
-        deletedDoseIds = response.deletedDoseIds,
-        deletedNoteIds = response.deletedNoteIds,
-        deletedSubstanceIds = response.deletedSubstanceIds,
-        deletedEffectIds = response.deletedEffectIds,
-        deletedInteractionIds = response.deletedInteractionIds,
-        deletedTimelineEventIds = response.deletedTimelineEventIds,
-        deletedCustomUnitIds = response.deletedCustomUnitIds,
+        deletedSessionIds = clean.deletedSessionIds,
+        deletedDoseIds = clean.deletedDoseIds,
+        deletedNoteIds = clean.deletedNoteIds,
+        deletedSubstanceIds = clean.deletedSubstanceIds,
+        deletedEffectIds = clean.deletedEffectIds,
+        deletedInteractionIds = clean.deletedInteractionIds,
+        deletedTimelineEventIds = clean.deletedTimelineEventIds,
+        deletedCustomUnitIds = clean.deletedCustomUnitIds,
         tombstoneCutoff = since
+    )
+    val applied = clean.sessions.size + clean.doses.size + clean.substances.size +
+        clean.effects.size + clean.interactions.size + clean.notes.size +
+        clean.timelineEvents.size + clean.customUnits.size
+    return SyncApplyResult(
+        appliedEntities = applied,
+        skippedEntities = filtered.skippedEntities,
+        skippedTombstones = filtered.skippedTombstones
     )
 }
 
@@ -229,12 +274,3 @@ object PairingSecretCrypto {
     const val KEY_LENGTH_BITS = 256
     const val GCM_NONCE_BYTES = 12
 }
-
-/**
- * Result of parsing and verifying a push request on the server side.
- */
-data class VerifiedPush(
-    val deviceId: String,
-    val batch: SyncBatch,
-    val body: String
-)

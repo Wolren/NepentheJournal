@@ -155,7 +155,8 @@ class SyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2
+                        protocolVersion = 2,
+                        wsSupported = true
                     )),
                     ContentType.Application.Json
                 )
@@ -167,7 +168,8 @@ class SyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2
+                        protocolVersion = 2,
+                        wsSupported = true
                     )),
                     ContentType.Application.Json
                 )
@@ -295,7 +297,7 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // One shared secret for this client — store it and return it
+                // One shared secret for this client: store it and return it
                 val sharedSecret = authenticator.generateSharedSecret()
                 val clientDeviceId = verifyReq.clientDeviceId.ifBlank {
                     "client-${verifyReq.clientFingerprint.take(8)}"
@@ -470,7 +472,7 @@ class SyncServerRouter(
 
                 val sinceStr = call.request.queryParameters["since"]
                 val since = sinceStr?.toLongOrNull() ?: 0L
-                if (since < 0 || since > System.currentTimeMillis() + 86_400_000L) {
+                if (since < 0 || since > System.currentTimeMillis() + EntityTimePolicy.FUTURE_MARGIN_MS) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Invalid since")),
                         ContentType.Application.Json, status = HttpStatusCode.BadRequest
@@ -758,7 +760,7 @@ class SyncServerRouter(
                 repo.upsertNote(Note(
                     id = "conflict:${session.id}:${tagged.deviceId}",
                     sessionId = session.id,
-                    title = "Sync conflict — ${session.title}",
+                    title = "Sync conflict: ${session.title}",
                     body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
                     createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                     updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
@@ -854,14 +856,14 @@ class SyncServerRouter(
         }
         return SyncResponse(
         success = true,
-        sessions = page(repo.sessions.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
-        doses = page(repo.doses.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
-        substances = page(repo.substances.value, MAX_SUBSTANCES) { it.updatedAt },
-        interactions = page(repo.interactions.value, MAX_INTERACTIONS) { it.updatedAt },
-        notes = page(repo.notes.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
-        timelineEvents = page(repo.timelineEvents.value, MAX_ITEMS_DEFAULT) { it.updatedAt },
-        effects = page(repo.effects.value, MAX_EFFECTS) { it.updatedAt },
-        customUnits = page(repo.customUnits.value, MAX_CUSTOM_UNITS) { it.updatedAt },
+        sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+        doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+        substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES) { it.updatedAt },
+        interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS) { it.updatedAt },
+        notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+        timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
+        effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS) { it.updatedAt },
+        customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS) { it.updatedAt },
         deletedSessionIds = deleted.deletedSessionIds,
         deletedDoseIds = deleted.deletedDoseIds,
         deletedNoteIds = deleted.deletedNoteIds,

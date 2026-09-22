@@ -30,6 +30,14 @@ data class WsPong(override val seq: Long) : WsMessage
 @SerialName("ws:delta")
 data class WsDelta(
     override val seq: Long,
+    /**
+     * Sender cursor this delta was built from (its lastSyncTime). Servers and
+     * clients apply tombstones from this delta with the cursor LWW rule:
+     * delete only when no local entity exists or local.updatedAt <= since
+     * (contract section b). Defaults to 0 for wire compatibility with older
+     * senders, which means "no local entity exists" only.
+     */
+    val since: Long = 0L,
     val sessions: List<Session> = emptyList(),
     val doses: List<Dose> = emptyList(),
     val substances: List<Substance> = emptyList(),

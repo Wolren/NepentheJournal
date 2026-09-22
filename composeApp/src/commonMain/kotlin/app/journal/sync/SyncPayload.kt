@@ -62,7 +62,22 @@ data class HostInfo(
     val deviceId: String,
     val deviceName: String,
     val fingerprint: String,
-    val protocolVersion: Int = 1
+    val protocolVersion: Int = 1,
+    /**
+     * True when this host serves the continuous-sync WebSocket endpoint
+     * (/sync/ws). Clients MUST skip WebSocket use when this field is absent
+     * or false (older hosts, and the iOS host today), falling back to HTTP
+     * push/pull only. Defaults to false, so ignoreUnknownKeys decoding in
+     * both directions stays safe. Contract section f.
+     */
+    val wsSupported: Boolean = false,
+    /**
+     * Host's STATIC P-256 ECDH public key: base64 of the 65-byte ANSI X9.62
+     * uncompressed point (0x04 || X || Y). Null until the host implements the
+     * ECDH pairing contract; clients MUST refuse to pair when it is absent.
+     * Field name PairingEcdh.HOST_PUBLIC_KEY_FIELD. Contract section g.
+     */
+    val ecdhPublicKeyB64: String? = null
 )
 
 /**
@@ -73,7 +88,16 @@ data class PairingVerifyRequest(
     val token: String,
     val clientDeviceId: String,
     val clientDeviceName: String,
-    val clientFingerprint: String
+    val clientFingerprint: String,
+    /**
+     * Client's EPHEMERAL P-256 ECDH public key (base64, 65-byte uncompressed
+     * point), fresh per pairing attempt. The host seals the sharedSecret under
+     * the ECDH-derived key and returns it in PairingResultResponse.ecdhSecretB64.
+     * Field name PairingEcdh.CLIENT_PUBLIC_KEY_FIELD. Null only from clients
+     * that predate contract section g; hosts MUST reject such requests once
+     * the SYNC-JVM/SYNC-IOS phases land.
+     */
+    val clientEcdhPublicKeyB64: String? = null
 )
 
 /**
@@ -90,11 +114,31 @@ data class PairingResultResponse(
     val success: Boolean,
     val error: String? = null,
     val deviceId: String? = null,
+    /**
+     * LEGACY plaintext sharedSecret. Contract section g: hosts stop
+     * populating this field and clients stop accepting it; it is deleted from
+     * this DTO once both platform phases have removed their reads/writes.
+     * Never emit it: a LAN observer of the pairing response must not learn
+     * the permanent sync secret.
+     */
     val sharedSecret: String? = null,
+    /**
+     * LEGACY token-wrapped secret (PBKDF2 over the pairing token). Superseded
+     * by [ecdhSecretB64]: the unwrap key (the token) travels in the same
+     * cleartext request body, so this field cannot resist a sniffer. Kept
+     * only for wire compatibility until both platform phases drop it.
+     */
     val encSecretB64: String? = null,
     val hostDeviceId: String? = null,
     val hostDeviceName: String? = null,
-    val hostFingerprint: String? = null
+    val hostFingerprint: String? = null,
+    /**
+     * base64(encryptBody(sharedSecret, wrapKey)) where wrapKey is the
+     * ECDH-derived key (PairingEcdh). This is the ONLY field that carries the
+     * sharedSecret under contract section g; clients fail pairing closed when
+     * it is absent.
+     */
+    val ecdhSecretB64: String? = null
 )
 
 /**

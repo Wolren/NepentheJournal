@@ -48,13 +48,13 @@ class SyncTransport(
     // Background coroutine scope for mDNS and other long-lived tasks
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Mutual exclusion for sync operations — prevents concurrent pairing/trust-store races.
+    // Mutual exclusion for sync operations; prevents concurrent pairing/trust-store races.
     private val syncLock = Mutex()
 
     // Active discovered peers from LAN scanning
     private val _discoveredPeers = MutableStateFlow<List<DiscoveredPeer>>(emptyList())
 
-    // Debug log — keeps the last 200 sync-related events for the UI debug viewer
+    // Debug log: keeps the last 200 sync-related events for the UI debug viewer
     private val _debugLog = MutableSharedFlow<String>(replay = 200)
     private fun appendDebug(msg: String) {
         Log.withTag("SyncTransport").i { msg }
@@ -187,7 +187,7 @@ class SyncTransport(
                     }
                     lanDiscovery?.registerService(info.port, deviceId, deviceFingerprint)
                 } catch (e: Exception) {
-                    Log.withTag("SyncTransport").w { "mDNS init/register failed: ${e.message} — continuing without LAN discovery" }
+                    Log.withTag("SyncTransport").w { "mDNS init/register failed: ${e.message}; continuing without LAN discovery" }
                     lanDiscovery = null
                 }
                 Result.success(info)
@@ -274,7 +274,7 @@ class SyncTransport(
 
                         // If no pairing token was provided, try to identify the host by fingerprint
                         if (peer.pairingToken.isNullOrBlank()) {
-                            appendDebug("No pairing token — attempting fingerprint-based re-connect")
+                            appendDebug("No pairing token: attempting fingerprint-based re-connect")
                             try {
                                 val probeClient = KtorSyncClient(
                                     repo = repo,
@@ -296,7 +296,7 @@ class SyncTransport(
                                                 peer.host, peer.port, deviceId, knownPeer.sharedSecret
                                             )
                                             if (hostProven) {
-                                                appendDebug("Host identity verified (challenge-response) — re-using stored secret for ${knownPeer.displayName}")
+                                                appendDebug("Host identity verified (challenge-response): re-using stored secret for ${knownPeer.displayName}")
                                                 val trustedPeer = DiscoveredPeer(
                                                     deviceId = knownPeer.deviceId,
                                                     displayName = knownPeer.displayName,
@@ -307,9 +307,9 @@ class SyncTransport(
                                                 )
                                                 return@withLock syncWith(trustedPeer, continuous)
                                             }
-                                            appendDebug("Host failed identity challenge — NOT re-using stored secret, needs re-pairing")
+                                            appendDebug("Host failed identity challenge: NOT re-using stored secret, needs re-pairing")
                                         } else {
-                                            appendDebug("Host fingerprint not in trust store — needs pairing")
+                                            appendDebug("Host fingerprint not in trust store: needs pairing")
                                         }
                                     } else {
                                         appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
@@ -466,7 +466,7 @@ class SyncTransport(
                             client.sendDelta(session, delta)
                             lastSyncTime = System.currentTimeMillis()
                         } catch (_: Exception) {
-                            // WS disconnected — mutation job will be recreated on next reconnect
+                            // WS disconnected; mutation job will be recreated on next reconnect
                         }
                     }
             }
@@ -635,7 +635,7 @@ class SyncTransport(
 
     // ===== WS Heartbeat & Incoming Reader =====
 
-    /** Launch a coroutine that reads incoming WS frames — processes pongs, pings, deltas, acks. */
+    /** Launch a coroutine that reads incoming WS frames: processes pongs, pings, deltas, acks. */
     private fun launchIncomingReader(
         deviceId: String,
         session: WebSocketSession,
@@ -658,7 +658,7 @@ class SyncTransport(
                                     appendDebug("WS delta from $deviceId: $skipped invalid items skipped")
                                 }
                             }
-                            is WsAck -> { /* server acknowledged our delta — nothing to do */ }
+                            is WsAck -> { /* server acknowledged our delta: nothing to do */ }
                             is WsPing -> {
                                 session.send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), WsPong(msg.seq))))
                             }
@@ -700,7 +700,7 @@ class SyncTransport(
                 }
 
                 if (wsConnection.lastPongSeq < seq) {
-                    Log.withTag("SyncTransport").w { "Heartbeat timeout for $deviceId — no pong within 10s" }
+                    Log.withTag("SyncTransport").w { "Heartbeat timeout for $deviceId: no pong within 10s" }
                     appendDebug("Heartbeat timeout: no pong from $deviceId within 10s")
                     triggerReconnect(deviceId)
                     return@launch
@@ -758,16 +758,9 @@ class SyncTransport(
 
     // ===== Data Validation =====
 
-    companion object {
-        private const val MIN_VALID_TIMESTAMP = 946684800000L // 2000-01-01T00:00:00Z
-        private const val MAX_FUTURE_MS = 86_400_000L // allow 1 day in the future
-    }
-
-    /** Validate entity timestamps: must be between year 2000 and now+1day. */
-    private fun isReasonableTimestamp(ts: Long): Boolean {
-        val now = System.currentTimeMillis()
-        return ts in MIN_VALID_TIMESTAMP..(now + MAX_FUTURE_MS)
-    }
+    /** Validate entity timestamps via the shared EntityTimePolicy. */
+    private fun isReasonableTimestamp(ts: Long): Boolean =
+        EntityTimePolicy.isReasonableEntityTime(ts)
 
     /**
      * Apply a WsDelta with per-entity data validation.
@@ -861,7 +854,7 @@ class SyncTransport(
                     }
                 }
                 toRemove.forEach { deviceId ->
-                    Log.withTag("SyncTransport").w { "Stale WS connection to $deviceId — removing" }
+                    Log.withTag("SyncTransport").w { "Stale WS connection to $deviceId: removing" }
                     appendDebug("Stale cleanup: removing connection to $deviceId")
                     wsConnections.remove(deviceId)?.let { conn ->
                         conn.mutationJob.cancel()
