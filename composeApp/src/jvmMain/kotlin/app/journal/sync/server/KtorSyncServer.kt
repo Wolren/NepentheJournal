@@ -82,7 +82,7 @@ class KtorSyncServer(
                 null
             }
             boundPort = resolved ?: port
-            val lanIp = resolveLocalIpV4() ?: "127.0.0.1"
+            val lanIp = resolveLocalIpv4() ?: "127.0.0.1"
             Log.withTag("KtorSyncServer").i { "Server started on $lanIp:$boundPort (fingerprint=$fp)" }
             return HostingInfo(lanIp, boundPort!!, fp)
         } catch (e: Exception) {

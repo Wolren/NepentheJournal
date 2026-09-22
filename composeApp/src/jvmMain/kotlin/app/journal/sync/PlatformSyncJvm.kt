@@ -26,8 +26,12 @@ import java.security.cert.Certificate
  * Enumerates all network interfaces, picks the first site-local IPv4 address
  * (192.168.x.x, 10.x.x.x, 172.16-31.x.x), falling back to any non-loopback
  * IPv4 address. Returns null if no suitable address is found.
+ *
+ * actual of the commonMain `expect fun resolveLocalIpv4()` (PlatformSync.kt);
+ * because androidMain dependsOn jvmMain this one body serves desktop AND
+ * Android, exactly like the generateSelfSignedP12 actual below it.
  */
-fun resolveLocalIpV4(): String? {
+actual fun resolveLocalIpv4(): String? {
     val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
     val candidates = mutableListOf<String>()
     while (interfaces.hasMoreElements()) {

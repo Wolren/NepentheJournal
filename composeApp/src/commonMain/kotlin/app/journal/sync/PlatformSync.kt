@@ -32,3 +32,18 @@ expect fun generateSelfSignedP12(
     alias: String,
     password: CharArray
 )
+
+/**
+ * First site-local (LAN) IPv4 address of this machine, else any non-loopback
+ * IPv4 address, else null when no suitable address exists.
+ *
+ * One shared signature for the platform LAN-address resolvers so every host
+ * can advertise a dialable sync address instead of the 0.0.0.0 wildcard:
+ *
+ * - jvmMain actual (compiled into BOTH desktop and Android, which
+ *   dependsOn jvmMain): the pre-existing resolveLocalIpV4 body, renamed in
+ *   PlatformSyncJvm.kt.
+ * - iosMain actual: a platform.darwin.getifaddrs walk over sockaddr_in
+ *   records (PlatformSyncIos.kt).
+ */
+expect fun resolveLocalIpv4(): String?

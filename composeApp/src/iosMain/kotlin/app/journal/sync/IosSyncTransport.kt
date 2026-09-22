@@ -153,14 +153,14 @@ class IosSyncTransport(
                 throw e
             }
             Log.withTag("IosSync").i { "iOS sync server bound on :$port" }
-            // Advertised address stays the wildcard bind: iosMain has no
-            // LAN IP resolver (resolveLocalIpV4 is jvmMain only, there is
-            // no expect/actual local-address API and no Network framework
-            // usage in this repo to reuse, and inventing getifaddrs C
-            // interop here could not be compiled on the host that owns this
-            // file). Peers pair against the address the user types.
-            _status.update { it.copy(isHosting = true, hostAddress = "$BIND_ADDRESS:$port") }
-            Result.success(HostingInfo(BIND_ADDRESS, port, deviceFingerprint))
+            // Advertised address: the shared LAN resolver (getifaddrs walk
+            // in PlatformSyncIos.kt, expect/actual resolveLocalIpv4) gives
+            // peers a dialable site-local address; fall back to the wildcard
+            // bind only when no suitable IPv4 exists. Peers pair against the
+            // address the user types.
+            val advertisedAddress = resolveLocalIpv4() ?: BIND_ADDRESS
+            _status.update { it.copy(isHosting = true, hostAddress = "$advertisedAddress:$port") }
+            Result.success(HostingInfo(advertisedAddress, port, deviceFingerprint))
         } catch (e: CancellationException) {
             // A cancelled start leaves neither a listener nor a claim: the
             // engine is stopped under NonCancellable, then the cancellation
@@ -413,6 +413,11 @@ class IosSyncTransport(
 
     override suspend fun revokeTrustedDevice(deviceId: String) {
         trustStore.revokeDevice(deviceId)
+        // PBKDF2 key-cache purge: the hook SyncCryptoIos.kt documents as
+        // missing. Mirrors jvmMain SyncTransport.revokeDevice exactly: a
+        // revoke can leave no key material for ANY peer resident, not just
+        // the revoked one.
+        clearAesKeyCache()
         disconnectFrom(deviceId)
     }
 
@@ -603,17 +608,14 @@ class IosSyncTransport(
         internal const val PAIRING_TOKEN_TTL_MS = 120_000L
 
         /**
-         * Wildcard bind address, also the address startHosting advertises.
+         * Wildcard bind address: the fallback for the advertised address
+         * when [resolveLocalIpv4] finds no suitable IPv4 (it is never the
+         * bind itself; the CIO engine binds all interfaces regardless).
          *
-         * The JVM host advertises resolveLocalIpV4() instead (first site
-         * local IPv4, then any non loopback address). That helper lives in
-         * jvmMain only: there is no expect/actual local address API in this
-         * project and no existing Network framework usage in iosMain to
-         * build on, and the only remaining route (new C interop over
-         * platform.darwin.getifaddrs plus sockaddr_in) cannot be compiled
-         * on the host that maintains this file, so it is deliberately not
-         * invented here. Bind stays on all interfaces; the address a user
-         * pairs with is typed by hand.
+         * The JVM host advertises resolveLocalIpv4() directly
+         * (KtorSyncServer: `resolveLocalIpv4() ?: "127.0.0.1"`). Both hosts
+         * now share that one expect/actual signature (commonMain
+         * PlatformSync.kt); the iOS side of it lives in PlatformSyncIos.kt.
          */
         private const val BIND_ADDRESS = "0.0.0.0"
 
