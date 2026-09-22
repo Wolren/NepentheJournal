@@ -11,6 +11,11 @@ actual object PlatformFile {
         return File(path).readText()
     }
 
+    actual fun size(path: String): Long {
+        val file = File(path)
+        return if (file.exists()) file.length() else -1L
+    }
+
     actual fun dataDir(): String {
         return System.getProperty("user.home")?.let { "$it/.nepenthe" }
             ?: throw IllegalStateException("Cannot determine home directory")

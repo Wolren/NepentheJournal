@@ -2,12 +2,11 @@ package app.journal.data
 
 import app.journal.NepentheApp
 import app.journal.log.Log
-import app.journal.model.*
 import app.journal.serde.AppJson
 import app.journal.util.PlatformLock
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
 import java.io.File
+import java.io.IOException
 
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
@@ -24,7 +23,20 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
     private fun tempPath(): String = dataPath() + ".tmp"
     private fun backupPath(): String = dataPath() + ".bak"
 
+    /** Set to true when [load] had to use [recoverSnapshot] (partial recovery). */
+    @Volatile
+    actual var lastLoadHadIssues: Boolean = false
+        private set
+
+    /** Human-readable summary of what was recovered during the last [load]. */
+    @Volatile
+    actual var lastLoadIssueSummary: String = ""
+        private set
+
     actual fun load() = saveLock.withLock {
+        lastLoadHadIssues = false
+        lastLoadIssueSummary = ""
+
         val target = File(dataPath())
         val tmp = File(tempPath())
 
@@ -40,98 +52,17 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
         try {
             val text = target.readText()
-            val snapshot = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }
-                .getOrElse { e ->
-                    Log.withTag("JournalStore").w { "Journal data failed full parse, attempting per-list recovery: ${e.message}" }
-                    recoverSnapshot(text)
-                }
-            AppJson.apply(repo, snapshot)
+            // Same recovery path + issue flags as JournalStoreDesktop so the
+            // App.kt recovery banner works on Android too (audit HIGH).
+            val decoded = decodeSnapshotWithRecovery(text)
+            if (decoded.parseError != null) {
+                lastLoadHadIssues = true
+                lastLoadIssueSummary = "Recovered from parse failure: ${decoded.parseError}"
+            }
+            AppJson.apply(repo, decoded.snapshot)
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
         }
-    }
-
-    /**
-     * Best-effort recovery when the whole-file parse fails: decode each top-level
-     * field on its own so a single malformed record only drops that record,
-     * not the entire category. Tombstones, persons, and prefs are recovered the
-     * same way so a partial load never silently wipes them.
-     * Uses proper [JsonElement] parsing, not string splitting.
-     */
-    private fun recoverSnapshot(text: String): JournalSnapshot {
-        val root: JsonObject =
-            runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()
-                ?: return JournalSnapshot(savedAt = app.journal.util.currentTimeMillis())
-        fun <T : Any> decodeList(key: String, serializer: KSerializer<T>): List<T> {
-            return try {
-                val arr = root[key]?.jsonArray ?: return emptyList()
-                arr.mapNotNull { element ->
-                    runCatching {
-                        AppJson.json.decodeFromJsonElement(serializer, element)
-                    }.getOrNull()
-                }
-            } catch (_: Exception) { emptyList() }
-        }
-        fun decodeBoolean(key: String, default: Boolean): Boolean =
-            runCatching { root[key]?.jsonPrimitive?.boolean ?: default }.getOrDefault(default)
-        fun decodeString(key: String, default: String): String =
-            runCatching {
-                val el = root[key] ?: return@runCatching default
-                if (el is JsonNull) default else el.jsonPrimitive.content
-            }.getOrDefault(default)
-        fun decodeNullableString(key: String): String? =
-            runCatching {
-                val el = root[key] ?: return@runCatching null
-                if (el is JsonNull) null else el.jsonPrimitive.content
-            }.getOrNull()
-        val tombstones: Map<String, Long> = runCatching {
-            root["tombstones"]?.jsonObject?.entries?.mapNotNull { (k, v) ->
-                runCatching { k to v.jsonPrimitive.long }.getOrNull()
-            }?.toMap() ?: emptyMap()
-        }.getOrDefault(emptyMap())
-        val ratingScaleMode: RatingScaleMode? = runCatching {
-            val el = root["ratingScaleMode"] ?: return@runCatching null
-            if (el is JsonNull) null
-            else AppJson.json.decodeFromJsonElement(RatingScaleMode.serializer(), el)
-        }.getOrNull()
-        val sessions = decodeList("sessions", Session.serializer())
-        val substances = decodeList("substances", Substance.serializer())
-        val doses = decodeList("doses", Dose.serializer())
-        val notes = decodeList("notes", Note.serializer())
-        val timelineEvents = decodeList("timelineEvents", TimelineEvent.serializer())
-        val interactions = decodeList("interactions", Interaction.serializer())
-        val effects = decodeList("effects", Effect.serializer())
-        val customUnits = decodeList("customUnits", CustomUnit.serializer())
-        val persons = decodeList("persons", Person.serializer())
-        Log.withTag("JournalStore").i {
-            "Recovered journal: ${sessions.size} sessions, ${substances.size} substances, " +
-            "${doses.size} doses, ${notes.size} notes, ${timelineEvents.size} events, " +
-            "${interactions.size} interactions, ${effects.size} effects, ${customUnits.size} units, " +
-            "${persons.size} persons, ${tombstones.size} tombstones"
-        }
-        return JournalSnapshot(
-            savedAt = app.journal.util.currentTimeMillis(),
-            sessions = sessions,
-            substances = substances,
-            doses = doses,
-            notes = notes,
-            timelineEvents = timelineEvents,
-            interactions = interactions,
-            effects = effects,
-            customUnits = customUnits,
-            persons = persons,
-            tombstones = tombstones,
-            ratingScaleMode = ratingScaleMode,
-            useShulginRating = decodeBoolean("useShulginRating", false),
-            useSubstanceColors = decodeBoolean("useSubstanceColors", true),
-            welcomeCompleted = decodeBoolean("welcomeCompleted", false),
-            seedFingerprint = decodeNullableString("seedFingerprint"),
-            obsidianVaultPath = decodeString("obsidianVaultPath", ""),
-            obsidianAutoExport = decodeBoolean("obsidianAutoExport", false),
-            obsidianSubfolder = decodeString("obsidianSubfolder", "Nepenthe"),
-            obsidianFileOrganization = decodeString("obsidianFileOrganization", "flat"),
-            showSessionsTrendChart = decodeBoolean("showSessionsTrendChart", false)
-        )
     }
 
     actual fun save(fullBackup: Boolean) = saveLock.withLock {
@@ -142,7 +73,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         try {
             baseDir.mkdirs()
 
-            // Locked snapshot — see JournalStoreDesktop.save() (audit S1).
+            // Locked snapshot - see JournalStoreDesktop.save() (audit S1).
             val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
@@ -162,40 +93,95 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
 
             if (!tmp.renameTo(target)) {
-                Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
-                target.writeText(text)
-                tmp.delete() // stale temp from the failed rename must not linger
+                Log.withTag("JournalStore").w { "Atomic rename failed (target may be locked), falling back to direct write with retry" }
+                // Retry up to 3 times total (initial + 2) with 100ms delay between attempts
+                var success = false
+                for (attempt in 1..3) {
+                    try {
+                        if (attempt > 1) {
+                            Thread.sleep(100L)
+                        }
+                        target.writeText(text)
+                        success = true
+                        break
+                    } catch (e: IOException) {
+                        Log.withTag("JournalStore").w { "Direct write attempt $attempt failed: ${e.message}" }
+                    }
+                }
+                if (success) {
+                    tmp.delete() // stale temp from the failed rename must not linger
+                } else {
+                    Log.withTag("JournalStore").e { "Failed to write journal data after 3 attempts" }
+                }
             }
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to save journal data: ${e.message}" }
         }
     }
 
-    actual fun restoreFromBackup(): Boolean {
-        Log.withTag("JournalStore").w { "restoreFromBackup not implemented on Android" }
-        return false
+    /**
+     * Replaces the main journal file from the .bak backup and reloads.
+     * Returns true if restore succeeded, false if no .bak was available.
+     */
+    actual fun restoreFromBackup(): Boolean = saveLock.withLock {
+        try {
+            val target = File(dataPath())
+            val backup = File(backupPath())
+            if (!backup.exists()) {
+                Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
+                return@withLock false
+            }
+            backup.copyTo(target, overwrite = true)
+            Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
+            // The backup is authoritative: clear live state first so entities created
+            // after the backup was taken are not merged back on top of the restore.
+            repo.clearAll()
+            // Reload the restored data
+            load()
+            return@withLock true
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").e(e) { "Failed to restore from backup: ${e.message}" }
+            return@withLock false
+        }
     }
 
-    actual fun triggerAutoBackup() {
-        val target = File(dataPath())
-        if (!target.exists()) return
+    /**
+     * Creates a timestamped backup copy in the .auto/ subdirectory next to the journal data file,
+     * named YYYYMMDD_HHmmss.json. Intended to be called on app close from the UI layer.
+     * After creating the new backup, rotates old backups keeping only the 10 most recent.
+     */
+    actual fun triggerAutoBackup() = saveLock.withLock {
         try {
+            val target = File(dataPath())
+            if (!target.exists()) {
+                Log.withTag("JournalStore").w { "Cannot auto-backup: no journal file exists" }
+                return@withLock
+            }
             val autoDir = File(baseDir, ".auto")
             autoDir.mkdirs()
             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
             val backupFile = File(autoDir, "$timestamp.json")
             target.copyTo(backupFile, overwrite = false)
             Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
+
+            // Rotate auto-backups: keep only the 10 most recent (desktop/iOS parity;
+            // triggerAutoBackup runs on every close so the directory was unbounded).
+            val allAutoBackups = autoDir.listFiles()
+                ?.filter { it.name.endsWith(".json") }
+                ?.sortedByDescending { it.name }
+                ?: emptyList()
+            if (allAutoBackups.size > 10) {
+                val toDelete = allAutoBackups.drop(10)
+                for (old in toDelete) {
+                    if (old.delete()) {
+                        Log.withTag("JournalStore").i { "Removed old auto-backup: ${old.name}" }
+                    } else {
+                        Log.withTag("JournalStore").w { "Failed to remove old auto-backup: ${old.name}" }
+                    }
+                }
+            }
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to create auto-backup: ${e.message}" }
         }
     }
-
-    @Volatile
-    actual var lastLoadHadIssues: Boolean = false
-        private set
-
-    @Volatile
-    actual var lastLoadIssueSummary: String = ""
-        private set
 }

@@ -29,6 +29,22 @@ actual object PlatformFile {
         }
     }
 
+    actual fun size(path: String): Long {
+        if (path.startsWith("content://")) {
+            val uri = Uri.parse(path)
+            NepentheApp.appContext.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (idx >= 0 && !cursor.isNull(idx)) return cursor.getLong(idx)
+                }
+            }
+            // Size unknown for this provider: let the caller decide (report -1).
+            return -1L
+        }
+        val file = File(path)
+        return if (file.exists()) file.length() else -1L
+    }
+
     actual fun dataDir(): String {
         return NepentheApp.appContext.filesDir.absolutePath
     }

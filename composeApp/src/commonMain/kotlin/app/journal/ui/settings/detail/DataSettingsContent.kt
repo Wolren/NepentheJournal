@@ -96,9 +96,20 @@ internal fun DataSettingsContent(
                             val path = FilePicker.openFile("JSON files", listOf("json"))
                             if (path != null) {
                                 try {
+                                    // Check the file length BEFORE readText: the 50 MB
+                                    // guard inside ExportImport can only see the content
+                                    // once it is already in memory. size() == -1 means
+                                    // unknown, which falls through to the decode checks.
+                                    if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
+                                        onStatusChange("Import failed: file too large (max 50 MB)")
+                                        return@launch
+                                    }
                                     val content = PlatformFile.readText(path)
-                                    val count = ExportImport.importSessions(repo, content)
-                                    onStatusChange("Imported $count sessions")
+                                    val result = ExportImport.importSessionsDetailed(repo, content)
+                                    onStatusChange(
+                                        if (result.error != null) "Import failed: ${result.error}"
+                                        else "Imported ${result.count} sessions"
+                                    )
                                 } catch (e: Exception) {
                                     onStatusChange("Import failed: ${e.message}")
                                 }
@@ -119,7 +130,7 @@ internal fun DataSettingsContent(
                                 try {
                                     val json = ExportImport.exportFullJournal(repo)
                                     PlatformFile.writeText(path, json)
-                                    onStatusChange("Exported full journal as JSON")
+                                    onStatusChange("Exported full journal backup (backup format; restore with Import backup)")
                                 } catch (e: Exception) {
                                     onStatusChange("Full JSON export failed: ${e.message}")
                                 }
@@ -128,10 +139,35 @@ internal fun DataSettingsContent(
                     }, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Default.Schema, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Export as JSON", maxLines = 1)
+                        Text("Backup (full)", maxLines = 1)
                     }
-                    // Spacer to keep alignment
-                    Box(modifier = Modifier.weight(1f))
+                    AppOutlinedButton(onClick = {
+                        scope.launch {
+                            val path = FilePicker.openFile("JSON files", listOf("json"))
+                            if (path != null) {
+                                try {
+                                    // Size check before readText (same as session import).
+                                    if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
+                                        onStatusChange("Import failed: file too large (max 50 MB)")
+                                        return@launch
+                                    }
+                                    val content = PlatformFile.readText(path)
+                                    val result = ExportImport.importFullJournal(repo, content)
+                                    onStatusChange(
+                                        if (result.error != null) "Import failed: ${result.error}"
+                                        else "Imported full journal backup: ${result.sessions} sessions, " +
+                                            "${result.substances} substances, ${result.doses} doses"
+                                    )
+                                } catch (e: Exception) {
+                                    onStatusChange("Import failed: ${e.message}")
+                                }
+                            }
+                        }
+                    }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Import backup", maxLines = 1)
+                    }
                 }
                 if (statusText != null) {
                     Spacer(Modifier.height(4.dp))

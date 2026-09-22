@@ -28,6 +28,12 @@ actual object PlatformFile {
             ?: throw Error("File not found or unreadable: $path")
     }
 
+    actual fun size(path: String): Long {
+        if (!fileManager.fileExistsAtPath(path)) return -1L
+        val attrs = fileManager.attributesOfItemAtPath(path, null)
+        return (attrs?.get(NSFileSize) as? NSNumber)?.longValue ?: -1L
+    }
+
     actual fun dataDir(): String {
         val docs = NSSearchPathForDirectoriesInDomains(
             NSDocumentDirectory, NSUserDomainMask, true

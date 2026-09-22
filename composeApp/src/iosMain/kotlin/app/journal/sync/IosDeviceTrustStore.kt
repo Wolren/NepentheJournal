@@ -108,6 +108,13 @@ class IosDeviceTrustStore(private val dataDir: String) {
     }
 
     private fun loadLocked(): IosTrustFile {
+        // Serve the in-memory cache first, exactly like the JVM twin's
+        // DeviceTrustStore.loadStore (first line): per-request getSharedSecret /
+        // isTrustedDeviceId must not re-read, base64-decode, AES-GCM-decrypt and
+        // JSON-parse the file on every call. Every write path (saveLocked)
+        // refreshes cachedStore before touching disk, so the cache never goes
+        // stale within the process.
+        cachedStore?.let { return it }
         if (!fileManager.fileExistsAtPath(filePath)) {
             if (fileManager.fileExistsAtPath(backupPath)) {
                 Log.withTag("IosTrustStore").w { "Primary trust store missing; restoring from backup" }

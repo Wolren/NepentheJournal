@@ -5,7 +5,6 @@ import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
-import app.journal.serde.AppJson
 import app.journal.sync.sha256
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
@@ -158,7 +157,7 @@ object DataInitializer {
             Log.withTag("DataInit").i { "Generated fuzz test data (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)" }
         }
 
-        // Step 5: Wire debounced auto-save (4.1) — saves 2s after every mutation
+        // Step 5: Wire debounced auto-save (4.1): saves 2s after every mutation
         if (scope != null) {
             autoSaveJob = repo.autoSave(scope) { store.save() }
             Log.withTag("DataInit").i { "Auto-save enabled (debounce 2000ms)" }
@@ -211,7 +210,7 @@ object DataInitializer {
             val newB = idMap[interaction.substanceBId] ?: interaction.substanceBId
             if (newA != interaction.substanceAId || newB != interaction.substanceBId) {
                 val sortedIds = listOf(newA, newB).sorted()
-                // Preserve the original interaction ID — it's just a unique key,
+                // Preserve the original interaction ID: it's just a unique key,
                 // the canonical pairing is defined by the substanceAId/substanceBId fields.
                 repo.upsertInteraction(
                     interaction.copy(
@@ -257,7 +256,9 @@ object DataInitializer {
                     Log.withTag("DataInit").w { "Seed resource $SEED_RESOURCE not found" }
                     return false
                 }
-            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(text)
+            // Strict shared decode (no recovery fallback): a corrupt bundled seed
+            // must fail this launch and retry next time, never half-load.
+            val snapshot = decodeSnapshot(text).getOrThrow()
             // Normalize substance classes (case, plural, joined-string cleanup)
             val normalizedSnapshot = snapshot.copy(
                 substances = snapshot.substances.map { sub ->
@@ -293,14 +294,16 @@ object DataInitializer {
     fun reloadDefaultSubstances(repo: IJournalRepository) {
         try {
             val text = readBundledResource(SEED_RESOURCE) ?: return
-            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(text)
+            // Same strict shared decode as tryLoadSeed; the outer catch keeps
+            // reporting the failure exactly as before.
+            val snapshot = decodeSnapshot(text).getOrThrow()
             val normalized = snapshot.copy(
                 substances = snapshot.substances.map { sub ->
                     sub.copy(substanceClass = SubstanceClassNormalizer.normalize(sub.substanceClass))
                 }
             )
 
-            // Only touch substances — preserve sessions, doses, settings, etc.
+            // Only touch substances: preserve sessions, doses, settings, etc.
             // Seed substances (deviceOrigin == "system") get overwritten by ID.
             // User-created substances are also overwritten if they share an ID;
             // substances with IDs not in the seed survive untouched.

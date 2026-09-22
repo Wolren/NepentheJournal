@@ -59,8 +59,29 @@ object AppJson {
     }
 
     fun apply(repo: IJournalRepository, snapshot: JournalSnapshot) {
-        if (snapshot.version != JournalSnapshot.CURRENT_VERSION) {
-            Log.withTag("JournalStore").w { "JournalSnapshot version mismatch: file v${snapshot.version}, app v${JournalSnapshot.CURRENT_VERSION}. Data may not load correctly." }
+        // Explicit version dispatch (audit "Schema versioning"): every arm is an
+        // identity migration today because no field migration has been needed
+        // yet, but the dispatch exists so a future version bump adds its arms
+        // here instead of silently warn-and-continuing. Unknown or newer
+        // versions get a clear warning: the file may come from a future app
+        // version and fields this build does not know are ignored on decode.
+        when (val version = snapshot.version) {
+            JournalSnapshot.CURRENT_VERSION -> {
+                // Current format: nothing to migrate.
+            }
+            in 1 until JournalSnapshot.CURRENT_VERSION -> {
+                Log.withTag("JournalStore").w {
+                    "JournalSnapshot version $version is older than app version " +
+                        "${JournalSnapshot.CURRENT_VERSION}; loading as-is (identity migration, no field migrations defined yet)"
+                }
+            }
+            else -> {
+                Log.withTag("JournalStore").w {
+                    "JournalSnapshot version $version does not match any known format " +
+                        "(app version ${JournalSnapshot.CURRENT_VERSION}): file is corrupt or was written " +
+                        "by a future app version. Loading best-effort; unknown fields are ignored."
+                }
+            }
         }
         repo.applyBatch(
             sessions = snapshot.sessions,

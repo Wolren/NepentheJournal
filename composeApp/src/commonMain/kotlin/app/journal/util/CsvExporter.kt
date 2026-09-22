@@ -89,11 +89,10 @@ object CsvExporter {
 
     private val noteTable = CsvTable(listOf(
         "id", "session_id", "title", "body",
-        "is_pinned", "created_at", "updated_at"
+        "created_at", "updated_at"
     )) { note: Note ->
         listOf(
             note.id, note.sessionId, note.title, note.body,
-            if (note.isPinned) "true" else "false",
             note.createdAt.toString(), note.updatedAt.toString()
         )
     }
@@ -139,9 +138,13 @@ object CsvExporter {
     /**
      * Resolves a filter into the set of session IDs that match.
      * Empty filter = all sessions.
+     *
+     * IDs come straight from repo.sessions.value: building the full
+     * sessionsDataFrame() here just to collect ids made every filtered export
+     * render the session table twice (audit F-performance row).
      */
     private fun resolveSessionIds(repo: IJournalRepository, filter: CsvExportFilter): Set<String> {
-        var ids = repo.sessionsDataFrame().map { it.id }.toSet()
+        var ids = repo.sessions.value.map { it.id }.toSet()
 
         if (filter.dateFrom != null || filter.dateTo != null) {
             val dateIds = repo.sessionIdsOnDateRange(filter.dateFrom, filter.dateTo).toSet()

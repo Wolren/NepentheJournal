@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.model.*
 import kotlin.test.*
 import java.io.File
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.concurrent.thread
 
@@ -19,6 +20,59 @@ class JournalStoreTest {
             System.setProperty("user.home", origHome)
             tmpDir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun v5EraFixtureLoadsCleanlyAsGoldenFile() = withTempHome { _ ->
+        // Minimal old-shape (v5-era) snapshot: no persons/tombstones/
+        // ratingScaleMode/welcomeCompleted/seedFingerprint, and entities still
+        // carry the legacy docType key the serializer no longer writes. It must
+        // decode as-is (all newer fields default) without tripping recovery.
+        val fixture = """
+            {"version":5,"savedAt":1700000000000,
+             "sessions":[{"id":"s:v5","docType":"session","createdAt":1690000000000,
+                          "updatedAt":1690000000000,"deviceOrigin":"test",
+                          "title":"V5 Session","startTime":1690000000000}],
+             "substances":[{"id":"sub:v5","docType":"substance","createdAt":1690000000000,
+                            "updatedAt":1690000000000,"deviceOrigin":"test",
+                            "name":"Old Substance","cachedAt":1690000000000,
+                            "sourceVersion":"test"}]}
+        """.trimIndent()
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        java.io.File(store.dataPath()).parentFile.mkdirs()
+        java.io.File(store.dataPath()).writeText(fixture)
+
+        store.load()
+        assertFalse(store.lastLoadHadIssues, "A clean v5 file must not trigger recovery")
+        assertTrue(store.lastLoadIssueSummary.isEmpty())
+        assertEquals(1, repo.sessions.value.size)
+        assertEquals("V5 Session", repo.sessions.value.first().title)
+        assertEquals(1, repo.substances.value.size)
+        // Store must stay fully usable afterwards
+        store.save()
+        assertTrue(java.io.File(store.dataPath()).readText().contains("V5 Session"))
+    }
+
+    @Test
+    fun unknownFutureSnapshotVersionLoadsBestEffort() = withTempHome { _ ->
+        // Version dispatch: unknown/newer versions warn but still apply
+        // (identity arm today). The file shape is otherwise current.
+        val repo0 = JournalRepository()
+        repo0.upsertSession(Session(
+            id = "s:future", createdAt = 1700000000000L, updatedAt = 1700000000000L,
+            deviceOrigin = "test", title = "From The Future", startTime = 1700000000000L
+        ))
+        val json = app.journal.serde.AppJson.json.encodeToString(repo0.fullSnapshot().copy(version = 999))
+        val repo = JournalRepository()
+        val store = JournalStore(repo)
+        java.io.File(store.dataPath()).parentFile.mkdirs()
+        java.io.File(store.dataPath()).writeText(json)
+
+        store.load()
+        assertFalse(store.lastLoadHadIssues, "Version mismatch is not a parse failure")
+        assertEquals(1, repo.sessions.value.size)
+        assertEquals("From The Future", repo.sessions.value.first().title)
     }
 
     @Test
@@ -239,7 +293,7 @@ class JournalStoreTest {
         ))
         store.save()
 
-        // Reload — should get both substances
+        // Reload: should get both substances
         val repo2 = JournalRepository()
         val store2 = JournalStore(repo2)
         store2.load()
@@ -265,14 +319,14 @@ class JournalStoreTest {
         val dataFile = File(store.dataPath())
         dataFile.setWritable(false)
 
-        // Attempt save while file is locked — retry loop should handle gracefully, no crash
+        // Attempt save while file is locked: retry loop should handle gracefully, no crash
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Retry Fail", startTime = 2000L
         ))
         store.save() // Must not throw
 
-        // Make file writable again and save — should succeed
+        // Make file writable again and save: should succeed
         dataFile.setWritable(true)
         store.save()
 
