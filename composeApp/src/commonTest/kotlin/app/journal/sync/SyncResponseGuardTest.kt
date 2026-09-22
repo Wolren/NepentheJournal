@@ -89,7 +89,9 @@ class SyncResponseGuardTest {
         val filter = validateSyncResponse(SyncResponse(
             success = true,
             sessions = listOf(
-                session("s:future", updatedAt = now + EntityTimePolicy.FUTURE_MARGIN_MS + 1),
+                // +60s of slack: the validator reads its own currentTimeMillis(), so a +1ms fixture
+                // drifts back inside the window whenever >=1ms elapses between the two reads.
+                session("s:future", updatedAt = now + EntityTimePolicy.FUTURE_MARGIN_MS + 60_000),
                 session("s:skew", updatedAt = now + EntityTimePolicy.FUTURE_MARGIN_MS - 60_000)
             )
         ))
