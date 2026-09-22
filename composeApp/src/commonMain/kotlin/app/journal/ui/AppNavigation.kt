@@ -1,0 +1,429 @@
+/*
+ * Nepenthe Journal - GPLv3
+ * Copyright (C) 2026 Wolren
+ *
+ * Derived from PsychonautWiki Journal (GPL-3.0-or-later)
+ * Copyright (C) 2022 Isaak Hanimann
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+package app.journal.ui
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import app.journal.data.IJournalRepository
+import app.journal.data.JournalStore
+import app.journal.model.Session
+import app.journal.sync.createSyncEngine
+import app.journal.util.currentTimeMillis
+import app.journal.util.isDesktopPlatform
+import app.journal.util.isSoftwareRender
+import app.journal.util.platformDeviceOrigin
+import app.journal.util.TimeDisplayMode
+import app.journal.ui.dashboard.DashboardScreen
+import app.journal.ui.safer.SaferScreen
+import app.journal.ui.search.SearchOverlay
+import app.journal.ui.session.CalendarScreen
+import app.journal.ui.session.SessionEditorScreen
+import app.journal.ui.session.SessionListScreen
+import app.journal.ui.session.SessionListViewModel
+import app.journal.ui.session.SessionTimelineScreen
+import app.journal.ui.session.LiveSessionScreen
+import app.journal.ui.settings.SettingsScreen
+import app.journal.ui.substances.SubstanceDetailScreen
+import app.journal.ui.substances.SubstanceEditorScreen
+import app.journal.ui.substances.SubstanceCompanionScreen
+import app.journal.ui.substances.SubstanceScreen
+import app.journal.ui.theme.BackgroundImage
+import app.journal.ui.theme.ThemeConfig
+
+enum class Screen(
+    val label: String,
+    val filledIcon: ImageVector,
+    val outlinedIcon: ImageVector
+) {
+    DASHBOARD("Dashboard", Icons.Filled.Dashboard, Icons.Outlined.Dashboard),
+    SESSIONS("Sessions", Icons.AutoMirrored.Filled.MenuBook, Icons.AutoMirrored.Outlined.MenuBook),
+    SUBSTANCES("Substances", Icons.Filled.Science, Icons.Outlined.Science),
+    SAFER("Safety", Icons.Filled.Warning, Icons.Outlined.Warning),
+    SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AppNavigation(
+    repo: IJournalRepository,
+    journalStore: JournalStore,
+    themeConfig: ThemeConfig,
+    colorScheme: ColorScheme,
+) {
+    var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    var editingSessionId by remember { mutableStateOf<String?>(null) }
+    var selectedTimelineSessionId by remember { mutableStateOf<String?>(null) }
+    var showCalendar by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
+    var editingSubstanceId by remember { mutableStateOf<String?>(null) }
+    var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
+    val sessionListViewModel = remember { SessionListViewModel.create(repo) }
+    val syncEngine = remember(repo) {
+        // Single persistence owner: the engine persists through THIS store
+        // instead of constructing its own (audit C5).
+        createSyncEngine(repo, persist = { journalStore.save(fullBackup = false) })
+    }
+    val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
+    var liveSessionId by remember { mutableStateOf<String?>(null) }
+    var companionSubstanceId by remember { mutableStateOf<String?>(null) }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colorScheme.background
+    ) {
+        // Desktop keyboard shortcuts
+        val desktopHandler = if (isDesktopPlatform()) {
+            Modifier.onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp && event.isCtrlPressed) {
+                    when (event.key) {
+                        Key.F -> { showSearch = true; true }
+                        Key.N -> { liveSessionId = "__new__"; true }
+                        else -> false
+                    }
+                } else false
+            }
+        } else Modifier
+        Box(Modifier.fillMaxSize().then(desktopHandler)) {
+            // Background image layer
+            BackgroundImage(
+                imagePath = themeConfig.backgroundImagePath,
+                opacity = themeConfig.backgroundOpacity
+            )
+
+            // Foreground content
+            val editingSession = remember(editingSessionId) {
+                editingSessionId?.let { id ->
+                    if (id == "__new__") null
+                    else repo.getSession(id)
+                }
+            }
+            val editingSubstance = remember(editingSubstanceId) {
+                editingSubstanceId?.let { id ->
+                    if (id == "__new__") null
+                    else repo.getSubstance(id)
+                }
+            }
+
+            val stableTimelineId = selectedTimelineSessionId
+            val stableSubstanceId = selectedSubstanceId
+            val stableLiveId = liveSessionId
+
+            SystemBackHandler {
+                when {
+                    liveSessionId != null -> liveSessionId = null
+                    showSearch -> showSearch = false
+                    companionSubstanceId != null -> companionSubstanceId = null
+                    editingSessionId != null -> editingSessionId = null
+                    selectedTimelineSessionId != null -> selectedTimelineSessionId = null
+                    editingSubstanceId != null -> editingSubstanceId = null
+                    selectedSubstanceId != null -> selectedSubstanceId = null
+                    showCalendar -> showCalendar = false
+                }
+            }
+
+            val isSoftwareRender = remember { isSoftwareRender() }
+            val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember {
+                if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
+                else spring(dampingRatio = 1f, stiffness = 4000f)
+            }
+            val fadeSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = remember {
+                if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
+                else spring(dampingRatio = 1f, stiffness = 4000f)
+            }
+
+            AnimatedContent(
+                targetState = when {
+                    showSearch -> NavigationState.Search
+                    companionSubstanceId != null -> NavigationState.CompanionSubstance
+                    liveSessionId != null -> NavigationState.LiveSession
+                    editingSessionId != null -> NavigationState.EditorSession
+                    selectedTimelineSessionId != null -> NavigationState.Timeline
+                    editingSubstanceId != null -> NavigationState.EditorSubstance
+                    selectedSubstanceId != null -> NavigationState.DetailSubstance
+                    showCalendar -> NavigationState.Calendar
+                    else -> NavigationState.Main
+                },
+                transitionSpec = {
+                    if (targetState is NavigationState.Main) {
+                        slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
+                        slideOutVertically(animationSpec = slideSpec) { it / 8 }
+                    } else {
+                        slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
+                        fadeOut(animationSpec = fadeSpec)
+                    }
+                },
+                label = "navOverlay"
+            ) { state ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                ) {
+                    when (state) {
+                    NavigationState.Search -> {
+                        SearchOverlay(
+                            repo = repo,
+                            onBack = { showSearch = false },
+                            onSessionClick = { sessionId ->
+                                selectedTimelineSessionId = sessionId
+                                showSearch = false
+                            },
+                            onSubstanceClick = { subId ->
+                                selectedSubstanceId = subId
+                                showSearch = false
+                            }
+                        )
+                    }
+                    NavigationState.LiveSession -> {
+                        val session = remember(stableLiveId) {
+                            stableLiveId?.let { id ->
+                                if (id == "__new__") null
+                                else repo.getSession(id)
+                            }
+                        }
+                        var liveCreateError by remember { mutableStateOf<String?>(null) }
+                        if (session != null) {
+                            LiveSessionScreen(
+                                repo = repo,
+                                session = session,
+                                onBack = { liveSessionId = null }
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Starting session...")
+                                    liveCreateError?.let { err ->
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(err, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                            val liveCreateKey = stableLiveId
+                            LaunchedEffect(liveCreateKey) {
+                                if (liveCreateKey != "__new__") return@LaunchedEffect
+                                // Live sessions are capped at one: resume the open
+                                // live session instead of stacking a second timer.
+                                val openLive = repo.sessions.value.firstOrNull {
+                                    it.id.startsWith("session:live:") && it.endTime == null
+                                }
+                                if (openLive != null) {
+                                    liveSessionId = openLive.id
+                                    return@LaunchedEffect
+                                }
+                                try {
+                                    val now = currentTimeMillis()
+                                val newSession = Session(
+                                    id = "session:live:${now}",
+                                    title = "Live Session",
+                                    startTime = now,
+                                    createdAt = now, updatedAt = now,
+                                    deviceOrigin = platformDeviceOrigin()
+                                )
+                                repo.upsertSession(newSession)
+                                liveSessionId = newSession.id
+                                } catch (e: Exception) {
+                                    liveCreateError = "Could not start session: ${e.message ?: "unknown error"}"
+                                }
+                            }
+                        }
+                    }
+                    NavigationState.EditorSession -> {
+                        SessionEditorScreen(
+                            repo = repo,
+                            sessionToEdit = editingSession,
+                            onBack = { editingSessionId = null }
+                        )
+                    }
+                    NavigationState.Timeline -> {
+                        val id = stableTimelineId
+                        if (id != null) {
+                            SessionTimelineScreen(
+                                repo = repo,
+                                sessionId = id,
+                                onBack = { selectedTimelineSessionId = null }
+                            )
+                        }
+                    }
+                    NavigationState.EditorSubstance -> {
+                        SubstanceEditorScreen(
+                            repo = repo,
+                            substanceToEdit = editingSubstance,
+                            onBack = { editingSubstanceId = null }
+                        )
+                    }
+                    NavigationState.DetailSubstance -> {
+                        val id = stableSubstanceId
+                        if (id != null) {
+                            SubstanceDetailScreen(
+                                repo = repo,
+                                substanceId = id,
+                                onBack = { selectedSubstanceId = null },
+                                onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null },
+                                onCompanion = { companionSubstanceId = id },
+                                onOpenSubstance = { selectedSubstanceId = it },
+                            )
+                        }
+                    }
+                    NavigationState.CompanionSubstance -> {
+                        val id = companionSubstanceId
+                        if (id != null) {
+                            SubstanceCompanionScreen(
+                                repo = repo,
+                                substanceId = id,
+                                onBack = { companionSubstanceId = null },
+                                onSessionClick = { sessionId: String ->
+                                    selectedTimelineSessionId = sessionId
+                                    companionSubstanceId = null
+                                }
+                            )
+                        }
+                    }
+                    NavigationState.Calendar -> {
+                        CalendarScreen(
+                            repo = repo,
+                            onBack = { showCalendar = false },
+                            onSessionTap = { id -> selectedTimelineSessionId = id; showCalendar = false }
+                        )
+                    }
+                    NavigationState.Main -> {
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = {
+                                if (selectedScreen == Screen.SESSIONS) {
+                                    TopAppBar(
+                                        title = {
+                                            Text(
+                                                selectedScreen.label,
+                                                style = MaterialTheme.typography.titleLarge
+                                            )
+                                        },
+                                        actions = {
+                                            when (selectedScreen) {
+                                                Screen.SESSIONS -> SessionListScreen.TopActions(
+                                                        showFavoritesOnly = showFavs,
+                                                        onToggleFavorites = { sessionListViewModel.showFavoritesOnly.value = !showFavs },
+                                                        onCalendarClick = { showCalendar = true },
+                                                        timeDisplayMode = timeDisplayMode,
+                                                        onCycleTimeDisplay = {
+                                                            timeDisplayMode = TimeDisplayMode.entries[
+                                                                (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                            ]
+                                                        }
+                                                    )
+                                                else -> Unit
+                                            }
+                                        },
+                                        colors = TopAppBarDefaults.topAppBarColors(
+                                            containerColor = Color.Transparent,
+                                            titleContentColor = MaterialTheme.colorScheme.onSurface,
+                                            actionIconContentColor = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    )
+                                }
+                            },
+                            bottomBar = {
+                                NavigationBar(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                ) {
+                                    Screen.entries.forEach { screen ->
+                                        NavigationBarItem(
+                                            selected = selectedScreen == screen,
+                                            onClick = { selectedScreen = screen },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = if (selectedScreen == screen) screen.filledIcon else screen.outlinedIcon,
+                                                    contentDescription = screen.label
+                                                )
+                                            },
+                                            label = { Text(screen.label) }
+                                        )
+                                    }
+                                }
+                            }
+                        ) { innerPadding ->
+                            Box(Modifier.padding(innerPadding).fillMaxSize()) {
+                                when (selectedScreen) {
+                                    Screen.DASHBOARD -> DashboardScreen(
+                                        repo = repo,
+                                        onSearchClick = { showSearch = true }
+                                    )
+                                    Screen.SESSIONS -> SessionListScreen(
+                                        viewModel = sessionListViewModel,
+                                        onNewSession = { editingSessionId = "__new__" },
+                                        onEditSession = { id -> editingSessionId = id },
+                                        onSessionClick = { id ->
+                                            // Ongoing sessions open the live card with its
+                                            // ingestion options; ended sessions open the
+                                            // read-only timeline.
+                                            if (repo.getSession(id)?.endTime == null) liveSessionId = id
+                                            else selectedTimelineSessionId = id
+                                        },
+                                        onLiveSession = { liveSessionId = "__new__" },
+                                        timeDisplayMode = timeDisplayMode,
+                                        onCycleTimeDisplay = {
+                                            timeDisplayMode = TimeDisplayMode.entries[
+                                                (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                            ]
+                                        }
+                                    )
+                                    Screen.SUBSTANCES -> SubstanceScreen(
+                                        onSubstanceClick = { id -> selectedSubstanceId = id },
+                                        onNewSubstance = { editingSubstanceId = "__new__" }
+                                    )
+                                    Screen.SAFER -> SaferScreen()
+                                    Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
+                                }  // closes when(selectedScreen)
+                            }  // closes inner Box(padding)
+                        }  // closes Scaffold innerPadding
+                    }  // closes "main" block
+                    }  // closes when(state)
+                }  // closes Box wrapper (background flash fix)
+            }  // closes AnimatedContent transitionSpec
+        }  // closes outer Box(fillMaxSize)
+    }  // closes Surface
+}
