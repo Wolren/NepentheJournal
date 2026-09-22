@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
@@ -30,7 +30,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionTimelineScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     sessionId: String,
     onBack: () -> Unit,
 ) {
@@ -127,7 +127,7 @@ fun SessionTimelineScreen(
         }
 
         // Visual timeline bar
-        item { TimelineBar(startTime = session.startTime, endTime = session.endTime, events = events, checkins = session.checkins, doses = doses, shulginRating = session.shulginRating) }
+        item { TimelineBar(startTime = session.startTime, endTime = session.endTime, events = events, checkins = session.checkins, doses = doses, repo = repo, shulginRating = session.shulginRating) }
 
         // Phase cards
         if (phaseRanges.isNotEmpty()) {

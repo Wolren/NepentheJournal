@@ -28,7 +28,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.CheckIn
 import app.journal.model.Dose
 import app.journal.model.TimelineEvent
@@ -126,9 +126,9 @@ internal fun TimelineBar(
     events: List<TimelineEvent>,
     checkins: List<CheckIn>,
     doses: List<Dose>,
+    repo: IJournalRepository,
     shulginRating: String? = null,
 ) {
-    val repo = remember { JournalRepository.instance }
     val isDark = isDarkTheme()
     val now = currentTimeMillis()
     val totalDuration = (endTime ?: now) - startTime

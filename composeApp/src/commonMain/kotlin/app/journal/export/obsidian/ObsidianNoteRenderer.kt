@@ -1,6 +1,6 @@
 package app.journal.export.obsidian
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import app.journal.model.*
 import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant

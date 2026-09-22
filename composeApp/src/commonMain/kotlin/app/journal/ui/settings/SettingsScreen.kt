@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.ui.components.DesktopScrollbar
 import androidx.compose.foundation.lazy.rememberLazyListState
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.model.RatingScaleMode
 import app.journal.sync.*
 import app.journal.ui.theme.*
@@ -47,7 +47,7 @@ import app.journal.ui.settings.detail.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     syncEngine: SyncEngine,
 ) {
     val sessionCount by repo.totalSessionCount.collectAsState(initial = 0)

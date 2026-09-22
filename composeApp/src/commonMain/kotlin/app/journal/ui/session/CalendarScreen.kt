@@ -25,8 +25,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import kotlinx.datetime.Instant
@@ -72,7 +72,7 @@ private data class CalendarCellData(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     onBack: () -> Unit,
     onSessionTap: (String) -> Unit,
 ) {

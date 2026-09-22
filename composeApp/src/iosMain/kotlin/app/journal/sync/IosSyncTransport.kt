@@ -1,8 +1,8 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.util.PlatformLock
@@ -46,8 +46,10 @@ import kotlinx.serialization.encodeToString
  * Compatible with desktop and Android hosts using the same protocol.
  */
 class IosSyncTransport(
-    private val repo: JournalRepository,
-    private val dataDir: String = platformSyncDataDir()
+    private val repo: IJournalRepository,
+    private val dataDir: String = platformSyncDataDir(),
+    /** Light persistence callback supplied by the composition root; falls back to a self-built store. */
+    private val persistAfterApply: (() -> Unit)? = null
 ) : SyncEngine {
 
     private val json = AppJson.json
@@ -91,7 +93,7 @@ class IosSyncTransport(
                 isRateLimited = ::isPairingRateLimited,
                 // Durability: flush the journal to disk after every accepted
                 // push and before the ack goes out (mirrors JVM factories).
-                persistAfterApply = { JournalStore(repo).save(fullBackup = false) }
+                persistAfterApply = this.persistAfterApply ?: { JournalStore(repo).save(fullBackup = false) }
             )
             pairingManager.generatePairingToken()
             val now = currentTimeMillis()

@@ -11,12 +11,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Substance
 
 @Composable
-internal fun EffectsSection(substance: Substance) {
-    val repo = remember { JournalRepository.instance }
+internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
     val allEffects by repo.effects.collectAsState()
     var selectedEffect by remember { mutableStateOf<String?>(null) }
 

@@ -1,7 +1,7 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
 import io.ktor.http.*
@@ -27,7 +27,7 @@ import app.journal.sync.encryptBody
 import java.util.concurrent.ConcurrentHashMap
 
 class KtorSyncServer(
-    private val repo: JournalRepository,
+    private val repo: IJournalRepository,
     private val port: Int,
     private val tlsIdentity: TlsIdentityManager,
     private val trustStore: DeviceTrustStore,
@@ -100,7 +100,7 @@ class KtorSyncServer(
  * Use [install] inside [io.ktor.server.engine.embeddedServer] or [io.ktor.server.testing.testApplication].
  */
 class SyncServerRouter(
-    private val repo: JournalRepository,
+    private val repo: IJournalRepository,
     private val trustStore: DeviceTrustStore,
     private val authenticator: SyncAuthenticator,
     private val onConnection: (String) -> Unit,

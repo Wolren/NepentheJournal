@@ -1,6 +1,6 @@
 package app.journal.model
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlin.test.*

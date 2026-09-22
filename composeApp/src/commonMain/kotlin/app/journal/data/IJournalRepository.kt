@@ -208,6 +208,11 @@ interface IJournalRepository {
     fun importTombstones(tombstones: Map<String, Long>)
 
     // ---- Lifecycle ----
-    fun autoSave(store: JournalStore, scope: CoroutineScope): Job
+    /**
+     * Debounced auto-save loop: after a quiet period following each mutation,
+     * invoke [save] (the caller owns persistence, so this interface never
+     * references the JournalStore class).
+     */
+    fun autoSave(scope: CoroutineScope, save: () -> Unit): Job
     fun clearAll()
 }

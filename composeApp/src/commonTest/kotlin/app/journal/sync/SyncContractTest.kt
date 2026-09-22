@@ -4,7 +4,7 @@ import app.journal.data.JournalRepository
 import app.journal.model.*
 import kotlin.test.*
 import kotlinx.serialization.encodeToString
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 
 /**
  * Contract tests for the shared sync protocol.

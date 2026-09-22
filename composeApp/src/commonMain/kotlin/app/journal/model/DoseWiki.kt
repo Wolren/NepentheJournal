@@ -2,7 +2,7 @@ package app.journal.model
 
 import kotlinx.serialization.Serializable
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 
 /**
  * Slimmed DoseWiki substance data, deserialized directly from the bundled

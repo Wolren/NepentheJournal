@@ -1,6 +1,6 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import app.journal.data.JournalRepository
 import app.journal.model.*
 import io.ktor.client.request.*

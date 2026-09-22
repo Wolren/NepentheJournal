@@ -13,18 +13,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.InteractionDedupe
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
 
 @Composable
 internal fun InteractionsSection(
+    repo: IJournalRepository,
     interactions: List<Interaction>,
     substanceId: String,
     onOpenSubstance: (String) -> Unit = {},
 ) {
-    val repo = remember { JournalRepository.instance }
     // Cross-source duplicates (seed class placeholder vs real substance id)
     // render under the same name: collapse to one row per pair, richer wins.
     val shown = remember(interactions) {

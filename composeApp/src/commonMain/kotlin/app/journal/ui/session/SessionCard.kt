@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.ui.components.HoverCard
@@ -44,7 +43,7 @@ fun SessionCard(
     timeDisplayMode: TimeDisplayMode,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onToggleFavorite: () -> Unit = { JournalRepository.instance.toggleFavorite(session.id) }
+    onToggleFavorite: () -> Unit
 ) {
     val isDark = isDarkTheme()
     // Card accent follows the session's actual substances, falling back to the

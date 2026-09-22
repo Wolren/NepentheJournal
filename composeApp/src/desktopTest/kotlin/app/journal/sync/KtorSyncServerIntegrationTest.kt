@@ -155,7 +155,7 @@ class KtorSyncServerIntegrationTest {
             val challenge = "0123456789abcdef0123456789abcdef"
             val resp = client.get("/auth/verify?deviceId=challenge-client&challenge=$challenge")
             assertEquals(HttpStatusCode.OK, resp.status)
-            val data = app.journal.data.AppJson.json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
+            val data = app.journal.serde.AppJson.json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
             assertTrue(kotlin.math.abs(System.currentTimeMillis() - data.timestamp) < 45_000)
 
             // Recompute the expected signature with the shared secret

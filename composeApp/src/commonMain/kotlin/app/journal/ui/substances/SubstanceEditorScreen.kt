@@ -13,8 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.model.InteractionClasses
 import app.journal.model.Substance
 import app.journal.ui.components.*
@@ -23,7 +23,7 @@ import app.journal.util.currentTimeMillis
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceEditorScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     substanceToEdit: Substance? = null,
     onBack: () -> Unit
 ) {

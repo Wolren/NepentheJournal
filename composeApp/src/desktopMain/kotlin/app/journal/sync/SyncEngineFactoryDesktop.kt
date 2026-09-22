@@ -1,6 +1,6 @@
 package app.journal.sync
 
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
 
 /**
@@ -9,8 +9,10 @@ import app.journal.data.JournalStore
  * crash cannot lose data the peer believes was accepted (audit D1).
  * Uses a light save (no .bak rotation; that would copy the journal 6 times
  * per sync frame); the debounced autosave performs the full backup shortly
- * after. Tests construct SyncTransport directly without the callback so they
- * never touch the real user home data path.
+ * after. The composition root passes its own store's light save as [persist];
+ * the fallback store below only runs when no caller supplies one (tests
+ * construct SyncTransport directly without any callback so they never touch
+ * the real user home data path).
  */
-actual fun createSyncEngine(repo: JournalRepository): SyncEngine =
-    SyncTransport(repo, persistAfterApply = { JournalStore(repo).save(fullBackup = false) })
+actual fun createSyncEngine(repo: IJournalRepository, persist: (() -> Unit)?): SyncEngine =
+    SyncTransport(repo, persistAfterApply = persist ?: { JournalStore(repo).save(fullBackup = false) })

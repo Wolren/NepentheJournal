@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.serde.AppJson
 import kotlin.test.*
 
 class AppJsonTest {

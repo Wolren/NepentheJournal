@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.model.ToleranceCalculator
 import app.journal.model.ToleranceInfo
 import app.journal.model.ToleranceLevel
@@ -37,7 +37,7 @@ import app.journal.ui.theme.isDarkTheme
 
 @Composable
 fun DashboardScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     onSearchClick: () -> Unit = {},
 ) {
     val sessions by repo.sessions.collectAsState()

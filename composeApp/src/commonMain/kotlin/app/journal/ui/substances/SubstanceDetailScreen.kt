@@ -20,8 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.data.DoseWikiLookup
 import app.journal.model.*
 import app.journal.ui.components.*
@@ -54,7 +54,7 @@ private val DosageBandColors = mapOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstanceDetailScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     substanceId: String,
     onBack: () -> Unit,
     onEdit: (String) -> Unit = {},
@@ -370,15 +370,15 @@ fun SubstanceDetailScreen(
         }
 
         // Effects
-        item { EffectsSection(substance = substance) }
+        item { EffectsSection(repo = repo, substance = substance) }
 
         // Interactions
         if (relatedInteractions.isNotEmpty()) {
-            item { InteractionsSection(interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
+            item { InteractionsSection(repo = repo, interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
         }
 
         // FDA drug interaction data
-        item { OpenFdaInteractionCard(substanceId = substanceId, substanceName = substance.name) }
+        item { OpenFdaInteractionCard(repo = repo, substanceId = substanceId, substanceName = substance.name) }
 
         // Cross-tolerances
         if (substance.crossTolerances.isNotEmpty()) {

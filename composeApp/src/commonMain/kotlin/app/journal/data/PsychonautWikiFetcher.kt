@@ -1,6 +1,6 @@
 package app.journal.data
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import app.journal.ingest.*
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk

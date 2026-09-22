@@ -1,6 +1,6 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString

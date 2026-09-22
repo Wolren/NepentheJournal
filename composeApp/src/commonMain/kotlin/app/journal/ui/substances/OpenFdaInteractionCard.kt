@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.data.OpenFdaClient
 import app.journal.util.createHttpClient
 import io.ktor.client.*
@@ -73,11 +73,11 @@ private fun parseInteractionText(raw: String): List<FdaInteractionEntry> {
  */
 @Composable
 fun OpenFdaInteractionCard(
+    repo: IJournalRepository,
     substanceId: String,
     substanceName: String,
     modifier: Modifier = Modifier
 ) {
-    val repo = remember { JournalRepository.instance }
     val substance = remember(substanceId) { repo.getSubstance(substanceId) }
 
     val shouldQuery = substance?.drugbankId != null || substance?.cid != null

@@ -18,8 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Session
+import app.journal.ui.LocalJournalRepository
 import app.journal.ui.components.DesktopScrollbar
 import app.journal.ui.components.*
 import app.journal.ui.theme.AdaptiveColors
@@ -37,7 +38,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
 @Composable
-fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
+fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     viewModel: SessionListViewModel,
     onNewSession: () -> Unit = {},
     onEditSession: (String) -> Unit = {},
@@ -200,7 +201,8 @@ fun SessionListScreen(repo: JournalRepository = JournalRepository.instance,
                                 substanceNameMap = substanceNameMap,
                                 timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
-                                onEdit = { onEditSession(session.id) }
+                                onEdit = { onEditSession(session.id) },
+                                onToggleFavorite = { repo.toggleFavorite(session.id) }
                             )
                         }
                     }

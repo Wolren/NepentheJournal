@@ -1,7 +1,6 @@
 package app.journal.ui.substances
 
 import app.journal.data.IJournalRepository
-import app.journal.data.JournalRepository
 import app.journal.model.Substance
 import app.journal.model.SubstanceTaxonomy
 import kotlinx.coroutines.FlowPreview
@@ -182,6 +181,6 @@ class SubstanceScreenViewModel(
     }
 
     companion object {
-        fun create(): SubstanceScreenViewModel = SubstanceScreenViewModel(JournalRepository.instance)
+        fun create(repo: IJournalRepository): SubstanceScreenViewModel = SubstanceScreenViewModel(repo)
     }
 }

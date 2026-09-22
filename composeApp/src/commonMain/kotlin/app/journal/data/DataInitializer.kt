@@ -5,6 +5,7 @@ import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.serde.AppJson
 import app.journal.sync.sha256
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
@@ -159,7 +160,7 @@ object DataInitializer {
 
         // Step 5: Wire debounced auto-save (4.1) — saves 2s after every mutation
         if (scope != null) {
-            autoSaveJob = repo.autoSave(store, scope)
+            autoSaveJob = repo.autoSave(scope) { store.save() }
             Log.withTag("DataInit").i { "Auto-save enabled (debounce 2000ms)" }
         }
 

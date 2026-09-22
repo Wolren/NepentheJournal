@@ -5,7 +5,7 @@ import app.journal.data.JournalRepository
 import app.journal.model.Dose
 import app.journal.model.Session
 import kotlinx.serialization.Serializable
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import kotlinx.serialization.encodeToString
 
 /**

@@ -1,8 +1,7 @@
 package app.journal.ingest
 
-import app.journal.data.AppJson
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.currentTimeMillis

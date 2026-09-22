@@ -1,7 +1,7 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.util.currentTimeMillis
 import io.ktor.http.*
@@ -21,7 +21,7 @@ import kotlinx.serialization.encodeToString
  * bounds, and last writer wins apply.
  */
 class IosSyncServerRouter(
-    private val repo: JournalRepository,
+    private val repo: IJournalRepository,
     private val trustStore: IosDeviceTrustStore,
     private val pairingManager: IosPairingManager,
     private val nonceCache: IosNonceReplayCache,

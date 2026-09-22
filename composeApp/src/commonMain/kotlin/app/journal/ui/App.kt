@@ -107,8 +107,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val ready by DataInitializer.initializedFlow.collectAsState()
 
     // ── Data integrity: startup recovery dialog ──
-    val concreteRepo = remember(repo) { (repo as? JournalRepository) ?: JournalRepository.instance }
-    val journalStore = remember(concreteRepo) { JournalStore(concreteRepo) }
+    val journalStore = remember(repo) { JournalStore(repo) }
     var showRecoveryDialog by remember { mutableStateOf(false) }
     var recoveryMessage by remember { mutableStateOf("") }
 
@@ -143,7 +142,11 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
-    val syncEngine = remember(concreteRepo) { createSyncEngine(concreteRepo) }
+    val syncEngine = remember(repo) {
+        // Single persistence owner: the engine persists through THIS store
+        // instead of constructing its own (audit C5).
+        createSyncEngine(repo, persist = { journalStore.save(fullBackup = false) })
+    }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
@@ -167,7 +170,10 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
         return
     }
 
-    CompositionLocalProvider(LocalThemeConfig provides themeConfig) {
+    CompositionLocalProvider(
+        LocalThemeConfig provides themeConfig,
+        LocalJournalRepository provides repo
+    ) {
         val isDark = themeManager.isDarkTheme()
         val colorScheme = themeManager.colorScheme(isDark)
 

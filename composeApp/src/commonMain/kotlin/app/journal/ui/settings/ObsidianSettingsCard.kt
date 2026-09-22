@@ -9,11 +9,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.export.obsidian.ObsidianExportConfig
 import app.journal.export.obsidian.ObsidianExportManager
 import app.journal.export.obsidian.ObsidianVaultOps
+import app.journal.ui.LocalJournalRepository
 import app.journal.ui.components.AppOutlinedButton
 import app.journal.ui.components.AppTonalButton
 import app.journal.util.FilePicker
@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ObsidianSettingsCard(
-    repo: IJournalRepository = JournalRepository.instance
+    repo: IJournalRepository = LocalJournalRepository.current
 ) {
 
     val scope = rememberCoroutineScope()

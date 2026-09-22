@@ -2,6 +2,7 @@ package app.journal.data
 
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.serde.AppJson
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -10,7 +11,7 @@ import kotlinx.serialization.json.*
 import platform.Foundation.*
 
 @OptIn(ExperimentalForeignApi::class)
-actual class JournalStore actual constructor(private val repo: JournalRepository) {
+actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
     /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
     private val saveLock = PlatformLock()

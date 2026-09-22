@@ -15,6 +15,7 @@ package app.journal.data
 
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.serde.AppJson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -921,14 +922,14 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Auto-save
     // ========================
 
-    override fun autoSave(store: JournalStore, scope: CoroutineScope): Job {
+    override fun autoSave(scope: CoroutineScope, save: () -> Unit): Job {
         return scope.launch {
             mutationCount
                 .drop(1)
                 .debounce(2000)
                 .collect {
                     try {
-                        store.save()
+                        save()
                         Log.withTag("Repo").v { "Auto-saved (mutation #$it)" }
                     } catch (e: Exception) {
                         Log.withTag("Repo").e(e) { "Auto-save failed" }

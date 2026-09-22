@@ -3,7 +3,7 @@
 package app.journal.util
 
 import app.journal.data.JournalRepository
-import app.journal.data.AppJson
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import platform.Foundation.*
 import kotlinx.cinterop.*

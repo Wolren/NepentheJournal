@@ -1,7 +1,7 @@
 package app.journal.sync
 
-import app.journal.data.AppJson
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
+import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
 import io.ktor.client.*
@@ -39,7 +39,7 @@ import javax.crypto.spec.SecretKeySpec
  * WebSocket continuous sync uses the same HMAC scheme for connection auth.
  */
 class KtorSyncClient(
-    private val repo: JournalRepository,
+    private val repo: IJournalRepository,
     private val tlsIdentity: TlsIdentityManager? = null,
     private val deviceId: String = "unknown",
     private val deviceFingerprint: String? = null,

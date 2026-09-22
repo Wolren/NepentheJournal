@@ -14,8 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.data.InteractionCheckResult
 import app.journal.data.InteractionChecker
-import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.ui.LocalJournalRepository
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.ui.components.InteractionWarnings
@@ -32,7 +32,7 @@ import kotlinx.datetime.toLocalDateTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionEditorScreen(
-    repo: IJournalRepository = JournalRepository.instance,
+    repo: IJournalRepository = LocalJournalRepository.current,
     sessionToEdit: Session? = null,
     onBack: () -> Unit
 ) {

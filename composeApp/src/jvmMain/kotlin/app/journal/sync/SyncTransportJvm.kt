@@ -1,6 +1,6 @@
 package app.journal.sync
 
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.sync.DiscoveryMode
@@ -25,7 +25,7 @@ import kotlinx.coroutines.TimeoutCancellationException
  * Continuous sync uses WebSocket for low-latency mutation push.
  */
 class SyncTransport(
-    private val repo: JournalRepository,
+    private val repo: IJournalRepository,
     private val dataDir: String = platformSyncDataDir(),
     private val persistAfterApply: (() -> Unit)? = null
 ) : SyncEngine {

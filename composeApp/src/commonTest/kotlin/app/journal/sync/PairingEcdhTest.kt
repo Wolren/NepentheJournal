@@ -65,13 +65,13 @@ class PairingEcdhTest {
     @Test
     fun `HostInfo defaults keep old peers decodable in both directions`() {
         val legacyJson = """{"deviceId":"h","deviceName":"PC","fingerprint":"fp","protocolVersion":2}"""
-        val decoded = app.journal.data.AppJson.json.decodeFromString<HostInfo>(legacyJson)
+        val decoded = app.journal.serde.AppJson.json.decodeFromString<HostInfo>(legacyJson)
         assertFalse(decoded.wsSupported, "absent wsSupported must decode as false")
         assertNull(decoded.ecdhPublicKeyB64)
 
         val modern = decoded.copy(wsSupported = true, ecdhPublicKeyB64 = "base64key")
-        val roundTrip = app.journal.data.AppJson.json.decodeFromString<HostInfo>(
-            app.journal.data.AppJson.json.encodeToString(modern)
+        val roundTrip = app.journal.serde.AppJson.json.decodeFromString<HostInfo>(
+            app.journal.serde.AppJson.json.encodeToString(modern)
         )
         assertTrue(roundTrip.wsSupported)
         assertEquals("base64key", roundTrip.ecdhPublicKeyB64)

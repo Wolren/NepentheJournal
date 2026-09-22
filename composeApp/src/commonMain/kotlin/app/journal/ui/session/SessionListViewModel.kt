@@ -1,7 +1,6 @@
 package app.journal.ui.session
 
 import app.journal.data.IJournalRepository
-import app.journal.data.JournalRepository
 import app.journal.model.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +10,7 @@ import kotlinx.coroutines.flow.*
 data class SubstanceFilterItem(val id: String, val name: String)
 
 class SessionListViewModel(
-    @PublishedApi internal val repo: IJournalRepository = JournalRepository.instance,
+    @PublishedApi internal val repo: IJournalRepository,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
     /** All sessions from the repository. */
@@ -77,7 +76,7 @@ class SessionListViewModel(
     }
 
     companion object {
-        fun create(repo: IJournalRepository = JournalRepository.instance): SessionListViewModel =
+        fun create(repo: IJournalRepository): SessionListViewModel =
             SessionListViewModel(repo)
     }
 }

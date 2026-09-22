@@ -23,8 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import app.journal.data.JournalRepository
+import app.journal.data.IJournalRepository
 import app.journal.model.Substance
+import app.journal.ui.LocalJournalRepository
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
@@ -33,7 +34,8 @@ import app.journal.ui.components.*
 
 @Composable
 fun SubstanceScreen(
-    viewModel: SubstanceScreenViewModel = remember { SubstanceScreenViewModel.create() },
+    repo: IJournalRepository = LocalJournalRepository.current,
+    viewModel: SubstanceScreenViewModel = remember(repo) { SubstanceScreenViewModel.create(repo) },
     onSubstanceClick: (String) -> Unit = {},
     onNewSubstance: () -> Unit = {}
 ) {

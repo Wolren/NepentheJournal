@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.log.Log
 import app.journal.model.DoseWikiDuration
 import app.journal.model.DoseWikiSubstance
+import app.journal.serde.AppJson
 import app.journal.util.readBundledResource
 
 /**
