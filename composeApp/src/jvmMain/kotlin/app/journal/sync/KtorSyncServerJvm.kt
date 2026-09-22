@@ -30,6 +30,7 @@ class KtorSyncServer(
     private val repo: IJournalRepository,
     private val port: Int,
     private val tlsIdentity: TlsIdentityManager,
+    private val ecdhIdentity: EcdhIdentityManager,
     private val trustStore: DeviceTrustStore,
     private val authenticator: SyncAuthenticator,
     private val onConnection: (String) -> Unit,
@@ -42,10 +43,13 @@ class KtorSyncServer(
     val deviceId: String by lazy { "device-${fingerprint.take(16)}" }
     private val deviceName: String by lazy { platformDeviceName() }
 
-    /** Port the server was configured to listen on. */
-    val actualPort: Int get() = port
+    /** Port the server actually bound. With the configured port 0 (ephemeral,
+     *  used by tests to avoid sibling-JVM collisions) this is NOT the
+     *  configured value, so [start] records the resolved connector port. */
+    val actualPort: Int get() = boundPort ?: port
+    private var boundPort: Int? = null
 
-    suspend fun start(): HostingInfo = runInterruptible {
+    suspend fun start(): HostingInfo {
         try {
             val fp = fingerprint
             val name = deviceName
@@ -54,6 +58,7 @@ class KtorSyncServer(
                 repo = repo,
                 trustStore = trustStore,
                 authenticator = authenticator,
+                ecdhIdentity = ecdhIdentity,
                 onConnection = onConnection,
                 deviceId = deviceId,
                 deviceName = name,
@@ -62,14 +67,24 @@ class KtorSyncServer(
             )
             this.router = router
 
-            server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
-                router.installRouting(this)
+            runInterruptible {
+                server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+                    router.installRouting(this)
+                }
+                server!!.start(wait = false)
             }
-
-            server!!.start(wait = false)
+            // Report what Netty really bound: identical to the configured
+            // port in production, the ephemeral port when port == 0.
+            val resolved = try {
+                server!!.engine.resolvedConnectors().firstOrNull()?.port
+            } catch (e: Exception) {
+                Log.withTag("KtorSyncServer").w { "Could not resolve bound port (${e.message}); using configured $port" }
+                null
+            }
+            boundPort = resolved ?: port
             val lanIp = resolveLocalIpV4() ?: "127.0.0.1"
-            Log.withTag("KtorSyncServer").i { "Server started on $lanIp:$port (fingerprint=$fp)" }
-            HostingInfo(lanIp, port, fp)
+            Log.withTag("KtorSyncServer").i { "Server started on $lanIp:$boundPort (fingerprint=$fp)" }
+            return HostingInfo(lanIp, boundPort!!, fp)
         } catch (e: Exception) {
             Log.withTag("KtorSyncServer").e(e) { "Server start failed: ${e.message}" }
             throw e
@@ -103,6 +118,7 @@ class SyncServerRouter(
     private val repo: IJournalRepository,
     private val trustStore: DeviceTrustStore,
     private val authenticator: SyncAuthenticator,
+    private val ecdhIdentity: EcdhIdentityManager,
     private val onConnection: (String) -> Unit,
     private val deviceId: String,
     private val deviceName: String,
@@ -149,37 +165,39 @@ class SyncServerRouter(
         }
 
         app.routing {
-            get("/info") {
+            get(SyncEndpoints.INFO) {
                 call.respondText(
                     json.encodeToString(HostInfo(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2,
-                        wsSupported = true
+                        protocolVersion = SYNC_PROTOCOL_VERSION,
+                        wsSupported = true,
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64
                     )),
                     ContentType.Application.Json
                 )
             }
 
-            get("/pairing/start") {
+            get(SyncEndpoints.PAIRING_START) {
                 call.respondText(
                     json.encodeToString(HostInfo(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2,
-                        wsSupported = true
+                        protocolVersion = SYNC_PROTOCOL_VERSION,
+                        wsSupported = true,
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64
                     )),
                     ContentType.Application.Json
                 )
             }
 
-            get("/auth/verify") {
+            get(SyncEndpoints.AUTH_VERIFY) {
                 val clientIp = call.request.local.remoteHost
                 evictStaleThrottle(verifyThrottle, VERIFY_WINDOW_MS)
                 if (isThrottled(verifyThrottle, clientIp, MAX_VERIFY_PER_WINDOW, VERIFY_WINDOW_MS)) {
-                    warnAuth(call, null, "/auth/verify", "rate limited")
+                    warnAuth(call, null, SyncEndpoints.AUTH_VERIFY, "rate limited")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
@@ -195,7 +213,7 @@ class SyncServerRouter(
                 // and unknown devices all return 401 with the same body, so
                 // the endpoint is not a device-existence oracle.
                 if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
-                    warnAuth(call, deviceIdParam, "/auth/verify", "missing device or challenge")
+                    warnAuth(call, deviceIdParam, SyncEndpoints.AUTH_VERIFY, "missing device or challenge")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -203,7 +221,7 @@ class SyncServerRouter(
                     return@get
                 }
                 if (challengeRaw != null && challengeRaw.length > MAX_CHALLENGE_LEN) {
-                    warnAuth(call, deviceIdParam, "/auth/verify", "challenge over 128 chars")
+                    warnAuth(call, deviceIdParam, SyncEndpoints.AUTH_VERIFY, "challenge over 128 chars")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -212,7 +230,7 @@ class SyncServerRouter(
                 }
                 val secret = trustStore.getSharedSecret(deviceIdParam)
                 if (secret == null) {
-                    warnAuth(call, deviceIdParam, "/auth/verify", "unknown device")
+                    warnAuth(call, deviceIdParam, SyncEndpoints.AUTH_VERIFY, "unknown device")
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -230,7 +248,7 @@ class SyncServerRouter(
                 )
             }
 
-            post("/pairing/verify") {
+            post(SyncEndpoints.PAIRING_VERIFY) {
                 // Socket-level remote address. X-Forwarded-For is deliberately
                 // NOT trusted: this server is directly reachable on the LAN with
                 // no proxy, so the header is client-controlled and would let an
@@ -240,7 +258,7 @@ class SyncServerRouter(
                 val clientIp = call.request.local.remoteHost
                 evictStaleBuckets()
                 if (isRateLimited(clientIp)) {
-                    warnAuth(call, null, "/pairing/verify", "rate limited")
+                    warnAuth(call, null, SyncEndpoints.PAIRING_VERIFY, "rate limited")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Too many attempts. Try again later.")),
                         ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
@@ -249,7 +267,7 @@ class SyncServerRouter(
                 }
 
                 if (!hasValidContentLength(call, MAX_PAIRING_BODY_BYTES)) {
-                    warnAuth(call, null, "/pairing/verify", "pairing body missing length or over 4KB")
+                    warnAuth(call, null, SyncEndpoints.PAIRING_VERIFY, "pairing body missing length or over 4KB")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Body too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
@@ -289,7 +307,7 @@ class SyncServerRouter(
                 }
 
                 if (!authenticator.verifyPairingToken(verifyReq.token)) {
-                    warnAuth(call, verifyReq.clientDeviceId, "/pairing/verify", "invalid or expired token")
+                    warnAuth(call, verifyReq.clientDeviceId, SyncEndpoints.PAIRING_VERIFY, "invalid or expired token")
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Invalid or expired token")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -297,10 +315,52 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // One shared secret for this client: store it and return it
+                // Contract section g (ECDH): the permanent secret is ONLY
+                // delivered sealed under an ECDH-derived key. Reject the
+                // pairing when the client key is missing, not valid base64,
+                // not 65 bytes, not prefixed 0x04, or not on the curve.
+                val clientEcdhPublicKeyB64 = verifyReq.clientEcdhPublicKeyB64
+                if (clientEcdhPublicKeyB64 == null) {
+                    warnAuth(call, verifyReq.clientDeviceId, SyncEndpoints.PAIRING_VERIFY, "missing ECDH public key")
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "ECDH public key required; upgrade the client")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+                val ecdhSharedSecret = try {
+                    ecdhIdentity.agreeWith(clientEcdhPublicKeyB64)
+                } catch (e: Exception) {
+                    warnAuth(call, verifyReq.clientDeviceId, SyncEndpoints.PAIRING_VERIFY, "invalid ECDH public key")
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Invalid ECDH public key")),
+                        ContentType.Application.Json, status = HttpStatusCode.BadRequest
+                    )
+                    return@post
+                }
+
+                // One shared secret for this client: mint it, seal it under
+                // the ECDH-derived key, then store it. The legacy plaintext
+                // sharedSecret and PBKDF2 encSecretB64 fields are NOT
+                // populated anymore: a LAN observer of this response must
+                // not learn the permanent sync secret (audit C4).
                 val sharedSecret = authenticator.generateSharedSecret()
                 val clientDeviceId = verifyReq.clientDeviceId.ifBlank {
                     "client-${verifyReq.clientFingerprint.take(8)}"
+                }
+                val ecdhSecretB64 = try {
+                    PairingEcdh.wrapSharedSecret(ecdhSharedSecret, sharedSecret)
+                } catch (e: Exception) {
+                    // Fail closed: never fall back to emitting the secret in
+                    // the clear when the seal cannot be produced.
+                    Log.withTag("KtorSyncServer").e(e) { "ECDH pairing seal failed" }
+                    call.respondText(
+                        json.encodeToString(PairingResultResponse(false, error = "Pairing seal failed")),
+                        ContentType.Application.Json, status = HttpStatusCode.InternalServerError
+                    )
+                    return@post
+                } finally {
+                    ecdhSharedSecret.fill(0)
                 }
 
                 trustStore.addPeer(DeviceTrustStore.TrustedPeer(
@@ -314,25 +374,14 @@ class SyncServerRouter(
                 // Also ensure the host has its own record (same shared secret or separate)
                 hostSecret() // ensures host peer exists
 
-                // C2 wrap: the same secret encrypted under a key derived from
-                // the pairing token, so a LAN observer of this response learns
-                // nothing. The legacy field stays populated this wave.
-                val encSecretB64 = try {
-                    SyncAuthenticator.encryptPairingSecret(verifyReq.token, clientDeviceId, sharedSecret)
-                } catch (e: Exception) {
-                    Log.withTag("KtorSyncServer").w { "pairing secret wrap failed, sending legacy field only" }
-                    null
-                }
-
                 call.respondText(
                     json.encodeToString(PairingResultResponse(
                         success = true,
                         deviceId = clientDeviceId,
-                        sharedSecret = sharedSecret,
-                        encSecretB64 = encSecretB64,
                         hostDeviceId = deviceId,
                         hostDeviceName = deviceName,
-                        hostFingerprint = fingerprint
+                        hostFingerprint = fingerprint,
+                        ecdhSecretB64 = ecdhSecretB64
                     )),
                     ContentType.Application.Json
                 )
@@ -340,11 +389,11 @@ class SyncServerRouter(
                 onConnection("Paired with ${verifyReq.clientDeviceName}")
             }
 
-            post("/sync/push") {
+            post(SyncEndpoints.SYNC_PUSH) {
                 val pushIp = call.request.local.remoteHost
                 evictStaleThrottle(pushThrottle, PUSH_WINDOW_MS)
                 if (isThrottled(pushThrottle, pushIp, MAX_PUSH_PER_WINDOW, PUSH_WINDOW_MS)) {
-                    warnAuth(call, null, "/sync/push", "rate limited")
+                    warnAuth(call, null, SyncEndpoints.SYNC_PUSH, "rate limited")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Too many requests")),
                         ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
@@ -354,7 +403,7 @@ class SyncServerRouter(
                 // Declared length is enforced BEFORE the body is buffered:
                 // missing, chunked, or oversized bodies are refused unread.
                 if (!hasValidContentLength(call, MAX_BODY_BYTES)) {
-                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/push", "missing or oversized content length")
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], SyncEndpoints.SYNC_PUSH, "missing or oversized content length")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
@@ -363,7 +412,7 @@ class SyncServerRouter(
                 }
                 val auth = verifyRequest(call)
                 if (auth == null) {
-                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/push", "authentication failed")
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], SyncEndpoints.SYNC_PUSH, "authentication failed")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Authentication failed")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -373,7 +422,7 @@ class SyncServerRouter(
                 val (callerDeviceId, encryptedBody) = auth
 
                 if (encryptedBody.length > SyncAuthenticator.MAX_SYNC_BODY_BYTES) {
-                    warnAuth(call, callerDeviceId, "/sync/push", "payload too large")
+                    warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PUSH, "payload too large")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
                         ContentType.Application.Json, status = HttpStatusCode.fromValue(413)
@@ -384,7 +433,7 @@ class SyncServerRouter(
                 // Decrypt the encrypted body before processing
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
-                    warnAuth(call, callerDeviceId, "/sync/push", "unknown device")
+                    warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PUSH, "unknown device")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Unknown device; re-pair required")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -416,7 +465,7 @@ class SyncServerRouter(
                 // paired device could attribute writes / conflict notes to
                 // another device (audit L8).
                 if (batch.deviceId != callerDeviceId) {
-                    warnAuth(call, callerDeviceId, "/sync/push", "device ID mismatch")
+                    warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PUSH, "device ID mismatch")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Device ID mismatch")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -448,11 +497,11 @@ class SyncServerRouter(
                 call.respondText(encryptedResponse, ContentType.Application.Json)
             }
 
-            get("/sync/pull") {
+            get(SyncEndpoints.SYNC_PULL) {
                 val pullIp = call.request.local.remoteHost
                 evictStaleThrottle(pullThrottle, PULL_WINDOW_MS)
                 if (isThrottled(pullThrottle, pullIp, MAX_PULL_PER_WINDOW, PULL_WINDOW_MS)) {
-                    warnAuth(call, null, "/sync/pull", "rate limited")
+                    warnAuth(call, null, SyncEndpoints.SYNC_PULL, "rate limited")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Too many requests")),
                         ContentType.Application.Json, status = HttpStatusCode.TooManyRequests
@@ -461,7 +510,7 @@ class SyncServerRouter(
                 }
                 val auth = verifyRequest(call)
                 if (auth == null) {
-                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], "/sync/pull", "authentication failed")
+                    warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], SyncEndpoints.SYNC_PULL, "authentication failed")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Authentication failed")),
                         ContentType.Application.Json, status = HttpStatusCode.Unauthorized
@@ -482,7 +531,7 @@ class SyncServerRouter(
 
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
-                    warnAuth(call, callerDeviceId, "/sync/pull", "unknown device")
+                    warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PULL, "unknown device")
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Unknown device; re-pair required")),
                         ContentType.Application.Json, status = HttpStatusCode.Forbidden
@@ -499,7 +548,7 @@ class SyncServerRouter(
                 call.respondText(encryptedResponse, ContentType.Application.Json)
             }
 
-            webSocket("/sync/ws") {
+            webSocket(SyncEndpoints.SYNC_WS) {
                 // Header-only auth: query strings leak into logs, caches, and
                 // history. Older query-based clients are rejected, not
                 // downgraded.
@@ -518,6 +567,13 @@ class SyncServerRouter(
                     close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, "Authentication failed"))
                     return@webSocket
                 }
+
+                // Contract section a.3: every authenticated handshake is a NEW
+                // EPOCH for this device. Discard all prior sequence state so a
+                // stale/replayed seq from an earlier connection can never
+                // reject a frame of this one (and client reboot resets that
+                // used to stall sync forever after nanoTime restarts).
+                wsSeqState.remove(callerDeviceId)
 
                 // Derive AES key for decrypting WsDelta frames. Once keyed,
                 // plaintext deltas are refused: every WsDelta frame must be
@@ -577,12 +633,10 @@ class SyncServerRouter(
                                     continue
                                 }
                                 repo.applyBatch(
-                                    sessions = msg.sessions,
                                     doses = msg.doses,
                                     substances = msg.substances,
                                     effects = msg.effects,
                                     interactions = msg.interactions,
-                                    notes = msg.notes,
                                     timelineEvents = msg.timelineEvents,
                                     customUnits = msg.customUnits,
                                     lastWriterWins = true,
@@ -594,11 +648,25 @@ class SyncServerRouter(
                                     deletedInteractionIds = msg.deletedInteractionIds,
                                     deletedTimelineEventIds = msg.deletedTimelineEventIds,
                                     deletedCustomUnitIds = msg.deletedCustomUnitIds,
-                                    tombstoneCutoff = 0L
+                                    // Contract section b row 2: same cursor LWW rule as
+                                    // the HTTP push path. Transport choice must not
+                                    // change delete semantics (the old unconditional 0
+                                    // let an older WS delete wipe a newer local edit).
+                                    // Older senders leave since at its 0 default, which
+                                    // yields the conservative "no local entity" rule.
+                                    tombstoneCutoff = msg.since
                                 )
+                                // Contract section c: sessions and notes take the SAME
+                                // shared-merge routes as the HTTP push path. The note
+                                // merge is the repo's upsertNoteWithConflict, never a
+                                // platform-local branch.
+                                val conflicts =
+                                    applySessionsWithConflict(msg.sessions, msg.deletedSessionIds, callerDeviceId) +
+                                        applyNotesWithConflict(msg.notes, msg.deletedNoteIds, callerDeviceId)
                                 // Persist before acking the delta (same rule as
                                 // the push route; see audit D1).
                                 persistAfterApply?.invoke()
+                                if (conflicts > 0) onConnection("$conflicts conflict(s)")
                                 outgoing.send(Frame.Text(
                                     wsJson.encodeToString(WsMessage.serializer(), WsAck(seq = msg.seq))
                                 ))
@@ -687,6 +755,10 @@ class SyncServerRouter(
      * in the WS route covers connections with traffic).
      */
     suspend fun closeDeviceSessions(deviceId: String) {
+        // Contract section a.5: evict the sequence state together with the
+        // sessions, so the per-device map cannot grow forever after
+        // revocations and disconnects.
+        wsSeqState.remove(deviceId)
         val sessions = wsSessions.remove(deviceId) ?: return
         for (session in sessions.toList()) {
             try {
@@ -694,16 +766,6 @@ class SyncServerRouter(
             } catch (_: Exception) {
             }
         }
-    }
-
-    /**
-     * Pre-check Content-Length before reading the body: Ktor receiveText has
-     * no default size limit, so refuse oversized requests early instead of
-     * buffering them. Returns false when the request must be rejected.
-     */
-    private fun checkContentLength(call: ApplicationCall, maxBytes: Long): Boolean {
-        val declared = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: return true
-        return declared <= maxBytes
     }
 
     /**
@@ -753,12 +815,32 @@ class SyncServerRouter(
             deletedCustomUnitIds = tagged.deletedCustomUnitIds,
             tombstoneCutoff = batch.since
         )
-        tagged.sessions.forEach { session ->
-            if (session.id in tagged.deletedSessionIds) return@forEach
+        // Sessions and notes are NOT handed to applyBatch: both go through
+        // the shared merge routes below, exactly like the WS delta path.
+        conflicts += applySessionsWithConflict(tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
+        conflicts += applyNotesWithConflict(tagged.notes, tagged.deletedNoteIds, tagged.deviceId)
+        onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${tagged.deviceName}")
+    }
+
+    /**
+     * Apply pushed sessions with the session-outcome conflict branch
+     * (contract section c item 4: this branch may stay platform-side until
+     * the shared mergeSessionConflict lands in commonMain). Loser bodies
+     * become conflict notes; device names are truncated by the caller.
+     * Returns the number of conflicts created.
+     */
+    private fun applySessionsWithConflict(
+        sessions: List<Session>,
+        deletedIds: List<String>,
+        remoteDeviceId: String
+    ): Int {
+        var conflicts = 0
+        sessions.forEach { session ->
+            if (session.id in deletedIds) return@forEach
             val existing = repo.getSession(session.id)
             if (existing != null && existing.updatedAt > session.updatedAt) {
                 repo.upsertNote(Note(
-                    id = "conflict:${session.id}:${tagged.deviceId}",
+                    id = "conflict:${session.id}:$remoteDeviceId",
                     sessionId = session.id,
                     title = "Sync conflict: ${session.title}",
                     body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
@@ -766,17 +848,33 @@ class SyncServerRouter(
                     updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                     // Tag interaction provenance: conflict notes always carry
                     // the pushing device so the origin is never ambiguous.
-                    deviceOrigin = "sync:${tagged.deviceId}"
+                    deviceOrigin = "sync:$remoteDeviceId"
                 ))
                 conflicts++
-            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:${tagged.deviceId}" }))
+            } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" }))
         }
-        tagged.notes.forEach { note ->
-            if (note.id in tagged.deletedNoteIds) return@forEach
-            val resolved = repo.upsertNoteWithConflict(note, tagged.deviceId)
+        return conflicts
+    }
+
+    /**
+     * Apply incoming notes through the SHARED conflict merge
+     * (IJournalRepository.upsertNoteWithConflict), never a hand-rolled
+     * platform branch (contract section c). Shared by the HTTP push route
+     * and the WS delta route so both paths resolve conflicts identically.
+     * Returns the number of notes that came back with conflict siblings.
+     */
+    private fun applyNotesWithConflict(
+        notes: List<Note>,
+        deletedIds: List<String>,
+        remoteDeviceId: String
+    ): Int {
+        var conflicts = 0
+        notes.forEach { note ->
+            if (note.id in deletedIds) return@forEach
+            val resolved = repo.upsertNoteWithConflict(note, remoteDeviceId)
             if (resolved != null && resolved.conflictSiblings.isNotEmpty()) conflicts++
         }
-        onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${tagged.deviceName}")
+        return conflicts
     }
 
     /**

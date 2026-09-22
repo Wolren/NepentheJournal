@@ -26,6 +26,16 @@ import kotlinx.serialization.encodeToString
 
 // ========== Endpoint paths ==========
 
+/**
+ * Wire protocol version this build speaks and serves. Both hosts advertise
+ * it in HostInfo.protocolVersion; clients compare it at pairing and first
+ * sync. A mismatch is WARN-ONLY on the JVM client (appendDebug warning plus
+ * a lastError-style status line, never a hard reject): warn vs reject was
+ * not pinned by the contract, and SYNC-JVM chose warn so an older peer
+ * keeps working while the user is told to upgrade.
+ */
+const val SYNC_PROTOCOL_VERSION = 2
+
 object SyncEndpoints {
     /**
      * URL scheme for every sync endpoint. Pinned to "http" by the ECDH

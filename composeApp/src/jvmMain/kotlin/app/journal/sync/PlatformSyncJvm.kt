@@ -39,7 +39,7 @@ fun resolveLocalIpV4(): String? {
             if (addr is Inet4Address && !addr.isLoopbackAddress) {
                 val host = addr.hostAddress ?: continue
                 if (addr.isSiteLocalAddress) {
-                    // Site-local is the best candidate — return immediately
+                    // Site-local is the best candidate , return immediately
                     return host
                 }
                 candidates.add(host)

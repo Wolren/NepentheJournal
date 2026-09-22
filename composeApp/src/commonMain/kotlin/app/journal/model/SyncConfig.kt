@@ -15,7 +15,7 @@ data class SyncConfig(
     val deviceId: String,
     val displayName: String,
     val hostingEnabled: Boolean = false,
-    val listenerPort: Int = 4984,
+    val listenerPort: Int = DEFAULT_PORT,
     val autoSyncOnLan: Boolean = true,
     val continuousSync: Boolean = false,
     val discoveryMode: DiscoveryMode = DiscoveryMode.LAN_AUTO_DISCOVERY,

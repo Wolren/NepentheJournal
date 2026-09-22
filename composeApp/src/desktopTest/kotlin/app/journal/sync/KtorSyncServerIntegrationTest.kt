@@ -2,11 +2,15 @@ package app.journal.sync
 
 import app.journal.data.JournalRepository
 import app.journal.model.Dose
+import app.journal.model.Interaction
+import app.journal.model.InteractionRisk
 import app.journal.model.Session
 import app.journal.sync.DeviceTrustStore.TrustedPeer
 import app.journal.sync.aesEncryptionKey
 import app.journal.sync.base64Encode
 import app.journal.sync.encryptBody
+import kotlinx.coroutines.runBlocking
+import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.*
@@ -48,23 +52,22 @@ class KtorSyncServerIntegrationTest {
             assertTrue(body.contains("Test Device"))
             assertTrue(body.contains("abc123def456"))
             assertTrue(body.contains("test-device-abc123"))
+            // Contract g/f: both HostInfo sites advertise the static ECDH
+            // public point, serve the pinned protocol version, and keep WS.
+            assertNotNull(extractField(body, "ecdhPublicKeyB64"),
+                "HostInfo must advertise ecdhPublicKeyB64")
+            assertTrue(body.contains("\"protocolVersion\":$SYNC_PROTOCOL_VERSION"),
+                "HostInfo must serve the pinned protocol version")
+            assertTrue(body.contains("\"wsSupported\":true"))
         }
     }
 
     @Test
-    fun `pairing verify returns shared secret`() {
+    fun `pairing verify returns ECDH-sealed secret only`() {
         testApplication {
             application { installRouter() }
-            val token = authenticator.generatePairingToken()
-            val resp = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"test-client","clientDeviceName":"Client","clientFingerprint":"client789xyz"}""")
-            }
-            assertEquals(HttpStatusCode.OK, resp.status)
-            val body = resp.bodyAsText()
-            assertTrue(body.contains("\"success\":true"))
-            val secret = extractField(body, "sharedSecret")
-            assertNotNull(secret)
+            val secret = client.pairEcdh("test-client", "Client", "client789xyz")
+            // The host stored the very secret it sealed under the ECDH key.
             assertEquals(secret, trustStore.getSharedSecret("test-client"))
         }
     }
@@ -104,18 +107,13 @@ class KtorSyncServerIntegrationTest {
     fun `sync push with paired secret succeeds`() {
         testApplication {
             application { installRouter() }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"paired-client","clientDeviceName":"Client","clientFingerprint":"client789xyz"}""")
-            }
-            val sharedSecret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val sharedSecret = client.pairEcdh("paired-client", "Client", "client789xyz")
 
             val plainBody = """{"deviceId":"paired-client","deviceName":"Client","since":0,"substances":[],"doses":[],"sessions":[],"interactions":[],"notes":[],"timelineEvents":[],"effects":[],"customUnits":[]}"""
             // Encrypt the body the same way the real client does
             val aesKey = aesEncryptionKey(sharedSecret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
-            val authValue = authenticator.signRequest("paired-client", encryptedBody, sharedSecret)
+            val authValue = sign("paired-client", encryptedBody, sharedSecret)
 
             val push = client.post("/sync/push") {
                 header("X-Sync-Device", "paired-client")
@@ -143,14 +141,8 @@ class KtorSyncServerIntegrationTest {
     fun `auth verify proves host knows the secret`() {
         testApplication {
             application { installRouter() }
-            // Pair a client through the real endpoint
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"challenge-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            assertEquals(HttpStatusCode.OK, pair.status)
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            // Pair a client through the real ECDH endpoint
+            val secret = client.pairEcdh("challenge-client", "Client", "cfp")
 
             val challenge = "0123456789abcdef0123456789abcdef"
             val resp = client.get("/auth/verify?deviceId=challenge-client&challenge=$challenge")
@@ -190,18 +182,13 @@ class KtorSyncServerIntegrationTest {
     fun `sync push rejects deviceId mismatch`() {
         testApplication {
             application { installRouter() }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"real-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val secret = client.pairEcdh("real-client", "Client", "cfp")
 
             // Batch claims a DIFFERENT device than the authenticated header
             val plainBody = """{"deviceId":"other-device","deviceName":"Client","since":0}"""
             val aesKey = aesEncryptionKey(secret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
-            val authValue = authenticator.signRequest("real-client", encryptedBody, secret)
+            val authValue = sign("real-client", encryptedBody, secret)
             val push = client.post("/sync/push") {
                 header("X-Sync-Device", "real-client")
                 header("X-Sync-Auth", authValue)
@@ -218,7 +205,7 @@ class KtorSyncServerIntegrationTest {
             application { installRouter() }
             trustStore.addPeer(TrustedPeer("evil", "Evil", "evil", "real-secret", System.currentTimeMillis()))
             val body = """{"deviceId":"evil","deviceName":"Evil","since":0}"""
-            val authValue = authenticator.signRequest("evil", body, "wrong-secret")
+            val authValue = sign("evil", body, "wrong-secret")
             val resp = client.post("/sync/push") {
                 header("X-Sync-Device", "evil")
                 header("X-Sync-Auth", authValue)
@@ -240,10 +227,67 @@ class KtorSyncServerIntegrationTest {
     private fun Application.installRouter(persistAfterApply: (() -> Unit)? = null) {
         SyncServerRouter(
             repo = repo, trustStore = trustStore, authenticator = authenticator,
+            ecdhIdentity = EcdhIdentityManager(testDir.absolutePath),
             onConnection = {}, deviceId = "test-device-abc123",
             deviceName = "Test Device", fingerprint = "abc123def456",
             persistAfterApply = persistAfterApply
         ).installRouting(this)
+    }
+
+    /**
+     * Sign like the production client: the shared commonMain
+     * buildAuthHeader/hmacSha256Hex pair is the single HMAC implementation
+     * (SyncAuthenticator.signRequest was deleted as test-only dead code in
+     * this wave; its format is identical).
+     */
+    private fun sign(deviceId: String, body: String, secret: String): String =
+        buildAuthHeader(
+            deviceId, body, secret.encodeToByteArray(),
+            System.currentTimeMillis(), generateNonce()
+        )
+
+    /**
+     * Pair through the contract-g ECDH flow against the production router:
+     * fetch the host's static P-256 key from HostInfo, send an EPHEMERAL
+     * public key, and resolve the secret ONLY by unwrapping ecdhSecretB64.
+     * Also proves the legacy plaintext/PBKDF2 fields carry no secret.
+     */
+    private suspend fun HttpClient.pairEcdh(
+        clientDeviceId: String,
+        clientDeviceName: String = "Client",
+        clientFingerprint: String = "cfp"
+    ): String {
+        val infoBody = get("/pairing/start").bodyAsText()
+        val hostKey = extractField(infoBody, "ecdhPublicKeyB64")
+            ?: error("HostInfo must advertise ecdhPublicKeyB64: $infoBody")
+        val ephemeral = EcdhIdentityManager.generateEphemeralKeyPair()
+        val myKey = EcdhIdentityManager.uncompressedPointB64(ephemeral.public)
+        val token = authenticator.generatePairingToken()
+        val resp = post("/pairing/verify") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"token":"$token","clientDeviceId":"$clientDeviceId",""" +
+                    """"clientDeviceName":"$clientDeviceName",""" +
+                    """"clientFingerprint":"$clientFingerprint",""" +
+                    """"clientEcdhPublicKeyB64":"$myKey"}"""
+            )
+        }
+        val body = resp.bodyAsText()
+        assertEquals(HttpStatusCode.OK, resp.status, "ECDH pairing must succeed: $body")
+        assertNull(extractField(body, "sharedSecret"),
+            "legacy plaintext sharedSecret must no longer be emitted")
+        assertNull(extractField(body, "encSecretB64"),
+            "legacy PBKDF2 encSecretB64 must no longer be emitted")
+        val sealed = extractField(body, "ecdhSecretB64")
+            ?: error("server must seal the secret in ecdhSecretB64: $body")
+        val shared = EcdhIdentityManager.agree(ephemeral.private, hostKey)
+        val secret = try {
+            PairingEcdh.unwrapSharedSecret(shared, sealed)
+        } finally {
+            shared.fill(0)
+        }
+        assertFalse(body.contains(secret), "the sealed secret must never appear in the clear")
+        return secret
     }
 
     @Test
@@ -251,17 +295,12 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             var persistCount = 0
             application { installRouter(persistAfterApply = { persistCount++ }) }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"persist-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val secret = client.pairEcdh("persist-client", "Client", "cfp")
 
             val plainBody = """{"deviceId":"persist-client","deviceName":"Client","since":0,"sessions":[{"id":"s:p1","title":"Pushed","startTime":1700000000000,"createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test"}]}"""
             val aesKey = aesEncryptionKey(secret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
-            val authValue = authenticator.signRequest("persist-client", encryptedBody, secret)
+            val authValue = sign("persist-client", encryptedBody, secret)
             val push = client.post("/sync/push") {
                 header("X-Sync-Device", "persist-client")
                 header("X-Sync-Auth", authValue)
@@ -279,15 +318,10 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             var persistCount = 0
             application { installRouter(persistAfterApply = { persistCount++ }) }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"ws-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val secret = client.pairEcdh("ws-client", "Client", "cfp")
 
             // The WS handshake auth signs the literal body "ws" (production contract)
-            val authValue = authenticator.signRequest("ws-client", "ws", secret)
+            val authValue = sign("ws-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
             wsClient.webSocket("/sync/ws", {
@@ -322,14 +356,9 @@ class KtorSyncServerIntegrationTest {
     fun `ws plaintext delta refused on keyed connection`() {
         testApplication {
             application { installRouter() }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"ws-plain-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val secret = client.pairEcdh("ws-plain-client", "Client", "cfp")
 
-            val authValue = authenticator.signRequest("ws-plain-client", "ws", secret)
+            val authValue = sign("ws-plain-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
             wsClient.webSocket("/sync/ws", {
@@ -358,14 +387,9 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             var persistCount = 0
             application { installRouter(persistAfterApply = { persistCount++ }) }
-            val token = authenticator.generatePairingToken()
-            val pair = client.post("/pairing/verify") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"token":"$token","clientDeviceId":"ws-enc-client","clientDeviceName":"Client","clientFingerprint":"cfp"}""")
-            }
-            val secret = extractField(pair.bodyAsText(), "sharedSecret")!!
+            val secret = client.pairEcdh("ws-enc-client", "Client", "cfp")
 
-            val authValue = authenticator.signRequest("ws-enc-client", "ws", secret)
+            val authValue = sign("ws-enc-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
             wsClient.webSocket("/sync/ws", {
@@ -403,15 +427,8 @@ class KtorSyncServerIntegrationTest {
     fun `repairing rotates secret and old secret rejected`() {
         testApplication {
             application { installRouter() }
-            suspend fun pair(deviceId: String): String {
-                val token = authenticator.generatePairingToken()
-                val r = client.post("/pairing/verify") {
-                    contentType(ContentType.Application.Json)
-                    setBody("""{"token":"$token","clientDeviceId":"$deviceId","clientDeviceName":"Client","clientFingerprint":"fp-$deviceId"}""")
-                }
-                assertEquals(HttpStatusCode.OK, r.status)
-                return extractField(r.bodyAsText(), "sharedSecret")!!
-            }
+            suspend fun pair(deviceId: String): String =
+                client.pairEcdh(deviceId, "Client", "fp-$deviceId")
             val first = pair("rot-client")
             val second = pair("rot-client")
             assertNotEquals(first, second, "re-pairing must mint a fresh secret")
@@ -420,7 +437,7 @@ class KtorSyncServerIntegrationTest {
                 val plainBody = """{"deviceId":"rot-client","deviceName":"Client","since":0,"substances":[],"doses":[],"sessions":[],"interactions":[],"notes":[],"timelineEvents":[],"effects":[],"customUnits":[]}"""
                 val aesKey = aesEncryptionKey(secret)
                 val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
-                val authValue = authenticator.signRequest("rot-client", encryptedBody, secret)
+                val authValue = sign("rot-client", encryptedBody, secret)
                 return client.post("/sync/push") {
                     header("X-Sync-Device", "rot-client")
                     header("X-Sync-Auth", authValue)
@@ -456,6 +473,192 @@ class KtorSyncServerIntegrationTest {
                 setBody("""{"token":"bad-6","clientDeviceId":"c6","clientDeviceName":"","clientFingerprint":""}""")
             }
             assertEquals(HttpStatusCode.TooManyRequests, r.status)
+        }
+    }
+
+    /**
+     * Contract section d TEST obligation (audit C1): a first sync against
+     * the bundled seed shape (2015 interactions, cap 100) must go out as
+     * validator-sized slices, sent sequentially, and the cursor may advance
+     * to cycleStart ONLY when every slice acked success=true.
+     */
+    @Test
+    fun `2015 interaction push advances cursor only after all slices ack`() = runBlocking {
+        val server = KtorSyncServer(
+            repo = repo,
+            port = 0, // ephemeral: never collide with concurrently running sibling test JVMs
+            tlsIdentity = TlsIdentityManager(testDir.absolutePath),
+            ecdhIdentity = EcdhIdentityManager(testDir.absolutePath),
+            trustStore = trustStore,
+            authenticator = authenticator,
+            onConnection = {}
+        )
+        val info = server.start()
+        val port = info.port
+        try {
+            // Sender side: the 2015-interaction seed that deadlocked C1.
+            val clientRepo = JournalRepository()
+            val base = 1_700_000_000_000L
+            repeat(2015) { i ->
+                clientRepo.upsertInteraction(Interaction(
+                    id = "int:$i",
+                    createdAt = base + i * 1000L,
+                    updatedAt = base + i * 1000L,
+                    substanceAId = "sub:a",
+                    substanceBId = "sub:b",
+                    riskLevel = InteractionRisk.LOW,
+                    description = "seed interaction $i"
+                ))
+            }
+
+            // Real contract-g ECDH pairing against the real server.
+            val bootstrap = KtorSyncClient(
+                repo = clientRepo, deviceId = "chunk-client", deviceName = "Chunker"
+            )
+            val hostInfo = bootstrap.requestHostInfo("127.0.0.1", port).getOrThrow()
+            assertEquals(SYNC_PROTOCOL_VERSION, hostInfo.protocolVersion,
+                "both hosts must serve the pinned protocol version")
+            assertNotNull(hostInfo.ecdhPublicKeyB64)
+            val token = authenticator.generatePairingToken()
+            val pairing = bootstrap.completePairing(
+                host = "127.0.0.1", port = port, token = token,
+                clientDeviceId = "chunk-client", clientDeviceName = "Chunker",
+                clientFingerprint = "chunk-fp",
+                hostEcdhPublicKeyB64 = hostInfo.ecdhPublicKeyB64
+            )
+            bootstrap.close()
+            val secret = pairing.getOrThrow().sharedSecret
+
+            val client = KtorSyncClient(
+                repo = clientRepo, deviceId = "chunk-client",
+                deviceFingerprint = "chunk-fp", deviceName = "Chunker",
+                sharedSecret = secret
+            )
+            try {
+                val push = client.pushChanges(
+                    host = "127.0.0.1", port = port,
+                    deviceId = "chunk-client", deviceName = "Chunker", since = 0L
+                )
+                assertTrue(push.isSuccess, "chunked push must succeed: ${push.exceptionOrNull()?.message}")
+                val result = push.getOrThrow()
+
+                val expectedSlices =
+                    (2015 + SyncLimits.MAX_INTERACTIONS - 1) / SyncLimits.MAX_INTERACTIONS
+                assertEquals(expectedSlices, result.acks.size,
+                    "2015 interactions must be sliced into validator-sized pushes")
+                assertTrue(result.acks.all { it.success }, "every slice must ack success=true")
+                assertEquals(2015, repo.interactions.value.size,
+                    "every slice must be applied to the server repo")
+
+                // The pinned cursor rule over the REAL ack list of this push:
+                // advance to cycleStart only with a complete success set.
+                val previous = 1_700_000_000_000L
+                assertEquals(result.cycleStart,
+                    advanceCursorIfAllSucceeded(previous, result.cycleStart, result.acks),
+                    "cursor advances to cycleStart only after ALL slices ack success")
+                val withOneFailure = result.acks.dropLast(1) +
+                    result.acks.last().copy(success = false)
+                assertEquals(previous,
+                    advanceCursorIfAllSucceeded(previous, result.cycleStart, withOneFailure),
+                    "one failed slice must hold the cursor at its previous value")
+                assertEquals(previous,
+                    advanceCursorIfAllSucceeded(previous, result.cycleStart, emptyList()),
+                    "an empty ack list must never advance the cursor")
+            } finally {
+                client.close()
+            }
+        } finally {
+            server.stop()
+        }
+    }
+
+    /**
+     * Contract section b TEST obligation: the tombstone cutoff is the
+     * SENDER's cursor on every JVM apply path. The same fixture (one local
+     * entity above the cursor, one at-or-below, one absent) must produce
+     * identical keep/delete outcomes through HTTP push and through WS apply.
+     */
+    @Test
+    fun `tombstone cutoff parity between HTTP push and WS apply`() {
+        testApplication {
+            application { installRouter() }
+            val secret = client.pairEcdh("parity-client", "Client", "cfp")
+            val cursor = 1_700_000_000_000L
+
+            fun seed(tag: String) {
+                repo.upsertSession(Session(
+                    id = "s:$tag:new", title = "Newer $tag", startTime = cursor,
+                    createdAt = cursor, updatedAt = cursor + 5_000, deviceOrigin = "local"
+                ))
+                repo.upsertSession(Session(
+                    id = "s:$tag:old", title = "Older $tag", startTime = cursor - 10_000,
+                    createdAt = cursor - 10_000, updatedAt = cursor - 5_000, deviceOrigin = "local"
+                ))
+            }
+
+            fun outcome(tag: String): Triple<Boolean, Boolean, Boolean> {
+                val deleted = repo.deletedIdsSince(0L).deletedSessionIds
+                return Triple(
+                    repo.getSession("s:$tag:new") != null,
+                    repo.getSession("s:$tag:old") == null,
+                    deleted.contains("s:$tag:ghost")
+                )
+            }
+
+            fun assertRule(tag: String, path: String) {
+                val (newerKept, olderDeleted, _) = outcome(tag)
+                assertTrue(newerKept,
+                    "$path: local.updatedAt above the sender cursor must survive the delete")
+                assertTrue(olderDeleted,
+                    "$path: local.updatedAt <= sender cursor must be deleted")
+                assertNull(repo.getSession("s:$tag:ghost"),
+                    "$path: a tombstone for an absent local entity leaves it absent")
+            }
+
+            fun fixtureBody() =
+                """{"deviceId":"parity-client","deviceName":"Client","since":$cursor,""" +
+                    """"sessions":[],"doses":[],"substances":[],"interactions":[],"notes":[],""" +
+                    """"timelineEvents":[],"effects":[],"customUnits":[],""" +
+                    """"deletedSessionIds":["s:%s:new","s:%s:old","s:%s:ghost"]}"""
+
+            // Path 1: HTTP push
+            seed("http")
+            val aesKey = aesEncryptionKey(secret)
+            val batch = fixtureBody().let { String.format(it, "http", "http", "http") }
+            val encryptedBody = base64Encode(encryptBody(batch, aesKey))
+            val push = client.post("/sync/push") {
+                header("X-Sync-Device", "parity-client")
+                header("X-Sync-Auth", sign("parity-client", encryptedBody, secret))
+                contentType(ContentType.Application.Json)
+                setBody(encryptedBody)
+            }
+            assertEquals(HttpStatusCode.OK, push.status, push.bodyAsText())
+            assertRule("http", "HTTP push")
+
+            // Path 2: WS delta with the SAME cursor and tombstone list
+            seed("ws")
+            val authValue = sign("parity-client", "ws", secret)
+            val wsClient = createClient { install(WebSockets) }
+            wsClient.webSocket("/sync/ws", {
+                header(SyncAuthenticator.DEVICE_ID_HEADER, "parity-client")
+                header(SyncAuthenticator.AUTH_HEADER, authValue)
+            }) {
+                val delta = WsDelta(
+                    seq = 1L,
+                    since = cursor,
+                    deletedSessionIds = listOf("s:ws:new", "s:ws:old", "s:ws:ghost")
+                )
+                val encoded = wsJson.encodeToString(WsMessage.serializer(), delta)
+                send(Frame.Text(base64Encode(encryptBody(encoded, aesKey))))
+                val ackFrame = incoming.receive() as Frame.Text
+                val ack = wsJson.decodeFromString<WsMessage>(ackFrame.readText()) as WsAck
+                assertNull(ack.error, "parity delta must be accepted: ${ack.error}")
+            }
+            assertRule("ws", "WS apply")
+
+            // Cross-path parity: identical outcomes on both transports.
+            assertEquals(outcome("http"), outcome("ws"),
+                "HTTP push and WS apply must produce identical tombstone-cutoff outcomes")
         }
     }
 

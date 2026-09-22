@@ -7,6 +7,18 @@ class SyncAuthenticatorTest {
     private val trustStore = DeviceTrustStore(System.getProperty("java.io.tmpdir") + "/sync-auth-${System.nanoTime()}")
     private val authenticator = SyncAuthenticator(trustStore)
 
+    /**
+     * Sign like the production client: the shared commonMain
+     * buildAuthHeader/hmacSha256Hex pair is the single HMAC implementation.
+     * SyncAuthenticator.signRequest was deleted as test-only dead code in
+     * this wave; its output format is identical (timestamp:nonce:signature).
+     */
+    private fun sign(deviceId: String, body: String, secret: String): String =
+        buildAuthHeader(
+            deviceId, body, secret.encodeToByteArray(),
+            System.currentTimeMillis(), generateNonce()
+        )
+
     @AfterTest
     fun cleanup() {
         trustStore.clearAll()
@@ -76,7 +88,7 @@ class SyncAuthenticatorTest {
         ))
 
         val body = """{"test":"data","number":42}"""
-        val authHeader = authenticator.signRequest(deviceId, body, secret)
+        val authHeader = sign(deviceId, body, secret)
         val parts = authHeader.split(":")
         assertEquals(3, parts.size, "auth header should be timestamp:nonce:signature")
         assertTrue(parts[0].toLongOrNull() != null, "timestamp should be a number")
@@ -96,7 +108,7 @@ class SyncAuthenticatorTest {
         ))
 
         val body = "test"
-        val authHeader = authenticator.signRequest(deviceId, body, secret)
+        val authHeader = sign(deviceId, body, secret)
         assertFalse(authenticator.verifyRequest("wrong-device", body, authHeader))
     }
 
@@ -111,7 +123,7 @@ class SyncAuthenticatorTest {
         ))
 
         val body = "original body"
-        val authHeader = authenticator.signRequest(deviceId, body, secret)
+        val authHeader = sign(deviceId, body, secret)
         assertFalse(authenticator.verifyRequest(deviceId, "tampered body", authHeader))
     }
 
@@ -142,7 +154,7 @@ class SyncAuthenticatorTest {
         ))
 
         val body = "test body"
-        val authHeader = authenticator.signRequest(deviceId, body, secret)
+        val authHeader = sign(deviceId, body, secret)
 
         // First use should pass
         assertTrue(authenticator.verifyRequest(deviceId, body, authHeader))
@@ -164,37 +176,6 @@ class SyncAuthenticatorTest {
         val s1 = authenticator.generateSharedSecret()
         val s2 = authenticator.generateSharedSecret()
         assertNotEquals(s1, s2)
-    }
-
-    // ==================== Pairing response ====================
-
-    @Test
-    fun pairingResponseRoundtrip() {
-        val deviceId = "test-pairing"
-        val secret = authenticator.generateSharedSecret()
-        trustStore.addPeer(DeviceTrustStore.TrustedPeer(
-            deviceId = deviceId, displayName = "Pair",
-            fingerprint = "pair-fp", sharedSecret = secret,
-            pairedAt = System.currentTimeMillis()
-        ))
-
-        val header = authenticator.signPairingResponse(deviceId, secret)
-        assertTrue(authenticator.verifyPairingResponse(deviceId, header, secret))
-    }
-
-    @Test
-    fun pairingResponseFailsForWrongSecret() {
-        val deviceId = "test-wrong-secret"
-        val secret = authenticator.generateSharedSecret()
-        val wrongSecret = authenticator.generateSharedSecret()
-        trustStore.addPeer(DeviceTrustStore.TrustedPeer(
-            deviceId = deviceId, displayName = "Wrong",
-            fingerprint = "wrong-fp", sharedSecret = secret,
-            pairedAt = System.currentTimeMillis()
-        ))
-
-        val header = authenticator.signPairingResponse(deviceId, secret)
-        assertFalse(authenticator.verifyPairingResponse(deviceId, header, wrongSecret))
     }
 
     // ==================== Constants ====================

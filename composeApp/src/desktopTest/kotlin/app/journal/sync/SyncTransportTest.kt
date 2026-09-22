@@ -13,7 +13,7 @@ import kotlinx.serialization.encodeToString
  *
  * Server-starting tests (startHosting, syncWith, connectManually) are covered
  * by [KtorSyncServerIntegrationTest] which uses Ktor's in-process testApplication{}
- * — no real server or port binding needed. This class tests only the state
+ * , no real server or port binding needed. This class tests only the state
  * management layer of SyncTransport.
  */
 class SyncTransportTest {
@@ -113,7 +113,7 @@ class SyncTransportTest {
             ))
         )
         // Test with far-future timestamp (not directly validated in validateSyncBatch,
-        // so we rely on what the validator actually checks — dose amount)
+        // so we rely on what the validator actually checks , dose amount)
         // Amount negative should be caught
         assertNotNull(validateSyncBatch(negativeDose),
             "Negative dose amount should be rejected")
@@ -253,6 +253,6 @@ private suspend fun <T> retryOnFailure(
         if (result.isSuccess) return result
         lastFailure = result
     }
-    // Last attempt — return whatever comes back
+    // Last attempt , return whatever comes back
     return block()
 }

@@ -11,6 +11,26 @@ import javax.crypto.spec.SecretKeySpec
 
 private val secureRandom = SecureRandom()
 
+/**
+ * Derived AES key cache (audit: PBKDF2 at 600k iterations used to run on
+ * EVERY push, pull and drain page, hundreds of ms of CPU per request).
+ *
+ * Keyed by the exact secret string, bounded at [MAX_CACHED_AES_KEYS].
+ * Invalidation on revoke: entries are only ever looked up by their own
+ * secret, so once a device is revoked or re-paired its old secret is never
+ * queried again and the stale entry is unreachable;
+ * [clearAesKeyCache] purges everything immediately (wired into
+ * SyncTransport.revokeDevice). The pairing wrap keeps its own separate
+ * PBKDF2 (PairingSecretCrypto, 100k iterations) and is never cached here.
+ */
+private val aesKeyCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
+private const val MAX_CACHED_AES_KEYS = 64
+
+/** Drop every cached AES key; see [aesKeyCache] for when to call this. */
+fun clearAesKeyCache() {
+    aesKeyCache.clear()
+}
+
 /** Cryptographically secure random bytes via java.security.SecureRandom. */
 actual fun secureRandomBytes(size: Int): ByteArray =
     ByteArray(size).also { secureRandom.nextBytes(it) }
@@ -33,10 +53,18 @@ actual fun base64Decode(str: String): ByteArray =
  * casual brute-force while remaining fast on desktop JVM.
  */
 actual fun aesEncryptionKey(password: String): ByteArray {
+    aesKeyCache[password]?.let { return it }
     val salt = "NepentheSync!".encodeToByteArray()
     val spec = PBEKeySpec(password.toCharArray(), salt, 600_000, 256)
     val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-    return factory.generateSecret(spec).encoded
+    val key = try {
+        factory.generateSecret(spec).encoded
+    } finally {
+        spec.clearPassword()
+    }
+    if (aesKeyCache.size >= MAX_CACHED_AES_KEYS) aesKeyCache.clear()
+    aesKeyCache[password] = key
+    return key
 }
 
 /** AES-256-GCM encrypt: 12-byte IV || ciphertext+tag. */

@@ -212,7 +212,7 @@ class DeviceTrustStoreTest {
         val fileContent = File(testDir, "trusted-devices.json").readText()
         assertFalse(fileContent.contains(secret), "plaintext should NOT appear on disk")
 
-        // Re-read from a fresh store — secret must decrypt correctly
+        // Re-read from a fresh store , secret must decrypt correctly
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertEquals(secret, store2.getSharedSecret("dev-enc"))
     }
@@ -237,7 +237,7 @@ class DeviceTrustStoreTest {
     fun pbkdf2SaltPersistsAcrossRestarts() {
         store.addPeer(samplePeer("dev-salt", "fp-salt").copy(sharedSecret = "test-secret"))
 
-        // Reload from disk — should use the same salt
+        // Reload from disk , should use the same salt
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertEquals("test-secret", store2.getSharedSecret("dev-salt"))
 
@@ -246,7 +246,7 @@ class DeviceTrustStoreTest {
         assertTrue(fileContent.contains("\"salt\""), "store JSON should contain salt field")
         assertTrue(fileContent.contains("\"version\":2"), "store should be version 2")
 
-        // Another reload — still works
+        // Another reload , still works
         val store3 = DeviceTrustStore(testDir.absolutePath)
         assertEquals("test-secret", store3.getSharedSecret("dev-salt"))
     }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.TimeoutCancellationException
 
 /**
@@ -32,6 +33,8 @@ class SyncTransport(
 
     // Persistent infrastructure
     private val tlsIdentity = TlsIdentityManager(dataDir)
+    // Static P-256 pairing key (contract g), persisted next to identity.p12.
+    private val ecdhIdentity = EcdhIdentityManager(dataDir)
     private val trustStore = DeviceTrustStore(dataDir)
     private val authenticator = SyncAuthenticator(trustStore)
 
@@ -80,12 +83,44 @@ class SyncTransport(
         val mutationJob: Job,
         val peerHost: String,
         val peerPort: Int,
-        val peerFingerprint: String
+        val peerFingerprint: String,
+        /** Per-connection outgoing seq counter; the first delta sent is seq 1. */
+        val seqCounter: AtomicLong = AtomicLong(0L),
+        /** In-flight (seq, cycleStart) pushes awaiting their WsAck. */
+        val pendingPushes: PendingWsPushes = PendingWsPushes()
     ) {
         @Volatile
         var lastPongSeq: Long = -1L
         var heartbeatJob: Job? = null
         var incomingJob: Job? = null
+    }
+
+    /**
+     * In-flight WS pushes for one connection in send order (contract
+     * sections a and d): lastSyncTime may advance to a delta's cycleStart
+     * only when its ack reports success while every earlier delta is already
+     * acked. A rejected ack clears the queue WITHOUT advancing, so the
+     * unsent-through data is resent by the HTTP fallback cycle. A delta that
+     * failed to hit the wire is cancelled so it cannot block later advances.
+     */
+    private class PendingWsPushes {
+        private val queue = ArrayDeque<Pair<Long, Long>>() // (seq, cycleStart)
+
+        @Synchronized fun push(seq: Long, cycleStart: Long) { queue.addLast(seq to cycleStart) }
+        @Synchronized fun cancel(seq: Long) { queue.removeAll { it.first == seq } }
+        @Synchronized fun failAll() { queue.clear() }
+
+        /** Consume the ack for [seq]; returns the cursor to advance to, or null. */
+        @Synchronized fun ack(seq: Long): Long? {
+            val idx = queue.indexOfFirst { it.first == seq }
+            if (idx < 0) return null
+            if (idx > 0) {
+                // Out-of-order ack: drop it, never advance past an unacked head.
+                queue.removeAt(idx)
+                return null
+            }
+            return queue.removeFirst().second
+        }
     }
     private val wsConnections = ConcurrentHashMap<String, WsConnection>()
 
@@ -95,6 +130,11 @@ class SyncTransport(
     /** Revoke a previously paired device. */
     fun revokeDevice(deviceId: String) {
         trustStore.revokeDevice(deviceId)
+        // PBKDF2 key cache invalidation (audit perf note): cached AES keys are
+        // only ever looked up by their own secret, so a revoked secret can
+        // never be queried again; purging here also drops any OTHER peer's
+        // cached derivation so a revoke cannot leave key material resident.
+        clearAesKeyCache()
         activePeers.removeAll { it.deviceId == deviceId }
         // Drop the client-side WS connection, if any, using the same
         // teardown as stopContinuousSync (suspending close runs off-thread:
@@ -126,6 +166,7 @@ class SyncTransport(
                     repo = repo,
                     port = config.listenerPort,
                     tlsIdentity = tlsIdentity,
+                    ecdhIdentity = ecdhIdentity,
                     trustStore = trustStore,
                     authenticator = authenticator,
                     onConnection = { msg ->
@@ -253,7 +294,15 @@ class SyncTransport(
                                 return@withLock Result.failure(error ?: Exception("Sync exchange failed"))
                             }
 
-                            lastSyncTime = System.currentTimeMillis()
+                            // Contract d pin_deviation_flag: the ONLY wall-clock
+                            // value allowed to become the cursor is
+                            // ChunkedPushResult.cycleStart, captured BEFORE the
+                            // batch was built, and it is applied exclusively
+                            // through advanceCursorIfAllSucceeded over the real
+                            // per-slice acks. A partial push keeps the old cursor
+                            // so the unconfirmed remainder is resent next cycle.
+                            val push = exchange.getOrThrow()
+                            lastSyncTime = advanceCursorIfAllSucceeded(since, push.cycleStart, push.acks)
                             trustStore.updateLastSeen(existingPeer.deviceId)
                             val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
                             if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)
@@ -287,6 +336,7 @@ class SyncTransport(
                                     if (hostInfo.isSuccess) {
                                         val info = hostInfo.getOrThrow()
                                         appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
+                                        warnOnProtocolMismatch(info, "first sync probe")
                                         val knownPeer = trustStore.getPeer(info.fingerprint)
                                         if (knownPeer != null) {
                                             // Challenge the host before re-using the stored secret:
@@ -383,12 +433,17 @@ class SyncTransport(
                     // Never log the pairing token: the debug log replays to the
                     // UI viewer, and the token is the secret that wraps the key.
                     appendDebug("pairWithPeer: host reachable, completing pairing")
+                    val info = hostInfo.getOrThrow()
+                    warnOnProtocolMismatch(info, "pairing")
                     val result = client.completePairing(
                         host = peer.host, port = peer.port,
                         token = token,
                         clientDeviceId = deviceId,
                         clientDeviceName = deviceDisplayName,
-                        clientFingerprint = deviceFingerprint
+                        clientFingerprint = deviceFingerprint,
+                        // Contract g: reuse the HostInfo key already fetched
+                        // here; no extra round trip and no key material logged.
+                        hostEcdhPublicKeyB64 = info.ecdhPublicKeyB64
                     )
 
                     if (result.isSuccess) {
@@ -430,6 +485,43 @@ class SyncTransport(
 
     // ---- WebSocket continuous sync ----
 
+    /**
+     * One-shot HostInfo probe with its client always closed (audit: leaked
+     * CIO engines on every failed connect). Returns null when unreachable so
+     * callers treat the capability as unknown rather than absent.
+     */
+    private suspend fun probeHostInfo(peer: DiscoveredPeer): HostInfo? {
+        val probe = KtorSyncClient(repo = repo, tlsIdentity = tlsIdentity)
+        return try {
+            val info = probe.requestHostInfo(peer.host, peer.port).getOrNull()
+            if (info != null) warnOnProtocolMismatch(info, "capability probe")
+            info
+        } catch (_: Exception) {
+            null
+        } finally {
+            try { probe.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Contract task 9: a protocol version mismatch WARNs through the debug
+     * log and surfaces as a lastError-style status line. It never rejects
+     * the connection: warn vs hard-reject was not pinned by the contract and
+     * SYNC-JVM chose warn so an older peer keeps working while the user is
+     * told to upgrade both ends.
+     */
+    private fun warnOnProtocolMismatch(info: HostInfo, context: String) {
+        if (info.protocolVersion != SYNC_PROTOCOL_VERSION) {
+            appendDebug(
+                "WARNING: $context host protocol v${info.protocolVersion} != local " +
+                    "v$SYNC_PROTOCOL_VERSION; continuing (update recommended)"
+            )
+            _status.value = _status.value.copy(
+                lastError = "Protocol version mismatch: host v${info.protocolVersion}, local v$SYNC_PROTOCOL_VERSION"
+            )
+        }
+    }
+
     override suspend fun startContinuousSync(peer: DiscoveredPeer) = withContext(Dispatchers.IO) {
         try {
             val existingPeer = peer.fingerprint?.let { trustStore.getPeer(it) }
@@ -438,6 +530,20 @@ class SyncTransport(
 
             // Close existing connection to this peer if any
             stopContinuousSync(existingPeer.deviceId)
+
+            // Contract section f: ask the host BEFORE opening a socket. iOS
+            // hosts advertise wsSupported=false; reconnecting blindly would
+            // burn the whole retry budget against a port that never answers.
+            // An unreachable host leaves the capability unknown; proceed and
+            // let the connect error surface as before.
+            val hostInfo = probeHostInfo(peer)
+            if (hostInfo?.wsSupported == false) {
+                appendDebug(
+                    "Host ${existingPeer.displayName} does not support WebSocket sync " +
+                        "(wsSupported=false); staying on HTTP push/pull"
+                )
+                return@withContext
+            }
 
             val secret = existingPeer.sharedSecret
             val client = KtorSyncClient(
@@ -451,7 +557,15 @@ class SyncTransport(
                 persistAfterApply = persistAfterApply
                 )
 
+            var registered = false
+            try {
             val session = client.connectWs(peer.host, peer.port) { /* incoming frames handled by launchIncomingReader */ }
+
+            // Per-connection seq counter and in-flight push ledger: both live
+            // on the WsConnection so every reconnect starts a fresh epoch
+            // (contract section a: first delta is seq 1).
+            val seqCounter = AtomicLong(0L)
+            val pendingPushes = PendingWsPushes()
 
             // Subscribe to local mutations and push over WebSocket
             val mutationJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
@@ -460,12 +574,21 @@ class SyncTransport(
                     .debounce(500)
                     .collect { _ ->
                         val since = lastSyncTime ?: 0L
-                        val delta = buildDelta(since)
+                        val seq = seqCounter.incrementAndGet()
+                        // Contract d: cycleStart is captured BEFORE the delta is
+                        // built and is the only wall-clock value that may ever
+                        // move lastSyncTime; it does so only via the server ack.
+                        val cycleStart = System.currentTimeMillis()
+                        val delta = buildDelta(since, seq)
                         if (isEmptyDelta(delta)) return@collect
                         try {
+                            pendingPushes.push(seq, cycleStart)
                             client.sendDelta(session, delta)
-                            lastSyncTime = System.currentTimeMillis()
                         } catch (_: Exception) {
+                            // Never sent: drop the ledger entry so it cannot
+                            // block later ack advances; the data is resent by
+                            // the next mutation cycle or the HTTP push.
+                            pendingPushes.cancel(seq)
                             // WS disconnected; mutation job will be recreated on next reconnect
                         }
                     }
@@ -477,7 +600,9 @@ class SyncTransport(
                 mutationJob = mutationJob,
                 peerHost = peer.host,
                 peerPort = peer.port,
-                peerFingerprint = existingPeer.fingerprint
+                peerFingerprint = existingPeer.fingerprint,
+                seqCounter = seqCounter,
+                pendingPushes = pendingPushes
             )
 
             // Launch incoming frame reader (handles WsPong, WsDelta from server)
@@ -486,6 +611,15 @@ class SyncTransport(
             wsConnection.heartbeatJob = launchHeartbeat(existingPeer.deviceId, session, wsConnection)
 
             wsConnections[existingPeer.deviceId] = wsConnection
+            registered = true
+            } finally {
+                // Audit leak fix: a failed handshake or setup must close the
+                // CIO engine. Once registered, the connection owns its own
+                // teardown (stopContinuousSync / revoke / stale cleanup).
+                if (!registered) {
+                    try { client.close() } catch (_: Exception) {}
+                }
+            }
 
             // Ensure stale cleanup is running
             startStaleCleanup()
@@ -601,10 +735,15 @@ class SyncTransport(
 
     // ---- Helpers ----
 
-    private fun buildDelta(since: Long): WsDelta {
+    private fun buildDelta(since: Long, seq: Long): WsDelta {
         val deleted = repo.deletedIdsSince(since)
         return WsDelta(
-        seq = System.nanoTime(),
+        seq = seq,
+        // Sender cursor (contract section b): the receiving side applies this
+        // delta's tombstones with the cursor LWW rule instead of
+        // unconditionally. The old default 0 meant "delete whenever absent"
+        // and let an older sender wipe newer local edits.
+        since = since,
         sessions = repo.sessions.value.filter { it.updatedAt > since },
         doses = repo.doses.value.filter { it.updatedAt > since },
         substances = repo.substances.value.filter { it.updatedAt > since },
@@ -652,13 +791,17 @@ class SyncTransport(
                                 wsConnection.lastPongSeq = msg.seq
                             }
                             is WsDelta -> {
+                                // Receiving never advances lastSyncTime: that is
+                                // the OUTGOING cursor and only moves when an ack
+                                // confirms a push (wall-clock receive stamp
+                                // removed per contract d). The delta applies its
+                                // own sender cursor for the tombstone rule.
                                 val skipped = validateAndApplyDelta(msg)
-                                lastSyncTime = System.currentTimeMillis()
                                 if (skipped > 0) {
                                     appendDebug("WS delta from $deviceId: $skipped invalid items skipped")
                                 }
                             }
-                            is WsAck -> { /* server acknowledged our delta: nothing to do */ }
+                            is WsAck -> handleWsAck(deviceId, wsConnection, msg)
                             is WsPing -> {
                                 session.send(Frame.Text(wsJson.encodeToString(WsMessage.serializer(), WsPong(msg.seq))))
                             }
@@ -718,6 +861,43 @@ class SyncTransport(
     }
 
     // ===== WS Reconnection =====
+
+    /**
+     * Contract section a: a WsAck only advances the cursor when it reports
+     * success for the OLDEST in-flight delta (each entry's cycleStart was
+     * captured before its delta was built). A rejected delta logs through
+     * appendDebug, leaves lastSyncTime untouched, and falls back to an HTTP
+     * push cycle for that data.
+     */
+    private fun handleWsAck(deviceId: String, conn: WsConnection, ack: WsAck) {
+        val error = ack.error
+        if (error != null) {
+            conn.pendingPushes.failAll()
+            appendDebug("WS delta rejected by $deviceId: $error; cursor held, falling back to HTTP push")
+            backgroundScope.launch {
+                try {
+                    val peer = trustStore.getPeerById(deviceId)
+                    syncWith(
+                        DiscoveredPeer(
+                            deviceId = peer?.deviceId ?: deviceId,
+                            displayName = peer?.displayName ?: deviceId,
+                            host = conn.peerHost,
+                            port = conn.peerPort,
+                            isTrusted = true,
+                            fingerprint = conn.peerFingerprint
+                        ),
+                        continuous = false
+                    )
+                } catch (e: Exception) {
+                    appendDebug("WS to HTTP fallback failed for $deviceId: ${e.message}")
+                }
+            }
+            return
+        }
+        conn.pendingPushes.ack(ack.seq)?.let { cycleStart ->
+            lastSyncTime = maxOf(lastSyncTime ?: 0L, cycleStart)
+        }
+    }
 
     /** Trigger reconnection to a WS peer with exponential backoff: 1s, 2s, 4s, 8s, 16s (capped 30s). Max 5 attempts. */
     private fun triggerReconnect(deviceId: String) {
@@ -826,7 +1006,11 @@ class SyncTransport(
             deletedInteractionIds = ids(delta.deletedInteractionIds),
             deletedTimelineEventIds = ids(delta.deletedTimelineEventIds),
             deletedCustomUnitIds = ids(delta.deletedCustomUnitIds),
-            tombstoneCutoff = 0L
+            // Contract section b: same cursor LWW rule as every other JVM
+            // apply path. delta.since is the sender's cursor when it built
+            // the delta; the 0 default from older senders collapses to the
+            // conservative "no local entity" rule.
+            tombstoneCutoff = delta.since
         )
         // Durability: persist what we just applied (audit D1).
         persistAfterApply?.invoke()

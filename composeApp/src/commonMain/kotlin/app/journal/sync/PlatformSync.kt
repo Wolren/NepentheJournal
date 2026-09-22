@@ -21,7 +21,7 @@ expect fun platformDeviceName(): String
  * Generates a self-signed RSA 2048-bit X.509 certificate and stores
  * it in a new PKCS12 keystore at [storePath].
  *
- * Uses BouncyCastle internally — works on both desktop JVM and Android.
+ * Uses BouncyCastle internally , works on both desktop JVM and Android.
  *
  * @param storePath absolute path for the output .p12 file
  * @param alias key alias in the keystore

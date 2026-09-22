@@ -21,10 +21,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
-import java.security.MessageDigest
-import java.security.SecureRandom
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * LAN sync client with AES-256-GCM body encryption + HMAC-SHA256 request signing.
@@ -37,6 +33,13 @@ import javax.crypto.spec.SecretKeySpec
  *   - AUTHENTICATED mode (sharedSecret != null): AES-256-GCM + HMAC-SHA256
  *
  * WebSocket continuous sync uses the same HMAC scheme for connection auth.
+ *
+ * Contract notes (docs/HARDENING-CONTRACTS-2026-09.md):
+ *   - Pushes are CHUNKED through buildPushSlices and sent sequentially; the
+ *     cursor only moves when every slice acks success=true (section d).
+ *   - Pairing resolves the secret ONLY from ecdhSecretB64 (section g).
+ *   - Pull responses pass the shared validateSyncResponse guard before they
+ *     reach the store (client-response guard).
  */
 class KtorSyncClient(
     private val repo: IJournalRepository,
@@ -51,7 +54,9 @@ class KtorSyncClient(
     private val json = AppJson.json
     private val canSign: Boolean get() = sharedSecret != null
 
-    // Plain HTTP client — no TLS. Encryption + HMAC secures data on LAN.
+    // Plain HTTP client. Encryption + HMAC secures data on LAN; the scheme
+    // is built from SyncEndpoints.URL_SCHEME so a future TLS phase flips one
+    // constant (contract section g).
     private val client: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) { json(json) }
         install(WebSockets)
@@ -62,12 +67,16 @@ class KtorSyncClient(
         }
     }
 
+    /** "http://host:port" for every HTTP sync endpoint. */
+    private fun endpoint(host: String, port: Int): String =
+        "${SyncEndpoints.URL_SCHEME}://$host:$port"
+
     // ---- Pairing endpoints (no auth needed) ----
 
     suspend fun requestHostInfo(host: String, port: Int): Result<HostInfo> =
         withContext(Dispatchers.IO) {
             try {
-                val response = client.get("http://$host:$port/pairing/start")
+                val response = client.get("${endpoint(host, port)}${SyncEndpoints.PAIRING_START}")
                 val info = response.body<HostInfo>()
                 Result.success(info)
             } catch (e: Exception) {
@@ -75,46 +84,84 @@ class KtorSyncClient(
             }
         }
 
-    /** Complete pairing with a host using a user-entered token. */
+    /**
+     * Complete pairing with a host using a user-entered token.
+     *
+     * Contract section g (ECDH): generates an EPHEMERAL P-256 keypair for
+     * this attempt, sends it in clientEcdhPublicKeyB64, and resolves the
+     * shared secret ONLY by unwrapping ecdhSecretB64 with the ECDH-derived
+     * key. When the host sends no ecdhSecretB64 (pre-contract host) pairing
+     * FAILS CLOSED; the legacy plaintext sharedSecret and PBKDF2
+     * encSecretB64 fields are never read here. No key material and no
+     * sealed secret is ever logged (the debug log replays to the UI viewer).
+     *
+     * @param hostEcdhPublicKeyB64 the host's static public key from HostInfo
+     * (fetched by the caller when it already holds it); fetched here only
+     * when absent.
+     */
     suspend fun completePairing(
         host: String, port: Int,
         token: String,
         clientDeviceId: String,
         clientDeviceName: String,
-        clientFingerprint: String
+        clientFingerprint: String,
+        hostEcdhPublicKeyB64: String? = null
     ): Result<DevicePairingResult> = withContext(Dispatchers.IO) {
         try {
-            val response = client.post("http://$host:$port/pairing/verify") {
+            val ephemeral = EcdhIdentityManager.generateEphemeralKeyPair()
+            val clientPublicKeyB64 = EcdhIdentityManager.uncompressedPointB64(ephemeral.public)
+            val hostPublicKeyB64 = hostEcdhPublicKeyB64
+                ?: requestHostInfo(host, port).getOrNull()?.ecdhPublicKeyB64
+            if (hostPublicKeyB64 == null) {
+                return@withContext Result.failure(
+                    Exception("Host does not support ECDH pairing; upgrade the host")
+                )
+            }
+
+            val response = client.post("${endpoint(host, port)}${SyncEndpoints.PAIRING_VERIFY}") {
                 contentType(ContentType.Application.Json)
                 setBody(PairingVerifyRequest(
                     token = token,
                     clientDeviceId = clientDeviceId,
                     clientDeviceName = clientDeviceName,
-                    clientFingerprint = clientFingerprint
+                    clientFingerprint = clientFingerprint,
+                    clientEcdhPublicKeyB64 = clientPublicKeyB64
                 ))
             }
             val result = response.body<PairingResultResponse>()
-            if (result.success) {
-                // Prefer the token-wrapped secret: it crossed the LAN
-                // encrypted under a key only the token holder derives. Fall
-                // back to the legacy plaintext field for older hosts.
-                val secret = result.encSecretB64?.let { enc ->
-                    try {
-                        SyncAuthenticator.decryptPairingSecret(token, clientDeviceId, enc)
-                    } catch (_: Exception) {
-                        result.sharedSecret ?: ""
-                    }
-                } ?: (result.sharedSecret ?: "")
-                Result.success(DevicePairingResult(
-                    deviceId = result.deviceId ?: "",
-                    sharedSecret = secret,
-                    hostDeviceId = result.hostDeviceId ?: "",
-                    hostDeviceName = result.hostDeviceName ?: "",
-                    hostFingerprint = result.hostFingerprint ?: ""
-                ))
-            } else {
-                Result.failure(Exception(result.error ?: "Pairing failed"))
+            if (!result.success) {
+                return@withContext Result.failure(Exception(result.error ?: "Pairing failed"))
             }
+
+            val sealed = result.ecdhSecretB64
+                ?: return@withContext Result.failure(
+                    Exception("Host does not support ECDH pairing; upgrade the host")
+                )
+            val ecdhSharedSecret = try {
+                EcdhIdentityManager.agree(ephemeral.private, hostPublicKeyB64)
+            } catch (e: Exception) {
+                return@withContext Result.failure(
+                    Exception("Host advertised an invalid ECDH public key")
+                )
+            }
+            val secret = try {
+                PairingEcdh.unwrapSharedSecret(ecdhSharedSecret, sealed)
+            } catch (e: Exception) {
+                // Fail closed: wrong key, tampered ciphertext, or a host that
+                // only populated the legacy fields. Never fall back to them.
+                return@withContext Result.failure(
+                    Exception("ECDH pairing secret could not be unwrapped; refusing legacy fields")
+                )
+            } finally {
+                ecdhSharedSecret.fill(0)
+            }
+            Result.success(DevicePairingResult(
+                deviceId = result.deviceId ?: "",
+                sharedSecret = secret,
+                hostDeviceId = result.hostDeviceId ?: "",
+                hostDeviceName = result.hostDeviceName ?: "",
+                hostFingerprint = result.hostFingerprint ?: ""
+            ))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -126,9 +173,9 @@ class KtorSyncClient(
     private val maxPullPages = 20
 
     private suspend fun fetchPullPage(host: String, port: Int, cursor: Long): SyncResponse {
-        val uri = "/sync/pull?since=$cursor"
+        val uri = "${SyncEndpoints.SYNC_PULL}?since=$cursor"
         val authHeader = authenticateRequest(deviceId, uri)
-        val httpResponse = client.get("http://$host:$port$uri") {
+        val httpResponse = client.get("${endpoint(host, port)}$uri") {
             header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
             header(SyncAuthenticator.AUTH_HEADER, authHeader)
         }
@@ -161,12 +208,46 @@ class KtorSyncClient(
         return page
     }
 
+    /**
+     * Outcome of one chunked push cycle (contract section d).
+     *
+     * [acks] holds exactly one response per slice, in send order. [cycleStart]
+     * is the ONLY wall-clock value of the cycle: captured before the batch was
+     * built, so no change made during the round trip can be skipped, and it is
+     * the only value the caller may advance its cursor to, and only through
+     * [advanceCursorIfAllSucceeded] with [acks].
+     */
+    data class ChunkedPushResult(
+        val acks: List<SyncResponse>,
+        val cycleStart: Long,
+        val finalResponse: SyncResponse
+    )
+
+    /**
+     * Push everything changed since [since], sliced into validator-sized
+     * chunks (contract section d, audit C1):
+     *
+     * 1. buildPushSlices caps every collection so a 2015-interaction seed
+     *    (cap 100) becomes 21 slices instead of one rejected batch.
+     * 2. Slices are sent strictly sequentially; slice N+1 leaves only after
+     *    slice N received its response.
+     * 3. The first failure (transport error, success=false, decode failure,
+     *    zero acks) aborts with Result.failure and NO cursor advice happens
+     *    upstream: the caller keeps its previous cursor and resends from
+     *    there next cycle.
+     * 4. On full success the caller advances the cursor to [ChunkedPushResult.cycleStart]
+     *    via advanceCursorIfAllSucceeded(previous, cycleStart, acks).
+     */
     suspend fun pushChanges(
         host: String, port: Int,
         deviceId: String, deviceName: String,
         since: Long
-    ): Result<SyncResponse> = withContext(Dispatchers.IO) {
+    ): Result<ChunkedPushResult> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
+
+        // Contract d.4: captured BEFORE the batch is built. This is the only
+        // wall-clock value allowed to become the push cursor.
+        val cycleStart = System.currentTimeMillis()
 
         val deleted = repo.deletedIdsSince(since)
         val batch = SyncBatch(
@@ -190,84 +271,56 @@ class KtorSyncClient(
             deletedTimelineEventIds = deleted.deletedTimelineEventIds,
             deletedCustomUnitIds = deleted.deletedCustomUnitIds
         )
-
-        val bodyText = json.encodeToString(batch)
-        // Encrypt body with AES-256-GCM, then base64-encode for transport
+        val slices = buildPushSlices(batch)
         val aesKey = aesEncryptionKey(sharedSecret!!)
-        val encryptedBody = base64Encode(encryptBody(bodyText, aesKey))
-        val authHeader = authenticateRequest(deviceId, encryptedBody)
+        val acks = mutableListOf<SyncResponse>()
 
-        val response = retryWithBackoff {
-            val httpResponse = client.post("http://$host:$port/sync/push") {
-                contentType(ContentType.Application.Json)
-                header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
-                header(SyncAuthenticator.AUTH_HEADER, authHeader)
-                setBody(encryptedBody)
-            }
-            // Read raw body, base64-decode, decrypt, then deserialize
-            val rawBody = httpResponse.bodyAsText()
-            val decrypted = decryptBody(base64Decode(rawBody), aesKey)
-            json.decodeFromString<SyncResponse>(decrypted)
-        }
+        for ((index, slice) in slices.withIndex()) {
+            val bodyText = json.encodeToString(slice)
+            // Encrypt body with AES-256-GCM, then base64-encode for transport
+            val encryptedBody = base64Encode(encryptBody(bodyText, aesKey))
+            val authHeader = authenticateRequest(deviceId, encryptedBody)
 
-        response.fold(
-            onSuccess = { syncResponse ->
-                try {
-                    val last = applyAndDrain(host, port, syncResponse, since)
-                    if (last.success) return@withContext Result.success(last)
-                    return@withContext Result.failure(Exception(last.error ?: "Push failed"))
-                } catch (e: Exception) {
-                    Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
-                    return@withContext Result.failure(e)
+            val sliceResult = retryWithBackoff {
+                val httpResponse = client.post("${endpoint(host, port)}${SyncEndpoints.SYNC_PUSH}") {
+                    contentType(ContentType.Application.Json)
+                    header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
+                    header(SyncAuthenticator.AUTH_HEADER, authHeader)
+                    setBody(encryptedBody)
                 }
-            },
-            onFailure = { Result.failure(it) }
-        )
-    }
-
-    suspend fun pullChanges(
-        host: String, port: Int,
-        since: Long
-    ): Result<SyncResponse> = withContext(Dispatchers.IO) {
-        if (!canSign) return@withContext Result.failure(Exception("Not paired"))
-
-        val uri = "/sync/pull?since=$since"
-        val authHeader = authenticateRequest(deviceId, uri)
-
-        val response = retryWithBackoff {
-            val httpResponse = client.get("http://$host:$port$uri") {
-                header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
-                header(SyncAuthenticator.AUTH_HEADER, authHeader)
+                // Read raw body, base64-decode, decrypt, then deserialize
+                val rawBody = httpResponse.bodyAsText()
+                val decrypted = decryptBody(base64Decode(rawBody), aesKey)
+                json.decodeFromString<SyncResponse>(decrypted)
             }
-            val rawBody = httpResponse.bodyAsText()
-            val aesKey = aesEncryptionKey(sharedSecret!!)
-            val decrypted = decryptBody(base64Decode(rawBody), aesKey)
-            json.decodeFromString<SyncResponse>(decrypted)
-        }
-
-        response.fold(
-            onSuccess = { syncResponse ->
-                try {
-                    val last = applyAndDrain(host, port, syncResponse, since)
-                    if (last.success) return@withContext Result.success(last)
-                    return@withContext Result.failure(Exception(last.error ?: "Pull failed"))
-                } catch (e: Exception) {
-                    Log.withTag("SyncClient").e(e) { "applyPull failed after successful pull" }
-                    return@withContext Result.failure(e)
-                }
-            },
-            onFailure = { Result.failure(it) }
-        )
-    }
-
-    suspend fun fetchHostInfo(host: String, port: Int): Result<HostInfo> =
-        withContext(Dispatchers.IO) {
-            try {
-                client.get("http://$host:$port/info").body<HostInfo>().let { Result.success(it) }
-            } catch (e: Exception) {
-                Result.failure(e)
+            val ack = sliceResult.getOrElse { error ->
+                Log.withTag("SyncClient").w { "push slice $index/${slices.size} failed: ${error.message}" }
+                return@withContext Result.failure(error)
+            }
+            acks += ack
+            if (!ack.success) {
+                // Stop immediately: later slices must not be sent, and the
+                // cursor stays where it was so everything not confirmed is
+                // resent next cycle.
+                Log.withTag("SyncClient").w { "push slice $index/${slices.size} rejected: ${ack.error}" }
+                return@withContext Result.failure(Exception(ack.error ?: "Push slice rejected"))
             }
         }
+
+        // Every slice acked success=true. Apply the exchange data: the final
+        // ack is the freshest snapshot of the same since cursor, and
+        // applyAndDrain follows its pagination from there.
+        try {
+            val last = applyAndDrain(host, port, acks.last(), since)
+            if (!last.success) {
+                return@withContext Result.failure(Exception(last.error ?: "Push failed"))
+            }
+            Result.success(ChunkedPushResult(acks = acks, cycleStart = cycleStart, finalResponse = last))
+        } catch (e: Exception) {
+            Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
+            Result.failure(e)
+        }
+    }
 
     /**
      * Prove the host knows [secret] before re-using a stored pairing secret.
@@ -281,12 +334,12 @@ class KtorSyncClient(
             try {
                 val rawChallenge = generateNonce()
                 val challenge = rawChallenge.take(128)
-                val resp = client.get("http://$host:$port/auth/verify") {
+                val resp = client.get("${endpoint(host, port)}${SyncEndpoints.AUTH_VERIFY}") {
                     header(SyncAuthenticator.DEVICE_ID_HEADER, callerDeviceId)
                     header("X-Sync-Challenge", challenge)
                 }
                 if (resp.status != HttpStatusCode.OK) {
-                    val legacy = client.get("http://$host:$port/auth/verify?deviceId=$callerDeviceId&challenge=$challenge")
+                    val legacy = client.get("${endpoint(host, port)}${SyncEndpoints.AUTH_VERIFY}?deviceId=$callerDeviceId&challenge=$challenge")
                     if (legacy.status != HttpStatusCode.OK) return@withContext false
                     return@withContext checkChallenge(legacy.bodyAsText(), callerDeviceId, challenge, secret)
                 }
@@ -302,56 +355,42 @@ class KtorSyncClient(
         if (kotlin.math.abs(System.currentTimeMillis() - data.timestamp) > SyncAuth.TIMESTAMP_WINDOW_MS) {
             return false
         }
-        val expected = hmac(secret, "challenge:$callerDeviceId:${data.timestamp}:$challenge")
+        val payload = "challenge:$callerDeviceId:${data.timestamp}:$challenge"
+        val expected = hmacSha256Hex(secret.encodeToByteArray(), payload.encodeToByteArray())
         return constantTimeEquals(data.signature, expected)
     }
 
     private suspend fun applyPull(response: SyncResponse, since: Long) {
-        repo.applyBatch(
-            sessions = response.sessions,
-            doses = response.doses,
-            substances = response.substances,
-            effects = response.effects,
-            interactions = response.interactions,
-            notes = response.notes,
-            timelineEvents = response.timelineEvents,
-            customUnits = response.customUnits,
-            lastWriterWins = true,
-            deletedSessionIds = response.deletedSessionIds,
-            deletedDoseIds = response.deletedDoseIds,
-            deletedNoteIds = response.deletedNoteIds,
-            deletedSubstanceIds = response.deletedSubstanceIds,
-            deletedEffectIds = response.deletedEffectIds,
-            deletedInteractionIds = response.deletedInteractionIds,
-            deletedTimelineEventIds = response.deletedTimelineEventIds,
-            deletedCustomUnitIds = response.deletedCustomUnitIds,
-            tombstoneCutoff = since
-        )
+        // Client-response guard (contract): the shared validateSyncResponse
+        // filters the raw lists before they touch the store, and the skip
+        // counts are logged with their totals instead of being applied blind.
+        val applied = applySyncResponse(repo, response, since)
+        if (applied.skippedEntities > 0 || applied.skippedTombstones > 0) {
+            Log.withTag("SyncClient").w {
+                "Pull response guard skipped ${applied.skippedEntities} invalid entities and " +
+                    "${applied.skippedTombstones} invalid tombstone IDs (since=$since)"
+            }
+        }
         // Persist pulled data immediately (audit D1): the pull cursor advances
         // after this response, so a crash before the debounced autosave would
         // skip re-fetching this data on the next sync.
         persistAfterApply?.invoke()
     }
 
+    /**
+     * Build the shared auth header: "timestamp:nonce:signature" from the
+     * commonMain builders (single HMAC implementation for every platform,
+     * shared SecureRandom-backed nonce; audit: HMAC triplication).
+     */
     private fun authenticateRequest(deviceId: String, body: String): String {
         val secret = this.sharedSecret ?: throw IllegalStateException("No shared secret")
-        val timestamp = System.currentTimeMillis()
-        val nonce = generateNonce()
-        val signature = hmac(secret, "$deviceId:$timestamp:$nonce:$body")
-        return "$timestamp:$nonce:$signature"
-    }
-
-    private fun generateNonce(): String {
-        val bytes = ByteArray(16)
-        SecureRandom().nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun hmac(secret: String, data: String): String {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        return mac.doFinal(data.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        return buildAuthHeader(
+            deviceId = deviceId,
+            body = body,
+            secret = secret.encodeToByteArray(),
+            timestamp = System.currentTimeMillis(),
+            nonce = generateNonce()
+        )
     }
 
     /** Constant-time comparison to avoid timing side channels on HMAC checks. */
@@ -368,14 +407,16 @@ class KtorSyncClient(
         callerDeviceId: String = this.deviceId,
         onDelta: (WsDelta) -> Unit
     ): WebSocketSession {
-        if (!canSign) throw IllegalStateException("No shared secret — pair this device first")
+        if (!canSign) throw IllegalStateException("No shared secret, pair this device first")
 
         val authHeader = authenticateRequest(callerDeviceId, "ws")
         // Header-only auth: query strings leak into access logs and crash
         // reports. webSocketSession takes a request builder, so headers ride
-        // the handshake instead of the URL.
+        // the handshake instead of the URL. The ws scheme is fixed here:
+        // SyncEndpoints.URL_SCHEME is the HTTP scheme used by every REST
+        // endpoint above.
         return client.webSocketSession({
-            url("ws://$host:$port/sync/ws")
+            url("ws://$host:$port${SyncEndpoints.SYNC_WS}")
             header(SyncAuthenticator.DEVICE_ID_HEADER, callerDeviceId)
             header(SyncAuthenticator.AUTH_HEADER, authHeader)
         })

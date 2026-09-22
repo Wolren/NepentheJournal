@@ -103,17 +103,10 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     }
 
     // ---- HMAC signing ----
-
-    /**
-     * Sign a request body for the given device.
-     * Returns the "timestamp:nonce:signature" header value.
-     */
-    fun signRequest(deviceId: String, body: String, secret: String): String {
-        val timestamp = System.currentTimeMillis()
-        val nonce = generateNonce()
-        val signature = hmac(secret, "$deviceId:$timestamp:$nonce:$body")
-        return "$timestamp:$nonce:$signature"
-    }
+    // signRequest was deleted with this wave's dead-code pass: zero
+    // production callers (proof: repo-wide grep, declaration only) and the
+    // shared commonMain buildAuthHeader/hmacSha256Hex pair is the single
+    // signing implementation for clients and tests alike.
 
     /**
      * Verify a signed request.
@@ -142,14 +135,11 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         return constantTimeEquals(signature, expected)
     }
 
-    /** Generate a signing header for pairing response (uses device's own secret). */
-    fun signPairingResponse(deviceId: String, secret: String): String {
-        val body = "pairing-ok:$deviceId"
-        val timestamp = System.currentTimeMillis()
-        val nonce = generateNonce()
-        val signature = hmac(secret, "${deviceId}:$timestamp:$nonce:$body")
-        return "$timestamp:$nonce:$signature"
-    }
+    // signPairingResponse and verifyPairingResponse were deleted with this
+    // wave's dead-code pass: zero production callers (proof: repo-wide
+    // grep, declaration only; their two SyncAuthenticatorTest round-trips
+    // were removed with them). Pairing responses are not HMAC-signed by
+    // either platform; the ECDH seal (PairingEcdh) carries their security.
 
     /**
      * Sign a host-identity challenge: HMAC-SHA256 of
@@ -160,28 +150,7 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     fun signChallenge(deviceId: String, timestamp: Long, challenge: String, secret: String): String =
         hmac(secret, "challenge:$deviceId:$timestamp:$challenge")
 
-    /** Verify a pairing response signing header. */
-    fun verifyPairingResponse(deviceId: String, authHeader: String, secret: String): Boolean {
-        val parts = authHeader.split(":", limit = 3)
-        if (parts.size != 3) return false
-        val (timestampStr, nonce, signature) = parts
-        val timestamp = timestampStr.toLongOrNull() ?: return false
-
-        val now = System.currentTimeMillis()
-        if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
-
-        val body = "pairing-ok:$deviceId"
-        val expected = hmac(secret, "${deviceId}:$timestamp:$nonce:$body")
-        return constantTimeEquals(signature, expected)
-    }
-
     // ---- Private ----
-
-    private fun generateNonce(): String {
-        val bytes = ByteArray(16)
-        secureRandom.nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
 
     private fun hmac(secret: String, data: String): String {
         val mac = Mac.getInstance("HmacSHA256")
