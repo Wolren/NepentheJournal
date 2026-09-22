@@ -2,8 +2,11 @@ package app.journal.data
 
 import app.journal.model.*
 import kotlin.test.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 
 class JournalRepositoryTest {
 
@@ -195,28 +198,6 @@ class JournalRepositoryTest {
         assertEquals("s:1", inRange.first())
     }
 
-    // ==================== Search ====================
-
-    @Test
-    fun searchSubstancesMatchesNameAndAliasCaseInsensitive() {
-        val repo = JournalRepository()
-        repo.upsertSubstance(sampleSubstance("sub:1", "LSD", listOf("Lysergamide")).copy(aliases = listOf("Lucy")))
-        repo.upsertSubstance(sampleSubstance("sub:2", "MDMA", listOf("Empathogen")))
-        val byName = repo.searchSubstances("mdma")
-        assertEquals(1, byName.size)
-        assertEquals("MDMA", byName.first().name)
-        val byAlias = repo.searchSubstances("lucy")
-        assertEquals(1, byAlias.size)
-        assertEquals("LSD", byAlias.first().name)
-    }
-
-    @Test
-    fun searchSubstancesReturnsEmptyForNoMatch() {
-        val repo = JournalRepository()
-        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
-        assertTrue(repo.searchSubstances("zzznotfound").isEmpty())
-    }
-
     // ==================== Preferences ====================
 
     @Test
@@ -277,8 +258,13 @@ class JournalRepositoryTest {
         assertEquals(1, repo.sessions.value.size)
         assertEquals(1, repo.substances.value.size)
         assertEquals(1, repo.doses.value.size)
-        assertEquals(RatingScaleMode.SHULGIN, repo.ratingScaleMode.value)
-        assertFalse(repo.useSubstanceColors.value)
+        // EXPECTATION CHANGED (hardening, audit tombstone-pref-wipe): applySnapshot
+        // no longer applies the snapshot's preference fields at all. Its only
+        // production caller is the bundled-seed apply, which must never rewrite user
+        // prefs; preference restore belongs to AppJson.apply (disk load / backup
+        // restore), which is untouched. A fresh repo therefore keeps its defaults.
+        assertEquals(RatingScaleMode.OFF, repo.ratingScaleMode.value)
+        assertTrue(repo.useSubstanceColors.value)
     }
 
     // ==================== DataFrame export ====================
@@ -538,8 +524,13 @@ class JournalRepositoryTest {
         val resolved = repo.upsertNoteWithConflict(remote, "remote")
         assertNotNull(resolved)
         assertEquals(1, resolved.conflictSiblings.size)
-        assertEquals("remote version", resolved.conflictSiblings.first().body)
+        // EXPECTATION CHANGED (hardening, contract c): the sibling is now the LOSING
+        // body, never the winner's own body. The remote note is newer (200 > 100), so
+        // its body wins the merge and the local body is the one preserved.
+        assertEquals("local version", resolved.conflictSiblings.first().body)
         assertEquals("remote", resolved.conflictSiblings.first().deviceOrigin)
+        assertEquals(100L, resolved.conflictSiblings.first().updatedAt)
+        assertEquals("remote version", resolved.body)
     }
 
     @Test
@@ -614,7 +605,7 @@ class JournalRepositoryTest {
             createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
         )
         repo.upsertTimelineEvent(event)
-        // Upsert same event again (same session) — should not duplicate
+        // Upsert same event again (same session) - should not duplicate
         repo.upsertTimelineEvent(event)
         assertEquals(1, repo.eventsForSession("s:1").size)
     }
@@ -728,5 +719,404 @@ class JournalRepositoryTest {
 
         val hits = repo.search("zebra")
         assertTrue(hits.none { it.entityId == "s:1" }, "deleted session must vanish from search")
+    }
+
+    // ==================== Search index freshness (dirty-flag rebuild) ====================
+
+    @Test
+    fun searchIndexReflectsJustUpsertedAndDeletedNote() {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:s", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", body = "changelog about kratom capsules"))
+        val hits = repo.search("kratom")
+        assertTrue(hits.any { it.entityId == "n:s" }, "just-upserted note must be searchable")
+        repo.deleteNote("n:s")
+        assertTrue(repo.search("kratom").none { it.entityId == "n:s" }, "deleted note must vanish from search")
+    }
+
+    @Test
+    fun searchIndexReflectsEntitiesAppliedByBatch() {
+        val repo = JournalRepository()
+        repo.applyBatch(substances = listOf(sampleSubstance("sub:1", "Psilocybin Mushroom")))
+        assertTrue(repo.search("psilocybin").any { it.entityId == "sub:1" },
+            "batch-applied substance must be searchable")
+    }
+
+    // ==================== upsertSessionChildren (batch save) ====================
+
+    @Test
+    fun sessionChildrenBatchMatchesPerItemUpserts() {
+        fun seeded(): JournalRepository {
+            val repo = JournalRepository()
+            repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+            repo.upsertSubstance(sampleSubstance("sub:2", "MDMA"))
+            repo.upsertSession(sampleSession("s:1"))
+            return repo
+        }
+        val doses = listOf(
+            sampleDose("d:1", "sub:1", "s:1", 1000L),
+            sampleDose("d:2", "sub:2", "s:1", 1500L),
+            sampleDose("d:3", "sub:1", "s:1", 2000L, amount = 50.0)
+        )
+        val events = listOf(
+            TimelineEvent(id = "e:1", sessionId = "s:1", timestamp = 1000L,
+                eventType = TimelineEventType.ONSET, label = "Start",
+                createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"),
+            TimelineEvent(id = "e:2", sessionId = "s:1", timestamp = 5000L,
+                eventType = TimelineEventType.PEAK, label = "Peak",
+                createdAt = 0L, updatedAt = 0L, deviceOrigin = "test")
+        )
+
+        val perItem = seeded()
+        doses.forEach { perItem.upsertDose(it) }
+        events.forEach { perItem.upsertTimelineEvent(it) }
+
+        val batch = seeded()
+        val toleranceBefore = batch.toleranceVersion.value
+        batch.upsertSessionChildren("s:1", doses, events)
+
+        assertEquals(perItem.doses.value, batch.doses.value, "same stored doses")
+        assertEquals(perItem.timelineEvents.value, batch.timelineEvents.value, "same stored events")
+        assertEquals(perItem.dosesForSession("s:1"), batch.dosesForSession("s:1"))
+        assertEquals(perItem.eventsForSession("s:1"), batch.eventsForSession("s:1"))
+        assertEquals(perItem.sessionIdsForSubstance("sub:1").toSet(), batch.sessionIdsForSubstance("sub:1").toSet())
+        assertEquals(perItem.sessionIdsForSubstance("sub:2").toSet(), batch.sessionIdsForSubstance("sub:2").toSet())
+        assertEquals(perItem.substanceDoseStats, batch.substanceDoseStats,
+            "batch stats must equal the incrementally maintained stats")
+        assertEquals(toleranceBefore + 1, batch.toleranceVersion.value,
+            "batch bumps tolerance exactly once (per-item path bumps once per dose)")
+    }
+
+    @Test
+    fun sessionChildrenReparentDraftIdRows() {
+        val repo = JournalRepository()
+        val draftId = "session:draft:test"
+        val draftDose = sampleDose("d:1", "sub:1", draftId, 1000L)
+        val draftEvent = TimelineEvent(id = "e:1", sessionId = draftId, timestamp = 1000L,
+            eventType = TimelineEventType.ONSET, label = "Start",
+            createdAt = 0L, updatedAt = 0L, deviceOrigin = "test")
+        repo.upsertSessionChildren("s:1", listOf(draftDose), listOf(draftEvent))
+        assertEquals(1, repo.dosesForSession("s:1").size)
+        assertTrue(repo.dosesForSession(draftId).isEmpty(), "draft dose must leave the draft session")
+        assertEquals(1, repo.eventsForSession("s:1").size)
+        assertTrue(repo.eventsForSession(draftId).isEmpty(), "draft event must leave the draft session")
+        assertEquals(setOf("s:1"), repo.sessionIdsForSubstance("sub:1").toSet())
+    }
+
+    @Test
+    fun sessionChildrenEmptyBatchIsNoop() {
+        val repo = JournalRepository()
+        val mutationsBefore = repo.mutationCount.value
+        val toleranceBefore = repo.toleranceVersion.value
+        repo.upsertSessionChildren("s:1", emptyList(), emptyList())
+        assertEquals(mutationsBefore, repo.mutationCount.value)
+        assertEquals(toleranceBefore, repo.toleranceVersion.value)
+    }
+
+    // ==================== Seed apply preserves tombstones + prefs ====================
+
+    @Test
+    fun applySnapshotPreservesTombstonesAndUserPrefs() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:gone"))
+        repo.deleteSession("s:gone")
+        repo.setWelcomeCompleted(true)
+        repo.setRatingScaleMode(RatingScaleMode.NUMERIC)
+        repo.setSubstanceColors(false)
+        val tombstonesBefore = repo.exportTombstones()
+        assertTrue(tombstonesBefore.isNotEmpty(), "fixture must record a tombstone")
+
+        // A bundled-seed snapshot carries its own (default) prefs and no tombstones.
+        repo.applySnapshot(JournalSnapshot(
+            savedAt = 1000L,
+            substances = listOf(sampleSubstance("sub:1", "LSD")),
+            useSubstanceColors = true,
+            welcomeCompleted = false
+        ))
+
+        val tombstonesAfter = repo.exportTombstones()
+        for ((key, deletedAt) in tombstonesBefore) {
+            assertEquals(deletedAt, tombstonesAfter[key], "recorded tombstone $key must survive seed apply")
+        }
+        assertTrue(repo.welcomeCompleted.value, "welcomeCompleted=true must survive seed apply")
+        assertEquals(RatingScaleMode.NUMERIC, repo.ratingScaleMode.value,
+            "user rating preference must survive seed apply")
+        assertFalse(repo.useSubstanceColors.value, "user color preference must survive seed apply")
+        // The snapshot's entities still land on top of existing data.
+        assertEquals(1, repo.substances.value.size)
+    }
+
+    // ==================== Conflict merge (contract c) ====================
+
+    @Test
+    fun conflictMergeKeepsBothBodiesWhenLocalWins() {
+        val repo = JournalRepository()
+        val local = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
+            sessionId = "s:1", body = "newer local body")
+        repo.upsertNote(local)
+        val incoming = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "remote",
+            sessionId = "s:1", body = "older remote body")
+        repo.upsertNoteWithConflict(incoming, "device-b")
+        val stored = repo.notes.value.first { it.id == "n:1" }
+        assertEquals("newer local body", stored.body)
+        assertEquals(1, stored.conflictSiblings.size)
+        assertEquals("older remote body", stored.conflictSiblings[0].body)
+        assertEquals(100L, stored.conflictSiblings[0].updatedAt)
+        assertEquals(200L, stored.updatedAt, "winner keeps its own timestamp (no inflation)")
+    }
+
+    @Test
+    fun upsertNoteWithConflictIsIdempotentOnReplay() = runBlocking {
+        val repo = JournalRepository()
+        val local = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "local body")
+        repo.upsertNote(local)
+        val remote = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "remote",
+            sessionId = "s:1", body = "remote body")
+        val first = repo.upsertNoteWithConflict(remote, "device-b")
+        val second = repo.upsertNoteWithConflict(remote, "device-b")
+        assertNotNull(first)
+        assertNotNull(second)
+        assertEquals(first, second, "re-applying the same remote note must be a no-op")
+        assertEquals(1, second.conflictSiblings.size, "sibling must not duplicate on replay")
+        assertEquals(1, repo.pendingConflictCount.first())
+    }
+
+    @Test
+    fun pendingConflictCountCountsOnlyConflictedNotes() = runBlocking {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "plain note one"))
+        assertEquals(0, repo.pendingConflictCount.first())
+        repo.upsertNote(Note(id = "n:2", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "will conflict"))
+        repo.upsertNoteWithConflict(Note(id = "n:2", createdAt = 0L, updatedAt = 200L,
+            deviceOrigin = "remote", sessionId = "s:1", body = "rival body"), "device-b")
+        assertEquals(1, repo.pendingConflictCount.first())
+        repo.upsertNote(Note(id = "n:3", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:1", body = "plain note two"))
+        assertEquals(1, repo.pendingConflictCount.first(),
+            "only notes with non-empty conflictSiblings count")
+    }
+
+    @Test
+    fun applyBatchNoteBranchKeepsBothBodiesBothOrderings() = runBlocking {
+        val repo = JournalRepository()
+        // Ordering 1: local newer than the peer note.
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
+            sessionId = "s:1", body = "local newer"))
+        // Ordering 2: peer note newer than the local note.
+        repo.upsertNote(Note(id = "n:2", createdAt = 0L, updatedAt = 100L, deviceOrigin = "local",
+            sessionId = "s:1", body = "local older"))
+
+        repo.applyBatch(
+            notes = listOf(
+                Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "peer",
+                    sessionId = "s:1", body = "peer older"),
+                Note(id = "n:2", createdAt = 0L, updatedAt = 200L, deviceOrigin = "peer",
+                    sessionId = "s:1", body = "peer newer")
+            ),
+            lastWriterWins = true
+        )
+
+        val n1 = repo.notes.value.first { it.id == "n:1" }
+        assertEquals("local newer", n1.body)
+        assertEquals("peer older", n1.conflictSiblings.single().body)
+        val n2 = repo.notes.value.first { it.id == "n:2" }
+        assertEquals("peer newer", n2.body)
+        assertEquals("local older", n2.conflictSiblings.single().body)
+        assertEquals(2, repo.pendingConflictCount.first())
+    }
+
+    @Test
+    fun applyBatchIdenticalBodyDoesNotRegressUpdatedAt() {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
+            sessionId = "s:1", body = "same body"))
+        repo.applyBatch(
+            notes = listOf(Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "peer",
+                sessionId = "s:1", body = "same body")),
+            lastWriterWins = true
+        )
+        val stored = repo.notes.value.first { it.id == "n:1" }
+        assertEquals(200L, stored.updatedAt, "an older identical note must not roll updatedAt back")
+        assertTrue(stored.conflictSiblings.isEmpty())
+    }
+
+    @Test
+    fun applyBatchConflictReplayIsIdempotent() {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
+            sessionId = "s:1", body = "local body"))
+        val peer = Note(id = "n:1", createdAt = 0L, updatedAt = 100L, deviceOrigin = "peer",
+            sessionId = "s:1", body = "peer body")
+        repo.applyBatch(notes = listOf(peer), lastWriterWins = true)
+        val afterFirst = repo.notes.value.first { it.id == "n:1" }
+        repo.applyBatch(notes = listOf(peer), lastWriterWins = true)
+        val afterSecond = repo.notes.value.first { it.id == "n:1" }
+        assertEquals(afterFirst, afterSecond, "re-applying the same conflict batch must change nothing")
+        assertEquals("local body", afterSecond.body)
+        assertEquals(1, afterSecond.conflictSiblings.size)
+    }
+
+    @Test
+    fun applyBatchSeedPathBlindOverwritesNotesWithoutConflict() {
+        val repo = JournalRepository()
+        repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
+            sessionId = "s:1", body = "stored body"))
+        // Seed/restore path (lastWriterWins = false, the default) stays authoritative.
+        repo.applyBatch(notes = listOf(Note(id = "n:1", createdAt = 0L, updatedAt = 100L,
+            deviceOrigin = "seed", sessionId = "s:1", body = "seed body")))
+        val stored = repo.notes.value.first { it.id == "n:1" }
+        assertEquals("seed body", stored.body)
+        assertTrue(stored.conflictSiblings.isEmpty(), "authoritative restore must not create conflicts")
+    }
+
+    // ==================== Dose index / stat integrity ====================
+
+    @Test
+    fun upsertDoseReparentUpdatesSessionAndSubstanceIndices() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertSession(sampleSession("s:2"))
+        val dose = sampleDose("d:1", "sub:1", "s:1", 1000L)
+        repo.upsertDose(dose)
+        repo.upsertDose(dose.copy(sessionId = "s:2"))
+        assertTrue(repo.dosesForSession("s:1").isEmpty(), "old session must lose the moved dose")
+        assertEquals(1, repo.dosesForSession("s:2").size, "new session holds exactly one copy")
+        assertEquals(setOf("s:2"), repo.sessionIdsForSubstance("sub:1").toSet(),
+            "stale session must leave the substance index")
+        val stats = repo.substanceDoseStats["sub:1"]
+        assertNotNull(stats)
+        assertEquals(1, stats.first)
+        assertEquals(1000L, stats.second)
+    }
+
+    @Test
+    fun upsertDoseSubstanceChangeMovesIndicesAndStats() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        val dose = sampleDose("d:1", "sub:1", "s:1", 1000L)
+        repo.upsertDose(dose)
+        repo.upsertDose(dose.copy(substanceId = "sub:2"))
+        assertTrue(repo.sessionIdsForSubstance("sub:1").isEmpty(), "old substance index must be cleaned")
+        assertEquals(setOf("s:1"), repo.sessionIdsForSubstance("sub:2").toSet())
+        assertFalse(repo.substanceDoseStats.containsKey("sub:1"))
+        assertEquals(1, repo.substanceDoseStats["sub:2"]?.first)
+    }
+
+    @Test
+    fun deleteDoseKeepsSessionIndexWhenSiblingDoseRemains() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
+        repo.deleteDose("d:1")
+        assertEquals(setOf("s:1"), repo.sessionIdsForSubstance("sub:1").toSet(),
+            "the session still holds d:2 and must stay indexed")
+        assertEquals(1, repo.substanceDoseStats["sub:1"]?.first)
+    }
+
+    @Test
+    fun substanceDoseStatsSurviveCreateDeleteReparentRebuild() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertSession(sampleSession("s:2"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
+
+        repo.deleteDose("d:1")
+        // The incremental delete path must already be consistent with no rebuild:
+        // the session still holds d:2, so it stays indexed.
+        assertEquals(setOf("s:1"), repo.sessionIdsForSubstance("sub:1").toSet())
+        assertEquals(1, repo.substanceDoseStats["sub:1"]?.first)
+
+        // Re-parent the survivor: incremental stats must shrink to one session again.
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:2", 2000L))
+        val statsBefore = repo.substanceDoseStats
+        val sessionsBefore = repo.sessionIdsForSubstance("sub:1").toSet()
+        assertEquals(setOf("s:2"), sessionsBefore, "stale session must not survive the re-parent")
+        assertEquals(1, statsBefore["sub:1"]?.first, "distinct-session count must shrink with the move")
+
+        // Roundtrip: a from-scratch rebuild must reproduce the incremental state.
+        repo.rebuildIndices()
+        assertEquals(statsBefore, repo.substanceDoseStats,
+            "incremental stats must equal rebuildSubstanceDoseStats output")
+        assertEquals(sessionsBefore, repo.sessionIdsForSubstance("sub:1").toSet())
+    }
+
+    @Test
+    fun sessionCascadeKeepsSubstanceSessionIndexConsistent() {
+        val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertSession(sampleSession("s:2"))
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:1", "s:2", 2000L))
+        repo.deleteSession("s:1") // removeWhere cascade path
+        assertEquals(setOf("s:2"), repo.sessionIdsForSubstance("sub:1").toSet())
+        val statsBefore = repo.substanceDoseStats
+        assertEquals(1, statsBefore["sub:1"]?.first)
+        repo.rebuildIndices()
+        assertEquals(statsBefore, repo.substanceDoseStats,
+            "cascade must run the same invalidation a full rebuild produces")
+    }
+
+    // ==================== applyBatch tolerance bump ====================
+
+    @Test
+    fun applyBatchBumpsToleranceVersionOnceForDoseAndSubstancePuts() {
+        val repo = JournalRepository()
+        val before = repo.toleranceVersion.value
+        repo.applyBatch(
+            doses = listOf(sampleDose("d:1", "sub:1", "s:1", 1000L)),
+            substances = listOf(sampleSubstance("sub:1", "LSD"))
+        )
+        assertEquals(before + 1, repo.toleranceVersion.value, "exactly one bump per batch")
+
+        val beforeNotes = repo.toleranceVersion.value
+        repo.applyBatch(notes = listOf(Note(id = "n:1", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", sessionId = "s:1", body = "x")))
+        assertEquals(beforeNotes, repo.toleranceVersion.value, "notes do not affect tolerance")
+    }
+
+    // ==================== Derived flows for the UI wave ====================
+
+    @Test
+    fun dosesForSubstanceFlowFilters() = runBlocking {
+        val repo = JournalRepository()
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        repo.upsertDose(sampleDose("d:2", "sub:2", "s:1", 2000L))
+        assertEquals(listOf("d:1"), repo.dosesForSubstance("sub:1").first().map { it.id })
+        repo.upsertDose(sampleDose("d:3", "sub:1", "s:2", 3000L))
+        assertEquals(listOf("d:1", "d:3"), repo.dosesForSubstance("sub:1").first().map { it.id })
+        assertTrue(repo.dosesForSubstance("sub:none").first().isEmpty())
+    }
+
+    @Test
+    fun dosesForSubstanceFlowSkipsUnrelatedMutations() = runBlocking {
+        val repo = JournalRepository()
+        repo.upsertDose(sampleDose("d:1", "sub:1", "s:1", 1000L))
+        val emissions = mutableListOf<List<Dose>>()
+        val collector = launch { repo.dosesForSubstance("sub:1").collect { emissions.add(it) } }
+        while (emissions.isEmpty()) yield()
+        repo.upsertDose(sampleDose("d:2", "sub:2", "s:1", 2000L)) // different substance
+        delay(200)
+        assertEquals(1, emissions.size, "unrelated mutation must not re-emit (dedup)")
+        repo.upsertDose(sampleDose("d:3", "sub:1", "s:2", 3000L)) // this substance
+        delay(200)
+        assertEquals(2, emissions.size, "related mutation must re-emit")
+        collector.cancel()
+    }
+
+    @Test
+    fun substanceMapsExposeLiveNames() = runBlocking {
+        val repo = JournalRepository()
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD"))
+        repo.upsertSubstance(sampleSubstance("sub:2", "MDMA"))
+        assertEquals(mapOf("sub:1" to "LSD", "sub:2" to "MDMA"), repo.substanceNamesById.first())
+        assertEquals("LSD", repo.substancesById.first()["sub:1"]?.name)
+        repo.upsertSubstance(sampleSubstance("sub:1", "LSD-2025"))
+        assertEquals("LSD-2025", repo.substanceNamesById.first()["sub:1"])
+        assertNull(repo.substancesById.first()["gone"])
     }
 }

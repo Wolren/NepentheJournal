@@ -20,7 +20,6 @@ import app.journal.log.Log
 import app.journal.model.*
 import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.*
-import app.journal.ui.components.TagChip
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 import kotlin.random.Random
@@ -204,21 +203,13 @@ fun SessionEditorScreen(
 
         val existingIds = if (sessionToEdit != null)
             repo.dosesForSession(sessionToEdit.id).map { it.id }.toSet() else emptySet()
-        val keptIds = mutableSetOf<String>()
-        sessionDoses.forEach { dose ->
-            val d = if (dose.sessionId != sessionId) dose.copy(sessionId = sessionId) else dose
-            repo.upsertDose(d)
-            keptIds.add(d.id)
-        }
+        val keptIds = sessionDoses.map { it.id }.toSet()
+        // One putAll per store + ONE index rebuild instead of a full reindex
+        // per dose/event: a 10-dose/5-event save used to do 15 reindexes under
+        // the repo lock on the UI thread. Draft-id re-parenting of doses and
+        // events happens inside the repository.
+        repo.upsertSessionChildren(sessionId, sessionDoses, sessionEvents)
         (existingIds - keptIds).forEach { repo.deleteDose(it) }
-
-        // Re-parent timeline events from the draft id to the saved session id.
-        // Events added in the editor were persisted immediately under the
-        // draft id; without this they would be invisible in the timeline.
-        sessionEvents.forEach { event ->
-            val e = if (event.sessionId != sessionId) event.copy(sessionId = sessionId) else event
-            repo.upsertTimelineEvent(e)
-        }
 
         onBack()
     }

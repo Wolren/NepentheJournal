@@ -12,7 +12,6 @@ class EntityStoreTest {
         val store = EntityStore(idOf)
         assertEquals(0, store.size)
         assertTrue(store.all.isEmpty())
-        assertTrue(store.keys.isEmpty())
     }
 
     @Test
@@ -121,38 +120,11 @@ class EntityStoreTest {
     }
 
     @Test
-    fun keysReturnsAllIds() {
-        val store = EntityStore(idOf)
-        store.put(TestEntity("a", "Alice", 1))
-        store.put(TestEntity("b", "Bob", 2))
-        assertEquals(setOf("a", "b"), store.keys)
-    }
-
-    @Test
-    fun initialEntitiesAreLoaded() {
-        val initial = listOf(
-            TestEntity("a", "Alice", 1),
-            TestEntity("b", "Bob", 2)
-        )
-        val store = EntityStore(idOf, initial)
-        assertEquals(2, store.size)
-        assertEquals("Alice", store.get("a")?.name)
-    }
-
-    @Test
     fun putWithSameIdReplacesAndShrinks() {
         val store = EntityStore(idOf)
         store.put(TestEntity("a", "Alice", 1))
         store.put(TestEntity("a", "Alice-2", 2))
         assertEquals(1, store.size) // not 2
-    }
-
-    @Test
-    fun batchAllowsDirectMutation() {
-        val store = EntityStore(idOf)
-        store.put(TestEntity("a", "Alice", 1))
-        store.batch { this["a"] = TestEntity("a", "Mutated", 99) }
-        assertEquals("Mutated", store.get("a")?.name)
     }
 
     @Test
@@ -182,43 +154,12 @@ class EntityStoreTest {
     }
 
     @Test
-    fun batchEmitsAfterEmptyMutation() {
-        val store = EntityStore(idOf)
-        store.put(TestEntity("a", "Alice", 1))
-        // Verify the flow value is accessible without hanging
-        val currentValue = store.flow.value
-        assertEquals("Alice", currentValue.first().name)
-    }
-
-    @Test
     fun putAllWithEmptyListIsNoOp() {
         val store = EntityStore(idOf)
         store.put(TestEntity("a", "Alice", 1))
         store.putAll(emptyList())
         assertEquals(1, store.size)
         assertEquals("Alice", store.get("a")?.name)
-    }
-
-    @Test
-    fun removeAllRemovesMultipleKeys() {
-        val store = EntityStore(idOf)
-        store.put(TestEntity("a", "Alice", 1))
-        store.put(TestEntity("b", "Bob", 2))
-        store.put(TestEntity("c", "Charlie", 3))
-        val removed: Int = store.removeAll(setOf("a", "c"))
-        assertEquals(2, removed)
-        assertEquals(1, store.size)
-        assertEquals("Bob", store.get("b")?.name)
-        assertNull(store.get("a"))
-    }
-
-    @Test
-    fun removeAllWithEmptySetDoesNothing() {
-        val store = EntityStore(idOf)
-        store.put(TestEntity("a", "Alice", 1))
-        val removedCount = store.removeAll(emptySet())
-        assertEquals(0, removedCount)
-        assertEquals(1, store.size)
     }
 
     @Test

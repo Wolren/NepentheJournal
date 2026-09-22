@@ -22,9 +22,11 @@ data class SearchResult(
  * Lightweight full-text search index for the journal.
  *
  * Builds a simple inverted index from all text fields of all entity types.
- * The dataset is small enough that rebuilding from scratch on every mutation
- * is fast (< 10ms for a typical journal). The index is held in-memory and
- * rebuilt on load and after bulk mutations.
+ * The dataset is small enough that a full rebuild from scratch is fast
+ * (< 10ms for a typical journal), so the index is never maintained
+ * incrementally. JournalRepository marks it dirty on every mutation and
+ * rebuilds lazily inside search() (results are never stale) plus once per
+ * auto-save quiet period; bulk applies rebuild eagerly.
  */
 class SearchIndex {
 

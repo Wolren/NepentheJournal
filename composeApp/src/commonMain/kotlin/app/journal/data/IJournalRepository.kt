@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.StateFlow
  * Public interface for the journal data repository.
  *
  * All entity store operations follow the same pattern:
- * - upsert* — insert or update by ID
- * - get* — single entity lookup by ID (returns null if missing)
- * - delete* — remove by ID (no-op if missing)
- * - *ForSession / *ForSubstance — indexed children queries
+ * - upsert* - insert or update by ID
+ * - get* - single entity lookup by ID (returns null if missing)
+ * - delete* - remove by ID (no-op if missing)
+ * - *ForSession / *ForSubstance - indexed children queries
  *
  * StateFlows emit fresh lists after every mutation.
  * Implementations must be thread-safe.
@@ -65,6 +65,25 @@ interface IJournalRepository {
     val totalSubstanceCount: Flow<Int>
     val pendingConflictCount: Flow<Int>
 
+    /**
+     * Live id -> Substance map for O(1) lookups without taking the repo lock
+     * per row. Emits only when the map content changes.
+     */
+    val substancesById: Flow<Map<String, Substance>>
+
+    /**
+     * Live id -> display name map (the cheap shape dashboards remember).
+     * Emits only when a name is added, removed or renamed.
+     */
+    val substanceNamesById: Flow<Map<String, String>>
+
+    /**
+     * Doses of [substanceId] as a flow, deduplicated: mutations that do not
+     * change this substance's dose list (for example edits to other
+     * substances) do not re-emit.
+     */
+    fun dosesForSubstance(substanceId: String): Flow<List<Dose>>
+
     // ---- Bulk apply ----
     fun fullSnapshot(): JournalSnapshot
     fun applySnapshot(snapshot: JournalSnapshot)
@@ -87,10 +106,23 @@ interface IJournalRepository {
     fun dosesForSession(sessionId: String): List<Dose>
     fun deleteDose(id: String)
 
+    /**
+     * Batch upsert of one session's doses and timeline events: one putAll per
+     * store, one index rebuild, one tolerance bump (only when doses changed)
+     * and one mutation bump. Children whose sessionId differs from
+     * [sessionId] (draft-id children of a not-yet-saved session) are
+     * re-parented here, so callers may pass their lists as-is. Final state is
+     * equivalent to looping [upsertDose] / [upsertTimelineEvent].
+     */
+    fun upsertSessionChildren(
+        sessionId: String,
+        doses: List<Dose>,
+        timelineEvents: List<TimelineEvent>
+    )
+
     // ---- Substances ----
     fun upsertSubstance(substance: Substance)
     fun getSubstance(id: String): Substance?
-    fun searchSubstances(query: String): List<Substance>
     fun deleteSubstance(id: String)
 
     // ---- Interactions ----
@@ -121,9 +153,12 @@ interface IJournalRepository {
     fun notesForSession(sessionId: String): List<Note>
 
     /**
-     * Atomically upsert a note, merging conflict siblings if the note body differs
-     * from the existing version. Runs under the repository lock to prevent
-     * TOCTOU races between read and write.
+     * Atomically upsert a note through the shared conflict merge: when the
+     * stored body differs, the note with the higher updatedAt wins (tie:
+     * incoming) and the LOSING body is preserved in full as a ConflictSibling
+     * (never destroyed). Runs under the repository lock to prevent TOCTOU
+     * races between read and write. Every other note apply path
+     * (applyBatch on sync paths) routes through the same merge.
      * @return the resolved note (with conflict siblings if applicable), or null if skipped
      */
     fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note?
@@ -138,11 +173,10 @@ interface IJournalRepository {
     fun sessionIdsForSubstance(substanceId: String): List<String>
 
     /**
-     * Batch version of [sessionIdsForSubstance] — returns the union of session IDs
+     * Batch version of [sessionIdsForSubstance] - returns the union of session IDs
      * that contain doses of any of the given substance IDs, using a single lock acquire.
      */
     fun sessionIdsForSubstances(substanceIds: Set<String>): Set<String>
-
     fun rebuildIndices()
 
     /**
@@ -174,6 +208,12 @@ interface IJournalRepository {
     /**
      * Bulk-apply entities. Snapshot loads pass [persons]; sync deltas leave the
      * default empty so device-local persons are never overwritten by peers.
+     *
+     * Notes on a last-writer-wins (sync) apply do NOT blind-overwrite: they
+     * route through the same conflict merge as [upsertNoteWithConflict], so a
+     * divergent peer edit keeps both bodies. Seed/restore applies
+     * (lastWriterWins = false) stay authoritative blind writes. Dose or
+     * substance puts bump toleranceVersion exactly once for the batch.
      */
     fun applyBatch(
         sessions: List<Session> = emptyList(),
@@ -211,7 +251,8 @@ interface IJournalRepository {
     /**
      * Debounced auto-save loop: after a quiet period following each mutation,
      * invoke [save] (the caller owns persistence, so this interface never
-     * references the JournalStore class).
+     * references the JournalStore class). The same quiet-period tail also
+     * refreshes the full-text search index when mutations dirtied it.
      */
     fun autoSave(scope: CoroutineScope, save: () -> Unit): Job
     fun clearAll()

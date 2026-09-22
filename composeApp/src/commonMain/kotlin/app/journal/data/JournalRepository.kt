@@ -1,5 +1,5 @@
 /*
- * Nepenthe Journal — GPLv3
+ * Nepenthe Journal - GPLv3
  * Copyright (C) 2026 Wolren
  *
  * Derived from PsychonautWiki Journal (GPL-3.0-or-later)
@@ -116,6 +116,23 @@ class JournalRepository internal constructor() : IJournalRepository {
         list.count { it.conflictSiblings.isNotEmpty() }
     }
 
+    /**
+     * Doses of one substance as a flow, deduplicated: edits to other
+     * substances re-emit the source list but leave this filtered list equal,
+     * so collectors see no emission (distinctUntilChanged).
+     */
+    override fun dosesForSubstance(substanceId: String): Flow<List<Dose>> =
+        doses.map { list -> list.filter { it.substanceId == substanceId } }.distinctUntilChanged()
+
+    /** Live id -> Substance map; emits only when membership or content changes. */
+    override val substancesById: Flow<Map<String, Substance>> =
+        substances.map { list -> list.associateBy { it.id } }.distinctUntilChanged()
+
+    /** Live id -> display name map; emits only on add/remove/rename. */
+    override val substanceNamesById: Flow<Map<String, String>> =
+        substancesById.map { byId -> byId.mapValues { (_, substance) -> substance.name } }
+            .distinctUntilChanged()
+
     // ---- Session-child indexes (incrementally updated) ----
     private val _dosesBySession = mutableMapOf<String, MutableList<Dose>>()
     private val _notesBySession = mutableMapOf<String, MutableList<Note>>()
@@ -123,6 +140,14 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     // ---- Full-text search index ----
     val searchIndex = SearchIndex()
+    /**
+     * Set by every single-entity mutation, cleared by
+     * [rebuildSearchIndexLocked]. Mutations only flip this bit (O(1) under
+     * the repo lock) instead of tokenizing every entity; [search] rebuilds
+     * lazily before querying so results are never stale, and the auto-save
+     * quiet-period tail rebuilds once per burst of edits. Guarded by [lock].
+     */
+    private var searchIndexDirty = true
 
     // ========================
     //  Tombstones (deleted IDs pending propagation to peers)
@@ -237,13 +262,16 @@ class JournalRepository internal constructor() : IJournalRepository {
     // ========================
 
     /**
-     * Bulk-apply entities from a sync delta — single emissions per store, single mutation bump.
+     * Bulk-apply entities from a sync delta: single emissions per store, single
+     * mutation bump, one shared putAll pass ([bulkPutLocked]).
      *
      * @param lastWriterWins when true, incoming entities whose `updatedAt` is older than
      * the existing record are skipped (last-writer-wins by timestamp). Sync paths MUST pass
      * true: without it, a replayed response or a stale peer push silently rolls back newer
      * local data (audit M3). Seed loading and backup restore keep the default false so
-     * "Reset to defaults" / restore remain authoritative.
+     * "Reset to defaults" / restore remain authoritative. Notes are the exception: on a
+     * sync path they route through the same conflict merge as upsertNoteWithConflict so a
+     * divergent edit keeps both bodies (contract c).
      * @param persons device-local snapshot-only entities (never synced, no tombstones).
      * Sync deltas leave this empty; snapshot loads pass the stored list.
      */
@@ -279,20 +307,35 @@ class JournalRepository internal constructor() : IJournalRepository {
         val substancesToPut = newer(substances, substancesStore::get, { it.id }, { it.updatedAt })
         val effectsToPut = newer(effects, effectsStore::get, { it.id }, { it.updatedAt })
         val interactionsToPut = newer(interactions, interactionsStore::get, { it.id }, { it.updatedAt })
-        val notesToPut = newer(notes, notesStore::get, { it.id }, { it.updatedAt })
         val timelineEventsToPut = newer(timelineEvents, timelineEventsStore::get, { it.id }, { it.updatedAt })
         val customUnitsToPut = newer(customUnits, customUnitsStore::get, { it.id }, { it.updatedAt })
-        if (sessionsToPut.isNotEmpty()) sessionsStore.putAll(sessionsToPut)
-        if (dosesToPut.isNotEmpty()) dosesStore.putAll(dosesToPut)
-        if (substancesToPut.isNotEmpty()) substancesStore.putAll(substancesToPut)
-        if (effectsToPut.isNotEmpty()) effectsStore.putAll(effectsToPut)
-        if (interactionsToPut.isNotEmpty()) interactionsStore.putAll(interactionsToPut)
-        if (notesToPut.isNotEmpty()) notesStore.putAll(notesToPut)
-        if (timelineEventsToPut.isNotEmpty()) timelineEventsStore.putAll(timelineEventsToPut)
-        if (customUnitsToPut.isNotEmpty()) customUnitsStore.putAll(customUnitsToPut)
+        // Notes on a sync (LWW) path never blind-overwrite: each incoming note goes
+        // through the SAME merge as upsertNoteWithConflict, so the losing body is
+        // preserved as a ConflictSibling. The incoming note's own deviceOrigin is the
+        // batch path's remote attribution (a batch carries no sender id). An identical
+        // body older than the stored one is dropped so updatedAt cannot regress; an
+        // unchanged merged result (idempotent replay) is dropped as a no-op.
+        // Seed/restore paths (lastWriterWins = false) stay authoritative blind writes.
+        val notesToPut: List<Note> =
+            if (!lastWriterWins) notes
+            else notes.mapNotNull { incoming ->
+                val existing = notesStore.get(incoming.id) ?: return@mapNotNull incoming
+                val merged = mergeNoteConflictLocked(existing, incoming, incoming.deviceOrigin)
+                if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
+            }
         // Persons are device-local (never synced, no tombstones): snapshot loads only.
         val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt })
-        if (personsToPut.isNotEmpty()) personsStore.putAll(personsToPut)
+        val anyIndexedPut = bulkPutLocked(
+            sessions = sessionsToPut,
+            substances = substancesToPut,
+            doses = dosesToPut,
+            notes = notesToPut,
+            timelineEvents = timelineEventsToPut,
+            interactions = interactionsToPut,
+            effects = effectsToPut,
+            customUnits = customUnitsToPut,
+            persons = personsToPut,
+        )
         val tombstonesChanged = applyTombstonesLocked(
             DeletedIds(
                 deletedSessionIds, deletedDoseIds, deletedNoteIds, deletedSubstanceIds,
@@ -303,12 +346,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         // Rebuild all indices after bulk upsert to handle updates to existing entities
         // where old index entries (dates, per-session children) need to be replaced.
         // Persons need no rebuild: they back no query index.
-        if (sessionsToPut.isNotEmpty() || dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty() ||
-            effectsToPut.isNotEmpty() || interactionsToPut.isNotEmpty() ||
-            notesToPut.isNotEmpty() || timelineEventsToPut.isNotEmpty() || customUnitsToPut.isNotEmpty() ||
-            tombstonesChanged
-        ) {
+        if (anyIndexedPut || tombstonesChanged) {
             rebuildAllIndices()
+        }
+        // Mirror the per-entity tolerance invalidation exactly once per batch: upsertDose
+        // and upsertSubstance bump per item, tombstone deletes already bump through their
+        // per-entity helpers (deleteDoseLocked / deleteSubstanceLocked).
+        if (dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty()) {
+            bumpToleranceVersion()
         }
         bumpMutationCount()
     }
@@ -317,28 +362,78 @@ class JournalRepository internal constructor() : IJournalRepository {
         AppJson.snapshot(this)
     }
 
+    /**
+     * Apply a full snapshot (bundled seed load, "reset with test data").
+     * Entity lists merge over current state (putAll by id).
+     *
+     * Two kinds of local state are PRESERVED instead of being overwritten by the
+     * snapshot (audit "tombstone-pref-wipe"): recorded tombstones (union with the
+     * snapshot's, newest timestamp wins, both retention-filtered, so a seed apply
+     * cannot forget pending deletes) and the user preference flows (ratingScaleMode,
+     * substanceColors, welcomeCompleted are left untouched). The snapshot's own
+     * preference fields are deliberately ignored here: the only production caller is
+     * the bundled-seed apply, which must never rewrite user prefs. Disk restore goes
+     * through AppJson.apply, which still restores prefs and replaces tombstones via
+     * importTombstones.
+     */
     override fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
-        _tombstones.clear()
+        pruneTombstonesLocked()
         val tombCutoff = currentTimeMillis() - tombstoneRetentionMs
         for ((key, deletedAt) in snapshot.tombstones) {
-            if (deletedAt >= tombCutoff) _tombstones[key] = deletedAt
+            if (deletedAt < tombCutoff) continue
+            val current = _tombstones[key]
+            if (current == null || deletedAt > current) _tombstones[key] = deletedAt
         }
-        sessionsStore.putAll(snapshot.sessions)
-        substancesStore.putAll(snapshot.substances)
-        dosesStore.putAll(snapshot.doses)
-        notesStore.putAll(snapshot.notes)
-        timelineEventsStore.putAll(snapshot.timelineEvents)
-        interactionsStore.putAll(snapshot.interactions)
-        effectsStore.putAll(snapshot.effects)
-        customUnitsStore.putAll(snapshot.customUnits)
-        personsStore.putAll(snapshot.persons)
-        rebuildAllIndices()
-        setRatingScaleMode(
-            snapshot.ratingScaleMode
-                ?: if (snapshot.useShulginRating) RatingScaleMode.SHULGIN else RatingScaleMode.OFF,
+        val changed = bulkPutLocked(
+            sessions = snapshot.sessions,
+            substances = snapshot.substances,
+            doses = snapshot.doses,
+            notes = snapshot.notes,
+            timelineEvents = snapshot.timelineEvents,
+            interactions = snapshot.interactions,
+            effects = snapshot.effects,
+            customUnits = snapshot.customUnits,
+            persons = snapshot.persons,
         )
-        setSubstanceColors(snapshot.useSubstanceColors)
-        setWelcomeCompleted(snapshot.welcomeCompleted)
+        if (changed) rebuildAllIndices()
+    }
+
+    /**
+     * Shared putAll pass used by [applyBatch] and [applySnapshot]: one StateFlow
+     * emission per store, no per-entity index work. Returns true when any entity
+     * that backs a query index was written; callers must run [rebuildAllIndices]
+     * when it returns true. Persons are device-local and back no index, so they
+     * never flip the result. Tombstone policy stays with each caller: applyBatch
+     * applies peer deletes under a cutoff, applySnapshot merges them.
+     * Callers must hold [lock].
+     */
+    private fun bulkPutLocked(
+        sessions: List<Session>,
+        substances: List<Substance>,
+        doses: List<Dose>,
+        notes: List<Note>,
+        timelineEvents: List<TimelineEvent>,
+        interactions: List<Interaction>,
+        effects: List<Effect>,
+        customUnits: List<CustomUnit>,
+        persons: List<Person>,
+    ): Boolean {
+        var indexedChanged = false
+        fun <T> put(store: EntityStore<T>, items: List<T>) {
+            if (items.isEmpty()) return
+            store.putAll(items)
+            indexedChanged = true
+        }
+        put(sessionsStore, sessions)
+        put(substancesStore, substances)
+        put(dosesStore, doses)
+        put(notesStore, notes)
+        put(timelineEventsStore, timelineEvents)
+        put(interactionsStore, interactions)
+        put(effectsStore, effects)
+        put(customUnitsStore, customUnits)
+        if (persons.isNotEmpty()) personsStore.putAll(persons)
+        return indexedChanged
     }
 
     // ========================
@@ -397,7 +492,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         rebuildSearchIndexLocked()
     }
 
-    /** Incrementally update precomputed dose stats for a substance — counts distinct sessions only. */
+    /** Incrementally update precomputed dose stats for a substance - counts distinct sessions only. */
     private fun updateDoseStatsForSubstance(substanceId: String, sessionId: String, timestamp: Long) {
         val ids = _doseStatsSessionIds.getOrPut(substanceId) { mutableSetOf() }
         val isNew = ids.add(sessionId)
@@ -429,7 +524,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (oldSession != null) removeSessionFromIndices(oldSession)
         addSessionToIndices(session)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
@@ -442,10 +537,10 @@ class JournalRepository internal constructor() : IJournalRepository {
         if (oldSession != null) removeSessionFromIndices(oldSession)
         addSessionToIndices(sessionsStore.get(sessionId)!!)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
-    override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteSession(id: String) = lock.withLock { deleteSessionLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteSessionLocked(id: String) {
         val session = sessionsStore.get(id) ?: return
@@ -497,51 +592,66 @@ class JournalRepository internal constructor() : IJournalRepository {
     //  Doses
     // ========================
 
+    /**
+     * Drop one dose from the per-session list and the per-substance session set.
+     * The session is only forgotten when no OTHER dose of the same substance still
+     * lives there: the previous unconditional removal dropped live sessions from
+     * [sessionIdsForSubstance] whenever a session held two doses of one substance,
+     * and a re-parent left the old session behind. Callers must hold [lock].
+     */
+    private fun removeDoseFromIndicesLocked(dose: Dose) {
+        val sessionDoses = _dosesBySession[dose.sessionId]
+        sessionDoses?.removeAll { it.id == dose.id }
+        val sessionStillUsed = sessionDoses?.any { it.substanceId == dose.substanceId } == true
+        if (!sessionStillUsed) {
+            val sessions = _sessionsPerSubstance[dose.substanceId]
+            sessions?.remove(dose.sessionId)
+            if (sessions != null && sessions.isEmpty()) _sessionsPerSubstance.remove(dose.substanceId)
+            if (sessionDoses != null && sessionDoses.isEmpty()) _dosesBySession.remove(dose.sessionId)
+        }
+    }
+
     override fun upsertDose(dose: Dose) = lock.withLock {
         val prev = dosesStore.put(dose)
-        val prevSessionId = prev?.sessionId
-        val prevSubstanceId = prev?.substanceId
 
-        // Remove previous entry from the session index to prevent duplicates on update
-        if (prevSessionId != null) {
-            _dosesBySession[prevSessionId]?.removeAll { it.id == dose.id }
+        if (prev != null) {
+            // Re-parent / replace cleanup (audit: a sessionId change skipped index and
+            // stat maintenance): drop the PREVIOUS index rows first, then recompute
+            // this substance's stats from the store that already holds the final dose
+            // (a moved session or a lowered timestamp can shrink them, which a running
+            // incremental max can never do).
+            removeDoseFromIndicesLocked(prev)
+            rebuildSubstanceDoseStats(prev.substanceId)
+            if (dose.substanceId != prev.substanceId) {
+                rebuildSubstanceDoseStats(dose.substanceId)
+            }
+        } else {
+            // Brand-new dose: incremental add is exact (distinct sessions + max ts).
+            updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
         }
         _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
-
-        if (prevSubstanceId != null && prevSubstanceId != dose.substanceId) {
-            _sessionsPerSubstance[prevSubstanceId]?.remove(dose.sessionId)
-            if (_sessionsPerSubstance[prevSubstanceId]?.isEmpty() == true)
-                _sessionsPerSubstance.remove(prevSubstanceId)
-            rebuildSubstanceDoseStats(prevSubstanceId)
-        }
         _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
-
-        // Update substance dose stats incrementally (distinct session count + last used timestamp).
-        updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
 
         bumpToleranceVersion()
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun dosesForSession(sessionId: String): List<Dose> =
         lock.withLock { _dosesBySession[sessionId]?.toList() ?: emptyList() }
 
-    override fun deleteDose(id: String) = lock.withLock { deleteDoseLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteDose(id: String) = lock.withLock { deleteDoseLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteDoseLocked(id: String) {
         val removed = dosesStore.remove(id) ?: return
         recordTombstone("dose", id)
-        _dosesBySession[removed.sessionId]?.removeAll { it.id == id }
-        _sessionsPerSubstance[removed.substanceId]?.remove(removed.sessionId)
-        if (_sessionsPerSubstance[removed.substanceId]?.isEmpty() == true)
-            _sessionsPerSubstance.remove(removed.substanceId)
+        removeDoseFromIndicesLocked(removed)
         rebuildSubstanceDoseStats(removed.substanceId)
         bumpToleranceVersion()
         bumpMutationCount()
     }
 
-    override fun deleteNote(id: String) = lock.withLock { deleteNoteLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteNote(id: String) = lock.withLock { deleteNoteLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteNoteLocked(id: String) {
         val removed = notesStore.remove(id) ?: return
@@ -550,7 +660,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteTimelineEvent(id: String) = lock.withLock { deleteTimelineEventLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteTimelineEvent(id: String) = lock.withLock { deleteTimelineEventLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteTimelineEventLocked(id: String) {
         val removed = timelineEventsStore.remove(id) ?: return
@@ -567,20 +677,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         substancesStore.put(substance)
         bumpToleranceVersion()
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun getSubstance(id: String): Substance? = lock.withLock { substancesStore.get(id) }
 
-    override fun searchSubstances(query: String): List<Substance> = lock.withLock {
-        val q = query.lowercase()
-        substancesStore.all.filter {
-            it.name.lowercase().contains(q) ||
-            it.aliases.any { a -> a.lowercase().contains(q) }
-        }
-    }
-
-    override fun deleteSubstance(id: String) = lock.withLock { deleteSubstanceLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteSubstance(id: String) = lock.withLock { deleteSubstanceLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteSubstanceLocked(id: String) {
         substancesStore.remove(id)
@@ -625,7 +727,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun upsertInteraction(interaction: Interaction) = lock.withLock {
         interactionsStore.put(interaction)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun getInteraction(id: String): Interaction? = lock.withLock { interactionsStore.get(id) }
@@ -647,7 +749,7 @@ class JournalRepository internal constructor() : IJournalRepository {
             _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
         }
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun getEffect(id: String): Effect? = lock.withLock { effectsStore.get(id) }
@@ -669,10 +771,10 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
-    override fun deleteCustomUnit(id: String) = lock.withLock { deleteCustomUnitLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteCustomUnit(id: String) = lock.withLock { deleteCustomUnitLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteCustomUnitLocked(id: String) {
         val removed = customUnitsStore.remove(id) ?: return
@@ -687,7 +789,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         _customUnitsBySubstance[substanceId]?.toList() ?: emptyList()
     }
 
-    override fun deleteEffect(id: String) = lock.withLock { deleteEffectLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteEffect(id: String) = lock.withLock { deleteEffectLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteEffectLocked(id: String) {
         val removed = effectsStore.remove(id) ?: return
@@ -700,7 +802,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    override fun deleteInteraction(id: String) = lock.withLock { deleteInteractionLocked(id); rebuildSearchIndexLocked() }
+    override fun deleteInteraction(id: String) = lock.withLock { deleteInteractionLocked(id); markSearchIndexDirtyLocked() }
 
     private fun deleteInteractionLocked(id: String) {
         interactionsStore.remove(id) ?: return
@@ -771,26 +873,56 @@ class JournalRepository internal constructor() : IJournalRepository {
             _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
         }
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
+    }
+
+    /**
+     * The ONE conflict merge for every note apply path (contract c,
+     * HARDENING-CONTRACTS-2026-09 section c): the losing body is NEVER destroyed.
+     *
+     * - Bodies equal: incoming wins, carrying the union of both conflictSiblings
+     *   (deduplicated by body, so replays stay idempotent).
+     * - Bodies differ: the higher updatedAt wins (tie: incoming) and the LOSING
+     *   note's full body is preserved as
+     *   ConflictSibling(body = loser.body, deviceOrigin = remoteDeviceId,
+     *   updatedAt = loser.updatedAt). The winner keeps its own updatedAt, so the
+     *   merge never inflates timestamps and LWW stays stable across peers.
+     *
+     * Used by [upsertNoteWithConflict] and the sync branch of [applyBatch].
+     * Callers must hold [lock].
+     */
+    private fun mergeNoteConflictLocked(existing: Note, incoming: Note, remoteDeviceId: String): Note {
+        if (existing.body == incoming.body) {
+            val siblings = (existing.conflictSiblings + incoming.conflictSiblings)
+                .distinctBy { it.body }
+            return incoming.copy(conflictSiblings = siblings)
+        }
+        val incomingWins = incoming.updatedAt >= existing.updatedAt
+        val winner = if (incomingWins) incoming else existing
+        val loser = if (incomingWins) existing else incoming
+        // Body already preserved: replaying the losing edit is a no-op.
+        if (winner.conflictSiblings.any { it.body == loser.body }) return winner
+        return winner.copy(
+            conflictSiblings = winner.conflictSiblings +
+                ConflictSibling(loser.body, remoteDeviceId, loser.updatedAt),
+        )
     }
 
     override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = lock.withLock {
         val sessionId = note.sessionId ?: return@withLock null
         val existing = notesStore.get(note.id)
-        val resolved = if (existing != null && existing.body != note.body) {
-            note.copy(conflictSiblings = existing.conflictSiblings +
-                    ConflictSibling(note.body, remoteDeviceId, note.updatedAt))
-        } else note
+        val resolved = if (existing == null) note else mergeNoteConflictLocked(existing, note, remoteDeviceId)
         notesStore.put(resolved)
-        if (sessionId != (existing?.sessionId ?: sessionId)) {
-            existing?.sessionId?.let { _notesBySession[it]?.removeAll { n -> n.id == note.id } }
+        // Re-index under the STORED note's session: when the local copy wins the
+        // merge its sessionId may differ from the incoming note's.
+        existing?.sessionId?.let { oldSessionId ->
+            _notesBySession[oldSessionId]?.removeAll { n -> n.id == note.id }
         }
-        if (existing != null) {
-            _notesBySession[sessionId]?.removeAll { it.id == note.id }
+        resolved.sessionId?.let { newSessionId ->
+            _notesBySession.getOrPut(newSessionId) { mutableListOf() }.add(resolved)
         }
-        _notesBySession.getOrPut(sessionId) { mutableListOf() }.add(resolved)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
         resolved
     }
 
@@ -810,11 +942,40 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
         _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
         bumpMutationCount()
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     override fun eventsForSession(sessionId: String): List<TimelineEvent> =
         lock.withLock { (_eventsBySession[sessionId] ?: emptyList()).sortedBy { it.timestamp } }
+
+    /**
+     * Batch upsert of one session's doses and timeline events (task: SessionEditor
+     * save path). One putAll per store, ONE index rebuild ([rebuildAllIndices]
+     * recomputes the per-session lists, per-substance session sets and dose stats in
+     * a single pass), one tolerance bump when doses changed, one mutation bump.
+     * Children whose sessionId differs from [sessionId] (draft-id rows of a
+     * not-yet-saved session) are re-parented here. Final state is equivalent to
+     * looping [upsertDose] / [upsertTimelineEvent], proven by
+     * JournalRepositoryTest.sessionChildrenBatchMatchesPerItemUpserts.
+     */
+    override fun upsertSessionChildren(
+        sessionId: String,
+        doses: List<Dose>,
+        timelineEvents: List<TimelineEvent>
+    ) = lock.withLock {
+        val reparentedDoses = doses.map {
+            if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+        }
+        val reparentedEvents = timelineEvents.map {
+            if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+        }
+        if (reparentedDoses.isEmpty() && reparentedEvents.isEmpty()) return@withLock
+        dosesStore.putAll(reparentedDoses)
+        timelineEventsStore.putAll(reparentedEvents)
+        rebuildAllIndices()
+        if (reparentedDoses.isNotEmpty()) bumpToleranceVersion()
+        bumpMutationCount()
+    }
 
     // ========================
     //  Query indices (public)
@@ -929,6 +1090,10 @@ class JournalRepository internal constructor() : IJournalRepository {
                 .debounce(2000)
                 .collect {
                     try {
+                        // Same quiet-period tail as the save: mutations only mark the
+                        // search index dirty, so one idle rebuild covers a whole burst
+                        // of edits instead of a rebuild per keystroke afterward.
+                        rebuildSearchIndexIfDirty()
                         save()
                         Log.withTag("Repo").v { "Auto-saved (mutation #$it)" }
                     } catch (e: Exception) {
@@ -998,19 +1163,35 @@ class JournalRepository internal constructor() : IJournalRepository {
     // ========================
 
     override fun search(query: String): List<SearchResult> = lock.withLock {
+        // Rebuild-if-dirty before querying: mutations only flip the flag, so a
+        // search right after an upsert/delete can never see a stale index.
+        if (searchIndexDirty) rebuildSearchIndexLocked()
         searchIndex.search(query)
+    }
+
+    /** Rebuild the search index only when a mutation dirtied it. */
+    private fun rebuildSearchIndexIfDirty() = lock.withLock {
+        if (searchIndexDirty) rebuildSearchIndexLocked()
+    }
+
+    /** Flip the dirty bit instead of tokenizing every entity (callers hold [lock]). */
+    private fun markSearchIndexDirtyLocked() {
+        searchIndexDirty = true
     }
 
     private fun rebuildSearchIndexLocked() {
         searchIndex.rebuild(
-            sessions = sessionsStore.all.toList(),
-            substances = substancesStore.all.toList(),
-            notes = notesStore.all.toList(),
-            doses = dosesStore.all.toList(),
-            timelineEvents = timelineEventsStore.all.toList(),
-            effects = effectsStore.all.toList(),
+            // EntityStore.all already returns a fresh snapshot per store: the old
+            // extra .toList() copies were redundant.
+            sessions = sessionsStore.all,
+            substances = substancesStore.all,
+            notes = notesStore.all,
+            doses = dosesStore.all,
+            timelineEvents = timelineEventsStore.all,
+            effects = effectsStore.all,
             substanceNames = substancesStore.all.associate { it.id to it.name }
         )
+        searchIndexDirty = false
     }
 
     override fun rebuildSearchIndex() = lock.withLock { rebuildSearchIndexLocked() }
