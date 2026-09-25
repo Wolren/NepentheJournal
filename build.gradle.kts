@@ -11,7 +11,13 @@ buildscript {
         resolutionStrategy {
             force(
                 "org.jdom:jdom2:2.0.6.1",
-                "org.bitbucket.b_c:jose4j:0.9.6"
+                "org.bitbucket.b_c:jose4j:0.9.6",
+                // AGP tooling ships Bouncy Castle 1.79 / commons-lang3 3.16 on the
+                // plugin classpath; the subprojects block below cannot reach it
+                "org.bouncycastle:bcprov-jdk18on:1.85",
+                "org.bouncycastle:bcpkix-jdk18on:1.85",
+                "org.bouncycastle:bcutil-jdk18on:1.85",
+                "org.apache.commons:commons-lang3:3.20.0"
             )
         }
     }
@@ -43,7 +49,26 @@ subprojects {
                 "org.apache.httpcomponents:httpmime:4.5.14",
                 "org.apache.httpcomponents:httpcore:4.4.16",
                 // Commons Lang - uncontrolled recursion
-                "org.apache.commons:commons-lang3:3.20.0"
+                "org.apache.commons:commons-lang3:3.20.0",
+                // Apache HTTP Components 5 (via ktor-client-apache5 test client) -
+                // HPack header bomb, header-parsing memory exhaustion, connection leak
+                "org.apache.httpcomponents.client5:httpclient5:5.6.3",
+                "org.apache.httpcomponents.core5:httpcore5:5.4.3",
+                "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
+                // OpenTelemetry - unbounded baggage allocation (Kotlin SwiftExport worker)
+                "io.opentelemetry:opentelemetry-api:1.62.0"
+            )
+        }
+    }
+}
+
+subprojects {
+    buildscript {
+        configurations.classpath {
+            resolutionStrategy.force(
+                // Kover's coverage-report drags in vulnerable FreeMarker on the
+                // composeApp plugin classpath
+                "org.freemarker:freemarker:2.3.35"
             )
         }
     }
