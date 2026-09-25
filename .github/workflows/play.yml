@@ -42,8 +42,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
-
+      # android-actions/setup-android@v3 deliberately absent: its default
+      # sdkmanager package list includes the removed 'tools' package; the
+      # GitHub Ubuntu image already ships a licensed Android SDK.
       - name: Restore signing secrets
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}

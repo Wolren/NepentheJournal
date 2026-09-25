@@ -35,7 +35,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # android-actions/setup-android@v3 is deliberately absent: its default
+      # sdkmanager package list includes 'tools', which modern cmdline-tools no
+      # longer ships, so the action always exits 1. The GitHub Ubuntu image
+      # ships a licensed Android SDK; the CI android-build job builds with no
+      # setup step at all.
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
@@ -58,7 +62,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # android-actions/setup-android@v3 is deliberately absent: its default
+      # sdkmanager package list includes 'tools', which modern cmdline-tools no
+      # longer ships, so the action always exits 1. The GitHub Ubuntu image
+      # ships a licensed Android SDK; the CI android-build job builds with no
+      # setup step at all.
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
