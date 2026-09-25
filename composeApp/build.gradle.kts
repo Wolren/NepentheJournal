@@ -35,6 +35,7 @@ kotlin {
         iosTarget.compilations.getByName("main").cinterops.create("securityEx") {
             defFile(project.file("src/nativeInterop/cinterop/SecurityEx.def"))
             packageName = "platform.SecurityEx"
+            compilerOpts.add("-I" + project.file("src/nativeInterop/cinterop").absolutePath)
         }
         iosTarget.compilations.getByName("main").cinterops.create("ccGcm") {
             defFile(project.file("src/nativeInterop/cinterop/CCGcm.def"))

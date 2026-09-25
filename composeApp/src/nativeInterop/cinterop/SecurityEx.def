@@ -1,2 +1,2 @@
 package = platform.SecurityEx
-headers = Security/SecKey.h
+headers = nepenthe_seckey_exchange.h

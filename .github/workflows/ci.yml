@@ -134,6 +134,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
+      - name: Probe iOS SDK for SecKeyCopyKeyExchangeResult
+        run: |
+          SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+          echo "SDK: $SDK"
+          grep -n "SecKeyCopyKeyExchangeResult" "$SDK/usr/include/Security/SecKey.h" | head -5 || echo "NOT FOUND in iOS simulator SDK SecKey.h"
+
       - name: Compile iOS framework (simulator)
         run: |
           ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 --no-daemon
