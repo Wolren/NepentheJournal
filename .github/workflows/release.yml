@@ -1,0 +1,152 @@
+name: Release
+
+# Desktop release pipeline: MSI (Windows), DEB (Linux), DMG (macOS).
+#
+# nativeDistributions targetFormats in composeApp/build.gradle.kts = Msi + Deb
+# + Dmg, so one job per format on the matching runner. The Compose Gradle
+# plugin auto-provisions WiX 3.11 (downloadWix/unzipWix tasks) and jpackage
+# comes from the Gradle JVM, so the Windows job only needs a JDK 17 setup;
+# this recipe is the locally proven one (corretto-17.0.13 + plugin WiX).
+#
+# Triggers:
+#   push tag v*  -> build + publish a GitHub Release (guarded: tag must match
+#                   the version in build.gradle.kts and the About card).
+#   workflow_dispatch -> build + upload artifacts only, no release. Use this
+#                   to prove the installers before cutting a tag.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Release files only: publishing happens in the publish job with an explicit
+# write grant.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Xmx2g
+
+jobs:
+  verify-version:
+    name: Verify version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: versionName, packageVersion and About card must agree
+        run: |
+          set -euo pipefail
+          V=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts)
+          test -n "$V" || { echo "::error::packageVersion not found in build.gradle.kts"; exit 1; }
+          echo "packageVersion=$V"
+          grep -qF "versionName = \"$V\"" composeApp/build.gradle.kts \
+            || { echo "::error::versionName does not match packageVersion $V"; exit 1; }
+          grep -qF "Nepenthe Journal v$V" \
+              composeApp/src/commonMain/kotlin/app/journal/ui/settings/detail/SettingsInfoCards.kt \
+            || { echo "::error::About card string does not match version $V"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "$GITHUB_REF_NAME" = "v$V" \
+              || { echo "::error::tag $GITHUB_REF_NAME does not match version v$V"; exit 1; }
+          fi
+          echo "VERSION_OK $V"
+
+  msi:
+    name: Windows MSI
+    needs: verify-version
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - name: Build MSI
+        run: ./gradlew :composeApp:packageMsi --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-msi
+          path: composeApp/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+  deb:
+    name: Linux DEB
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - name: Ensure fakeroot (required by the jpackage DEB bundler)
+        run: command -v fakeroot || (sudo apt-get update -q && sudo apt-get install -y fakeroot)
+      - name: Build DEB
+        run: ./gradlew :composeApp:packageDeb --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-deb
+          path: composeApp/build/compose/binaries/main/deb/*.deb
+          if-no-files-found: error
+
+  dmg:
+    name: macOS DMG
+    needs: verify-version
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+      - name: Build DMG
+        run: ./gradlew :composeApp:packageDmg --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dmg
+          path: composeApp/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [msi, deb, dmg]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -la
+          sha256sum *.msi *.deb *.dmg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Nepenthe Journal $GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.msi dist/*.deb dist/*.dmg dist/SHA256SUMS.txt
