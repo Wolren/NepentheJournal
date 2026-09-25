@@ -1,9 +1,9 @@
-package app.journal.util.crypto
-
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 
+package app.journal.util.crypto
+
 import kotlinx.cinterop.*
-import platform.CommonCrypto.*
+import platform.CoreCrypto.*
 import platform.Foundation.NSData
 import platform.Foundation.base64EncodedStringWithOptions
 import platform.Foundation.create

@@ -13,7 +13,9 @@ import platform.Foundation.NSFileSize
 import platform.Foundation.NSNumber
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.closeFile
 import platform.Foundation.dataUsingEncoding
+import platform.Foundation.seekToEndOfFile
 import platform.Foundation.fileHandleForWritingAtPath
 import platform.Foundation.stringWithContentsOfFile
 import platform.Foundation.writeToFile
@@ -103,7 +105,7 @@ internal class IosFileLogWriter(private val appDir: String) : LogWriter() {
             }
             try {
                 handle.seekToEndOfFile()
-                handle.writeData(data)
+                handle.writeData(data!!, null)
             } finally {
                 handle.closeFile()
             }

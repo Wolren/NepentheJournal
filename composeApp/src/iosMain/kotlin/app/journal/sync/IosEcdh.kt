@@ -20,7 +20,7 @@ import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSNumber
 import platform.Security.SecKeyCopyExternalRepresentation
 import platform.Security.SecKeyCopyPublicKey
-import platform.Security.SecKeyCreateKeyExchange
+import platform.SecurityEx.SecKeyCreateKeyExchange
 import platform.Security.SecKeyCreateRandomKey
 import platform.Security.SecKeyCreateWithData
 import platform.Security.SecKeyRef
@@ -210,10 +210,9 @@ object IosEcdh {
         val peerKey = importPublicKey(peerPublicBytes) ?: return null
         val sharedCfData = try {
             SecKeyCreateKeyExchange(
-                privateKey,
-                peerKey,
-                kSecKeyAlgorithmECDHKeyExchangeStandard,
-                null,
+                privateKey.reinterpret(),
+                peerKey.reinterpret(),
+                kSecKeyAlgorithmECDHKeyExchangeStandard.reinterpret(),
                 null
             )
         } finally {

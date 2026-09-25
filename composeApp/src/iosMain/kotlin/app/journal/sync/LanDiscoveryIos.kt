@@ -10,7 +10,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import platform.Foundation.*
-import platform.objc.Protocol
+import objcnames.classes.Protocol
 
 @OptIn(ExperimentalForeignApi::class)
 actual class LanDiscovery {

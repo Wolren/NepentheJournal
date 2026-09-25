@@ -1,9 +1,9 @@
-package app.journal.sync
-
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 
+package app.journal.sync
+
 import kotlinx.cinterop.*
-import platform.CommonCrypto.*
+import platform.CoreCrypto.*
 import platform.Security.SecRandomCopyBytes
 import app.journal.util.PlatformLock
 

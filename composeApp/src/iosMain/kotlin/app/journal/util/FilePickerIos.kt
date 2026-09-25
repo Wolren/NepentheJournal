@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
-import platform.objc.Protocol
+import objcnames.classes.Protocol
 import kotlin.coroutines.resume
 
 @OptIn(ExperimentalForeignApi::class)

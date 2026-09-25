@@ -16,7 +16,7 @@ plugins {
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group.startsWith("io.netty")) {
-            useVersion("4.2.16.Final")
+            useVersion("4.2.17.Final")
         }
     }
 }
@@ -29,11 +29,11 @@ kotlin {
     jvm("desktop")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework { baseName = "composeApp"; isStatic = true }
-        // Kotlin ships no platform.CommonCrypto bindings, so the sync/crypto
-        // actuals bind CommonCrypto themselves through this cinterop def.
-        iosTarget.compilations.getByName("main").cinterops.create("commonCrypto") {
-            defFile(project.file("src/nativeInterop/cinterop/CommonCrypto.def"))
-            packageName = "platform.CommonCrypto"
+        // SecKeyCreateKeyExchange is missing from Kotlin's platform.Security bindings;
+        // bind it from the SDK header under its own package.
+        iosTarget.compilations.getByName("main").cinterops.create("securityEx") {
+            defFile(project.file("src/nativeInterop/cinterop/SecurityEx.def"))
+            packageName = "platform.SecurityEx"
         }
     }
 
