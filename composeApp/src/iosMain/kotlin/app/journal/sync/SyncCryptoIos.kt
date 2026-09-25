@@ -3,6 +3,8 @@
 package app.journal.sync
 
 import kotlinx.cinterop.*
+import platform.CCCryptoGcm.CCCryptorGCMOneshotDecrypt
+import platform.CCCryptoGcm.CCCryptorGCMOneshotEncrypt
 import platform.CoreCrypto.*
 import platform.Security.SecRandomCopyBytes
 import app.journal.util.PlatformLock
@@ -70,24 +72,18 @@ actual fun aesEncryptionKey(password: String): ByteArray {
     val iterations = 600_000U
 
     val derivedKey = ByteArray(keyLen.toInt())
-    password.encodeToByteArray().usePinned { pwPinned ->
-        salt.usePinned { saltPinned ->
-            derivedKey.usePinned { keyPinned ->
-                val status = CCKeyDerivationPBKDF(
-                    kCCPBKDF2,
-                    pwPinned.addressOf(0),
-                    password.length.toULong(),
-                    saltPinned.addressOf(0),
-                    salt.size.toULong(),
-                    kCCPRFHmacAlgSHA256,
-                    iterations,
-                    keyPinned.addressOf(0),
-                    keyLen
-                )
-                check(status == 0) { "CCKeyDerivationPBKDF failed with status $status" }
-            }
-        }
-    }
+    val status = CCKeyDerivationPBKDF(
+        kCCPBKDF2,
+        password,
+        password.length.convert(),
+        salt.asUByteArray().refTo(0),
+        salt.size.convert(),
+        kCCPRFHmacAlgSHA256,
+        iterations.convert(),
+        derivedKey.asUByteArray().refTo(0),
+        keyLen.convert()
+    )
+    check(status == 0) { "CCKeyDerivationPBKDF failed with status $status" }
     aesKeyCacheLock.withLock {
         if (aesKeyCache.size >= MAX_CACHED_AES_KEYS) aesKeyCache.clear()
         aesKeyCache[password] = derivedKey
@@ -123,14 +119,13 @@ actual fun encryptBody(body: String, key: ByteArray): ByteArray {
                 ciphertext.usePinned { ctPinned ->
                     tag.usePinned { tagPinned ->
                         val status = CCCryptorGCMOneshotEncrypt(
-                            kCCEncrypt,
                             kCCAlgorithmAES,
                             keyPinned.addressOf(0), key.size.toULong(),
                             ivPinned.addressOf(0), iv.size.toULong(),
                             null, 0uL,       // no additional authenticated data
                             ptPinned.addressOf(0), plaintext.size.toULong(),
                             ctPinned.addressOf(0),
-                            tagPinned.addressOf(0)
+                            tagPinned.addressOf(0), tag.size.toULong()
                         )
                         check(status == kCCSuccess) {
                             "AES-256-GCM encryption failed with status $status"
@@ -168,7 +163,6 @@ actual fun decryptBody(data: ByteArray, key: ByteArray): String {
                 ciphertext.usePinned { ctPinned ->
                     plaintext.usePinned { ptPinned ->
                         val status = CCCryptorGCMOneshotDecrypt(
-                            kCCDecrypt,
                             kCCAlgorithmAES,
                             keyPinned.addressOf(0), key.size.toULong(),
                             ivPinned.addressOf(0), iv.size.toULong(),

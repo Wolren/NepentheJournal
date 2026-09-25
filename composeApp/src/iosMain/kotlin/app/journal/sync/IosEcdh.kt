@@ -20,7 +20,7 @@ import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSNumber
 import platform.Security.SecKeyCopyExternalRepresentation
 import platform.Security.SecKeyCopyPublicKey
-import platform.SecurityEx.SecKeyCreateKeyExchange
+import platform.SecurityEx.SecKeyCopyKeyExchangeResult
 import platform.Security.SecKeyCreateRandomKey
 import platform.Security.SecKeyCreateWithData
 import platform.Security.SecKeyRef
@@ -209,10 +209,11 @@ object IosEcdh {
     fun agreeRaw(privateKey: SecKeyRef, peerPublicBytes: ByteArray): ByteArray? {
         val peerKey = importPublicKey(peerPublicBytes) ?: return null
         val sharedCfData = try {
-            SecKeyCreateKeyExchange(
+            SecKeyCopyKeyExchangeResult(
                 privateKey.reinterpret(),
+                kSecKeyAlgorithmECDHKeyExchangeStandard!!.reinterpret(),
                 peerKey.reinterpret(),
-                kSecKeyAlgorithmECDHKeyExchangeStandard.reinterpret(),
+                null,
                 null
             )
         } finally {
@@ -220,9 +221,9 @@ object IosEcdh {
         }
         val shared = sharedCfData ?: return null
         return try {
-            cfDataToBytes(shared)
+            cfDataToBytes(shared.reinterpret())
         } finally {
-            CFRelease(shared)
+            CFRelease(shared.reinterpret())
         }
     }
 

@@ -29,11 +29,17 @@ kotlin {
     jvm("desktop")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework { baseName = "composeApp"; isStatic = true }
-        // SecKeyCreateKeyExchange is missing from Kotlin's platform.Security bindings;
-        // bind it from the SDK header under its own package.
+        // SecKeyCopyKeyExchangeResult is missing from Kotlin's platform.Security bindings;
+        // bind it from the SDK header under its own package. The CommonCrypto GCM
+        // oneshot SPI has no public SDK header, so it is declared by a local shim.
         iosTarget.compilations.getByName("main").cinterops.create("securityEx") {
             defFile(project.file("src/nativeInterop/cinterop/SecurityEx.def"))
             packageName = "platform.SecurityEx"
+        }
+        iosTarget.compilations.getByName("main").cinterops.create("ccGcm") {
+            defFile(project.file("src/nativeInterop/cinterop/CCGcm.def"))
+            packageName = "platform.CCCryptoGcm"
+            compilerOpts.add("-I" + project.file("src/nativeInterop/cinterop").absolutePath)
         }
     }
 

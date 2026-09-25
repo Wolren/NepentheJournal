@@ -48,11 +48,7 @@ actual fun secureRandomBytes(size: Int): ByteArray {
 
 actual fun sha256(data: ByteArray): ByteArray {
     val digest = ByteArray(CC_SHA256_DIGEST_LENGTH)
-    data.usePinned { src ->
-        digest.usePinned { dst ->
-            CC_SHA256(src.addressOf(0), data.size.toUInt(), dst.addressOf(0))
-        }
-    }
+    CC_SHA256(data.asUByteArray().refTo(0), data.size.convert(), digest.asUByteArray().refTo(0))
     return digest
 }
 

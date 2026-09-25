@@ -1,0 +1,2 @@
+package = platform.CCCryptoGcm
+headers = nepenthe_ccgcm_spi.h
