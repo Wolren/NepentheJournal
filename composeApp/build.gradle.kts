@@ -270,8 +270,21 @@ compose.desktop {
             )
             packageName = "Nepenthe Journal"
             packageVersion = "0.1.0"
+            vendor = "Wolren"
+            description = "Offline-first psychoactive substance session tracker"
+            copyright = "Copyright (C) 2026 Wolren"
+            // Shown as the installer license step (jpackage converts to RTF).
+            licenseFile.set(rootProject.file("LICENSE"))
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
+                // Without these, the MSI installs with no Start Menu entry and
+                // no desktop shortcut: the app is unlaunchable from the UI.
+                menu = true
+                shortcut = true
+                // jpackage otherwise derives the MSI upgrade code from vendor +
+                // name; pinning keeps future installs upgrading in place even if
+                // vendor or package name is ever edited.
+                upgradeUuid = "D07ABD38-858F-464A-ABF6-9405C622BB14"
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icon.png"))
