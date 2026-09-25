@@ -478,7 +478,7 @@ object DoseWikiIngestor {
             for (sub in repo.substances.value) {
                 put(sub.name.lowercase(), sub)
                 for (alias in sub.aliases) {
-                    putIfAbsent(alias.lowercase(), sub)
+                    getOrPut(alias.lowercase()) { sub }
                 }
             }
         }.toMutableMap()
@@ -486,7 +486,7 @@ object DoseWikiIngestor {
     private fun register(lookup: MutableMap<String, Substance>, sub: Substance) {
         lookup[sub.name.lowercase()] = sub
         for (alias in sub.aliases) {
-            lookup.putIfAbsent(alias.lowercase(), sub)
+            lookup.getOrPut(alias.lowercase()) { sub }
         }
     }
 

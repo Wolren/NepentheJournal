@@ -29,6 +29,12 @@ kotlin {
     jvm("desktop")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework { baseName = "composeApp"; isStatic = true }
+        // Kotlin ships no platform.CommonCrypto bindings, so the sync/crypto
+        // actuals bind CommonCrypto themselves through this cinterop def.
+        iosTarget.compilations.getByName("main").cinterops.create("commonCrypto") {
+            defFile(project.file("src/nativeInterop/cinterop/CommonCrypto.def"))
+            packageName = "platform.CommonCrypto"
+        }
     }
 
     sourceSets {

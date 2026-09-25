@@ -248,7 +248,7 @@ class IosSyncTransport(
      */
     internal fun isPairingRateLimited(clientKey: String): Boolean = pairingAttemptsLock.withLock {
         val now = currentTimeMillis()
-        val expired = pairingAttempts.filterValues { now - it.value.second > PAIRING_RATE_WINDOW_MS }.keys.toList()
+        val expired = pairingAttempts.filterValues { now - it.second > PAIRING_RATE_WINDOW_MS }.keys.toList()
         expired.forEach { pairingAttempts.remove(it) }
         val (count, windowStart) = pairingAttempts[clientKey] ?: Pair(0, now)
         val next = if (now - windowStart > PAIRING_RATE_WINDOW_MS) Pair(1, now) else Pair(count + 1, windowStart)

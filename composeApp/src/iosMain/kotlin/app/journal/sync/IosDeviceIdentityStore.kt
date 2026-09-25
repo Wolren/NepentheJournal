@@ -54,20 +54,23 @@ class IosDeviceIdentityStore(private val dataDir: String) {
 
     /** 32 random bytes identifying this device, generated once and persisted. */
     fun identityBytes(): ByteArray = iosSyncLock.withLock {
-        cachedHex?.let { return hexToBytes(it) }
-        if (fileManager.fileExistsAtPath(filePath)) {
-            val stored = loadLocked().identityHex
-            if (stored.length == 64 && stored.all { it in HEX }) {
-                cachedHex = stored
-                return hexToBytes(stored)
+        val cached = cachedHex
+        val stored = if (cached != null) {
+            cached
+        } else if (fileManager.fileExistsAtPath(filePath)) {
+            val fromFile = loadLocked().identityHex
+            if (fromFile.length != 64 || !fromFile.all { it in HEX }) {
+                throw IllegalStateException("Device identity file is corrupt; refusing to reissue identity")
             }
-            throw IllegalStateException("Device identity file is corrupt; refusing to reissue identity")
+            fromFile
+        } else {
+            val fresh = secureRandomBytes(32)
+            val hex = fresh.toHex()
+            saveLocked(IosIdentityFile(identityHex = hex))
+            hex
         }
-        val fresh = secureRandomBytes(32)
-        val hex = fresh.toHex()
-        saveLocked(IosIdentityFile(identityHex = hex))
-        cachedHex = hex
-        fresh
+        cachedHex = stored
+        hexToBytes(stored)
     }
 
     /** Stable short device id derived from the secret identity bytes. */

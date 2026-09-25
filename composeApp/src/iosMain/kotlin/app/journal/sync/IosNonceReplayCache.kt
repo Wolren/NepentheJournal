@@ -25,19 +25,23 @@ class IosNonceReplayCache(private val maxEntries: Int = 5_000) {
      */
     fun checkAndRecord(nonce: String, timestamp: Long): Boolean = iosSyncLock.withLock {
         val now = currentTimeMillis()
-        if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
-        if (seen.containsKey(nonce)) return false
-        if (seen.size >= maxEntries) {
-            val cutoff = now - TIMESTAMP_WINDOW_MS
-            val expired = seen.entries.filter { it.value < cutoff }.map { it.key }
-            for (key in expired) seen.remove(key)
-            while (seen.size >= maxEntries) {
-                val oldest = seen.entries.minByOrNull { it.value }?.key ?: break
-                seen.remove(oldest)
+        if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) {
+            false
+        } else if (seen.containsKey(nonce)) {
+            false
+        } else {
+            if (seen.size >= maxEntries) {
+                val cutoff = now - TIMESTAMP_WINDOW_MS
+                val expired = seen.entries.filter { it.value < cutoff }.map { it.key }
+                for (key in expired) seen.remove(key)
+                while (seen.size >= maxEntries) {
+                    val oldest = seen.entries.minByOrNull { it.value }?.key ?: break
+                    seen.remove(oldest)
+                }
             }
+            seen[nonce] = timestamp
+            true
         }
-        seen[nonce] = timestamp
-        true
     }
 
     fun size(): Int = iosSyncLock.withLock { seen.size }

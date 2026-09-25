@@ -11,9 +11,8 @@ import kotlinx.coroutines.withContext
 import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
+import platform.objc.Protocol
 import kotlin.coroutines.resume
-
-private interface Protocol
 
 @OptIn(ExperimentalForeignApi::class)
 actual object FilePicker {
@@ -146,7 +145,7 @@ actual object FilePicker {
      * One-shot delegate: resumes the awaiting suspend function from the
      * picker callbacks (pick or cancel) instead of returning a stale value.
      */
-    private inner class ResultDelegate(
+    private class ResultDelegate(
         private val onResult: (String?) -> Unit
     ) : UIDocumentPickerDelegateProtocol {
         private var resumed = false
@@ -165,6 +164,9 @@ actual object FilePicker {
         override fun isMemberOfClass(aClass: ObjCClass?): Boolean = false
         override fun conformsToProtocol(aProtocol: Protocol?): Boolean = false
         override fun respondsToSelector(aSelector: CPointer<out CPointed>?): Boolean = false
+        override fun hash(): ULong = 0uL
+        override fun superclass(): ObjCClass? = null
+        override fun description(): String? = null
         override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
         override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?): Any? = null
         override fun performSelector(aSelector: CPointer<out CPointed>?, withObject: Any?, _withObject: Any?): Any? = null

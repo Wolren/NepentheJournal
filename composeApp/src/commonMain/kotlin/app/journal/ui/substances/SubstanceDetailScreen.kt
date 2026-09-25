@@ -74,7 +74,7 @@ fun SubstanceDetailScreen(
     val substanceIdByName = remember(substancesById) {
         buildMap {
             substancesById.values.forEach { put(it.name, it.id) }
-            substancesById.values.forEach { putIfAbsent(it.name.lowercase(), it.id) }
+            substancesById.values.forEach { getOrPut(it.name.lowercase()) { it.id } }
         }
     }
     val themeManager = remember { ThemeManager.instance }

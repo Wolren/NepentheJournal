@@ -255,7 +255,7 @@ fun DoseWikiTripReport.check(): TripReportCheck {
     report.substances.forEach {
         if (it.dose.isNullOrBlank()) warnings.add("Substance ${it.name} has no dose.")
     }
-    val bytes = DoseWikiTripReport.json.encodeToString(this).toByteArray(Charsets.UTF_8).size
+    val bytes = DoseWikiTripReport.json.encodeToString(this).encodeToByteArray().size
     if (bytes > DoseWikiTripReport.MAX_BODY_BYTES) {
         errors.add("Payload is $bytes bytes, over the ${DoseWikiTripReport.MAX_BODY_BYTES} limit.")
     }

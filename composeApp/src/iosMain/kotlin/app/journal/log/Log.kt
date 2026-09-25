@@ -14,6 +14,8 @@ import platform.Foundation.NSNumber
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.dataUsingEncoding
+import platform.Foundation.fileHandleForWritingAtPath
+import platform.Foundation.stringWithContentsOfFile
 import platform.Foundation.writeToFile
 
 actual fun initLogging(appDir: String?) {
@@ -36,7 +38,7 @@ actual fun initLogging(appDir: String?) {
  * Logging never throws: every IO failure is swallowed.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal class IosFileLogWriter(private val appDir: String) : LogWriter {
+internal class IosFileLogWriter(private val appDir: String) : LogWriter() {
 
     private val fileManager = NSFileManager.defaultManager
     private val lock = platform.Foundation.NSRecursiveLock()

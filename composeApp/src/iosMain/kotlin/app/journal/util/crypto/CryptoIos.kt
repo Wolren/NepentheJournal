@@ -1,8 +1,11 @@
 package app.journal.util.crypto
 
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 import kotlinx.cinterop.*
 import platform.CommonCrypto.*
 import platform.Foundation.NSData
+import platform.Foundation.base64EncodedStringWithOptions
 import platform.Foundation.create
 import platform.Security.SecRandomCopyBytes
 import platform.posix.memcpy

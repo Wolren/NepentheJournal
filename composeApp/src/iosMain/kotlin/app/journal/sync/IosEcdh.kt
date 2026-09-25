@@ -3,7 +3,7 @@ package app.journal.sync
 import app.journal.util.crypto.base64Encode
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UInt8Var
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.reinterpret
@@ -240,14 +240,12 @@ object IosEcdh {
     private fun bytesToCfData(bytes: ByteArray): CFDataRef? {
         if (bytes.isEmpty()) return null
         return bytes.usePinned { pinned ->
-            CFDataCreate(null, pinned.addressOf(0).reinterpret<UInt8Var>(), bytes.size.toLong())
+            CFDataCreate(null, pinned.addressOf(0).reinterpret<UByteVar>(), bytes.size.toLong())
         }
     }
 
-    companion object {
-        /** P-256 key size in bits. */
-        const val KEY_BITS = 256
-    }
+    /** P-256 key size in bits. */
+    const val KEY_BITS = 256
 }
 
 /**

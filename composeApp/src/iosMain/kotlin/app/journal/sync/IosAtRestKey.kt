@@ -5,11 +5,9 @@ import app.journal.util.crypto.secureRandomBytes
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.UInt8Var
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.cstr
-import kotlinx.cinterop.getPointer
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
@@ -18,12 +16,12 @@ import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDataCreate
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
+import platform.CoreFoundation.CFDataRef
 import platform.CoreFoundation.CFDictionaryAddValue
 import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.CFStringCreateWithCString
 import platform.CoreFoundation.CFTypeRefVar
-import platform.CoreFoundation.__CFData
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFStringEncodingUTF8
 import platform.Security.SecItemAdd
@@ -103,7 +101,7 @@ internal class IosAtRestKey(
             val result = alloc<CFTypeRefVar>()
             when (val status = SecItemCopyMatching(query, result.ptr)) {
                 errSecSuccess -> {
-                    val data = result.value?.reinterpret<__CFData>()
+                    val data = result.value as? CFDataRef
                         ?: throw IllegalStateException("Keychain returned no data")
                     try {
                         val len = CFDataGetLength(data).toInt()
@@ -138,7 +136,7 @@ internal class IosAtRestKey(
             CFDictionaryAddValue(addDict, kSecAttrService, cfString(service, this, owned))
             CFDictionaryAddValue(addDict, kSecAttrAccount, cfString(account, this, owned))
             val cfData = key.usePinned { pinned ->
-                CFDataCreate(null, pinned.addressOf(0).reinterpret<UInt8Var>(), key.size.toLong())
+                CFDataCreate(null, pinned.addressOf(0).reinterpret<UByteVar>(), key.size.toLong())
             } ?: throw IllegalStateException("Cannot create Keychain data")
             try {
                 CFDictionaryAddValue(addDict, kSecValueData, cfData)
@@ -173,7 +171,7 @@ internal class IosAtRestKey(
             CFDictionaryAddValue(query, kSecAttrService, cfString(service, this, owned))
             CFDictionaryAddValue(query, kSecAttrAccount, cfString(account, this, owned))
             val cfData = key.usePinned { pinned ->
-                CFDataCreate(null, pinned.addressOf(0).reinterpret<UInt8Var>(), key.size.toLong())
+                CFDataCreate(null, pinned.addressOf(0).reinterpret<UByteVar>(), key.size.toLong())
             } ?: throw IllegalStateException("Cannot create Keychain data")
             try {
                 CFDictionaryAddValue(update, kSecValueData, cfData)
@@ -196,7 +194,7 @@ internal class IosAtRestKey(
         // transient pointer is safe; the created string is owned by us.
         val created = CFStringCreateWithCString(
             null,
-            value.cstr.getPointer(scope),
+            value,
             kCFStringEncodingUTF8
         ) ?: throw IllegalStateException("Cannot encode Keychain string")
         owned.add(created)

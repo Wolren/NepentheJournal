@@ -1,0 +1,3 @@
+package = platform.CommonCrypto
+headers = CommonCrypto/CommonCryptor.h CommonCrypto/CommonKeyDerivation.h CommonCrypto/CommonDigest.h CommonCrypto/CommonHMAC.h
+headerFilter = CommonCrypto/.*

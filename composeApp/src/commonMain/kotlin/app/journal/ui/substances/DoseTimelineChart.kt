@@ -98,8 +98,9 @@ fun DoseTimelineChart(
                     Instant.fromEpochMilliseconds(dose.timestamp)
                         .toLocalDateTime(TimeZone.currentSystemDefault()).date
                 }
-                    .toSortedMap()
-                    .entries.map { (date, ds) -> date to ds.sumOf { it.amount } }
+                    .toList()
+                    .sortedBy { it.first }
+                    .map { (date, ds) -> date to ds.sumOf { it.amount } }
             }
 
             val values = remember(dailyEntries) { dailyEntries.map { it.second } }
@@ -137,7 +138,7 @@ fun DoseTimelineChart(
                         formatter = CartesianValueFormatter { _, v, _ ->
                             // Show "5 mg" style only when amounts are small integers; keep raw value
                             val iv = v.toInt()
-                            if (v == iv.toDouble()) iv.toString() else String.format("%.1f", v)
+                            if (v == iv.toDouble()) iv.toString() else (kotlin.math.round(v * 10.0) / 10.0).toString()
                         },
                     ),
                     bottomAxis = HorizontalAxis.rememberBottom(

@@ -344,7 +344,7 @@ internal fun TimelineBar(
             cursorX?.let { cx ->
                 Spacer(Modifier.height(6.dp))
                 Text("T+${axisLabel((cx * 60_000).toLong())} · intensity " +
-                        "~${"%.1f".format(intensityAt(samples, cx, 0f))}/10",
+                        "~${kotlin.math.round(intensityAt(samples, cx, 0f) * 10.0) / 10.0}/10",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -14,6 +14,7 @@ import platform.Foundation.NSSetUncaughtExceptionHandler
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.stringWithContentsOfFile
+import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.writeToFile
 import platform.UIKit.UIDevice
 
@@ -147,7 +148,7 @@ fun writeCrashLog(appDir: String, threadName: String, detail: String) {
 }
 
 /** Directory the uncaught exception hook writes crash dumps to. */
-@Volatile
+@kotlin.concurrent.Volatile
 private var crashReportDir: String? = null
 
 /**
