@@ -291,6 +291,13 @@ compose.desktop {
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
+                // jpackage mirrors Apple's CFBundleShortVersionString rule and
+                // rejects a leading zero ("The first number in an app-version
+                // cannot be zero"), which kills the app-image before DMG
+                // creation. The macOS-scoped override feeds only the Apple
+                // bundlers; global packageVersion, versionName, the About card
+                // and the release tag stay 0.1.0.
+                packageVersion = "1.0.0"
             }
         }
     }

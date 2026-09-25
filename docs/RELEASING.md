@@ -9,6 +9,7 @@ The Release workflow fails its version guard when these drift:
 | `versionName`        | `composeApp/build.gradle.kts` (android block)           |
 | `packageVersion`     | `composeApp/build.gradle.kts` (nativeDistributions)     |
 | About card string    | `composeApp/src/commonMain/.../detail/SettingsInfoCards.kt` |
+| macOS `packageVersion` (intentionally different) | `composeApp/build.gradle.kts` (macOS block) |
 
 ## Cutting a release
 
@@ -35,7 +36,12 @@ The Release workflow fails its version guard when these drift:
 - **Linux DEB**: the jpackage deb bundler needs `fakeroot` (the workflow
   installs it when missing).
 - **macOS DMG**: built on `macos-15` (Apple Silicon), bundled runtime is
-  arm64. Artifacts are unsigned; right-click Open on first launch.
+  arm64. Artifacts are unsigned; right-click Open on first launch. The
+  macOS block sets its own `packageVersion = "1.0.0"`: jpackage rejects a
+  leading zero for the app bundle (Apple CFBundleShortVersionString rule),
+  so the Apple bundlers see 1.0.0 while everything else stays 0.1.0. Bump
+  this value together with the other surfaces on a version change (any
+  nonzero-first version).
 - **Windows upgrade identity**: `upgradeUuid` in `composeApp/build.gradle.kts`
   is pinned (`D07ABD38-858F-464A-ABF6-9405C622BB14`). Never regenerate it:
   changing it breaks in-place upgrades of installed copies.

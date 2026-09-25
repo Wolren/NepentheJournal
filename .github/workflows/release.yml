@@ -40,7 +40,10 @@ jobs:
       - name: versionName, packageVersion and About card must agree
         run: |
           set -euo pipefail
-          V=$(sed -n 's/.*packageVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts)
+          # Anchored to nativeDistributions indentation (12 spaces): the
+          # macOS-block packageVersion override has its own intentional value
+          # and must not be picked up here.
+          V=$(sed -n 's/^            packageVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts)
           test -n "$V" || { echo "::error::packageVersion not found in build.gradle.kts"; exit 1; }
           echo "packageVersion=$V"
           grep -qF "versionName = \"$V\"" composeApp/build.gradle.kts \
