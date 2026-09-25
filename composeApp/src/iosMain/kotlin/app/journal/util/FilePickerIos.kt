@@ -12,6 +12,7 @@ import platform.Foundation.*
 import platform.UIKit.*
 import platform.UniformTypeIdentifiers.*
 import objcnames.classes.Protocol
+import platform.darwin.NSObject
 import kotlin.coroutines.resume
 
 @OptIn(ExperimentalForeignApi::class)
@@ -147,7 +148,7 @@ actual object FilePicker {
      */
     private class ResultDelegate(
         private val onResult: (String?) -> Unit
-    ) : UIDocumentPickerDelegateProtocol {
+    ) : NSObject(), UIDocumentPickerDelegateProtocol {
         private var resumed = false
 
         private fun finish(url: String?) {

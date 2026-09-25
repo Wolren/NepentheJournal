@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import platform.Foundation.*
 import objcnames.classes.Protocol
+import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
 actual class LanDiscovery {
@@ -27,7 +28,7 @@ actual class LanDiscovery {
     @OptIn(ExperimentalForeignApi::class)
     private class NetServiceBrowserDelegate(
         private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
-    ) : NSNetServiceBrowserDelegateProtocol {
+    ) : NSObject(), NSNetServiceBrowserDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
         override fun performSelector(aSelector: CPointer<out CPointed>?): Any? = null
@@ -63,7 +64,7 @@ actual class LanDiscovery {
     @OptIn(ExperimentalForeignApi::class)
     private class NetServiceDelegate(
         private val flow: kotlinx.coroutines.channels.SendChannel<LanDiscoveryEvent>
-    ) : NSNetServiceDelegateProtocol {
+    ) : NSObject(), NSNetServiceDelegateProtocol {
         override fun isEqual(`object`: Any?): Boolean = false
         override fun `class`(): ObjCClass? = null
         override fun isProxy(): Boolean = false
