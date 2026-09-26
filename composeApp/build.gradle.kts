@@ -113,7 +113,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.ktor.client.cio)
-                implementation(libs.ktor.server.netty)
+                // ktor-server-netty is declared at project level (bottom of this
+                // file) with an exclude for netty-codec-http3 — do not add it here.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.test.host)
                 implementation(libs.ktor.serialization)
@@ -138,7 +139,8 @@ kotlin {
         val jvmMain = create("jvmMain") {
             dependsOn(commonMain)
             dependencies {
-                implementation(libs.ktor.server.netty)
+                // ktor-server-netty is declared at project level (bottom of this
+                // file) with an exclude for netty-codec-http3 — do not add it here.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.serialization)
                 implementation(libs.ktor.server.websockets)
@@ -177,6 +179,23 @@ kotlin {
     }
 }
 
+// ktor 3.6.0 pulls netty-codec-http3 → netty-codec-native-quic (5 platform-
+// native jars carrying byte-identical META-INF entries, which fail Android's
+// mergeReleaseJavaResource). LAN sync uses plain HTTP/WS — HTTP/3 is unused.
+// Declared HERE because the KMP sourceSet dependencies{} DSL has no
+// per-dependency exclusion lambda and catalog dependencies are immutable.
+// Both former edges (jvmMainImplementation, desktopTestImplementation) were
+// removed from sourceSets; keeping any unexcluded edge would re-add http3 to
+// the merged graph.
+dependencies {
+    "jvmMainImplementation"(libs.ktor.server.netty) {
+        exclude(group = "io.netty", module = "netty-codec-http3")
+    }
+    "desktopTestImplementation"(libs.ktor.server.netty) {
+        exclude(group = "io.netty", module = "netty-codec-http3")
+    }
+}
+
 // KMP test tasks (desktopTest) are NOT standard Gradle Test tasks,
 // so tasks.withType<Test>() does not match them. BOTH test entry points
 // (scripts/run-tests.sh and the CI test step in .github/workflows/ci.yml)
@@ -206,7 +225,10 @@ val hasUploadKeystore = uploadKeystoreFile.exists()
 
 android {
     namespace = "app.journal"
-    compileSdk = 36
+    // 37 required since the 2026-09 dep bumps: vico 3.3.1, coil 3.6.3 and
+    // compose 1.12.x AARs fail checkReleaseAarMetadata on compileSdk < 37.
+    // targetSdk stays 36 deliberately (runtime behavior change, separate).
+    compileSdk = 37
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
     sourceSets["main"].assets.srcDirs("src/androidMain/assets")
@@ -217,7 +239,15 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
-    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,LICENSE.md,LICENSE.txt,NOTICE.md,*.properties}" } }
+    // duplicate META-INF files from netty-codec-native-quic platform jars
+    // (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the
+    // 2026-09 ktor/netty bumps; dedupe license copies.
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,LICENSE.md,LICENSE.txt,NOTICE.md,*.properties,license/*}"
+            excludes += "/META-INF/license/*"
+        }
+    }
     signingConfigs {
         if (hasUploadKeystore) {
             create("release") {

@@ -193,7 +193,7 @@
  			};
  			name = Release;
  		};
- 		23274EDFE6B9CA73B4FFCD48 = {
+ 		23274EDFE6B9CA73B4FFCD49 = {
  			isa = XCBuildConfiguration;
  			buildSettings = {
  				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -247,7 +247,7 @@
  		23274EDFE6B9CA73B4FFCD48 = {
  			isa = XCConfigurationList;
  			buildConfigurations = (
- 				23274EDFE6B9CA73B4FFCD48,
+ 				23274EDFE6B9CA73B4FFCD49,
  				712DAF117662E2F08486A1C0,
  			);
  			defaultConfigurationIsVisible = 0;
