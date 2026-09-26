@@ -52,7 +52,7 @@ subprojects {
                 "org.apache.commons:commons-lang3:3.20.0",
                 // Apache HTTP Components 5 (via ktor-client-apache5 test client) -
                 // HPack header bomb, header-parsing memory exhaustion, connection leak
-                "org.apache.httpcomponents.client5:httpclient5:5.6.3",
+                "org.apache.httpcomponents.client5:httpclient5:5.6.4",
                 "org.apache.httpcomponents.core5:httpcore5:5.4.3",
                 "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
                 // OpenTelemetry - unbounded baggage allocation (Kotlin SwiftExport worker)
