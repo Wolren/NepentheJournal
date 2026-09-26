@@ -53,7 +53,26 @@ data class SyncResponse(
     /** True when per-type caps cut this page; the client must keep pulling. */
     val truncated: Boolean = false,
     /** Low-water cursor for the next page. Valid only when [truncated]. */
-    val nextSince: Long = 0L
+    val nextSince: Long = 0L,
+    /**
+     * Composite id half of the low-water cursor: the id of the LAST row
+     * served at [nextSince]. Resume rule: the next page serves rows strictly
+     * after (nextSince, nextSinceId) in (updatedAt, id) order — see
+     * [isAfterPullCursor].
+     *
+     * Why a timestamp alone is not enough: the bundled seed's 2015
+     * interactions all share one updatedAt, so a timestamp-only cursor
+     * cannot move inside that tie group. The old `updatedAt > since` filter
+     * re-served the first rows of the group forever and silently dropped
+     * every row past the first page.
+     *
+     * Additive field with an empty default: older peers decode it as ""
+     * (ignoreUnknownKeys) and fall back to their timestamp-only drain; older
+     * peers never send it, and a truncated page from an older server with an
+     * empty id stalls the new client's drain check instead of looping — no
+     * loss, no regression, same behaviour as before.
+     */
+    val nextSinceId: String = ""
 )
 
 @Serializable

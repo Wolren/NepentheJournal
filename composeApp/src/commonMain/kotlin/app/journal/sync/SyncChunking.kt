@@ -129,3 +129,22 @@ fun allSucceeded(acks: List<SyncResponse>): Boolean =
  */
 fun advanceCursorIfAllSucceeded(previousCursor: Long, candidateCursor: Long, acks: List<SyncResponse>): Long =
     if (allSucceeded(acks)) candidateCursor else previousCursor
+
+/**
+ * Full cursor rule for a push+pull cycle (contract section d): the cursor
+ * moves to [candidateCursor] only when EVERY slice acked success AND the
+ * paired pull drain finished ([drainComplete]).
+ *
+ * An incomplete drain (page budget hit, cursor stall, or a page fetch that
+ * kept failing) must hold the cursor even when the push half succeeded:
+ * this cursor is also the next cycle's pull starting point, so advancing it
+ * past pages that never arrived would make that tail unreachable until the
+ * next cold start. Re-sending an already-delivered push slice is idempotent
+ * (LWW), which is strictly cheaper than silently losing a pull page.
+ */
+fun cursorAfterCycle(
+    previousCursor: Long,
+    candidateCursor: Long,
+    acks: List<SyncResponse>,
+    drainComplete: Boolean
+): Long = if (drainComplete) advanceCursorIfAllSucceeded(previousCursor, candidateCursor, acks) else previousCursor
