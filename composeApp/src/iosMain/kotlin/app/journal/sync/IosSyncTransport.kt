@@ -326,14 +326,25 @@ class IosSyncTransport(
             }
 
             // Pull: sign the exact target including the since param, same as JVM.
-            // Drain while truncated, following the low-water nextSince cursor.
-            // A failed, missing, or undecodable page fails the whole cycle
-            // WITHOUT touching the cursor (contract section d).
+            // Drain while truncated, following the COMPOSITE
+            // (nextSince, nextSinceId) cursor: a timestamp-only cursor cannot
+            // walk inside a group of tied timestamps (the bundled seed's 2015
+            // interactions share one updatedAt), so the id half is required to
+            // make progress without skipping. A failed, missing, undecodable,
+            // rejected, stalled, or over-budget page fails the WHOLE cycle
+            // WITHOUT touching lastSyncAt (contract section d): lastSyncAt is
+            // stamped below only after a fully completed drain, so the next
+            // cycle retries from the old cursor instead of skipping the tail
+            // that never arrived. The 200-page bound mirrors the JVM
+            // KtorSyncClient.maxPullPages.
             var pullCursor = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
                 pushResp.nextSince else (_status.value.lastSyncAt ?: 0L)
+            var pullCursorId = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
+                pushResp.nextSinceId else ""
             var pullPages = 0
-            while (pullPages < 20) {
-                val pullResp = fetchPullPage(client, peer, deviceId, secret, aesKey, pullCursor)
+            var pullComplete = false
+            while (pullPages < 200) {
+                val pullResp = fetchPullPage(client, peer, deviceId, secret, aesKey, pullCursor, pullCursorId)
                 if (pullResp == null) {
                     val msg = "Pull response missing, undecodable, or rejected by host"
                     _status.update { it.copy(lastError = msg) }
@@ -346,12 +357,30 @@ class IosSyncTransport(
                 }
                 applySyncResponse(repo, pullResp, pullCursor)
                 persistApplied()
-                if (!pullResp.truncated) break
-                val next = if (pullResp.nextSince > 0L) pullResp.nextSince
+                if (!pullResp.truncated) {
+                    pullComplete = true
+                    break
+                }
+                val hasNextSince = pullResp.nextSince > 0L
+                val nextTs = if (hasNextSince) pullResp.nextSince
                     else maxOf(pullResp.maxUpdatedAt(), pullCursor)
-                if (next <= pullCursor) break
-                pullCursor = next
+                val nextId = if (hasNextSince) pullResp.nextSinceId else ""
+                val progressed = nextTs > pullCursor || (nextTs == pullCursor && nextId > pullCursorId)
+                if (!progressed) {
+                    val msg = "Pull cursor stalled at $pullCursor/$pullCursorId; holding sync cursor"
+                    Log.withTag("IosSync").w { msg }
+                    _status.update { it.copy(lastError = msg) }
+                    return Result.failure(Exception(msg))
+                }
+                pullCursor = nextTs
+                pullCursorId = nextId
                 pullPages++
+            }
+            if (!pullComplete) {
+                val msg = "Pull drain did not complete (page limit 200); holding sync cursor"
+                Log.withTag("IosSync").w { msg }
+                _status.update { it.copy(lastError = msg) }
+                return Result.failure(Exception(msg))
             }
 
             // Reached only when every slice and page succeeded, stamped with
@@ -374,9 +403,14 @@ class IosSyncTransport(
         deviceId: String,
         secret: ByteArray,
         aesKey: ByteArray,
-        cursor: Long
+        cursor: Long,
+        cursorId: String = ""
     ): SyncResponse? {
-        val target = "${SyncEndpoints.SYNC_PULL}?since=$cursor"
+        // Signed verbatim against the request target (same rule as the JVM
+        // client); the id half is query-encoded so '&' or '=' in an id
+        // cannot corrupt the parameter pair.
+        val idParam = if (cursorId.isEmpty()) "" else "&sinceId=${cursorId.encodeURLParameter()}"
+        val target = "${SyncEndpoints.SYNC_PULL}?since=$cursor$idParam"
         val auth = buildAuthHeader(deviceId, target, secret, currentTimeMillis(), generateNonce())
         val pullResponse = client.get("http://${peer.host}:${peer.port}$target") {
             header(SyncAuth.DEVICE_ID_HEADER, deviceId)

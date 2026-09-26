@@ -407,6 +407,12 @@ class IosSyncServerRouter(
                     )
                     return@get
                 }
+                // Composite resume id (SyncResponse.nextSinceId), bounded
+                // exactly like the JVM pull route; absent from older clients.
+                val sinceId = call.request.queryParameters["sinceId"]
+                    ?.trim()
+                    ?.take(SyncLimits.MAX_ID_LEN)
+                    .orEmpty()
 
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
@@ -417,7 +423,7 @@ class IosSyncServerRouter(
                     return@get
                 }
 
-                val response = buildSyncResponse(since)
+                val response = buildSyncResponse(since, sinceId)
                 trustStore.updateLastSeen(callerDeviceId)
                 val aesKey = aesEncryptionKey(callerSecret)
                 val encryptedResponse = base64Encode(encryptBody(
@@ -463,30 +469,39 @@ class IosSyncServerRouter(
         return constantTimeEquals(signature, expected)
     }
 
-    private fun buildSyncResponse(since: Long): SyncResponse {
+    /**
+     * Oldest-first pages with a COMPOSITE (updatedAt, id) low-water cursor —
+     * the iOS mirror of the JVM SyncServerHandlers.handlePull (see the
+     * shared isAfterPullCursor for cursor semantics). A timestamp-only
+     * cursor cannot walk inside a group of tied timestamps: the bundled
+     * seed's 2015 interactions share one updatedAt, so the old
+     * `updatedAt > since` filter dropped every row past page one silently.
+     */
+    private fun buildSyncResponse(since: Long, sinceId: String = ""): SyncResponse {
         val deleted = repo.deletedIdsSince(since)
-        // Oldest-first pages with a low-water nextSince, same contract as
-        // the JVM pull handler: the client drains while truncated is set.
-        val lowWater = mutableListOf<Long>()
         var truncated = false
-        fun <T> page(list: List<T>, max: Int, updatedAt: (T) -> Long): List<T> {
-            val fresh = list.filter { updatedAt(it) > since }.sortedBy(updatedAt)
+        val cuts = mutableListOf<Pair<Long, String>>()
+        fun <T> page(list: List<T>, max: Int, id: (T) -> String, updatedAt: (T) -> Long): List<T> {
+            val fresh = list
+                .filter { isAfterPullCursor(updatedAt(it), id(it), since, sinceId) }
+                .sortedWith(compareBy({ updatedAt(it) }, { id(it) }))
             if (fresh.size <= max) return fresh
             truncated = true
             val cut = fresh.take(max)
-            lowWater.add(cut.maxOf(updatedAt))
+            val last = cut.last()
+            cuts += updatedAt(last) to id(last)
             return cut
         }
-        return SyncResponse(
+        val response = SyncResponse(
             success = true,
-            sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES) { it.updatedAt },
-            effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS) { it.updatedAt },
-            interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS) { it.updatedAt },
-            notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT) { it.updatedAt },
-            customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS) { it.updatedAt },
+            sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
+            doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
+            substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES, { it.id }) { it.updatedAt },
+            effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS, { it.id }) { it.updatedAt },
+            interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS, { it.id }) { it.updatedAt },
+            notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
+            timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
+            customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS, { it.id }) { it.updatedAt },
             deletedSessionIds = deleted.deletedSessionIds,
             deletedDoseIds = deleted.deletedDoseIds,
             deletedNoteIds = deleted.deletedNoteIds,
@@ -495,9 +510,17 @@ class IosSyncServerRouter(
             deletedInteractionIds = deleted.deletedInteractionIds,
             deletedTimelineEventIds = deleted.deletedTimelineEventIds,
             deletedCustomUnitIds = deleted.deletedCustomUnitIds,
-            truncated = truncated,
-            nextSince = if (truncated) lowWater.min() else 0L
+            truncated = truncated
         )
+        if (truncated) {
+            // Lexicographic minimum over the per-type cut positions; cuts is
+            // non-empty because truncated is only set inside page() right
+            // before a cut is recorded.
+            val minCut = cuts.minWith(compareBy({ it.first }, { it.second }))
+                ?: error("truncated page without a cut position")
+            return response.copy(nextSince = minCut.first, nextSinceId = minCut.second)
+        }
+        return response
     }
 
     private fun applySyncBatch(batch: SyncBatch) {

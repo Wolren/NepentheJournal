@@ -216,6 +216,32 @@ fun applySyncResponse(
 }
 
 /**
+ * Composite pull-cursor rule shared by BOTH hosts' page handlers (JVM
+ * SyncServerHandlers.handlePull and iOS IosSyncServerRouter.buildSyncResponse).
+ *
+ * Two cursor shapes:
+ *  - [sinceId] blank: [since] is a sync-cycle wall-clock cursor. The filter
+ *    is INCLUSIVE (`updatedAt >= since`): an entity stamped in the same
+ *    millisecond as the cursor but missed by the previous cycle must be
+ *    served again rather than skipped. Duplicate delivery is idempotent
+ *    (LWW apply), while a skip stays invisible until the cursor resets.
+ *  - [sinceId] present: [since] is the composite resume position of a
+ *    truncated page, and the filter is strictly-after in (updatedAt, id)
+ *    order. With a total order the drain always makes progress inside a
+ *    group of tied timestamps and never skips a row.
+ *
+ * The id is compared against REPOSITORY ids (decoded); the wire carries it
+ * in SyncResponse.nextSinceId and the `sinceId` pull query parameter (which
+ * the server decodes before this comparison).
+ */
+fun isAfterPullCursor(updatedAt: Long, id: String, since: Long, sinceId: String): Boolean =
+    if (sinceId.isEmpty()) {
+        updatedAt >= since
+    } else {
+        updatedAt > since || (updatedAt == since && id > sinceId)
+    }
+
+/**
  * Highest updatedAt across every entity list in a sync response.
  * Used to advance pull cursors. Tombstones carry no wire timestamps, so
  * they never move the cursor on their own (their deletion timestamps live

@@ -171,11 +171,30 @@ class KtorSyncClient(
 
     // ---- Authenticated sync endpoints ----
 
-    /** Max pull pages per sync. Guards against a peer that reports truncated forever. */
-    private val maxPullPages = 20
+    /**
+     * Max pull pages per sync cycle. One page carries EVERY collection up to
+     * its cap (500 items / 1000 substances / 100 interactions per type), so
+     * 200 pages bounds ~100k rows of a single collection per cycle — far
+     * beyond any plausible journal. An honest peer cannot reach this bound;
+     * it exists only to bound a hostile peer that keeps reporting truncated
+     * (the stall check already stops a peer that cannot make progress).
+     *
+     * Hitting the bound is NOT a data-loss path: the drain reports
+     * `complete = false` and the transport holds its cursor
+     * ([cursorAfterCycle]), so the remainder is retried next cycle instead
+     * of being skipped by a cursor advanced to cycleStart.
+     */
+    private val maxPullPages = 200
 
-    private suspend fun fetchPullPage(host: String, port: Int, cursor: Long): SyncResponse {
-        val uri = "${SyncEndpoints.SYNC_PULL}?since=$cursor"
+    private suspend fun fetchPullPage(host: String, port: Int, cursor: Long, cursorId: String): SyncResponse {
+        // The GET signature covers the request URI verbatim
+        // (SyncServerSecurity.verifyRequest signs call.request.uri), so
+        // build the URI ONCE and use it for both the request and the HMAC.
+        // The id half is query-encoded: an id containing '&' or '=' would
+        // otherwise corrupt the parameter pair, and the host decodes the
+        // value before comparing ids.
+        val idParam = if (cursorId.isEmpty()) "" else "&sinceId=${cursorId.encodeURLParameter()}"
+        val uri = "${SyncEndpoints.SYNC_PULL}?since=$cursor$idParam"
         val authHeader = authenticateRequest(deviceId, uri)
         val httpResponse = client.get("${endpoint(host, port)}$uri") {
             header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
@@ -187,28 +206,92 @@ class KtorSyncClient(
         return json.decodeFromString<SyncResponse>(decrypted)
     }
 
-    /** Apply the first page, then keep pulling while truncated. Follows nextSince. */
-    private suspend fun applyAndDrain(host: String, port: Int, first: SyncResponse, firstSince: Long): SyncResponse {
+    /**
+     * Apply [first], then keep pulling while the host reports truncated,
+     * resuming at the COMPOSITE (nextSince, nextSinceId) cut so a group of
+     * tied timestamps can be walked past its first page.
+     *
+     * [complete] is true ONLY when a page arrived with truncated=false.
+     * Page-budget exhaustion, a cursor that cannot advance, a rejected page,
+     * or a fetch that keeps failing all return complete=false — the caller
+     * must then hold its sync cursor rather than advancing it past pages
+     * that never arrived. Extracted as a free function so every one of those
+     * branches is unit-testable with a scripted peer.
+     */
+    internal data class PullDrainResult(
+        val lastPage: SyncResponse,
+        val complete: Boolean
+    )
+
+    internal suspend fun drainPullPages(
+        first: SyncResponse,
+        firstSince: Long,
+        firstSinceId: String,
+        pageLimit: Int,
+        fetchPage: suspend (since: Long, sinceId: String) -> Result<SyncResponse>,
+        applyPage: suspend (page: SyncResponse, since: Long) -> Unit
+    ): PullDrainResult {
         var page = first
-        var cursor = firstSince
-        applyPull(page, cursor)
+        var cursorTs = firstSince
+        var cursorId = firstSinceId
+        applyPage(page, cursorTs)
         var pages = 1
-        while (page.truncated && pages < maxPullPages) {
-            val next = if (page.nextSince > 0L) page.nextSince else maxOf(page.maxUpdatedAt(), cursor)
-            if (next <= cursor) {
-                Log.withTag("SyncClient").w { "pull cursor stalled, stopping drain" }
-                break
+        while (page.truncated) {
+            if (pages >= pageLimit) {
+                Log.withTag("SyncClient").w {
+                    "pull drain hit page limit ($pageLimit) at cursor $cursorTs/$cursorId; stopping INCOMPLETE"
+                }
+                return PullDrainResult(page, complete = false)
             }
-            cursor = next
-            val r = retryWithBackoff { fetchPullPage(host, port, cursor) }
-            if (r.isFailure) break
+            // Resume position: the composite cut. nextSince=0 with
+            // truncated=true is an ancient host that does not paginate by
+            // cursor, so fall back to the page's own max updatedAt (legacy
+            // behaviour) with a blank id half.
+            val hasNextSince = page.nextSince > 0L
+            val nextTs = if (hasNextSince) page.nextSince else page.maxUpdatedAt()
+            val nextId = if (hasNextSince) page.nextSinceId else ""
+            val progressed = nextTs > cursorTs || (nextTs == cursorTs && nextId > cursorId)
+            if (!progressed) {
+                // Stalls when a pre-nextSinceId host splits a tie group at
+                // the cursor value (it cannot express progress inside one).
+                // Stopping is correct there: those rows are unreachable by
+                // this protocol version, and looping would re-serve them.
+                Log.withTag("SyncClient").w {
+                    "pull cursor stalled at $cursorTs/$cursorId; stopping INCOMPLETE"
+                }
+                return PullDrainResult(page, complete = false)
+            }
+            cursorTs = nextTs
+            cursorId = nextId
+            val r = fetchPage(cursorTs, cursorId)
+            if (r.isFailure) {
+                Log.withTag("SyncClient").w {
+                    "pull page fetch failed at $cursorTs/$cursorId: ${r.exceptionOrNull()?.message}; stopping INCOMPLETE"
+                }
+                return PullDrainResult(page, complete = false)
+            }
             page = r.getOrThrow()
-            if (!page.success) break
-            applyPull(page, cursor)
+            if (!page.success) return PullDrainResult(page, complete = false)
+            applyPage(page, cursorTs)
             pages++
         }
-        return page
+        return PullDrainResult(page, complete = true)
     }
+
+    /** Apply the first page, then keep pulling while truncated. */
+    private suspend fun applyAndDrain(
+        host: String, port: Int,
+        first: SyncResponse,
+        firstSince: Long,
+        firstSinceId: String = ""
+    ): PullDrainResult = drainPullPages(
+        first = first,
+        firstSince = firstSince,
+        firstSinceId = firstSinceId,
+        pageLimit = maxPullPages,
+        fetchPage = { ts, id -> retryWithBackoff { fetchPullPage(host, port, ts, id) } },
+        applyPage = { page, since -> applyPull(page, since) }
+    )
 
     /**
      * Outcome of one chunked push cycle (contract section d).
@@ -217,12 +300,19 @@ class KtorSyncClient(
      * is the ONLY wall-clock value of the cycle: captured before the batch was
      * built, so no change made during the round trip can be skipped, and it is
      * the only value the caller may advance its cursor to, and only through
-     * [advanceCursorIfAllSucceeded] with [acks].
+     * [cursorAfterCycle] with [acks] AND [drainComplete].
+     *
+     * [drainComplete] is false when the paired pull drain stopped early
+     * (page budget, stall, rejected or unfetchable page). The push half may
+     * still have fully succeeded; the caller must hold its cursor anyway,
+     * because that cursor is also the next cycle's pull starting point and
+     * advancing it would make the undelivered tail unreachable.
      */
     data class ChunkedPushResult(
         val acks: List<SyncResponse>,
         val cycleStart: Long,
-        val finalResponse: SyncResponse
+        val finalResponse: SyncResponse,
+        val drainComplete: Boolean = true
     )
 
     /**
@@ -237,8 +327,10 @@ class KtorSyncClient(
      *    zero acks) aborts with Result.failure and NO cursor advice happens
      *    upstream: the caller keeps its previous cursor and resends from
      *    there next cycle.
-     * 4. On full success the caller advances the cursor to [ChunkedPushResult.cycleStart]
-     *    via advanceCursorIfAllSucceeded(previous, cycleStart, acks).
+     * 4. On full success the caller advances the cursor to
+     *    [ChunkedPushResult.cycleStart] via
+     *    cursorAfterCycle(previous, cycleStart, acks, drainComplete) — and
+     *    only when the paired pull drain also completed.
      */
     suspend fun pushChanges(
         host: String, port: Int,
@@ -313,11 +405,22 @@ class KtorSyncClient(
         // ack is the freshest snapshot of the same since cursor, and
         // applyAndDrain follows its pagination from there.
         try {
-            val last = applyAndDrain(host, port, acks.last(), since)
-            if (!last.success) {
-                return@withContext Result.failure(Exception(last.error ?: "Push failed"))
+            val drain = applyAndDrain(host, port, acks.last(), since)
+            if (!drain.lastPage.success) {
+                return@withContext Result.failure(Exception(drain.lastPage.error ?: "Push failed"))
             }
-            Result.success(ChunkedPushResult(acks = acks, cycleStart = cycleStart, finalResponse = last))
+            if (!drain.complete) {
+                // Not an error for this cycle (the push half is durable and
+                // applied pages are persisted), but the caller must hold its
+                // cursor; say so where operators can see it.
+                Log.withTag("SyncClient").w { "pull drain incomplete; sync cursor will hold at since=$since" }
+            }
+            Result.success(ChunkedPushResult(
+                acks = acks,
+                cycleStart = cycleStart,
+                finalResponse = drain.lastPage,
+                drainComplete = drain.complete
+            ))
         } catch (e: Exception) {
             Log.withTag("SyncClient").e(e) { "applyPull failed after successful push" }
             Result.failure(e)

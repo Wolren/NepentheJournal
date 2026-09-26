@@ -822,4 +822,84 @@ class KtorSyncServerIntegrationTest {
             assertEquals("local outcome", repo.getSession("s:conflict")?.outcome)
         }
     }
+
+    /**
+     * Regression for the pull-pagination tie bug, end to end over a REAL
+     * server: the bundled seed shape (2015 interactions sharing ONE
+     * updatedAt) must arrive in FULL when a fresh client pulls from cursor 0.
+     * The old timestamp-only cursor cut at 100 rows, then filtered
+     * `updatedAt > since` and matched the zero remaining rows of the tie
+     * group — it reported the drain as finished with 100 of 2015 delivered.
+     */
+    @Test
+    fun `pull from cursor zero delivers every tied-timestamp interaction`() = runBlocking {
+        val server = KtorSyncServer(
+            repo = repo,
+            port = 0, // ephemeral: never collide with concurrently running sibling test JVMs
+            tlsIdentity = TlsIdentityManager(testDir.absolutePath),
+            ecdhIdentity = EcdhIdentityManager(testDir.absolutePath),
+            trustStore = trustStore,
+            authenticator = authenticator,
+            onConnection = {}
+        )
+        val info = server.start()
+        val port = info.port
+        val tied = 1_783_942_757_808L
+        try {
+            // Host side: the real seed shape, every row on one timestamp.
+            repeat(2015) { i ->
+                repo.upsertInteraction(Interaction(
+                    id = "int:$i",
+                    createdAt = tied,
+                    updatedAt = tied,
+                    substanceAId = "sub:a",
+                    substanceBId = "sub:b",
+                    riskLevel = InteractionRisk.LOW,
+                    description = "seed interaction $i"
+                ))
+            }
+
+            // Pair a fresh, EMPTY client through the real contract-g flow.
+            val clientRepo = JournalRepository()
+            val bootstrap = KtorSyncClient(
+                repo = clientRepo, deviceId = "tie-client", deviceName = "Tie"
+            )
+            val hostInfo = bootstrap.requestHostInfo("127.0.0.1", port).getOrThrow()
+            assertNotNull(hostInfo.ecdhPublicKeyB64)
+            val token = authenticator.generatePairingToken()
+            val pairing = bootstrap.completePairing(
+                host = "127.0.0.1", port = port, token = token,
+                clientDeviceId = "tie-client", clientDeviceName = "Tie",
+                clientFingerprint = "tie-fp",
+                hostEcdhPublicKeyB64 = hostInfo.ecdhPublicKeyB64
+            )
+            bootstrap.close()
+            val secret = pairing.getOrThrow().sharedSecret
+
+            val client = KtorSyncClient(
+                repo = clientRepo, deviceId = "tie-client",
+                deviceFingerprint = "tie-fp", deviceName = "Tie",
+                sharedSecret = secret
+            )
+            try {
+                // Empty client push (one no-op slice) whose ack carries the
+                // first pull page, then the drain walks the rest.
+                val push = client.pushChanges(
+                    host = "127.0.0.1", port = port,
+                    deviceId = "tie-client", deviceName = "Tie", since = 0L
+                )
+                assertTrue(push.isSuccess,
+                    "empty push + full pull must succeed: ${push.exceptionOrNull()?.message}")
+                val result = push.getOrThrow()
+                assertTrue(result.drainComplete,
+                    "the pull drain must run all the way to an untruncated page")
+                assertEquals(2015, clientRepo.interactions.value.size,
+                    "every tied-timestamp interaction must cross the pull (the old cursor stopped at 100)")
+            } finally {
+                client.close()
+            }
+        } finally {
+            server.stop()
+        }
+    }
 }

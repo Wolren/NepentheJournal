@@ -114,6 +114,37 @@ class SyncPayloadTest {
         assertEquals("Conflict body", decoded.conflictSiblings.first().body)
     }
 
+    // ==================== Composite pull cursor ====================
+
+    @Test
+    fun syncResponseNextSinceIdRoundtrip() {
+        val response = SyncResponse(
+            success = true,
+            interactions = listOf(interaction("i:99")),
+            truncated = true,
+            nextSince = 1_783_942_757_808L,
+            nextSinceId = "int:99"
+        )
+        val encoded = json.encodeToString(response)
+        val decoded = json.decodeFromString<SyncResponse>(encoded)
+        assertTrue(decoded.truncated)
+        assertEquals(1_783_942_757_808L, decoded.nextSince)
+        assertEquals("int:99", decoded.nextSinceId,
+            "the id half of the composite cursor must survive the wire")
+    }
+
+    @Test
+    fun syncResponseDecodesLegacyJsonWithoutNextSinceId() {
+        // A peer running an older build never sends nextSinceId; decoding
+        // must default it to "" so the client falls back to its timestamp
+        // drain instead of failing the whole response.
+        val legacy = """{"success":true,"truncated":true,"nextSince":1234}"""
+        val decoded = json.decodeFromString<SyncResponse>(legacy)
+        assertTrue(decoded.truncated)
+        assertEquals(1234L, decoded.nextSince)
+        assertEquals("", decoded.nextSinceId)
+    }
+
     // ==================== Helpers ====================
 
     private fun session(id: String) = Session(

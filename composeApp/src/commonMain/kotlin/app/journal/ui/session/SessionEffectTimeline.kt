@@ -3,7 +3,7 @@ package app.journal.ui.session
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Layout
+import androidx.compose.ui.layout.Layout
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,7 +72,7 @@ internal fun SessionEffectTimeline(
                 ?.let { substancesById[it.substanceId]?.durationProfile }
                 ?.let { parseDurationProfile(it) }
                 ?: emptyList()
-            if (profile.isEmpty()) emptyList()
+            if (profile.isEmpty() || anchorDose == null) emptyList()
             else synthesizedEffectSamples(profile, anchorDose.timestamp)
         }
     }

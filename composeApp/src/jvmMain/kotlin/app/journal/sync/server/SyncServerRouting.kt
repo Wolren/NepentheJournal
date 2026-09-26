@@ -457,6 +457,15 @@ class SyncServerRouter(
                     )
                     return@get
                 }
+                // Composite resume id (SyncResponse.nextSinceId). Bounded to
+                // MAX_ID_LEN and blanked when malformed, so a hostile client
+                // cannot smuggle an oversized cursor component into logs or
+                // comparisons; an unknown parameter from an older client
+                // simply stays "".
+                val sinceId = call.request.queryParameters["sinceId"]
+                    ?.trim()
+                    ?.take(SyncLimits.MAX_ID_LEN)
+                    .orEmpty()
 
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
@@ -468,7 +477,7 @@ class SyncServerRouter(
                     return@get
                 }
 
-                val response = handlers.handlePull(since)
+                val response = handlers.handlePull(since, sinceId)
                 trustStore.updateLastSeen(callerDeviceId)
                 val aesKey = aesEncryptionKey(callerSecret)
                 val encryptedResponse = base64Encode(encryptBody(

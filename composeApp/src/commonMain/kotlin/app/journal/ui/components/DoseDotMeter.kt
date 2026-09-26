@@ -75,8 +75,7 @@ fun DoseDotMeter(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
-        dots.total
-            .coerceAtLeast(1)
+        (0 until dots.total.coerceAtLeast(1))
             .chunked(columns.coerceAtLeast(1))
             .forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {

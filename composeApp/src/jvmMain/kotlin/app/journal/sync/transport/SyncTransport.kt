@@ -294,11 +294,21 @@ class SyncTransport(
                     // value allowed to become the cursor is
                     // ChunkedPushResult.cycleStart, captured BEFORE the
                     // batch was built, and it is applied exclusively
-                    // through advanceCursorIfAllSucceeded over the real
-                    // per-slice acks. A partial push keeps the old cursor
-                    // so the unconfirmed remainder is resent next cycle.
+                    // through cursorAfterCycle over the real per-slice acks
+                    // AND the pull-drain completion flag. A partial push
+                    // keeps the old cursor so the unconfirmed remainder is
+                    // resent next cycle; an incomplete PULL drain holds it
+                    // too, because this cursor is also the next cycle's
+                    // pull starting point and advancing it would skip the
+                    // pages that never arrived (they would stay
+                    // unreachable until the next cold start, which is
+                    // exactly the silent-tail bug cursorAfterCycle exists
+                    // to prevent).
                     val push = exchange.getOrThrow()
-                    lastSyncTime = advanceCursorIfAllSucceeded(since, push.cycleStart, push.acks)
+                    lastSyncTime = cursorAfterCycle(since, push.cycleStart, push.acks, push.drainComplete)
+                    if (!push.drainComplete) {
+                        appendDebug("Pull drain incomplete — sync cursor held at $since, resuming next cycle")
+                    }
                     trustStore.updateLastSeen(existingPeer.deviceId)
                     val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
                     if (activePeers.none { it.deviceId == cp.deviceId }) activePeers.add(cp)

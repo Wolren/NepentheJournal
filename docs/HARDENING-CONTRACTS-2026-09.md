@@ -212,7 +212,13 @@ number of conflicted notes.
    (`allSucceeded` / `advanceCursorIfAllSucceeded`, `SyncChunking.kt:122/:130`).
    On ANY failure (transport error, `success = false`, decode failure, zero
    acks) the cursor stays at its previous value; the next cycle resends from
-   there.
+   there. The SAME hold rule covers the pull half: the cycle cursor may only
+   move through `cursorAfterCycle(previous, cycleStart, acks, drainComplete)`
+   (`SyncChunking.kt`), and `drainComplete` is false whenever the paginated
+   pull did not reach an untruncated page. An incomplete drain therefore
+   keeps the old cursor instead of skipping whatever never arrived (an
+   advance to `cycleStart` would make those rows invisible to every later
+   cycle while the process lives).
 4. Cursor VALUE for a push cycle: the wall-clock instant captured BEFORE the
    batch was built (`cycleStart`, taken immediately before
    `buildSyncBatch`/`pushChanges` enters), NOT `currentTimeMillis()` at or
@@ -230,11 +236,25 @@ number of conflicted notes.
      the applied payload's `maxUpdatedAt` at most, never by the local clock.
    - `IosSyncTransport.kt:199` `_status.update { it.copy(lastSyncAt = currentTimeMillis()) }`
      after the whole sync (audit C2): banned outright.
-5. Pull pagination drains while `truncated == true`, following the server's
-   low-water `nextSince` (falling back to `maxUpdatedAt` only when the server
-   is old and sent `nextSince = 0`), stopping when `next <= cursor`. Existing
-   drains (`KtorSyncClient.applyAndDrain` :141-161 and `IosSyncTransport.kt`
-   :183-196) already follow this; do not regress it. Bounded pages (20) stay.
+5. Pull pagination drains while `truncated == true` following the server's
+   COMPOSITE low-water cut `(nextSince, nextSinceId)` — the pair that walks
+   inside a group of tied timestamps. A timestamp alone cannot: the bundled
+   seed's 2015 interactions all share one `updatedAt`, so the old
+   `updatedAt > since` filter re-served page one and silently dropped every
+   row past the cut. The resume rule is `isAfterPullCursor(updatedAt, id,
+   since, sinceId)` (`SyncContract.kt`): with an `sinceId` half it is
+   strictly-after in `(updatedAt, id)` order; with a blank `sinceId` (wall-
+   clock cursor, or an old server) it is inclusive `updatedAt >= since`, so
+   a row stamped in the cursor's own millisecond is re-served rather than
+   skipped. Falling back to `maxUpdatedAt` only applies when an old server
+   sends `nextSince = 0`; a cursor that cannot advance STOPS the drain
+   (`complete = false`) instead of looping. Drains
+   (`KtorSyncClient.drainPullPages` and `IosSyncTransport.syncWith`) must
+   report completion; the bound is 200 pages (~100k rows of one collection)
+   and exists only to bound a hostile peer — hitting it is not a loss path,
+   because incomplete means the cursor is held. Wire-compatible both ways:
+   `SyncResponse.nextSinceId` defaults to `""` (old peers decode it blank
+   and keep their timestamp-only behaviour; old servers never send it).
 6. `lastSyncTime`/`lastSyncAt` is per device and persists across cycles; it
    is never reset to "now" on failure.
 
@@ -246,7 +266,11 @@ which currently builds ONE un-chunked batch at :166-192 and is audit C1;
 **Test obligation (TEST agent):** end-to-end integration pushing a batch with
 2015 interactions (the bundled seed) through a real server: all slices
 accepted, cursor advanced once, and a forced failure in slice k leaves the
-cursor at the pre-cycle value.
+cursor at the pre-cycle value. Plus the mirror pull obligation: a fresh
+client pulling from cursor 0 against a host holding 2015 interactions that
+share ONE `updatedAt` receives all 2015 rows and reports
+`drainComplete = true` (`KtorSyncServerIntegrationTest`), and a drained
+cut is always resumed with its `nextSinceId` half.
 
 ---
 
