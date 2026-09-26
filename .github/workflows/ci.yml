@@ -152,10 +152,16 @@ jobs:
       # successful pipe masks xcodebuild failures. No -destination: simulator
       # device names drift with runner image updates; -sdk alone selects the
       # simulator.
+      # ARCHS override: the simulator platform's standard archs are
+      # "arm64 x86_64", and KMP's embedAndSignAppleFrameworkForXcode rejects
+      # x86_64 outright ("Unknown iOS simulator arch"). Kotlin/Native no
+      # longer targets the x86_64 simulator and the runner is Apple Silicon,
+      # so an arm64-only build is the correct and only option.
       - name: Verify Xcode project builds
         run: |
           cd iosApp
           xcodebuild -project iosApp.xcodeproj \
             -scheme "Nepenthe Journal" \
             -sdk iphonesimulator \
+            ARCHS=arm64 \
             build
