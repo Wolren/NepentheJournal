@@ -18,7 +18,9 @@ data class SubstanceColor(
     val light: Color,
     val dark: Color
 ) {
-    @Composable
+    // Deliberately NOT @Composable: reads only its own immutable fields, and
+    // must stay callable from draw scopes (Canvas lambdas), which are not
+    // composable contexts.
     fun getComposeColor(isDark: Boolean): Color = if (isDark) dark else light
 }
 
