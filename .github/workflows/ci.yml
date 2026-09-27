@@ -114,12 +114,11 @@ jobs:
           path: composeApp/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-  # iOS links only on macOS runners; the Kotlin 2.4.0 objc-interop state
-  # (README: Protocol type in kotlinx.cinterop) cannot be verified from a
-  # Windows host, so the job runs on demand until proven green. Switch the
-  # guard to push once a dispatch run passes.
+  # iOS links only on macOS runners and cannot be verified from a Windows
+  # host. Proven green on dispatch run 36260198315 (Kotlin 2.4.20, Xcode
+  # project verified), so the job now runs on every push/PR like the rest
+  # of CI. macOS runners are free for public repos.
   ios-build:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
