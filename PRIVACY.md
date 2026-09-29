@@ -1,6 +1,6 @@
 # Nepenthe Journal - Privacy Policy
 
-**Last updated:** 2026-07-10
+**Last updated:** 2026-09-29
 
 ## Summary
 
@@ -75,4 +75,4 @@ All functionality is and will always be free. This is a firm commitment, not a c
 ## Contact
 
 For questions about this privacy policy, open an issue at:
-https://github.com/Wolren/nepenthe-journal
+https://github.com/Wolren/NepentheJournal/issues

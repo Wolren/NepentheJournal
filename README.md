@@ -30,8 +30,8 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 
 ## Features
 
-- [x] **DoseWiki reference catalog (primary data source):** 577 substances with dosage by route, duration stages, interaction charts, pharmacology, and subjective-effect profiles — bundled offline as CC0 open data
-- [x] **One merged offline catalog:** DoseWiki records plus a PsychonautWiki-derived ETL seed (325 substances) are reconciled into a single catalog at startup — no reference API is ever called at runtime
+- [x] **DoseWiki reference catalog (primary data source):** 577 substances with dosage by route, duration stages, interaction charts, pharmacology, and subjective-effect profiles, bundled offline as CC0 open data
+- [x] **One merged offline catalog:** DoseWiki records plus a PsychonautWiki-derived ETL seed (325 substances) are reconciled into a single catalog at startup. No reference API is ever called at runtime
 - [x] Session tracking with substances, doses, ROAs, check-ins, and timeline events
 - [x] Tolerance dashboard per substance based on last ingestion time and frequency
 - [x] Activity heatmap showing session frequency over time
@@ -50,20 +50,20 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 
 ### Reference Data: DoseWiki (primary)
 
-DoseWiki ([dose.wiki](https://dose.wiki/)) is the app's primary reference source. Its open-data substance index is processed by `scripts/dosewiki_slim.py` into `dosewiki_slim.json` — **577 substances**, every one carrying:
+DoseWiki ([dose.wiki](https://dose.wiki/)) is the app's primary reference source. Its open-data substance index is processed by `scripts/dosewiki_slim.py` into `dosewiki_slim.json`: **577 substances**, every one carrying:
 
-- **Dosage** — dose ranges per route of administration
-- **Duration** — onset / peak / after-effects / total per route
-- **Subjective effects** — notes, sensory, physical, and cognitive facets with attribution
-- **Interactions** — with reasons (interaction risk data retains TripSit's non-commercial attribution)
-- **Pharmacology** — pharmacodynamics, pharmacokinetics, and metabolites
+- **Dosage:** dose ranges per route of administration
+- **Duration:** onset / peak / after-effects / total per route
+- **Subjective effects:** notes, sensory, physical, and cognitive facets with attribution
+- **Interactions:** with reasons (interaction risk data retains TripSit's non-commercial attribution)
+- **Pharmacology:** pharmacodynamics, pharmacokinetics, and metabolites
 - Plus summary, identification, classification, harm potential, legality, tolerance, and citations
 
 The substance prose is released under **CC0 1.0** (see [DoseWiki's license](https://dose.wiki/docs/license)). The source index is fetched from https://dose.wiki/open-data/SubstanceIndex.json with a GitHub mirror fallback, and cached at `scripts/cache/SubstanceIndex.json`.
 
 What the app builds from it:
 
-- `DoseWikiIngestor` (commonMain) ingests the slim JSON into the **effects store** and builds each substance's **duration profile** — which powers the dose-duration curves and the session effect timeline
+- `DoseWikiIngestor` (commonMain) ingests the slim JSON into the **effects store** and builds each substance's **duration profile**, which powers the dose-duration curves and the session effect timeline
 - The **substance catalog**: search, category chips from a 13-entry curated taxonomy (`DosewikiTaxonomy.kt`, `/dosewiki_taxonomy.json`), and detail screens showing dosage, duration, and effects
 - **Trip-report export** in the DoseWiki trip-report format (`export/DoseWikiTripReport.kt`, with consent/age/size validation)
 
@@ -245,11 +245,11 @@ Enable test data via any of:
 | Workflow | Trigger | Purpose | Status |
 |----------|---------|---------|--------|
 | CI | Push/PR to master | Verify seed hashes, compile Desktop + Android, run tests, build APK | Desktop + Android |
-| CI (iOS) | Manual (`workflow_dispatch`) | Compile the iOS Kotlin framework (simulator + device) and verify the Xcode project on macOS | On demand until proven green |
+| CI (iOS) | Push/PR to master | Compile the iOS Kotlin framework (simulator + device) and verify the Xcode project on macOS | Pass |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
-> **iOS status:** the iOS job runs on a macOS runner, compiles the Kotlin framework for both simulator and device, then builds the Xcode project. It is gated to manual dispatch until it is reliably green; see the [Actions tab](../../actions) for current results.
+> **iOS status:** the iOS job runs on a macOS runner, compiles the Kotlin framework for both simulator and device, then builds the Xcode project. It runs on every push and pull request; see the [Actions tab](../../actions) for current results.
 
 ---
 
@@ -270,6 +270,12 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before openin
 
 ---
 
+## Privacy
+
+Nepenthe Journal does not collect, transmit, or sell any personal information. No accounts, no analytics, no telemetry, no servers. Read the full [privacy policy](https://wolren.github.io/NepentheJournal/privacy.html).
+
+---
+
 ## License
 
 Code: GNU General Public License v3.0. See [LICENSE](LICENSE).
@@ -278,7 +284,7 @@ Bundled reference data has its own terms (see [NOTICE](NOTICE)): DoseWiki substa
 
 ## Acknowledgments
 
-- **DoseWiki** ([dose.wiki](https://dose.wiki/)): the primary reference source — dosage, duration, interactions, pharmacology, and subjective effects for 577 substances, released as CC0 open data.
+- **DoseWiki** ([dose.wiki](https://dose.wiki/)): the primary reference source: dosage, duration, interactions, pharmacology, and subjective effects for 577 substances, released as CC0 open data.
 - **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)): this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
 - **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)): public substance reference data accessed via their Semantic MediaWiki API and bundled as seed data.
 - **TripSit** ([tripsit.me](https://tripsit.me)): combination interaction and risk-assessment data.

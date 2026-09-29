@@ -13,4 +13,6 @@ Features:
 
 Important: this app is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Information is provided for harm reduction and educational purposes only. Always consult a qualified healthcare professional for medical advice.
 
+Privacy policy: https://wolren.github.io/NepentheJournal/privacy.html
+
 License: GPL-3.0
