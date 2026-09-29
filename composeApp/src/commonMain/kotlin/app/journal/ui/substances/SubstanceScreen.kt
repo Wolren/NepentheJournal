@@ -52,6 +52,13 @@ fun SubstanceScreen(
     val activeBroad by viewModel.activeBroad.collectAsState()
     val activeSpecifics by viewModel.activeSpecifics.collectAsState()
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    // Whether the nested specifics pane is open. Deliberately separate from
+    // the selection: checking a broad must not drag the nested list open, the
+    // arrow is the only thing that may open it, and it never outlives the menu.
+    var showSpecifics by remember { mutableStateOf(false) }
+    LaunchedEffect(categoryDropdownExpanded) {
+        if (!categoryDropdownExpanded) showSpecifics = false
+    }
     val scrollState = rememberLazyListState()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -128,6 +135,8 @@ fun SubstanceScreen(
                                             Text("${broad.label} (${broad.count})",
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                         },
+                                        // Selecting only: the nested pane opens from
+                                        // its arrow, never from the row itself.
                                         onClick = {
                                             viewModel.selectBroad(if (isSelected) null else broad.id)
                                         },
@@ -138,11 +147,24 @@ fun SubstanceScreen(
                                             )
                                         },
                                         trailingIcon = {
-                                            Icon(
-                                                Icons.Default.KeyboardArrowRight,
-                                                contentDescription = "Show specifics",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    if (!isSelected) {
+                                                        // The pane lists the active broad's
+                                                        // specifics, so open it on this one.
+                                                        viewModel.selectBroad(broad.id)
+                                                        showSpecifics = true
+                                                    } else {
+                                                        showSpecifics = !showSpecifics
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.KeyboardArrowRight,
+                                                    contentDescription = "Show specifics",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
                                         },
                                     )
                                 }
@@ -179,7 +201,7 @@ fun SubstanceScreen(
                     if (wideMenu) {
                         Row {
                             BroadPane()
-                            if (activeBroad != null) {
+                            if (activeBroad != null && showSpecifics) {
                                 VerticalDivider()
                                 SpecificPane()
                             }
@@ -187,7 +209,7 @@ fun SubstanceScreen(
                     } else {
                         Column {
                             BroadPane()
-                            if (activeBroad != null) {
+                            if (activeBroad != null && showSpecifics) {
                                 HorizontalDivider()
                                 SpecificPane()
                             }
@@ -198,46 +220,36 @@ fun SubstanceScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Results list
-            if (results.isEmpty() && query.isNotEmpty()) {
+            // Results list. The empty screen is held back the same way as on
+            // the sessions tab: the results flow emits an empty first frame
+            // on entry, which used to flash "No substances in database" before
+            // real results arrived.
+            if (results.isEmpty()) {
+                val showEmptyState = rememberEmptyStateVisible(isEmpty = results.isEmpty())
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Science, null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(48.dp))
-                        Text(
-                            text = "No substances match \"$query\"",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        AppOutlinedButton(onClick = onNewSubstance) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add custom substance")
-                        }
-                    }
-                }
-            } else if (results.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Science, null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(48.dp))
-                        Text("No substances in database",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        AppOutlinedButton(onClick = onNewSubstance) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add custom substance")
+                    if (showEmptyState) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Science, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(48.dp))
+                            Text(
+                                text = if (query.isNotEmpty()) {
+                                    "No substances match \"$query\""
+                                } else {
+                                    "No substances in database"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            AppOutlinedButton(onClick = onNewSubstance) {
+                                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Add custom substance")
+                            }
                         }
                     }
                 }

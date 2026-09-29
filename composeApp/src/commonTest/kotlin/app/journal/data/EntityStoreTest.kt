@@ -137,20 +137,28 @@ class EntityStoreTest {
                 }
             }
         }
-        // Relaxed concurrency check: EntityStore is NOT thread-safe for concurrent put,
-        // but should not throw or corrupt internal state under concurrent access.
         threads.forEach { it.start() }
         threads.forEach { it.join() }
-        // EntityStore is NOT thread-safe for concurrent writes.
-        // This test verifies that concurrent access doesn't throw or completely corrupt.
-        // We only verify that keys are bounded by the number of threads.
-        assertTrue(store.size in 1..4, "EntityStore should have 1-4 unique keys after 4 concurrent writers")
+
+        // Every EntityStore operation takes the store lock (see the class docs:
+        // the old unsynchronized map could lose entries under concurrent resize,
+        // which is exactly what the lock was added to prevent). So nothing here
+        // gets a range or a null guard: all four keys must survive, and each must
+        // hold the final write of its own writer. Key e:$i is written by thread i
+        // only, so j = 99 is deterministic, not "whatever was left behind".
+        assertEquals(4, store.size, "no key may be lost to concurrent put")
         for (i in 0 until 4) {
-            val entity = store.get("e:$i")
-            if (entity != null) {
-                assertTrue(entity.value >= 0, "entity e:$i should have non-negative value")
-            }
+            val entity = assertNotNull(store.get("e:$i"), "key e:$i must survive its 100 writes")
+            assertEquals("e:$i", entity.id, "entry stored under e:$i must carry that same id")
+            assertEquals("Entity-$i-99", entity.name, "e:$i must hold thread $i's last write")
+            assertEquals(i * 99, entity.value, "e:$i's value must belong to the write its name describes")
         }
+        assertEquals(4, store.flow.value.size, "the emitted snapshot must match the store")
+        assertEquals(
+            setOf("e:0", "e:1", "e:2", "e:3"),
+            store.all.map { it.id }.toSet(),
+            "the snapshot must expose exactly the written keys"
+        )
     }
 
     @Test

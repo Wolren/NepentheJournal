@@ -3,6 +3,7 @@ package app.journal.ui
 import app.journal.data.JournalRepository
 import app.journal.model.Session
 import app.journal.sync.SyncTransport
+import app.journal.ui.components.EMPTY_STATE_DELAY_MS
 import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
@@ -51,6 +52,12 @@ class ComposeScreenSmokeTest {
                     viewModel = SessionListViewModel(repo)
                 )
             }
+            waitForIdle()
+
+            // The count row and the empty state are held back until emptiness
+            // proves itself (an empty repository's first frame looks exactly
+            // like a tab that hasn't emitted yet), so step past the gate.
+            mainClock.advanceTimeBy(EMPTY_STATE_DELAY_MS + 100)
             waitForIdle()
 
             // Search bar structure: substance filter icon lives in its trailing slot.
