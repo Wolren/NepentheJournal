@@ -14,9 +14,9 @@ buildscript {
                 "org.bitbucket.b_c:jose4j:0.9.6",
                 // AGP tooling ships Bouncy Castle 1.79 / commons-lang3 3.16 on the
                 // plugin classpath; the subprojects block below cannot reach it
-                "org.bouncycastle:bcprov-jdk18on:1.85",
-                "org.bouncycastle:bcpkix-jdk18on:1.85",
-                "org.bouncycastle:bcutil-jdk18on:1.85",
+                "org.bouncycastle:bcprov-jdk18on:1.86",
+                "org.bouncycastle:bcpkix-jdk18on:1.86",
+                "org.bouncycastle:bcutil-jdk18on:1.86",
                 "org.apache.commons:commons-lang3:3.20.0"
             )
         }
@@ -41,9 +41,9 @@ subprojects {
                 "io.netty:netty-handler-proxy:4.2.18.Final",
                 "io.netty:netty-codec-socks:4.2.18.Final",
                 // Bouncy Castle - GOST CTR keystream reuse (critical), broken algorithm
-                "org.bouncycastle:bcprov-jdk18on:1.85",
-                "org.bouncycastle:bcpkix-jdk18on:1.85",
-                "org.bouncycastle:bcutil-jdk18on:1.85",
+                "org.bouncycastle:bcprov-jdk18on:1.86",
+                "org.bouncycastle:bcpkix-jdk18on:1.86",
+                "org.bouncycastle:bcutil-jdk18on:1.86",
                 // Apache HTTP Components - XSS in HttpClient
                 "org.apache.httpcomponents:httpclient:4.5.14",
                 "org.apache.httpcomponents:httpmime:4.5.14",
