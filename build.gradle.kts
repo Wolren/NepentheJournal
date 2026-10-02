@@ -11,7 +11,7 @@ buildscript {
         resolutionStrategy {
             force(
                 "org.jdom:jdom2:2.0.6.1",
-                "org.bitbucket.b_c:jose4j:0.9.6",
+                "org.bitbucket.b_c:jose4j:0.9.7",
                 // AGP tooling ships Bouncy Castle 1.79 / commons-lang3 3.16 on the
                 // plugin classpath; the subprojects block below cannot reach it
                 "org.bouncycastle:bcprov-jdk18on:1.85",
