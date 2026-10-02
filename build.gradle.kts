@@ -56,7 +56,7 @@ subprojects {
                 "org.apache.httpcomponents.core5:httpcore5:5.4.3",
                 "org.apache.httpcomponents.core5:httpcore5-h2:5.4.3",
                 // OpenTelemetry - unbounded baggage allocation (Kotlin SwiftExport worker)
-                "io.opentelemetry:opentelemetry-api:1.62.0"
+                "io.opentelemetry:opentelemetry-api:1.66.0"
             )
         }
     }
