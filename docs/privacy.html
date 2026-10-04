@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy - Nepenthe Journal</title>
+<meta name="description" content="Nepenthe Journal privacy policy: offline-first, no accounts, no analytics, no telemetry.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fafaf8;
+    --fg: #1b1a17;
+    --muted: #5f5b54;
+    --rule: #e4e1da;
+    --card: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151412;
+      --fg: #e8e6e1;
+      --muted: #a19c93;
+      --rule: #2b2926;
+      --card: #1c1b18;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 46rem; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+  h1 { font-size: 1.7rem; line-height: 1.25; margin: 0 0 0.4rem; }
+  .updated { color: var(--muted); font-size: 0.9rem; margin: 0 0 2.2rem; }
+  h2 { font-size: 1.15rem; margin: 2.3rem 0 0.6rem; }
+  p { margin: 0.6rem 0; }
+  ul { margin: 0.6rem 0; padding-left: 1.3rem; }
+  li { margin: 0.35rem 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.95rem; }
+  th, td { text-align: left; border-bottom: 1px solid var(--rule); padding: 0.5rem 0.75rem 0.5rem 0; vertical-align: top; }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9em; }
+  .callout {
+    border-left: 3px solid var(--muted);
+    background: var(--card);
+    padding: 0.75rem 1rem;
+    margin: 0.9rem 0;
+  }
+  a { color: inherit; text-underline-offset: 2px; }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+<h1>Nepenthe Journal Privacy Policy</h1>
+<p class="updated">Last updated: 2026-09-29</p>
+
+<h2>Summary</h2>
+<p>Nepenthe Journal is an offline-first journal app. Your data stays on your device. We do not collect, transmit, or sell any personal information.</p>
+
+<h2>What data the app stores</h2>
+<ul>
+  <li><strong>Journal entries</strong>: session logs you create, including substance names, doses, routes of administration, timestamps, notes, and ratings</li>
+  <li><strong>Substance reference data</strong>: bundled seed files built from public sources (PsychonautWiki via Semantic MediaWiki <code>action=ask</code>, DoseWiki CC0 slim pack, PDSP/BindingDB/ChEMBL/IUPHAR pharmacology data), cached locally</li>
+  <li><strong>Custom substances</strong>: any substances you create and add to your personal library</li>
+  <li><strong>Theme preferences</strong>: your color scheme and display settings</li>
+  <li><strong>Sync configuration</strong>: network settings for optional P2P sync (see below)</li>
+</ul>
+
+<h2>Where data is stored</h2>
+<p>All journal data is stored <strong>locally on your device</strong> in the app's private data directory. There is no connected server. Nothing is uploaded, synced, or sent without your explicit action.</p>
+<p>You can manually export your full journal data at any time via <strong>Settings &gt; Data</strong> (JSON, CSV, or ZIP). Sharing those exports is entirely at your discretion. Nothing leaves your device until you explicitly choose to export and share it.</p>
+
+<h2>P2P sync (optional)</h2>
+<p>If you enable Device Sync, your journal data is transmitted <strong>directly between your own devices over your local network (LAN)</strong>. This uses:</p>
+<ul>
+  <li>mDNS/DNS-SD (JmDNS) for peer discovery on the local network</li>
+  <li>Ktor HTTP server/client for encrypted data transfer between devices</li>
+</ul>
+<p><strong>No data passes through any external relay, cloud server, or third-party service.</strong> Sync is entirely peer-to-peer and limited to your local network. You control when sync is active and which devices participate.</p>
+
+<h2>No analytics, no tracking</h2>
+<p>The app contains <strong>no analytics SDKs, no telemetry, no crash reporting, and no advertising</strong>. No data about your usage, device, or journal entries is sent anywhere.</p>
+
+<h2>Permissions</h2>
+<p>The app requests the following Android permissions only when needed for optional features:</p>
+<table>
+  <thead>
+    <tr><th>Permission</th><th>Purpose</th><th>Required?</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>INTERNET</code></td><td>P2P sync between your devices over LAN</td><td>Yes, for sync</td></tr>
+    <tr><td><code>ACCESS_WIFI_STATE</code></td><td>Discover other devices for P2P sync</td><td>Yes, for sync</td></tr>
+    <tr><td><code>CHANGE_WIFI_MULTICAST_STATE</code></td><td>mDNS discovery for P2P sync</td><td>Yes, for sync</td></tr>
+    <tr><td><code>ACCESS_NETWORK_STATE</code></td><td>Check network availability for sync</td><td>Yes, for sync</td></tr>
+  </tbody>
+</table>
+<p>These permissions are never used to transmit data to third parties.</p>
+
+<h2>Data portability and deletion</h2>
+<p>You can export all your journal data as a JSON file from <strong>Settings &gt; Data &gt; Export</strong>. You can delete individual entries or all data at any time. Since all data is local, deleting the app removes all associated data from your device.</p>
+
+<h2>Children's privacy</h2>
+<p>This app is not intended for users under 18 years of age. The app references psychoactive substances and is designed for adult personal record-keeping and harm reduction purposes only.</p>
+
+<h2>Medical disclaimer</h2>
+<div class="callout"><strong>This app is not a medical device and does not diagnose, treat, cure, or prevent any medical condition.</strong></div>
+<p>The bundled substance reference data (see above) is provided for harm reduction and informational purposes only. The optional FDA drug-label card fetches live data from api.fda.gov when opened and needs network access. Always consult a qualified healthcare professional for medical advice.</p>
+
+<h2>Changes to this policy</h2>
+<p>If this privacy policy changes, the "Last updated" date at the top will be revised. Since the app does not phone home, you will see updated policies when you visit this URL.</p>
+
+<h2>Business model pledge</h2>
+<p>This app will <strong>never</strong> include:</p>
+<ul>
+  <li>Advertisements of any kind</li>
+  <li>Subscription tiers or paid features</li>
+  <li>Telemetry, analytics, or crash reporting</li>
+  <li>Account requirements or cloud dependency</li>
+</ul>
+<p>All functionality is and will always be free. This is a firm commitment, not a current-state description.</p>
+
+<h2>Contact</h2>
+<p>For questions about this privacy policy, open an issue at <a href="https://github.com/Wolren/NepentheJournal/issues">github.com/Wolren/NepentheJournal/issues</a>.</p>
+
+<footer>
+  <p><a href="https://github.com/Wolren/NepentheJournal">Nepenthe Journal</a> is free software, licensed GPLv3.</p>
+</footer>
+</main>
+</body>
+</html>

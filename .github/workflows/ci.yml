@@ -108,19 +108,25 @@ jobs:
             --no-daemon
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nepenthe-debug-apk
           path: composeApp/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-  # iOS links only on macOS runners and cannot be verified from this Windows
-  # host, so the job stays on demand until a dispatch run is green end to end.
+  # iOS links only on macOS runners and cannot be verified from a Windows
+  # host. Runs on every push/PR like the rest of CI; macOS runners are free
+  # for public repos.
+  #
+  # This job RUNS the iOS tests (iosSimulatorArm64Test) rather than only
+  # linking them. The earlier "proven green" claim covered linkDebugFramework*
+  # + xcodebuild only, so no test in iosTest/commonTest had ever executed on
+  # iOS; actually running them is what surfaced the three failures below.
+  #
   # Known blocker (YouTrack CMP-10179): Compose 1.11's prebuilt ui-uikit cache
-  # references UIViewLayoutRegion, iOS 26 SDK only, so this job pins Xcode 26.
-  # Switch the guard to push once a dispatch run passes.
+  # references UIViewLayoutRegion, an iOS 26 SDK symbol, so this job pins
+  # Xcode 26 instead of the image default (16.4 / iOS 18.5 SDK).
   ios-build:
-    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -190,19 +196,25 @@ jobs:
       # successful pipe masks xcodebuild failures. No -destination: simulator
       # device names drift with runner image updates; -sdk alone selects the
       # simulator.
+      # ARCHS override: the simulator platform's standard archs are
+      # "arm64 x86_64", and KMP's embedAndSignAppleFrameworkForXcode rejects
+      # x86_64 outright ("Unknown iOS simulator arch"). Kotlin/Native no
+      # longer targets the x86_64 simulator and the runner is Apple Silicon,
+      # so an arm64-only build is the correct and only option.
       - name: Verify Xcode project builds
         run: |
           cd iosApp
           xcodebuild -project iosApp.xcodeproj \
             -scheme "Nepenthe Journal" \
             -sdk iphonesimulator \
+            ARCHS=arm64 \
             build
 
       # if: always() so a failed xcodebuild step above does not silently skip
       # the test report; the XML is what tells you WHICH test failed.
       - name: Upload iOS test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-test-results
           path: composeApp/build/test-results/
