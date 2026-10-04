@@ -114,10 +114,11 @@ jobs:
           path: composeApp/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-  # iOS links only on macOS runners; the Kotlin 2.4.0 objc-interop state
-  # (README: Protocol type in kotlinx.cinterop) cannot be verified from a
-  # Windows host, so the job runs on demand until proven green. Switch the
-  # guard to push once a dispatch run passes.
+  # iOS links only on macOS runners and cannot be verified from this Windows
+  # host, so the job stays on demand until a dispatch run is green end to end.
+  # Known blocker (YouTrack CMP-10179): Compose 1.11's prebuilt ui-uikit cache
+  # references UIViewLayoutRegion, iOS 26 SDK only, so this job pins Xcode 26.
+  # Switch the guard to push once a dispatch run passes.
   ios-build:
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
@@ -133,6 +134,28 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
+
+      # Compose Multiplatform 1.11 ships a PREBUILT ui-uikit klib cache whose
+      # CMPLayoutRegion.o references _OBJC_CLASS_$_UIViewLayoutRegion. UIKit
+      # only declares that class in the iOS 26 SDK (YouTrack CMP-10179). The
+      # macos-15 image defaults to Xcode 16.4 (iOS 18.5 SDK), so
+      # linkDebugTestIosSimulatorArm64 dies with "Undefined symbols for
+      # architecture arm64" while the production framework links fine against
+      # the same SDK. Pin Xcode 26 so UIKit provides the symbol.
+      # Fails loudly if the image ever drops Xcode 26: silently falling back
+      # to the default would burn a full ~25min run to hit the same error.
+      - name: Pin Xcode 26 (iOS 26 SDK)
+        run: |
+          XCODE=/Applications/Xcode_26.2.app
+          if [ ! -d "$XCODE" ]; then
+            echo "::error::Missing $XCODE, so the iOS 26 SDK is unavailable. Installed:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          echo "simulator SDK: $(xcrun --sdk iphonesimulator --show-sdk-path)"
+          echo "simulator SDK version: $(xcrun --sdk iphonesimulator --show-sdk-version)"
 
       - name: Probe iOS SDK for SecKeyCopyKeyExchangeResult
         run: |
