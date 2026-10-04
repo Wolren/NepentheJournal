@@ -174,12 +174,21 @@ APK lands at `composeApp/build/outputs/apk/debug/`. Side-load to device over WiF
 ./gradlew composeApp:compileKotlinDesktop
 ./gradlew composeApp:compileDebugKotlinAndroid -x checkDebugAarMetadata
 
-# Run all tests (convenience script)
-bash scripts/run-tests.sh --all
-
-# Run only fast unit tests
+# Run the whole desktopTest suite (same thing CI runs; no --tests filters, audit C6)
 bash scripts/run-tests.sh
+
+# List every test file across all source sets
+bash scripts/run-tests.sh --list
 ```
+
+Two end-to-end suites guard the two ways a journal app silently loses user data — a bad first launch and a bad sync. Both run real sockets against a real Ktor server on `127.0.0.1`, so they exercise the production code path rather than a stub:
+
+| Suite | Asserts |
+|-------|---------|
+| `FirstLaunchE2ETest` | Cold start on an empty home seeds the library and writes a versioned store; a second launch reads from disk and skips re-ingest without reverting user edits; data applied from a peer is on disk **before** the ack and survives a restart; a live timer left behind by a crashed launch is aborted on the next start. |
+| `SyncContentFidelityE2ETest` | Every synced entity type crosses the wire field-for-field; offline edits on both sides converge and stay converged; deletes propagate both directions without resurrecting; divergent note edits keep both bodies and surface a pending conflict. |
+
+Both live in `desktopTest`, so they run on desktop and are not exercised on iOS or Android.
 
 ### Test Data
 
@@ -206,23 +215,24 @@ Enable test data via any of:
 | Service Discovery | JmDNS 3.6.3 |
 | Settings | multiplatform-settings 1.3.0 |
 | Thread Safety | PlatformLock (expect/actual: synchronized on JVM, NSLock on iOS) |
-| Test | kotlin.test (31 test files, 424 test methods) |
+| Test | kotlin.test (68 test files, 667 test methods) |
 
 ## CI/CD
 
 | Workflow | Trigger | Purpose | Status |
 |----------|---------|---------|--------|
 | CI | Push/PR to master | Compile Desktop + Android, verify seed hashes, run tests, build APK | Desktop + Android |
+| iOS | Manual (`workflow_dispatch` only) | Compile iOS frameworks (simulator + device), run `iosSimulatorArm64Test`, build the Xcode project | macOS 15 |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
-> **iOS build:** not currently passing on CI. The iOS target is scaffolded with full expect/actual coverage and Compose Multiplatform setup, but requires a macOS build machine with Xcode. The Kotlin 2.4.0 ObjC interop layer has a known issue with the `Protocol` type in `kotlinx.cinterop` that affects generated ObjC protocol delegate bindings. Fixing this requires either a macOS environment or a downstream Kotlin patch.
+> **iOS is the least-verified target.** Both iOS framework compiles (simulator and device) pass on CI, so the Kotlin 2.4.0 `kotlinx.cinterop` `Protocol` issue this section previously blamed does **not** block the build. What was actually blocking was the test step: `iosSimulatorArm64Test` had never been invoked by any workflow, and its first run failed on a Gradle resource merge — a test fixture published at the same path as the production `dosewiki_slim.json`, which the native test resource copy cannot deduplicate. That is fixed, but iOS stays unverified until `iosSimulatorArm64Test` has a green run and the job moves off `workflow_dispatch`.
 
 ---
 
 ## Limitations
 
-- **Desktop is the primary target.** Android builds but requires manual side-loading. iOS is scaffolded but blocked by a Kotlin 2.4.0 interop issue on CI.
+- **Desktop is the only runtime-tested target.** Both iOS and Android compile in CI, but neither has meaningful runtime coverage: `iosTest` is two smoke assertions on a manually-triggered macOS job, and there is no Android instrumentation source set (`composeApp/src/androidTest/` does not exist) nor an emulator AVD configured. Android also requires manual side-loading.
 - **LAN-only sync.** P2P sync works between devices on the same local network. No remote relay or cloud tunnel.
 - **Single-user.** The app has no multi-account or profile system. All data belongs to one user per install.
 - **No encryption at rest.** Journal data is stored as a JSON file on disk. No built-in encryption layer.
