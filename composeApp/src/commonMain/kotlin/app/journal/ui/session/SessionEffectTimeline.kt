@@ -39,8 +39,8 @@ import app.journal.util.parseDurationProfile
 
 /**
  * "Effect timeline" section of a session card: area curves of intensity over
- * the session window with a marker on every dose, plus an hour axis on both
- * the top and the bottom like the reference.
+ * the session window with a marker on every dose, plus an hour axis below the
+ * plot that runs from 0h.
  *
  * The curve is what the user logged (timeline events and check-ins) when they
  * exist. When they don't, each substance in the session gets its own curve
@@ -100,9 +100,16 @@ internal fun SessionEffectTimeline(
     val tickStep = remember(spanMs) { axisStepMs(spanMs) }
     val labels = remember(spanMs, tickStep) {
         val out = mutableListOf<TickLabel>()
-        var offset = tickStep
+        // Starts at 0 so the scale reads from the origin rather than from the
+        // first step. TickLabelRow clamps into the row, so a 0-fraction label
+        // sits flush against the left edge instead of half-hanging off it.
+        var offset = 0L
         while (offset < spanMs) {
-            out.add(TickLabel(fraction = offset.toFloat() / spanMs, text = axisLabel(offset)))
+            // axisLabel(0) is "0m", which would contradict the "1h 2h ..." it
+            // sits among on an hour-stepped axis. Match the neighbour's unit:
+            // a step of a full hour or more means the axis reads in hours.
+            val text = if (offset == 0L && tickStep >= 3_600_000L) "0h" else axisLabel(offset)
+            out.add(TickLabel(fraction = offset.toFloat() / spanMs, text = text))
             offset += tickStep
         }
         out
@@ -154,11 +161,6 @@ internal fun SessionEffectTimeline(
             val markerColorOf = doses.associate { it.id to (colorForSubstance[it.substanceId] ?: accent) }
             val layerColors = layers.map { layer ->
                 layer.substanceId?.let { colorForSubstance[it] } ?: accent
-            }
-
-            if (labels.isNotEmpty()) {
-                TickLabelRow(labels)
-                Spacer(Modifier.height(4.dp))
             }
 
             Canvas(
