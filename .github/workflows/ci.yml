@@ -148,6 +148,21 @@ jobs:
         run: |
           ./gradlew :composeApp:linkDebugFrameworkIosArm64 --no-daemon
 
+      # The iosSimulatorArm64Test task existed from the moment the iosTest
+      # source set was wired (build.gradle.kts) but was never invoked by ANY
+      # workflow, so iosTest plus every commonTest class had no iOS run
+      # anywhere. Placed BEFORE the xcodebuild step so a test failure surfaces
+      # on its own instead of being masked by a downstream build failure.
+      # Listed runtimes/devices first: when this task fails the log already
+      # shows what the runner actually had, rather than a bare "no devices".
+      - name: Show simulator runtimes and devices
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+
+      - name: Run iOS simulator tests (commonTest + iosTest)
+        run: ./gradlew :composeApp:iosSimulatorArm64Test --no-daemon
+
       # No xcpretty: not guaranteed on the runner and, without pipefail, a
       # successful pipe masks xcodebuild failures. No -destination: simulator
       # device names drift with runner image updates; -sdk alone selects the
@@ -159,3 +174,14 @@ jobs:
             -scheme "Nepenthe Journal" \
             -sdk iphonesimulator \
             build
+
+      # if: always() so a failed xcodebuild step above does not silently skip
+      # the test report; the XML is what tells you WHICH test failed.
+      - name: Upload iOS test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: composeApp/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
