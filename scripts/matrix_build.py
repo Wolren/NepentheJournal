@@ -99,11 +99,35 @@ MANUAL_CID_OVERRIDES: dict[str, int] = {
     "PCP": 6449,              # Phencyclidine
     "DXM": 5360696,           # Dextromethorphan
     "THC": 16078,             # Tetrahydrocannabinol (delta-9)
-    "LSA": 442075,            # Lysergic acid amide
+    # Was 442075: that CID is an unrelated furan natural product
+    # (C20H22O7, no nitrogen) - wrong join, caught by audit_seed.py.
+    "LSA": 442072,            # Lysergic acid amide (ergine), C16H17N3O
+    # PubChem's name endpoint returns tetrachloroethene (31373, C2Cl4) for
+    # "PCE"; the arylcyclohexylamine PCE is eticyclidine, C14H21N.
+    "PCE": 16622,             # Eticyclidine (N-ethylphencyclidine)
     "GHB": 10413,             # Gamma-Hydroxybutyric acid
     "GBL": 7035,              # Gamma-Butyrolactone
     "Kava": 5281052,          # Kavalactone (yangonin)
     "Salvinorin A": 128563,   # Salvinorin A
+}
+
+# Curated corrections for PsychonautWiki SMW properties that are corrupted
+# at the source (verified against the live smwbrowse API 2026-10-05: the
+# 1,3-Butanediol page returns DMT's Common_name, Chemical_class,
+# Psychoactive_class AND Effect; its name/summary/ROA/doses are its own).
+# Empty lists mean "honest unknown" - the upstream value belongs to a
+# different substance, so dropping it is more truthful than shipping it.
+# Applied in Stage 0 after load, before CID resolution and the TripSit
+# match, so both --input regenerations and fresh dumps get the correction.
+SUBSTANCE_FIELD_OVERRIDES: dict[str, dict[str, Any]] = {
+    "1,3-Butanediol": {
+        "aliases": [],
+        # PW-level Chemical_class + Psychoactive_class, mirroring the
+        # uncontaminated sibling page 1,4-Butanediol
+        # (["Alkanediol, Diol", "Depressant", ...]).
+        "substanceClass": ["Alkanediol, Diol", "Depressant"],
+        "effects": [],
+    },
 }
 
 # Substances that are mixtures/plants/no single CID
@@ -1170,6 +1194,20 @@ def main():
     if args.verbose:
         print(f"[+] Loaded {len(substances_raw)} substances, {len(interactions_raw)} interactions from SMW", file=sys.stderr)
 
+    # --- Stage 0b: Apply curated upstream-data corrections ---
+    for ov_name, fields in SUBSTANCE_FIELD_OVERRIDES.items():
+        sub = next((s for s in substances_raw if s["name"] == ov_name), None)
+        if sub is None:
+            continue
+        for field, value in fields.items():
+            if sub.get(field) != value and args.verbose:
+                print(
+                    f"[*] Field override {ov_name}.{field}: "
+                    f"{sub.get(field)!r} -> {value!r}",
+                    file=sys.stderr,
+                )
+            sub[field] = list(value) if isinstance(value, list) else value
+
     # --- Stage 1: Resolve PubChem CIDs ---
     if args.verbose:
         print("[*] Resolving PubChem CIDs...", file=sys.stderr)
@@ -1188,6 +1226,20 @@ def main():
                 print(f"[*] Loaded {cached}/{len(name_to_cid)} cached CIDs", file=sys.stderr)
         except Exception:
             name_to_cid = {}
+
+    # Manual CID overrides are authoritative even when already cached: a
+    # wrong resolution persists in pubchem_cid_cache.json forever (LSA was
+    # cached as 442075, PCE as tetrachloroethene 31373). Without this the
+    # cache would win over MANUAL_CID_OVERRIDES on every regeneration.
+    for ov_name, ov_cid in MANUAL_CID_OVERRIDES.items():
+        if ov_name in name_to_cid and name_to_cid[ov_name] != ov_cid:
+            if args.verbose:
+                print(
+                    f"[*] CID override {ov_name}: "
+                    f"{name_to_cid[ov_name]} -> {ov_cid}",
+                    file=sys.stderr,
+                )
+            name_to_cid[ov_name] = ov_cid
 
     resolved_count = 0
     missing_names = [s["name"] for s in substances_raw if s["name"] not in name_to_cid]
