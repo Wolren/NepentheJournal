@@ -1,6 +1,6 @@
 # Nepenthe Journal - Privacy Policy
 
-**Last updated:** 2026-09-29
+**Last updated:** 2026-10-05
 
 ## Summary
 
@@ -13,6 +13,7 @@ Nepenthe Journal is an offline-first journal app. Your data stays on your device
 - **Custom substances** - any substances you create and add to your personal library
 - **Theme preferences** - your color scheme and display settings
 - **Sync configuration** - network settings for optional P2P sync (see below)
+- **Crash logs and diagnostics** - a rolling application log (`nepenthe.log`, 5MB per file, up to 10 files) plus crash dumps written locally when an uncaught exception occurs (auto-deleted after 30 days). Stored only in the app's private data directory and never uploaded; they leave the device only if you export them yourself
 
 ## Where data is stored
 
@@ -31,7 +32,9 @@ If you enable Device Sync, your journal data is transmitted **directly between y
 
 ## No analytics, no tracking
 
-The app contains **no analytics SDKs, no telemetry, no crash reporting, and no advertising**. No data about your usage, device, or journal entries is sent anywhere.
+The app contains **no analytics SDKs, no telemetry, no crash-reporting SDK, and no advertising**. No data about your usage, device, or journal entries is sent anywhere.
+
+The app does write diagnostics to your own device: a rolling application log and crash dumps from uncaught exceptions. They are plain files on disk. No crash-reporting service is involved and nothing is uploaded automatically. You can review and export them yourself via **Settings > Developer** (Export logs and crash dumps); sharing that export is entirely at your discretion.
 
 ## Permissions
 
@@ -67,7 +70,7 @@ If this privacy policy changes, the "Last updated" date at the top will be revis
 This app will **never** include:
 - Advertisements of any kind
 - Subscription tiers or paid features
-- Telemetry, analytics, or crash reporting
+- Telemetry, analytics, or crash-reporting services
 - Account requirements or cloud dependency
 
 All functionality is and will always be free. This is a firm commitment, not a current-state description.

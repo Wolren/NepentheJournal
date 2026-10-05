@@ -89,7 +89,7 @@ internal fun PrivacyCardContent(privacyExpanded: Boolean, onToggle: () -> Unit) 
     ) {
         Text("Privacy and data", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
-        SelectableText(text = "All journal data is stored locally on your device. There is no connected server: nothing is uploaded, synced, or sent without your explicit action.\n\nThe app contains no analytics, no telemetry, and no tracking software. No data is collected or transmitted automatically.\n\nYou can manually export your full journal data at any time via \"Settings > Data (JSON, CSV, or ZIP)\". Sharing those exports is entirely at your discretion.\n\nOptional P2P sync transmits data directly between your own devices over your local network only. No data passes through any external relay.\n\nEverything is free, forever: no ads, no subscriptions, no accounts.\n\nFull privacy policy: PRIVACY.md in the app repository.",
+        SelectableText(text = "All journal data is stored locally on your device. There is no connected server: nothing is uploaded, synced, or sent without your explicit action.\n\nThe app contains no analytics, no telemetry, and no tracking software. No data is collected or transmitted automatically.\n\nCrash logs stay local too: the app writes a rolling log and crash dumps on your device, never uploaded, with no crash-reporting service involved. You can export them by hand via \"Settings > Developer\".\n\nYou can manually export your full journal data at any time via \"Settings > Data (JSON, CSV, or ZIP)\". Sharing those exports is entirely at your discretion.\n\nOptional P2P sync transmits data directly between your own devices over your local network only. No data passes through any external relay.\n\nEverything is free, forever: no ads, no subscriptions, no accounts.\n\nFull privacy policy: PRIVACY.md in the app repository.",
             style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant))
     }
 }
@@ -115,12 +115,12 @@ internal fun DeveloperCardContent(vm: app.journal.ui.settings.DataSettingsViewMo
             }
             Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
             Text("Diagnostics", style = MaterialTheme.typography.labelLarge)
-            Text("Export the app's rolling crash log for debugging.",
+            Text("Export the app's rolling logs and crash dumps for debugging.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             AppOutlinedButton(onClick = { vm.exportCrashLogs() }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.BugReport, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp)); Text("Export crash logs")
+                Spacer(Modifier.width(4.dp)); Text("Export logs and crash dumps")
             }
             crashLogStatus?.let { msg ->
                 Spacer(Modifier.height(4.dp))

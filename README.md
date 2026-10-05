@@ -129,7 +129,7 @@ Desktop (the primary target), Android, and iOS share one codebase, with platform
 | Service Discovery | JmDNS 3.6.3 |
 | Settings | multiplatform-settings 1.3.0 |
 | Thread Safety | PlatformLock (expect/actual: synchronized on JVM, NSLock on iOS) |
-| Test | kotlin.test (69 test files, 668 test methods) |
+| Test | kotlin.test (70 test files, 670 test methods) |
 
 ## CI/CD
 
