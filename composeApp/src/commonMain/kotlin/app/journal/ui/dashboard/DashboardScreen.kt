@@ -6,10 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +31,7 @@ import app.journal.ui.dashboard.ActivityHeatmap
 import app.journal.ui.dashboard.SessionsTrendChart
 import app.journal.ui.dashboard.TopSubstancesChart
 import kotlinx.datetime.*
+import app.journal.ui.charts.ChartTheme
 import app.journal.ui.components.*
 import app.journal.ui.theme.isDarkTheme
 
@@ -174,21 +174,25 @@ fun DashboardScreen(
             }
 
             if (toleranceList.isNotEmpty()) {
-                item {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Tolerance Overview", style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold)
-                        Text("based on last ingestions",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Header and cards share one item so the section reads as a block
+                // instead of a loose title floating 12 dp above a card stack.
+                item(key = "tolerance-overview") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Tolerance Overview",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface)
+                            Text("based on last ingestions",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
+                        }
+                        toleranceList.forEach { info -> ToleranceCard(info) }
                     }
-                }
-                itemsIndexed(toleranceList, key = { _, info -> info.substanceId }) { _, info ->
-                    ToleranceCard(info)
                 }
             } else {
                 item {
@@ -276,11 +280,6 @@ private fun ToleranceCard(info: ToleranceInfo) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(Modifier.size(26.dp).background(levelColor.copy(alpha = 0.10f), CircleShape))
-                Surface(modifier = Modifier.width(3.dp).height(36.dp), shape = RoundedCornerShape(1.5.dp), color = levelColor.copy(alpha = 0.85f)) {}
-            }
-            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(info.substanceName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -289,13 +288,40 @@ private fun ToleranceCard(info: ToleranceInfo) {
                 Spacer(Modifier.height(2.dp))
                 Text("Last: ${info.lastDoseAmount} ${info.lastDoseUnit} (${info.lastDoseRoute})",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(timeSinceLabel(info.hoursSinceLastDose, info.daysSinceLastDose),
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
-                    if (info.totalDosesLast30Days > 0) Text("${info.totalDosesLast30Days}x in 30d",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
-                }
+                Spacer(Modifier.height(7.dp))
+                ToleranceMeter(info.level, levelColor)
+                Spacer(Modifier.height(7.dp))
+                Text(timeSinceLabel(info.hoursSinceLastDose, info.daysSinceLastDose),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f))
             }
+        }
+    }
+}
+
+/**
+ * Slim level meter under the dose line: neutral track, level-colored fill sized
+ * by magnitude (NONE -> empty, LOW -> ~1/3, MED -> ~2/3, HIGH -> full).
+ */
+@Composable
+private fun ToleranceMeter(level: ToleranceLevel, color: Color) {
+    val fraction = when (level) {
+        ToleranceLevel.HIGH -> 1f
+        ToleranceLevel.MEDIUM -> 0.67f
+        ToleranceLevel.LOW -> 0.34f
+        ToleranceLevel.NONE -> 0f
+    }
+    Box(
+        Modifier.fillMaxWidth()
+            .height(4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(ChartTheme.trackColor())
+    ) {
+        if (fraction > 0f) {
+            Box(
+                Modifier.fillMaxWidth(fraction)
+                    .height(4.dp)
+                    .background(color.copy(alpha = 0.85f), RoundedCornerShape(2.dp))
+            )
         }
     }
 }

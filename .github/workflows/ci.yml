@@ -115,9 +115,17 @@ jobs:
           retention-days: 7
 
   # iOS links only on macOS runners and cannot be verified from a Windows
-  # host. Proven green on dispatch run 36260198315 (Kotlin 2.4.20, Xcode
-  # project verified), so the job now runs on every push/PR like the rest
-  # of CI. macOS runners are free for public repos.
+  # host. Runs on every push/PR like the rest of CI; macOS runners are free
+  # for public repos.
+  #
+  # This job RUNS the iOS tests (iosSimulatorArm64Test) rather than only
+  # linking them. The earlier "proven green" claim covered linkDebugFramework*
+  # + xcodebuild only, so no test in iosTest/commonTest had ever executed on
+  # iOS; actually running them is what surfaced the three failures below.
+  #
+  # Known blocker (YouTrack CMP-10179): Compose 1.11's prebuilt ui-uikit cache
+  # references UIViewLayoutRegion, an iOS 26 SDK symbol, so this job pins
+  # Xcode 26 instead of the image default (16.4 / iOS 18.5 SDK).
   ios-build:
     runs-on: macos-15
     steps:
@@ -133,6 +141,28 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
+      # Compose Multiplatform 1.11 ships a PREBUILT ui-uikit klib cache whose
+      # CMPLayoutRegion.o references _OBJC_CLASS_$_UIViewLayoutRegion. UIKit
+      # only declares that class in the iOS 26 SDK (YouTrack CMP-10179). The
+      # macos-15 image defaults to Xcode 16.4 (iOS 18.5 SDK), so
+      # linkDebugTestIosSimulatorArm64 dies with "Undefined symbols for
+      # architecture arm64" while the production framework links fine against
+      # the same SDK. Pin Xcode 26 so UIKit provides the symbol.
+      # Fails loudly if the image ever drops Xcode 26: silently falling back
+      # to the default would burn a full ~25min run to hit the same error.
+      - name: Pin Xcode 26 (iOS 26 SDK)
+        run: |
+          XCODE=/Applications/Xcode_26.2.app
+          if [ ! -d "$XCODE" ]; then
+            echo "::error::Missing $XCODE, so the iOS 26 SDK is unavailable. Installed:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          echo "simulator SDK: $(xcrun --sdk iphonesimulator --show-sdk-path)"
+          echo "simulator SDK version: $(xcrun --sdk iphonesimulator --show-sdk-version)"
+
       - name: Probe iOS SDK for SecKeyCopyKeyExchangeResult
         run: |
           SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
@@ -146,6 +176,21 @@ jobs:
       - name: Compile iOS framework (device)
         run: |
           ./gradlew :composeApp:linkDebugFrameworkIosArm64 --no-daemon
+
+      # The iosSimulatorArm64Test task existed from the moment the iosTest
+      # source set was wired (build.gradle.kts) but was never invoked by ANY
+      # workflow, so iosTest plus every commonTest class had no iOS run
+      # anywhere. Placed BEFORE the xcodebuild step so a test failure surfaces
+      # on its own instead of being masked by a downstream build failure.
+      # Listed runtimes/devices first: when this task fails the log already
+      # shows what the runner actually had, rather than a bare "no devices".
+      - name: Show simulator runtimes and devices
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+
+      - name: Run iOS simulator tests (commonTest + iosTest)
+        run: ./gradlew :composeApp:iosSimulatorArm64Test --no-daemon
 
       # No xcpretty: not guaranteed on the runner and, without pipefail, a
       # successful pipe masks xcodebuild failures. No -destination: simulator
@@ -164,3 +209,14 @@ jobs:
             -sdk iphonesimulator \
             ARCHS=arm64 \
             build
+
+      # if: always() so a failed xcodebuild step above does not silently skip
+      # the test report; the XML is what tells you WHICH test failed.
+      - name: Upload iOS test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-test-results
+          path: composeApp/build/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

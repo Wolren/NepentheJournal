@@ -202,14 +202,23 @@ APK lands at `composeApp/build/outputs/apk/debug/`. Side-load to device over WiF
 ./gradlew composeApp:compileKotlinDesktop
 ./gradlew composeApp:compileDebugKotlinAndroid -x checkDebugAarMetadata
 
-# Run all tests (convenience script)
-bash scripts/run-tests.sh --all
-
-# Run only fast unit tests
+# Run the whole desktopTest suite (same thing CI runs; no --tests filters, audit C6)
 bash scripts/run-tests.sh
+
+# List every test file across all source sets
+bash scripts/run-tests.sh --list
 ```
 
 On Windows, run the Gradle tasks directly with `gradlew.bat` (the helper script is bash).
+
+Two end-to-end suites guard the two ways a journal app silently loses user data — a bad first launch and a bad sync. Both run real sockets against a real Ktor server on `127.0.0.1`, so they exercise the production code path rather than a stub:
+
+| Suite | Asserts |
+|-------|---------|
+| `FirstLaunchE2ETest` | Cold start on an empty home seeds the library and writes a versioned store; a second launch reads from disk and skips re-ingest without reverting user edits; data applied from a peer is on disk **before** the ack and survives a restart; a live timer left behind by a crashed launch is aborted on the next start. |
+| `SyncContentFidelityE2ETest` | Every synced entity type crosses the wire field-for-field; offline edits on both sides converge and stay converged; deletes propagate both directions without resurrecting; divergent note edits keep both bodies and surface a pending conflict. |
+
+Both live in `desktopTest`, so they run on desktop and are not exercised on iOS or Android.
 
 ### Test Data
 
@@ -238,24 +247,24 @@ Enable test data via any of:
 | Service Discovery | JmDNS 3.6.3 |
 | Settings | multiplatform-settings 1.3.0 |
 | Thread Safety | PlatformLock (expect/actual: synchronized on JVM, NSLock on iOS) |
-| Test | kotlin.test (59 test files, 610 test methods) |
+| Test | kotlin.test (69 test files, 668 test methods) |
 
 ## CI/CD
 
 | Workflow | Trigger | Purpose | Status |
 |----------|---------|---------|--------|
 | CI | Push/PR to master | Verify seed hashes, compile Desktop + Android, run tests, build APK | Desktop + Android |
-| CI (iOS) | Push/PR to master | Compile the iOS Kotlin framework (simulator + device) and verify the Xcode project on macOS | Pass |
+| CI (iOS) | Push/PR to master | Compile the iOS Kotlin framework (simulator + device), run `iosSimulatorArm64Test`, build the Xcode project | macOS 15 |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
-> **iOS status:** the iOS job runs on a macOS runner, compiles the Kotlin framework for both simulator and device, then builds the Xcode project. It runs on every push and pull request; see the [Actions tab](../../actions) for current results.
+> **iOS now runs its test suite in CI.** Both iOS framework compiles (simulator and device) pass, and `iosSimulatorArm64Test` runs the shared `commonTest` + `iosTest` classes on the simulator. Getting there took four fixes, each for a real defect: a test fixture published at the same resource path as production `dosewiki_slim.json` (the native test resource copy cannot deduplicate), a `java.lang.Thread` reference in `commonTest` that Kotlin/Native does not have, YouTrack CMP-10179 (Compose 1.11's prebuilt ui-uikit cache references `UIViewLayoutRegion`, an iOS 26 SDK symbol the runner's default Xcode 16.4 lacks — fixed by pinning Xcode 26), and a resource lookup that assumed `NSBundle.mainBundle` points at the test bundle: the Kotlin/Native test runner is a plain executable, not an `.xctest` bundle, so `pathForResource` never saw `compose-resources/dosewiki_slim.json` beside the test binary and `DoseWikiLookupTest` failed on its first assertion (run 37230976879: 445/446). `readBundledResource` now falls back to the `compose-resources` directory next to the executable, which leaves real app-bundle lookups unchanged. As of run 37292403525 the suite is green: **446 tests, 0 failures** on the iOS simulator.
 
 ---
 
 ## Limitations
 
-- **Desktop is the primary target.** Android builds but requires manual side-loading. iOS builds require macOS/Xcode, and its CI verification runs on demand.
+- **Android is the only target without runtime coverage.** Desktop runs its full suite in CI and iOS runs `commonTest` + `iosTest` on a simulator (446 tests, green as of run 37292403525), but Android has no instrumentation source set (`composeApp/src/androidTest/` does not exist) and no emulator AVD configured — its unit tests run on the JVM only. Android also requires manual side-loading. The two end-to-end suites above live in `desktopTest`, so neither runs on iOS or Android.
 - **LAN-only sync.** P2P sync works between devices on the same local network. No remote relay or cloud tunnel.
 - **Single-user.** The app has no multi-account or profile system. All data belongs to one user per install.
 - **No encryption at rest.** Journal data is stored as a JSON file on disk. No built-in encryption layer.

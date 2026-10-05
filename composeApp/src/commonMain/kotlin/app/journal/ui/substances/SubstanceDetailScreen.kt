@@ -539,11 +539,7 @@ fun SubstanceDetailScreen(
         // Tolerance timeline
         item {
             if (allDosesForSubstance.isNotEmpty()) {
-                ToleranceTimelineSection(
-                    doses = allDosesForSubstance,
-                    substanceName = substance.name,
-                    isDark = themeManager.isDarkTheme()
-                )
+                ToleranceTimelineSection(doses = allDosesForSubstance)
             }
         }
 

@@ -48,14 +48,12 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     onCycleTimeDisplay: () -> Unit = {}
 ) {
     val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
-    // Doses, events and substances are collected once here and passed down to
+    // Doses and substance names are collected once here and passed down to
     // cards, so no card performs repository lookups of its own.
     val allDoses by repo.doses.collectAsState()
     val allSubstances by repo.substances.collectAsState()
-    val allEvents by repo.timelineEvents.collectAsState()
     val dosesBySession = remember(allDoses) { allDoses.groupBy { it.sessionId } }
-    val eventsBySession = remember(allEvents) { allEvents.groupBy { it.sessionId } }
-    val substancesById = remember(allSubstances) { allSubstances.associateBy { it.id } }
+    val substanceNameMap = remember(allSubstances) { allSubstances.associate { it.id to it.name } }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
     var substanceDropdownExpanded by remember { mutableStateOf(false) }
@@ -150,12 +148,20 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
 
             Spacer(Modifier.height(6.dp))
 
+            // The empty state - and the count that belongs to it - is held
+            // back until emptiness proves itself: the filtered flow emits an
+            // empty first frame on every tab entry, and painting "No sessions
+            // yet" over that frame is what made tab switches flicker.
+            val showEmptyState = rememberEmptyStateVisible(isEmpty = sessions.isEmpty())
+
             // Count row
-            Text(
-                text = "${sessions.size} session${if (sessions.size != 1) "s" else ""}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (sessions.isNotEmpty() || showEmptyState) {
+                Text(
+                    text = "${sessions.size} session${if (sessions.size != 1) "s" else ""}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(Modifier.height(4.dp))
 
@@ -165,27 +171,29 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.MenuBook, null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                            modifier = Modifier.size(48.dp))
-                        Text(
-                            text = when {
-                                searchQuery.isNotBlank() -> "No sessions match \"$searchQuery\""
-                                filterSubstanceIds.isNotEmpty() -> "No sessions with selected substances"
-                                showFavs -> "No favorite sessions"
-                                else -> "No sessions yet"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (searchQuery.isBlank() && filterSubstanceIds.isEmpty() && !showFavs) {
+                    if (showEmptyState) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.MenuBook, null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.size(48.dp))
                             Text(
-                                text = "Tap + to create your first session",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                text = when {
+                                    searchQuery.isNotBlank() -> "No sessions match \"$searchQuery\""
+                                    filterSubstanceIds.isNotEmpty() -> "No sessions with selected substances"
+                                    showFavs -> "No favorite sessions"
+                                    else -> "No sessions yet"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (searchQuery.isBlank() && filterSubstanceIds.isEmpty() && !showFavs) {
+                                Text(
+                                    text = "Tap + to create your first session",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
                         }
                     }
                 }
@@ -200,8 +208,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                             SessionCard(
                                 session = session,
                                 doses = dosesBySession[session.id] ?: emptyList(),
-                                events = eventsBySession[session.id] ?: emptyList(),
-                                substancesById = substancesById,
+                                substanceNameMap = substanceNameMap,
                                 timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
                                 onEdit = { onEditSession(session.id) },

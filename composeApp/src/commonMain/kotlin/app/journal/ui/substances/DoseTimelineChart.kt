@@ -1,39 +1,33 @@
 package app.journal.ui.substances
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.journal.model.Dose
 import app.journal.ui.charts.ChartTheme
+import app.journal.ui.charts.TickLabel
+import app.journal.ui.charts.TickLabelRow
 import app.journal.ui.components.StatItem
-import app.journal.ui.charts.integerFormatter
-import app.journal.ui.charts.themedStartAxis
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.chartSeriesColors
 import app.journal.ui.theme.isDarkTheme
 import app.journal.util.currentTimeMillis
-import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
-import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
-import com.patrykandpatrick.vico.compose.cartesian.data.columnModel
-import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
-import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
-import kotlinx.datetime.*
+import app.journal.util.formatDateShort
+import app.journal.util.formatDoseAmount
 
 /**
- * Compact dose-timeline column chart for a substance's dose history.
- * Daily totals over the last 60 days - forest column + muted axes
- * matching SessionsTrendChart and the Duration intensity curve.
+ * Ingestion history for a substance: every dose in the last 60 days as a stick
+ * on a baseline - height scaled to the largest dose in the window - with the
+ * date axis drawn on both sides of the plot, the way PsychonautWiki Journal
+ * frames its timelines. Stats and the route split stay as they were.
  */
 @Composable
 fun DoseTimelineChart(
@@ -45,15 +39,14 @@ fun DoseTimelineChart(
 
     val now = currentTimeMillis()
     val dayMs = 86400000L
-    val tz = TimeZone.currentSystemDefault()
     val isDark = isDarkTheme()
     // Route series derived from the theme accents.
     val routeColors = chartSeriesColors(8)
 
-    val recentDoses = remember(doses) {
+    val recentDoses = remember(doses, now) {
         doses.filter { now - it.timestamp < 60L * dayMs }
     }
-    val totalDoseLast30 = remember(doses) {
+    val totalDoseLast30 = remember(doses, now) {
         doses.filter { now - it.timestamp < 30L * dayMs }.sumOf { it.amount }
     }
     val lastDose = remember(doses) { doses.maxByOrNull { it.timestamp } }
@@ -89,111 +82,65 @@ fun DoseTimelineChart(
 
         Spacer(Modifier.height(8.dp))
 
-        if (recentDoses.size >= 3) {
-            // Remembered before LaunchedEffect so the chart model transaction
-            // does not restart on every recomposition.
-            val sorted = remember(recentDoses) { recentDoses.sortedBy { it.timestamp } }
-            val dailyEntries = remember(sorted) {
-                sorted.groupBy { dose ->
-                    Instant.fromEpochMilliseconds(dose.timestamp)
-                        .toLocalDateTime(TimeZone.currentSystemDefault()).date
-                }
-                    .toList()
-                    .sortedBy { it.first }
-                    .map { (date, ds) -> date to ds.sumOf { it.amount } }
-            }
-
-            val values = remember(dailyEntries) { dailyEntries.map { it.second } }
-            val labels = remember(dailyEntries) {
-                dailyEntries.map { (date, _) ->
-                    "${date.month.name.lowercase().take(3).replaceFirstChar { it.uppercase() }} ${date.day}"
-                }
-            }
-
-            val bottomFormatter = remember(labels) {
-                CartesianValueFormatter { _, x, _ ->
-                    labels[x.toInt().coerceIn(0, labels.lastIndex)]
-                }
-            }
-
-            // Adaptive forest accent for this substance, not a generic primary wash
+        if (recentDoses.isNotEmpty()) {
+            // Adaptive accent for this substance, not a generic primary wash.
             val accent = AdaptiveColors.colorFor(substanceName).getComposeColor(isDark)
-            val modelProducer = remember { CartesianChartModelProducer() }
-            LaunchedEffect(values) {
-                modelProducer.runTransaction { columnModel { series(values.map { it.toDouble() }) } }
+            // Normalize stick height to the largest dose in the window: a fixed
+            // denominator flattens every substance (20 mg vs 5000 mg scales).
+            val windowMax = remember(recentDoses) {
+                recentDoses.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 1.0
             }
-
-            CartesianChartHost(
-                chart = rememberCartesianChart(
-                    rememberColumnCartesianLayer(
-                        columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                            rememberLineComponent(
-                                fill = Fill(accent),
-                                thickness = 6.dp,
-                                shape = RoundedCornerShape(3.dp),
-                            )
-                        ),
-                    ),
-                    startAxis = themedStartAxis(
-                        formatter = CartesianValueFormatter { _, v, _ ->
-                            // Show "5 mg" style only when amounts are small integers; keep raw value
-                            val iv = v.toInt()
-                            if (v == iv.toDouble()) iv.toString() else (kotlin.math.round(v * 10.0) / 10.0).toString()
-                        },
-                    ),
-                    bottomAxis = HorizontalAxis.rememberBottom(
-                        line = com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLineComponent(
-                            fill = Fill(ChartTheme.axisLineColor()),
-                            thickness = 1.dp,
-                        ),
-                        label = com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLabelComponent(
-                            style = androidx.compose.ui.text.TextStyle(
-                                color = ChartTheme.labelColor(),
-                                fontSize = 10.sp,
-                            ),
-                        ),
-                        tick = com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisTickComponent(
-                            fill = Fill(ChartTheme.axisLineColor()),
-                            thickness = 1.dp,
-                        ),
-                        guideline = null,
-                        valueFormatter = bottomFormatter,
-                        itemPlacer = HorizontalAxis.ItemPlacer.aligned(
-                            spacing = {
-                                when {
-                                    labels.size <= 6 -> 1
-                                    labels.size <= 12 -> 2
-                                    else -> 3
-                                }
-                            }
-                        ),
-                    ),
-                ),
-                modelProducer = modelProducer,
-                modifier = Modifier.fillMaxWidth().height(120.dp)
+            val peakUnit = remember(recentDoses) {
+                recentDoses.groupBy { it.unit }.maxByOrNull { it.value.size }?.key.orEmpty()
+            }
+            val startMs = now - 60L * dayMs
+            val labels = listOf(
+                TickLabel(0f, formatDateShort(startMs)),
+                TickLabel(1f / 3f, formatDateShort(startMs + 20L * dayMs)),
+                TickLabel(2f / 3f, formatDateShort(startMs + 40L * dayMs)),
+                TickLabel(1f, "Today", emphasis = true),
             )
-        } else if (recentDoses.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                recentDoses.sortedByDescending { it.timestamp }.forEach { dose ->
-                    val local = Instant.fromEpochMilliseconds(dose.timestamp).toLocalDateTime(tz)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "${local.month.name.take(3)} ${local.day}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "${dose.amount} ${dose.unit} ${dose.routeOfAdministration}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+
+            val axisLine = ChartTheme.axisLineColor()
+            TickLabelRow(labels)
+            Spacer(Modifier.height(3.dp))
+            Canvas(Modifier.fillMaxWidth().height(100.dp)) {
+                val w = size.width
+                val h = size.height
+                if (w <= 0f || h <= 0f) return@Canvas
+                val bottom = h - 2.dp.toPx()
+                val top = 8.dp.toPx()
+                val plotH = bottom - top
+
+                drawLine(
+                    axisLine,
+                    Offset(0f, bottom),
+                    Offset(w, bottom),
+                    strokeWidth = 1.5f,
+                )
+
+                recentDoses.sortedBy { it.timestamp }.forEach { dose ->
+                    val x = ((dose.timestamp - startMs).toFloat() / (60f * dayMs)) * w
+                    val relHeight = (dose.amount / windowMax).coerceIn(0.06, 1.0).toFloat() * plotH
+                    val yTop = bottom - relHeight
+                    drawLine(
+                        accent,
+                        Offset(x, bottom),
+                        Offset(x, yTop),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                    drawCircle(accent, radius = 3.dp.toPx(), center = Offset(x, yTop))
                 }
             }
+            Spacer(Modifier.height(3.dp))
+            TickLabelRow(labels)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Taller lines mean larger doses - peak ${formatDoseAmount(windowMax)} $peakUnit in the last 60 days.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         } else {
             Text(
                 "No doses in the last 60 days",
@@ -250,5 +197,3 @@ fun DoseTimelineChart(
         }
     }
 }
-
-

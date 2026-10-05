@@ -18,11 +18,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
+import app.journal.ui.charts.ToleranceBarsChart
+import app.journal.ui.charts.buildToleranceRows
 import app.journal.model.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import app.journal.ui.session.timeline.*
+import app.journal.ui.theme.AdaptiveColors
+import app.journal.ui.theme.isDarkTheme
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -41,11 +45,14 @@ fun SessionTimelineScreen(
     val allSessions by repo.sessions.collectAsState()
     val allEvents by repo.timelineEvents.collectAsState()
     val allDoses by repo.doses.collectAsState()
+    val allSubstances by repo.substances.collectAsState()
     val session = remember(allSessions, sessionId) { allSessions.find { it.id == sessionId } }
     val events = remember(allEvents, sessionId) { allEvents.filter { it.sessionId == sessionId } }
     val doses = remember(allDoses, sessionId) { allDoses.filter { it.sessionId == sessionId } }
+    val substancesById = remember(allSubstances) { allSubstances.associateBy { it.id } }
 
     val sortedEvents = remember(events) { events.sortedBy { it.timestamp } }
+    val sortedDoses = remember(doses) { doses.sortedBy { it.timestamp } }
     val sessionDuration = remember(session) { (session?.endTime ?: currentTimeMillis()) - (session?.startTime ?: 0L) }
     val combinedItems = remember(sortedEvents, sessionDuration, session) {
         val items = mutableListOf<TimelineItem>()
@@ -73,6 +80,12 @@ fun SessionTimelineScreen(
     if (session == null) {
         NotFoundBox("Session not found")
         return
+    }
+
+    // Replayed tolerance over the month before this session: one row per
+    // substance that had any active tolerance in that window.
+    val toleranceRows = remember(allDoses, session.startTime, substancesById) {
+        buildToleranceRows(allDoses, session.startTime, substancesById)
     }
 
     ScreenScaffold(
@@ -133,8 +146,74 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Visual timeline bar
-        item { TimelineBar(startTime = session.startTime, endTime = session.endTime, events = events, checkins = session.checkins, doses = doses, repo = repo, shulginRating = session.shulginRating) }
+        // Effect timeline: intensity over the session window, with a marker on
+        // every dose. Logged curve when check-ins exist, otherwise a curve from
+        // the substance's own duration profile.
+        item {
+            val isDark = isDarkTheme()
+            val accentSource = remember(substancesById, sortedDoses, session.title) {
+                sortedDoses.firstOrNull()?.let { substancesById[it.substanceId]?.name }
+                    ?: session.title
+            }
+            val subColor = remember(accentSource) { AdaptiveColors.colorFor(accentSource) }
+            val accent = subColor.getComposeColor(isDark)
+            SessionDetailCard {
+                SessionEffectTimeline(
+                    session = session,
+                    doses = sortedDoses,
+                    events = events,
+                    substancesById = substancesById,
+                    accent = accent,
+                )
+            }
+        }
+
+        // Doses: PsychonautWiki-style rows - accent bar, time, substance,
+        // amount, and a dot meter of the dose against the reference dose.
+        if (sortedDoses.isNotEmpty()) {
+            item {
+                SessionDetailCard {
+                    Text(
+                        text = "Doses",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    SessionDoseRows(doses = sortedDoses, substancesById = substancesById)
+                }
+            }
+        }
+
+        // Tolerance: how sensitised each substance was at this session, rebuilt
+        // day by day over the month before it (reference: "Tolerance of
+        // ingestions up to here").
+        if (toleranceRows.isNotEmpty()) {
+            item {
+                SessionDetailCard {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Tolerance",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "past 30 days",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    ToleranceBarsChart(rows = toleranceRows, hereMs = session.startTime)
+                }
+            }
+        }
 
         // Phase cards
         if (phaseRanges.isNotEmpty()) {
@@ -286,12 +365,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Substances / Dosage Table
-        if (doses.isNotEmpty()) {
-            item { SectionHeader("Substances") }
-            item { DosageSummaryTable(doses = doses, repo = repo, sessionStart = session.startTime) }
-        }
-
         // Check-in effect tags
         if (session.checkins.any { it.effectScores.isNotEmpty() }) {
             item { EffectTagCloud(session = session, repo = repo) }
@@ -304,5 +377,23 @@ fun SessionTimelineScreen(
             text = { Text("Delete \"${deletingEvent?.label}\"? This cannot be undone.") },
             confirmButton = { AppTextButton(onClick = { deletingEvent?.let { repo.deleteTimelineEvent(it.id) }; deletingEvent = null }) { Text("Delete", color = MaterialTheme.colorScheme.error) } },
             dismissButton = { AppTextButton(onClick = { deletingEvent = null }) { Text("Cancel") } })
+    }
+}
+
+/**
+ * Standard session-detail card shell: surfaceVariant fill, 12dp corners, the
+ * hairline outlineVariant border and 14dp padding every other block on this
+ * screen (Intention, Set & Setting, Subject Profile) already uses.
+ */
+@Composable
+private fun SessionDetailCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp), content = content)
     }
 }

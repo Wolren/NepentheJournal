@@ -1,10 +1,11 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.serde.AppJson
 import kotlin.test.*
 import java.io.File
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlin.concurrent.thread
 
 class JournalStoreTest {
@@ -312,19 +313,40 @@ class JournalStoreTest {
             title = "Retry Test", startTime = 1000L
         ))
         val store = JournalStore(repo)
+        val path = store.dataPath()
         store.save()
-        assertTrue(File(store.dataPath()).exists(), "Data file should exist after save")
+        assertTrue(File(path).exists(), "Data file should exist after save")
 
-        // Make the data file read-only so the next renameTo + direct write fail
-        val dataFile = File(store.dataPath())
-        dataFile.setWritable(false)
-
-        // Attempt save while file is locked: retry loop should handle gracefully, no crash
+        // Phase A: a save that cannot even write its temp file (.tmp is a directory
+        // here) must fail without touching the journal - on every platform. Blocking
+        // the rename with a read-only target instead would only produce a real
+        // failure on Windows: POSIX rename ignores the target's mode, so there the
+        // "failed" save would silently succeed and this test would prove nothing.
+        val tmp = File("$path.tmp")
+        assertTrue(tmp.mkdirs(), "fixture: .tmp must be a directory that blocks the write")
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Retry Fail", startTime = 2000L
         ))
         store.save() // Must not throw
+        assertTrue(tmp.isDirectory, "the blocker must survive the failed save")
+        val afterBlocked = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readText())
+        assertEquals(listOf("Retry Test"), afterBlocked.sessions.map { it.title },
+            "a save that fails mid-flight must leave the previous snapshot intact, " +
+                "not a truncated, empty or mixed file")
+        assertTrue(tmp.deleteRecursively(), "fixture cleanup: the .tmp blocker must be removable")
+
+        // Phase B: read-only target exercises the production rename-fallback retry
+        // loop where the platform honours the flag (Windows: rename onto a read-only
+        // file fails, then the direct write fails all three attempts). POSIX ignores
+        // the flag, so the only assertion here is the invariant that holds either
+        // way: the journal must stay a complete, decodable snapshot.
+        val dataFile = File(path)
+        dataFile.setWritable(false)
+        store.save() // Must not throw
+        val afterReadOnly = AppJson.json.decodeFromString<JournalSnapshot>(dataFile.readText())
+        assertTrue(afterReadOnly.sessions.isNotEmpty(),
+            "the journal must never be emptied or truncated by a failed save")
 
         // Make file writable again and save: should succeed
         dataFile.setWritable(true)
@@ -486,25 +508,26 @@ class JournalStoreTest {
             assertTrue(bakFile.exists(), ".bak.$i should exist after 6 saves")
         }
 
-        // Verify each backup file contains valid JSON
-        val json = Json { ignoreUnknownKeys = true }
-        assertNotNull(
-            json.parseToJsonElement(File("$path.bak").readText()),
-            ".bak must contain valid JSON"
+        // Verify each backup decodes as a real journal snapshot, not merely as
+        // parseable JSON (a assertNotNull on parseToJsonElement can never fail:
+        // it throws on bad input instead of returning null). The rotation is
+        // deterministic: at save k the chain shifts .bak.(n) <- .bak.(n-1) and
+        // then copies the target - the state after save k-1 - into .bak.1/.bak,
+        // so after the 6th save .bak/.bak.1 hold S5, .bak.2 holds S4, ... .bak.5 S1.
+        val expectedSessionsBySlot = linkedMapOf(
+            ".bak" to 5, ".bak.1" to 5, ".bak.2" to 4, ".bak.3" to 3, ".bak.4" to 2, ".bak.5" to 1
         )
-        for (i in 1..5) {
-            val content = File("$path.bak.$i").readText()
-            assertNotNull(
-                json.parseToJsonElement(content),
-                ".bak.$i must contain valid JSON"
-            )
+        for ((slot, expected) in expectedSessionsBySlot) {
+            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(File("$path$slot").readText())
+            assertEquals(expected, snapshot.sessions.size,
+                "$slot must hold exactly the snapshot written by the save that created it")
         }
 
-        // Verify the main file is valid JSON and contains the last session
-        val mainContent = File(path).readText()
-        val mainJson = json.parseToJsonElement(mainContent)
-        assertNotNull(mainJson, "Main journal file must contain valid JSON")
-        assertTrue(mainContent.contains("Session 6"), "Main file should contain data from last save")
+        // Verify the main file is a complete snapshot of the last save
+        val mainSnapshot = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readText())
+        assertEquals(6, mainSnapshot.sessions.size, "main file must hold all six saved sessions")
+        assertTrue(mainSnapshot.sessions.any { it.title == "Session 6" },
+            "Main file should contain data from last save")
     }
 
     @Test
@@ -655,23 +678,33 @@ class JournalStoreTest {
         t1.join()
         t2.join()
 
-        // Verify the file is valid JSON after both saves complete
-        val json = Json { ignoreUnknownKeys = true }
+        // The file must be a complete, decodable journal snapshot after both
+        // saves. (The old assertNotNull(json.parseToJsonElement(...)) could not
+        // assert anything: that call throws on bad input instead of returning
+        // null, so it was a no-op dressed up as an assertion.)
         val content = File(path).readText()
-        assertNotNull(
-            json.parseToJsonElement(content),
-            "Journal file must contain valid JSON after concurrent saves"
-        )
+        val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(content)
 
         // Verify data loads without error
         val repo2 = JournalRepository()
         val store2 = JournalStore(repo2)
         store2.load()
-        assertTrue(repo2.sessions.value.size >= 1,
-            "At least one session should survive concurrent saves")
-        // We don't check exact count since concurrent updates may race
-        // But the file must not be corrupted
         assertFalse(store2.lastLoadHadIssues,
             "No load issues after concurrent saves")
+
+        // save() takes the store lock and snapshots the shared repo, so the file
+        // ends up holding whichever save ran last, and that save ran after its own
+        // thread's upsert. Therefore the seed session (written before either thread
+        // started) can never be lost, and at least one racing session must be in the
+        // final snapshot. The exact count is not pinned (2 or 3 depending on order),
+        // but "the seed alone", which the old `size >= 1` accepted, is not possible.
+        val titles = repo2.sessions.value.map { it.title }
+        assertTrue("Initial" in titles, "the seed session must survive concurrent saves")
+        assertTrue(titles.any { it == "Thread A" || it == "Thread B" },
+            "the last save must contain a session written by the racing threads, got: $titles")
+        assertTrue(titles.size in 2..3, "seed plus one or two racing sessions, got: $titles")
+        assertEquals(titles.size, titles.toSet().size, "concurrent saves must not duplicate sessions")
+        assertEquals(titles.toSet(), snapshot.sessions.map { it.title }.toSet(),
+            "the file on disk must match what a fresh load reads back")
     }
 }

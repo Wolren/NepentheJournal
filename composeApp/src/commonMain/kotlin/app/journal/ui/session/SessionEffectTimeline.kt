@@ -3,7 +3,6 @@ package app.journal.ui.session
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.ui.layout.Layout
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,16 +17,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.model.Substance
 import app.journal.model.TimelineEvent
+import app.journal.ui.charts.TickLabel
+import app.journal.ui.charts.TickLabelRow
 import app.journal.ui.session.timeline.axisLabel
 import app.journal.ui.session.timeline.axisStepMs
 import app.journal.ui.theme.AdaptiveColors
@@ -35,16 +36,19 @@ import app.journal.ui.theme.isDarkTheme
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDuration
 import app.journal.util.parseDurationProfile
-import kotlin.math.roundToInt
 
 /**
- * "Effect timeline" section of a session card: an area curve of intensity over
- * the session window with a marker on every dose, plus an hour axis.
+ * "Effect timeline" section of a session card: area curves of intensity over
+ * the session window with a marker on every dose, plus an hour axis below the
+ * plot that runs from 0h.
  *
  * The curve is what the user logged (timeline events and check-ins) when they
- * exist. When they don't, it falls back to a curve derived from the substance's
- * own duration profile, which is the same shape a dose is expected to make.
- * With neither, the card says so instead of drawing an invented line.
+ * exist. When they don't, each substance in the session gets its own curve
+ * derived from that substance's duration profile, anchored at that substance's
+ * first dose - so a redose or a second substance shows as its own hill rather
+ * than being flattened into one line. The first curve is solid, later ones
+ * dashed, which is how the reference tells overlapping curves apart.
+ * With nothing derivable, the card says so instead of drawing an invented line.
  *
  * The reference design's "Info" and expand affordances are deliberately not
  * reproduced: they open things this card has nowhere to send, so the header
@@ -62,18 +66,20 @@ internal fun SessionEffectTimeline(
     val isDark = isDarkTheme()
     val now = currentTimeMillis()
 
-    val curve = remember(events, session.checkins, doses, substancesById) {
+    val layers = remember(events, session.checkins, doses, substancesById) {
         val logged = loggedEffectSamples(events, session.checkins)
         if (logged.isNotEmpty()) {
-            logged
+            listOf(EffectCurveLayer(substanceId = null, samples = logged))
         } else {
-            val anchorDose = doses.minByOrNull { it.timestamp }
-            val profile = anchorDose
-                ?.let { substancesById[it.substanceId]?.durationProfile }
-                ?.let { parseDurationProfile(it) }
-                ?: emptyList()
-            if (profile.isEmpty() || anchorDose == null) emptyList()
-            else synthesizedEffectSamples(profile, anchorDose.timestamp)
+            doses.groupBy { it.substanceId }
+                .mapNotNull { (substanceId, group) ->
+                    val profile = substancesById[substanceId]?.durationProfile
+                        ?.let { parseDurationProfile(it) }
+                    if (profile.isNullOrEmpty()) return@mapNotNull null
+                    val samples = synthesizedEffectSamples(profile, group.minOf { it.timestamp })
+                    if (samples.isEmpty()) null else EffectCurveLayer(substanceId, samples)
+                }
+                .sortedBy { it.samples.first().timestampMs }
         }
     }
 
@@ -82,21 +88,28 @@ internal fun SessionEffectTimeline(
     val startMs = minOf(
         session.startTime,
         doses.minOfOrNull { it.timestamp } ?: Long.MAX_VALUE,
-        curve.minOfOrNull { it.timestampMs } ?: Long.MAX_VALUE,
+        layers.minOfOrNull { it.samples.first().timestampMs } ?: Long.MAX_VALUE,
     )
     val endMs = maxOf(
         session.endTime ?: now,
         doses.maxOfOrNull { it.timestamp } ?: Long.MIN_VALUE,
-        curve.maxOfOrNull { it.timestampMs } ?: Long.MIN_VALUE,
+        layers.maxOfOrNull { it.samples.last().timestampMs } ?: Long.MIN_VALUE,
     )
     val spanMs = (endMs - startMs).coerceAtLeast(60_000L)
 
     val tickStep = remember(spanMs) { axisStepMs(spanMs) }
     val labels = remember(spanMs, tickStep) {
         val out = mutableListOf<TickLabel>()
-        var offset = tickStep
+        // Starts at 0 so the scale reads from the origin rather than from the
+        // first step. TickLabelRow clamps into the row, so a 0-fraction label
+        // sits flush against the left edge instead of half-hanging off it.
+        var offset = 0L
         while (offset < spanMs) {
-            out.add(TickLabel(fraction = offset.toFloat() / spanMs, text = axisLabel(offset)))
+            // axisLabel(0) is "0m", which would contradict the "1h 2h ..." it
+            // sits among on an hour-stepped axis. Match the neighbour's unit:
+            // a step of a full hour or more means the axis reads in hours.
+            val text = if (offset == 0L && tickStep >= 3_600_000L) "0h" else axisLabel(offset)
+            out.add(TickLabel(fraction = offset.toFloat() / spanMs, text = text))
             offset += tickStep
         }
         out
@@ -111,7 +124,7 @@ internal fun SessionEffectTimeline(
                 text = "Effect timeline",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.weight(1f),
             )
             Text(
@@ -123,7 +136,7 @@ internal fun SessionEffectTimeline(
 
         Spacer(Modifier.height(8.dp))
 
-        if (curve.isEmpty()) {
+        if (layers.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(88.dp),
                 contentAlignment = Alignment.Center,
@@ -135,7 +148,21 @@ internal fun SessionEffectTimeline(
                 )
             }
         } else {
-            val surface = MaterialTheme.colorScheme.surfaceVariant
+            // The chart lives inside a surfaceVariant card, so both the fill
+            // behind it and the marker halos must be that same container color.
+            val container = MaterialTheme.colorScheme.surfaceVariant
+            // Resolved out here: getComposeColor is @Composable and the canvas
+            // draw pass is not a composable context. A curve and its dose dots
+            // share one color per substance, so dots read as the legend.
+            val colorForSubstance = doses.distinctBy { it.substanceId }.associate { dose ->
+                val name = substancesById[dose.substanceId]?.name ?: dose.substanceId
+                dose.substanceId to AdaptiveColors.colorFor(name).getComposeColor(isDark)
+            }
+            val markerColorOf = doses.associate { it.id to (colorForSubstance[it.substanceId] ?: accent) }
+            val layerColors = layers.map { layer ->
+                layer.substanceId?.let { colorForSubstance[it] } ?: accent
+            }
+
             Canvas(
                 modifier = Modifier.fillMaxWidth().height(100.dp),
             ) {
@@ -150,46 +177,62 @@ internal fun SessionEffectTimeline(
                     return h - (level.coerceIn(0f, 10f) / 10f) * (h - topPad)
                 }
 
-                val linePath = Path()
-                val first = curve.first()
-                linePath.moveTo(xAt(first.timestampMs), yAt(first.intensity))
-                for (i in 1 until curve.size) {
-                    val prev = curve[i - 1]
-                    val cur = curve[i]
-                    val x0 = xAt(prev.timestampMs)
-                    val y0 = yAt(prev.intensity)
-                    val x1 = xAt(cur.timestampMs)
-                    val y1 = yAt(cur.intensity)
-                    // Smooth join: control points sit on the horizontal midpoint,
-                    // which rounds the corners the way the reference curve does.
-                    val midX = (x0 + x1) / 2f
-                    linePath.cubicTo(midX, y0, midX, y1, x1, y1)
+                fun buildPaths(samples: List<EffectSample>): Pair<Path, Path> {
+                    val linePath = Path()
+                    val first = samples.first()
+                    linePath.moveTo(xAt(first.timestampMs), yAt(first.intensity))
+                    for (i in 1 until samples.size) {
+                        val prev = samples[i - 1]
+                        val cur = samples[i]
+                        val x0 = xAt(prev.timestampMs)
+                        val y0 = yAt(prev.intensity)
+                        val x1 = xAt(cur.timestampMs)
+                        val y1 = yAt(cur.intensity)
+                        // Smooth join: control points sit on the horizontal midpoint,
+                        // which rounds the corners the way the reference curve does.
+                        val midX = (x0 + x1) / 2f
+                        linePath.cubicTo(midX, y0, midX, y1, x1, y1)
+                    }
+                    val areaPath = Path()
+                    areaPath.addPath(linePath)
+                    areaPath.lineTo(xAt(samples.last().timestampMs), h)
+                    areaPath.lineTo(xAt(first.timestampMs), h)
+                    areaPath.close()
+                    return linePath to areaPath
                 }
 
-                val areaPath = Path()
-                areaPath.addPath(linePath)
-                areaPath.lineTo(xAt(curve.last().timestampMs), h)
-                areaPath.lineTo(xAt(first.timestampMs), h)
-                areaPath.close()
-
-                drawPath(
-                    path = areaPath,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            accent.copy(alpha = 0.38f),
-                            accent.copy(alpha = 0.05f),
+                // Every fill first, then every stroke, so overlapping hills
+                // never have a line buried under a neighbour's wash.
+                val built = layers.map { buildPaths(it.samples) }
+                layers.forEachIndexed { index, _ ->
+                    val (_, areaPath) = built[index]
+                    val color = layerColors[index]
+                    drawPath(
+                        path = areaPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                color.copy(alpha = 0.45f),
+                                color.copy(alpha = 0.06f),
+                            ),
                         ),
-                    ),
-                )
-                drawPath(
-                    path = linePath,
-                    color = accent,
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round,
-                    ),
-                )
+                    )
+                }
+                layers.forEachIndexed { index, _ ->
+                    val (linePath, _) = built[index]
+                    drawPath(
+                        path = linePath,
+                        color = layerColors[index],
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round,
+                            // Later curves dash so crossings stay readable.
+                            pathEffect = if (index == 0) null else PathEffect.dashPathEffect(
+                                floatArrayOf(9.dp.toPx(), 7.dp.toPx()),
+                            ),
+                        ),
+                    )
+                }
                 drawLine(
                     color = accent.copy(alpha = 0.35f),
                     start = Offset(0f, h),
@@ -197,17 +240,19 @@ internal fun SessionEffectTimeline(
                     strokeWidth = 1.dp.toPx(),
                 )
 
-                // One marker per dose, sitting on the curve at the dose's time.
+                // Dose markers rest on the axis at their own time, tinted with
+                // their substance's color - the reference puts them on the
+                // baseline rather than on the curve, and with several curves
+                // overlapping that is also the only unambiguous place.
                 val markerRadius = 4.5.dp.toPx()
                 val halo = 1.5.dp.toPx()
                 doses.forEach { dose ->
                     val x = xAt(dose.timestamp)
                     if (x < -markerRadius || x > w + markerRadius) return@forEach
-                    val name = substancesById[dose.substanceId]?.name ?: dose.substanceId
-                    val color = AdaptiveColors.colorFor(name).getComposeColor(isDark)
-                    val y = yAt(effectIntensityAt(curve, dose.timestamp))
-                    drawCircle(color = surface, radius = markerRadius + halo)
-                    drawCircle(color = color, radius = markerRadius)
+                    val color = markerColorOf[dose.id] ?: accent
+                    val position = Offset(x, h - markerRadius)
+                    drawCircle(color = container, radius = markerRadius + halo, center = position)
+                    drawCircle(color = color, radius = markerRadius, center = position)
                 }
             }
 
@@ -219,38 +264,5 @@ internal fun SessionEffectTimeline(
     }
 }
 
-private data class TickLabel(val fraction: Float, val text: String)
-
-/**
- * Row of axis labels placed at their true fractional positions, so they line
- * up with the curve regardless of how wide the text measures.
- */
-@Composable
-private fun TickLabelRow(labels: List<TickLabel>, modifier: Modifier = Modifier) {
-    Layout(
-        content = {
-            labels.forEach {
-                Text(
-                    text = it.text,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
-        },
-        modifier = modifier.fillMaxWidth().height(16.dp),
-    ) { measurables, constraints ->
-        val width = constraints.maxWidth
-        if (width <= 0 || measurables.isEmpty()) return@Layout layout(0, 0) {}
-        val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
-        layout(width, placeables.maxOf { it.height }) {
-            placeables.forEachIndexed { index, placeable ->
-                val center = labels[index].fraction * width
-                val x = (center - placeable.width / 2f).roundToInt()
-                    .coerceIn(0, (width - placeable.width).coerceAtLeast(0))
-                placeable.place(x, 0)
-            }
-        }
-    }
-}
+/** One drawn curve: which substance it belongs to (null = the logged curve) and its samples. */
+private data class EffectCurveLayer(val substanceId: String?, val samples: List<EffectSample>)

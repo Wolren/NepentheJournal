@@ -75,22 +75,23 @@ fun DoseDotMeter(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
-        (0 until dots.total.coerceAtLeast(1))
-            .chunked(columns.coerceAtLeast(1))
-            .forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { index ->
-                        val filled = index < dots.filled
-                        Box(
-                            modifier = Modifier
-                                .size(dotSize)
-                                .let {
-                                    if (filled) it.background(color, CircleShape)
-                                    else it.border(hollowStroke, CircleShape)
-                                },
-                        )
-                    }
+        var rowIndex = 0
+        while (rowIndex < dots.total) {
+            val rowEnd = (rowIndex + columns).coerceAtMost(dots.total)
+            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                for (index in rowIndex until rowEnd) {
+                    val filled = index < dots.filled
+                    Box(
+                        modifier = Modifier
+                            .size(dotSize)
+                            .let {
+                                if (filled) it.background(color, CircleShape)
+                                else it.border(hollowStroke, CircleShape)
+                            },
+                    )
                 }
             }
+            rowIndex = rowEnd
+        }
     }
 }

@@ -1,5 +1,9 @@
 package app.journal.data
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 class EntityStoreTest {
@@ -128,29 +132,61 @@ class EntityStoreTest {
     }
 
     @Test
-    fun concurrentPutAndReadIsConsistent() {
+    fun concurrentPutAndReadIsConsistent() = runBlocking {
+        // Coroutines instead of java.lang.Thread: this source set also compiles
+        // for Kotlin/Native (iosSimulatorArm64Test), which has no Thread class.
+        // Dispatchers.Default is a real multi-threaded pool on both JVM and
+        // Native, so the writes below still race across cores the way the old
+        // four-Thread version did.
         val store = EntityStore(idOf)
-        val threads = List(4) { i ->
-            Thread {
-                repeat(100) { j ->
-                    store.put(TestEntity("e:$i", "Entity-$i-$j", i * j))
+        coroutineScope {
+            repeat(4) { i ->
+                launch(Dispatchers.Default) {
+                    val keys = (0 until 64).map { j -> "e:$i:$j" }
+                    keys.forEach { k -> store.put(TestEntity(k, "first-$i", i)) }
+                    keys.forEach { k -> store.put(TestEntity(k, "Entity-$i-$k", i * 64)) }
                 }
             }
         }
-        // Relaxed concurrency check: EntityStore is NOT thread-safe for concurrent put,
-        // but should not throw or corrupt internal state under concurrent access.
-        threads.forEach { it.start() }
-        threads.forEach { it.join() }
-        // EntityStore is NOT thread-safe for concurrent writes.
-        // This test verifies that concurrent access doesn't throw or completely corrupt.
-        // We only verify that keys are bounded by the number of threads.
-        assertTrue(store.size in 1..4, "EntityStore should have 1-4 unique keys after 4 concurrent writers")
+
+        // Every EntityStore operation takes the store lock (see the class docs:
+        // the old unsynchronized map could lose entries under concurrent resize,
+        // which is exactly what the lock was added to prevent).
+        //
+        // 4 writers x 64 DISTINCT keys = 256 entries, well past a HashMap's
+        // default threshold of 12, so the map really resizes while all four
+        // writers are inside it. Four writers hammering 4 keys (the original
+        // shape) never resizes at all and so never exercised the race this
+        // exists for: measured against a lockless put it caught the mutation
+        // 0/25 runs; this shape catches it 25/25. Do not shrink the key count
+        // back down.
+        //
+        // Nothing here gets a range or a null guard: all 256 keys must survive,
+        // and each must hold the final pass of its own writer. Key e:$i:$j is
+        // written by writer i only, so the expected final value is
+        // deterministic, not "whatever was left behind".
+        assertEquals(256, store.size, "no key may be lost to concurrent put")
         for (i in 0 until 4) {
-            val entity = store.get("e:$i")
-            if (entity != null) {
-                assertTrue(entity.value >= 0, "entity e:$i should have non-negative value")
+            for (j in 0 until 64) {
+                val key = "e:$i:$j"
+                val entity = assertNotNull(store.get(key), "key $key must survive its writes")
+                assertEquals(key, entity.id, "entry stored under $key must carry that same id")
+                assertEquals(
+                    "Entity-$i-$key", entity.name,
+                    "$key must hold writer $i's final pass, not an earlier one"
+                )
+                assertEquals(
+                    i * 64, entity.value,
+                    "$key's value must belong to the write its name describes"
+                )
             }
         }
+        assertEquals(256, store.flow.value.size, "the emitted snapshot must match the store")
+        assertEquals(
+            (0 until 4).flatMap { i -> (0 until 64).map { j -> "e:$i:$j" } }.toSet(),
+            store.all.map { it.id }.toSet(),
+            "the snapshot must expose exactly the written keys"
+        )
     }
 
     @Test
