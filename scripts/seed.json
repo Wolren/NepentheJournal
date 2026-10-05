@@ -1,11 +1,11 @@
 {
   "version": 3,
-  "savedAt": 1783942757808,
+  "savedAt": 1791200589825,
   "sessions": [],
   "substances": [
     {
       "id": "cid:7896",
-      "oldId": "pwiki:1,3-butanediol",
+      "oldId": null,
       "cid": 7896,
       "docType": "substance",
       "createdAt": 1783690415546,
@@ -13,19 +13,11 @@
       "deviceOrigin": "system",
       "pwikiId": "1,3-Butanediol",
       "name": "1,3-Butanediol",
-      "aliases": [
-        "DMT",
-        "Dimethyltryptamine",
-        "Dmitri",
-        "n,n-dmt",
-        "dimethyltryptamine"
-      ],
+      "aliases": [],
       "summary": "1,3-Butanediol, not to be confused with 1,4-butanediol (a GHB prodrug), is a depressant substance and a prodrug for the ketone body beta-hydroxybutyrate (BHB). It occurs as a thick, colorless liquid or solid depending on storage temperature, and has a distinct bitter-sweet taste. It is used as a recreational intoxicant with effects comparable to alcohol, though much shorter in duration. The R enantiomer of 1,3-Butanediol is more active. \nThe toxicity of 1,3-Butanediol in animals models is lower than that of alcohol, potentially owing to the formation of a less toxic aldehyde following dehydrogenation by alcohol dehydrogenase.",
       "substanceClass": [
-        "Substituted_tryptamines",
-        "Psychedelic",
-        "psychedelic",
-        "common"
+        "Alkanediol, Diol",
+        "Depressant"
       ],
       "routesOfAdministration": [
         "Oral",
@@ -36,36 +28,7 @@
       "addictionPotential": null,
       "toxicity": [],
       "crossTolerances": [],
-      "effects": [
-        "Geometry",
-        "Physical Effect",
-        "Physical Effect2",
-        "Physical Effect3",
-        "Visual Acuity Effect1",
-        "Visual Distortion Effect1",
-        "Hallucinatory States1",
-        "Cognitive Effect1",
-        "Cognitive Effect2",
-        "Cognitive Effect3",
-        "Auditory Effect1",
-        "Auditory Effect2",
-        "Multisensory Effect1",
-        "Multisensory Effect2",
-        "Transpersonal Effect1",
-        "Transpersonal Effect2",
-        "immersive experience",
-        "open eye visuals",
-        "radical perspective shifting",
-        "profound life-changing spiritual experiences",
-        "powerful rushing of sensation",
-        "change in perception of time",
-        "auditory hallucinations",
-        "color shifting",
-        "hard on lungs when smoking",
-        "stomach discomfort",
-        "difficulty integrating experiences",
-        "overwhelming fear"
-      ],
+      "effects": [],
       "chemicalProperties": {
         "cid": 7896,
         "molecularFormula": "C4H10O2",
@@ -77,11 +40,10 @@
         "hBondDonorCount": 2,
         "hBondAcceptorCount": 2
       },
-      "erowidUrl": "https://www.erowid.org/experiences/subs/exp_DMT.shtml",
+      "erowidUrl": "",
       "sources": [
         "psychonautwiki",
-        "pubchem",
-        "tripsit"
+        "pubchem"
       ],
       "cachedAt": 1783690415546,
       "sourceVersion": "pwiki-smw-v2",
@@ -77331,9 +77293,9 @@
       "chemspiderId": "19975296"
     },
     {
-      "id": "cid:442075",
-      "oldId": "pwiki:lsa",
-      "cid": 442075,
+      "id": "cid:442072",
+      "oldId": "cid:442075",
+      "cid": 442072,
       "docType": "substance",
       "createdAt": 1783690415546,
       "updatedAt": 1783690415546,
@@ -77472,15 +77434,15 @@
         "insomnia"
       ],
       "chemicalProperties": {
-        "cid": 442075,
-        "molecularFormula": "C20H22O7",
-        "molecularWeight": "374.4",
-        "smiles": "C=C1C[C@@H]2[C@]34CO[C@@H]([C@@]1([C@H]3C[C@@H](C=C4C(=O)O2)O)C[C@@H](C5=COC=C5)O)O",
-        "inchiKey": "PNFZVLPHKKVBRI-QRLLFLNSSA-N",
-        "iupacName": "(1R,2S,4S,9R,12R,13S)-12-[(2S)-2-(furan-3-yl)-2-hydroxyethyl]-4,13-dihydroxy-11-methylidene-8,14-dioxatetracyclo[7.6.0.01,6.02,12]pentadec-5-en-7-one",
-        "xlogP": 0,
-        "hBondDonorCount": 3,
-        "hBondAcceptorCount": 7
+        "cid": 442072,
+        "molecularFormula": "C16H17N3O",
+        "molecularWeight": "267.33",
+        "smiles": "CN1C[C@@H](C=C2[C@H]1CC3=CNC4=CC=CC2=C34)C(=O)N",
+        "inchiKey": "GENAHGKEFJLNJB-QMTHXVAHSA-N",
+        "iupacName": "(6aR,9R)-7-methyl-6,6a,8,9-tetrahydro-4H-indolo[4,3-fg]quinoline-9-carboxamide",
+        "xlogP": 1.6,
+        "hBondDonorCount": 2,
+        "hBondAcceptorCount": 2
       },
       "erowidUrl": "https://www.erowid.org/experiences/subs/exp_LSA.shtml",
       "sources": [
@@ -106776,9 +106738,9 @@
       "chemspiderId": "21106360"
     },
     {
-      "id": "cid:31373",
-      "oldId": "pwiki:pce",
-      "cid": 31373,
+      "id": "cid:16622",
+      "oldId": "cid:31373",
+      "cid": 16622,
       "docType": "substance",
       "createdAt": 1783690415546,
       "updatedAt": 1783690415546,
@@ -106873,15 +106835,15 @@
         "Increased Introspection"
       ],
       "chemicalProperties": {
-        "cid": 31373,
-        "molecularFormula": "C2Cl4",
-        "molecularWeight": "165.8",
-        "smiles": "C(=C(Cl)Cl)(Cl)Cl",
-        "inchiKey": "CYTYCFOTNPOANT-UHFFFAOYSA-N",
-        "iupacName": "1,1,2,2-tetrachloroethene",
-        "xlogP": 3.4,
-        "hBondDonorCount": 0,
-        "hBondAcceptorCount": 0
+        "cid": 16622,
+        "molecularFormula": "C14H21N",
+        "molecularWeight": "203.32",
+        "smiles": "CCNC1(CCCCC1)C2=CC=CC=C2",
+        "inchiKey": "IFYLVUHLOOCYBG-UHFFFAOYSA-N",
+        "iupacName": "N-ethyl-1-phenylcyclohexan-1-amine",
+        "xlogP": 3.3,
+        "hBondDonorCount": 1,
+        "hBondAcceptorCount": 1
       },
       "erowidUrl": "",
       "sources": [
@@ -156840,12 +156802,12 @@
       ]
     },
     {
-      "id": "interaction:cid:442075:pwiki:lithium",
+      "id": "interaction:cid:442072:pwiki:lithium",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
-      "substanceAId": "cid:442075",
+      "substanceAId": "cid:442072",
       "substanceBId": "pwiki:lithium",
       "riskLevel": "DANGEROUS",
       "description": null,
@@ -156854,13 +156816,13 @@
       ]
     },
     {
-      "id": "interaction:cid:33741:cid:442075",
+      "id": "interaction:cid:33741:cid:442072",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
       "substanceAId": "cid:33741",
-      "substanceBId": "cid:442075",
+      "substanceBId": "cid:442072",
       "riskLevel": "UNSAFE",
       "description": null,
       "sources": [
@@ -156868,12 +156830,12 @@
       ]
     },
     {
-      "id": "interaction:cid:442075:cid:5281520",
+      "id": "interaction:cid:442072:cid:5281520",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
-      "substanceAId": "cid:442075",
+      "substanceAId": "cid:442072",
       "substanceBId": "cid:5281520",
       "riskLevel": "UNCERTAIN",
       "description": null,
@@ -156882,12 +156844,12 @@
       ]
     },
     {
-      "id": "interaction:cid:442075:pwiki:stimulants",
+      "id": "interaction:cid:442072:pwiki:stimulants",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
-      "substanceAId": "cid:442075",
+      "substanceAId": "cid:442072",
       "substanceBId": "pwiki:stimulants",
       "riskLevel": "UNCERTAIN",
       "description": null,
@@ -162692,12 +162654,12 @@
       ]
     },
     {
-      "id": "interaction:cid:31373:pwiki:stimulants",
+      "id": "interaction:cid:16622:pwiki:stimulants",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
-      "substanceAId": "cid:31373",
+      "substanceAId": "cid:16622",
       "substanceBId": "pwiki:stimulants",
       "riskLevel": "DANGEROUS",
       "description": null,
@@ -162706,12 +162668,12 @@
       ]
     },
     {
-      "id": "interaction:cid:31373:pwiki:depressants",
+      "id": "interaction:cid:16622:pwiki:depressants",
       "docType": "interaction",
-      "createdAt": 1783942757808,
-      "updatedAt": 1783942757808,
+      "createdAt": 1791200589825,
+      "updatedAt": 1791200589825,
       "deviceOrigin": "system",
-      "substanceAId": "cid:31373",
+      "substanceAId": "cid:16622",
       "substanceBId": "pwiki:depressants",
       "riskLevel": "DANGEROUS",
       "description": null,
