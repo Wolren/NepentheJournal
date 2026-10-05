@@ -20,11 +20,21 @@ import platform.Foundation.fileHandleForWritingAtPath
 import platform.Foundation.stringWithContentsOfFile
 import platform.Foundation.writeToFile
 
+@OptIn(ExperimentalForeignApi::class)
 actual fun initLogging(appDir: String?) {
     val writers = mutableListOf<LogWriter>(
         CommonWriter()
     )
     if (appDir != null) {
+        // Same belt as desktop Main.kt: the file writer and crash hook below
+        // swallow IO failures, so a missing data dir on first launch would
+        // silently drop every early log line. createDirectoryAtPath is
+        // idempotent and cheap.
+        try {
+            NSFileManager.defaultManager.createDirectoryAtPath(
+                appDir, withIntermediateDirectories = true, attributes = null, error = null
+            )
+        } catch (_: Exception) { /* console writer still logs */ }
         writers.add(IosFileLogWriter(appDir))
         cleanOldCrashLogs(appDir, maxAgeDays = 30)
         installCrashHandler(appDir)

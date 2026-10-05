@@ -59,7 +59,7 @@
 <body>
 <main>
 <h1>Nepenthe Journal Privacy Policy</h1>
-<p class="updated">Last updated: 2026-09-29</p>
+<p class="updated">Last updated: 2026-10-05</p>
 
 <h2>Summary</h2>
 <p>Nepenthe Journal is an offline-first journal app. Your data stays on your device. We do not collect, transmit, or sell any personal information.</p>
@@ -71,6 +71,7 @@
   <li><strong>Custom substances</strong>: any substances you create and add to your personal library</li>
   <li><strong>Theme preferences</strong>: your color scheme and display settings</li>
   <li><strong>Sync configuration</strong>: network settings for optional P2P sync (see below)</li>
+  <li><strong>Crash logs and diagnostics</strong>: a rolling application log (<code>nepenthe.log</code>, 5MB per file, up to 10 files) plus crash dumps written locally when an uncaught exception occurs (auto-deleted after 30 days). Stored only in the app's private data directory and never uploaded; they leave the device only if you export them yourself</li>
 </ul>
 
 <h2>Where data is stored</h2>
@@ -86,7 +87,8 @@
 <p><strong>No data passes through any external relay, cloud server, or third-party service.</strong> Sync is entirely peer-to-peer and limited to your local network. You control when sync is active and which devices participate.</p>
 
 <h2>No analytics, no tracking</h2>
-<p>The app contains <strong>no analytics SDKs, no telemetry, no crash reporting, and no advertising</strong>. No data about your usage, device, or journal entries is sent anywhere.</p>
+<p>The app contains <strong>no analytics SDKs, no telemetry, no crash-reporting SDK, and no advertising</strong>. No data about your usage, device, or journal entries is sent anywhere.</p>
+<p>The app does write diagnostics to your own device: a rolling application log and crash dumps from uncaught exceptions. They are plain files on disk. No crash-reporting service is involved and nothing is uploaded automatically. You can review and export them yourself via <strong>Settings &gt; Developer</strong> (Export logs and crash dumps); sharing that export is entirely at your discretion.</p>
 
 <h2>Permissions</h2>
 <p>The app requests the following Android permissions only when needed for optional features:</p>
@@ -121,7 +123,7 @@
 <ul>
   <li>Advertisements of any kind</li>
   <li>Subscription tiers or paid features</li>
-  <li>Telemetry, analytics, or crash reporting</li>
+  <li>Telemetry, analytics, or crash-reporting services</li>
   <li>Account requirements or cloud dependency</li>
 </ul>
 <p>All functionality is and will always be free. This is a firm commitment, not a current-state description.</p>
