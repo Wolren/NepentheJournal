@@ -12,7 +12,7 @@ No cloud, no accounts, no surveillance. Data lives on your device. Optional P2P 
 [![Last commit](https://img.shields.io/github/last-commit/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/commits)
 [![Issues](https://img.shields.io/github/issues/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/issues)
 [![Code size](https://img.shields.io/github/languages/code-size/Wolren/NepentheJournal)]()
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)](gradle/libs.versions.toml)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&logoColor=white)](gradle/libs.versions.toml)
 [![Desktop](https://img.shields.io/badge/Target-Desktop-6DB33F?logo=openjdk&logoColor=white)]()
 [![Android](https://img.shields.io/badge/Target-Android-3DDC84?logo=android&logoColor=white)]()
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows)
@@ -30,14 +30,14 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 
 ## Features
 
-- [x] **DoseWiki reference catalog (primary data source):** 577 substances with dosage by route, duration stages, interaction charts, pharmacology, and subjective-effect profiles, bundled offline as CC0 open data
-- [x] **One merged offline catalog:** DoseWiki records plus a PsychonautWiki-derived ETL seed (325 substances) are reconciled into a single catalog at startup. No reference API is ever called at runtime
+- [x] **DoseWiki reference catalog:** 577 substances with dosage by route, duration stages, interaction charts, pharmacology, and subjective-effect profiles, bundled offline as CC0 open data
+- [x] **One merged offline catalog:** DoseWiki records plus a PsychonautWiki-derived seed (325 substances) are reconciled into a single catalog at startup. No reference API is ever called at runtime
 - [x] Session tracking with substances, doses, ROAs, check-ins, and timeline events
 - [x] Tolerance dashboard per substance based on last ingestion time and frequency
 - [x] Activity heatmap showing session frequency over time
 - [x] Dose duration curves (intensity-over-time bezier) for every substance route, built from DoseWiki duration profiles
 - [x] Full-text search across sessions, substances, doses, notes, and effects
-- [x] P2P sync between desktop and phone over LAN via Ktor (no cloud relay)
+- [x] P2P sync between desktop and phone over LAN (no cloud relay)
 - [x] Custom theme editor with hex color pickers, card styles, background images, and opacity
 - [x] Harm reduction guidance plus curated external resources (Safer Use tab)
 - [x] Trip-report export in the [DoseWiki trip-report format](https://josiekins.xyz/html-craft/dosewiki-trip-report-format.html)
@@ -46,123 +46,75 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 
 ---
 
-## Architecture
+## Reference data
 
-### Reference Data: DoseWiki (primary)
+Everything the app knows about substances ships with the app. The only network call at runtime is the FDA drug-label card, which queries api.fda.gov on demand.
 
-DoseWiki ([dose.wiki](https://dose.wiki/)) is the app's primary reference source. Its open-data substance index is processed by `scripts/dosewiki_slim.py` into `dosewiki_slim.json`: **577 substances**, every one carrying:
+### DoseWiki (primary)
+
+DoseWiki ([dose.wiki](https://dose.wiki/)) is the primary reference source: 577 substances, each with:
 
 - **Dosage:** dose ranges per route of administration
-- **Duration:** onset / peak / after-effects / total per route
+- **Duration:** onset, peak, after-effects, and total per route
 - **Subjective effects:** notes, sensory, physical, and cognitive facets with attribution
 - **Interactions:** with reasons (interaction risk data retains TripSit's non-commercial attribution)
 - **Pharmacology:** pharmacodynamics, pharmacokinetics, and metabolites
 - Plus summary, identification, classification, harm potential, legality, tolerance, and citations
 
-The substance prose is released under **CC0 1.0** (see [DoseWiki's license](https://dose.wiki/docs/license)). The source index is fetched from https://dose.wiki/open-data/SubstanceIndex.json with a GitHub mirror fallback, and cached at `scripts/cache/SubstanceIndex.json`.
+The substance prose is released under CC0 1.0 (see [DoseWiki's license](https://dose.wiki/docs/license)). The catalog feeds the substance browser, the dose-duration curves, the session effect timeline, and trip-report export.
 
-What the app builds from it:
+### PsychonautWiki-derived seed
 
-- `DoseWikiIngestor` (commonMain) ingests the slim JSON into the **effects store** and builds each substance's **duration profile**, which powers the dose-duration curves and the session effect timeline
-- The **substance catalog**: search, category chips from a 13-entry curated taxonomy (`DosewikiTaxonomy.kt`, `/dosewiki_taxonomy.json`), and detail screens showing dosage, duration, and effects
-- **Trip-report export** in the DoseWiki trip-report format (`export/DoseWikiTripReport.kt`, with consent/age/size validation)
+Alongside DoseWiki, a 325-substance seed pre-processed from public sources adds substance classes, interactions, and identifiers. The two are merged into one catalog at startup. Sources:
 
-Four byte-identical copies of `dosewiki_slim.json` ship in the repo (`desktopMain`, `jvmMain`, and `iosMain` resources plus the `androidMain` assets); they are written in a single `scripts/dosewiki_slim.py` run so hashes stay equal, and CI verifies this.
+- **PsychonautWiki:** substance classes, effects, interactions, dose ranges
+- **PubChem:** CIDs, molecular properties, synonyms
+- **TripSit:** combination interactions and risk assessments
+- **ChEMBL** and **IUPHAR/BPS Guide to Pharmacology:** binding and bioactivity data
+- **PDSP Ki Database** and **BindingDB:** binding affinity measurements
+- **Wikidata:** DrugBank, ChEBI, UNII, and ATC identifiers
 
-### Reference Data: PsychonautWiki ETL Seed and Supporting Sources
+---
 
-Nepenthe Journal does NOT call any reference API at runtime. In addition to DoseWiki, a PsychonautWiki-derived ETL seed is pre-processed and bundled as JSON:
-
-| Source | Data | Method |
-|--------|------|--------|
-| PsychonautWiki SMW | Substance classes, effects, interactions, dose ranges (325 substances in the current seed) | Semantic MediaWiki `action=ask` dump via `scripts/smw_dump.py` |
-| PubChem | CIDs, molecular properties, synonyms | CID matching via PUG REST |
-| Wikidata | DrugBank IDs, ChEBI IDs, UNII, ATC codes | SPARQL query via `wdq` |
-| TripSit | Combination interactions, risk assessments | `scripts/fetch_tripsit.py` |
-| ChEMBL | Bioactivity data (Ki, IC50, EC50) | ChEMBL REST API |
-| IUPHAR/BPS GtoPdb | Ligand-target interactions (pKi, pIC50) | REST API from guidetopharmacology.org |
-| PDSP Ki Database | Ki binding records (4,140+ records, 93 substances) | CSV import from NIMH PDSP |
-| BindingDB | Affinity measurements (1,893+ records) | REST API by SMILES lookup |
-
-The ETL pipeline lives at `scripts/matrix_build.py` and merges all sources into a single `JournalSnapshot` JSON seed. Run it with:
-
-```bash
-python scripts/matrix_build.py --input scripts/seed.json --output scripts/cache/unified_seed.json --verbose
-```
-
-`scripts/seed.json` (JournalSnapshot v3, 325 substances) is the canonical seed. The four bundled copies (`desktopMain` and `jvmMain` and `iosMain` resources plus `androidMain` assets `psychonautwiki_seed.json`) are byte-identical copies of it: copy the pipeline result over all of them in one run so hashes stay equal. CI checks this.
-
-Substances are baked in at build time: no reference API calls happen in the running app, except the FDA drug-label card (`OpenFdaInteractionCard`), which queries api.fda.gov on demand and needs network.
-
-### Data Flow
-
-```mermaid
-graph TB
-  subgraph "Build Time"
-    A[ETL Pipeline<br>matrix_build.py]
-    B[PsychonautWiki Seed<br>psychonautwiki_seed.json · 325]
-    C[DoseWiki Slim<br>dosewiki_slim.json · 577]
-    A --> B
-  end
-
-  subgraph "Startup"
-    D[DataInitializer]
-    B --> D
-    C --> D
-    E[JournalStore<br>user Snapshot.json] --> D
-  end
-
-  subgraph "Runtime"
-    D --> F[JournalRepository<br>StateFlow-backed store]
-    F --> G[Compose UI]
-    E --> F
-    C -.-> H[DoseWikiIngestor<br>effects + duration profiles]
-    H --> F
-  end
-```
-
-Persistence uses a single JSON file (`JournalSnapshot`) with all documents serialized via kotlinx.serialization. Versioned backup rotation keeps 6 copies (`.bak` plus `.bak.1` through `.bak.5`; see `save()` in `composeApp/src/desktopMain/kotlin/app/journal/data/JournalStoreDesktop.kt`). Save retry with atomic writes prevents corruption.
-
-### Navigation
-
-Overlay-based navigation with bottom tabs and full-screen overlay editors. The navigation state is modeled as a sealed interface (`NavigationState`) for compile-time exhaustive `when` coverage.
+## Using the app
 
 - **Dashboard:** greeting, stats cards, activity heatmap, sessions trend chart, tolerance overview
 - **Sessions:** session list with tag filters, favorites toggle, search, calendar access
 - **Substances:** DoseWiki-powered catalog with search, category chips, dosage and duration detail, duration curves, pharmacology data, custom substance creation
 - **Safer Use:** harm reduction guidance and curated external resources (DoseWiki, PsychonautWiki, Erowid, TripSit, DanceSafe, RollSafe)
-- **Settings:** theme editor, P2P sync controls, data import/export, backup management, substance library
+- **Settings:** theme editor, sync controls, data import/export, backup management, substance library
 
-Overlays replace the content area for editors, detail views, and the calendar.
-
-### P2P Sync
-
-LAN-based sync using Ktor (no cloud, no Couchbase Enterprise):
-
-- **Host (JVM):** Ktor server advertises via mDNS (JmDNS), accepts push/pull sync requests on port 4984 by default (`SyncConfig.DEFAULT_PORT`)
-- **Client (all targets):** Ktor client pushes local changes and pulls remote changes
-- **Transport:** HTTP REST + HMAC-SHA256 auth + optional WebSocket for live delta push
-- **Pagination:** pulls use composite (timestamp, id) cursors, so bulk data with tied timestamps (e.g. bundled seed rows) transfers completely; the sync cursor only advances after a fully drained pull
-- **Resilience:** HTTP retry with exponential backoff, WS heartbeat/pong, reconnection logic, data validation gates
-- All sync controls are in Settings under a collapsible "Device Sync" section
-
-### Theme System
-
-Modular, serializable theme system:
-
-- `ThemeConfig`: all visual parameters (colors, card style, corner radius, background image, base theme)
-- `ThemeManager`: observable `StateFlow<ThemeConfig>`, derives WCAG-compliant Material3 `ColorScheme`
-- Contrast colors computed via relative luminance (WCAG): black or white text depending on background
-- Presets: Forest, Ocean, Sunset, Ember, Midnight, Mono (see `ThemePresets.all` in `ThemeConfig.kt`)
-- Persistent across sessions (stored as part of JournalSnapshot)
-
-### Cross-Platform
-
-Desktop (primary target), Android, and iOS share the same `commonMain` code. Platform-specific files (`desktopMain`, `androidMain`, `iosMain`) provide expect/actual declarations for file I/O, clipboard, back navigation, and window management. See `docs/CROSS_PLATFORM.md` for the full guide.
+Editors, detail views, and the calendar open as full-screen overlays over the current tab.
 
 ---
 
-## Getting Started
+## Sync between your devices
+
+P2P sync copies your journal between your own devices on the same local network:
+
+- The desktop app hosts and advertises itself; other devices connect to it directly. No cloud relay, no server you do not control.
+- Changes move in both directions, deletes propagate, and conflicting edits to the same note surface as a pending conflict instead of silently overwriting.
+- Requests are authenticated (HMAC-SHA256), so other devices on the network cannot write into your journal.
+- Every control lives in Settings, under the "Device Sync" section.
+
+---
+
+## Themes
+
+- Six presets to start from: Forest, Ocean, Sunset, Ember, Midnight, Mono
+- Custom colors with hex pickers, card styles, background images, and opacity
+- Text contrast adjusts automatically so labels stay readable on any background
+- Your theme is stored with the rest of your journal and comes back on the next launch
+
+---
+
+## Cross-platform
+
+Desktop (the primary target), Android, and iOS share one codebase, with platform-specific handling for file I/O, clipboard, back navigation, and windows. See [docs/CROSS_PLATFORM.md](docs/CROSS_PLATFORM.md) for the full guide.
+
+---
+
+## Getting started
 
 ### Prerequisites
 
@@ -171,75 +123,26 @@ Desktop (primary target), Android, and iOS share the same `commonMain` code. Pla
 - macOS + Xcode (for the iOS target)
 - Gradle wrapper included
 
-### Desktop (primary)
+### Desktop
 
-```bash
-# Run with test data for UI verification
-NEPENTHE_TEST_DATA=1 ./gradlew composeApp:run
+`./gradlew composeApp:run` opens a native window (use `gradlew.bat` on Windows). Add `NEPENTHE_TEST_DATA=1` to start with a deterministic sample journal for a look around; without it the app starts empty. Test data is also available from Settings > Developer > "Load Test Data".
 
-# Run without test data (empty app)
-./gradlew composeApp:run
+Keyboard shortcuts: Ctrl+F opens search, Ctrl+N starts a new live session, Esc goes back.
 
-# Windows: use gradlew.bat instead of ./gradlew
-```
+### Android
 
-The desktop app launches a native window via Compose Desktop. Test data mode populates sessions with varied substances and combos for UI debugging. Test data is deterministic (seed 42): same data every run.
-
-Desktop keyboard shortcuts: Ctrl+F opens search, Ctrl+N starts a new live session, Esc goes back.
-
-### Android APK
-
-```bash
-./gradlew composeApp:assembleDebug -x checkDebugAarMetadata
-```
-
-APK lands at `composeApp/build/outputs/apk/debug/`. Side-load to device over WiFi or USB.
-
-### Build Verification
-
-```bash
-# Compile targets
-./gradlew composeApp:compileKotlinDesktop
-./gradlew composeApp:compileDebugKotlinAndroid -x checkDebugAarMetadata
-
-# Run the whole desktopTest suite (same thing CI runs; no --tests filters, audit C6)
-bash scripts/run-tests.sh
-
-# List every test file across all source sets
-bash scripts/run-tests.sh --list
-```
-
-On Windows, run the Gradle tasks directly with `gradlew.bat` (the helper script is bash).
-
-Two end-to-end suites guard the two ways a journal app silently loses user data — a bad first launch and a bad sync. Both run real sockets against a real Ktor server on `127.0.0.1`, so they exercise the production code path rather than a stub:
-
-| Suite | Asserts |
-|-------|---------|
-| `FirstLaunchE2ETest` | Cold start on an empty home seeds the library and writes a versioned store; a second launch reads from disk and skips re-ingest without reverting user edits; data applied from a peer is on disk **before** the ack and survives a restart; a live timer left behind by a crashed launch is aborted on the next start. |
-| `SyncContentFidelityE2ETest` | Every synced entity type crosses the wire field-for-field; offline edits on both sides converge and stay converged; deletes propagate both directions without resurrecting; divergent note edits keep both bodies and surface a pending conflict. |
-
-Both live in `desktopTest`, so they run on desktop and are not exercised on iOS or Android.
-
-### Test Data
-
-Enable test data via any of:
-
-| Method | How |
-|--------|-----|
-| JVM flag | `-Dnepenthe.test-data=true` |
-| Env var | `NEPENTHE_TEST_DATA=1` |
-| Settings UI | Developer > "Load Test Data" button |
+`./gradlew composeApp:assembleDebug -x checkDebugAarMetadata` writes an APK to `composeApp/build/outputs/apk/debug/`, ready to side-load over USB or WiFi.
 
 ---
 
-## Tech Stack
+## Tech stack
 
 | Layer | Choice |
 |-------|--------|
-| UI Framework | Compose Multiplatform (JetBrains) 1.11.1 |
-| Language | Kotlin 2.4.0 |
+| UI Framework | Compose Multiplatform (JetBrains) 1.12.1 |
+| Language | Kotlin 2.4.20 |
 | Build System | Gradle 9.7.1 + AGP 9.3.1 |
-| Reference Data | DoseWiki (CC0, 577 substances) + PsychonautWiki-derived ETL seed (325 substances) |
+| Reference Data | DoseWiki (CC0, 577 substances) + PsychonautWiki-derived seed (325 substances) |
 | Persistence | JSON file via kotlinx.serialization, atomic writes + backup rotation |
 | Networking | Ktor 3.6.0 (client + server) |
 | Charts | Vico 3.3.1 |
@@ -253,22 +156,22 @@ Enable test data via any of:
 
 | Workflow | Trigger | Purpose | Status |
 |----------|---------|---------|--------|
-| CI | Push/PR to master | Verify seed hashes, compile Desktop + Android, run tests, build APK | Desktop + Android |
-| CI (iOS) | Push/PR to master | Compile the iOS Kotlin framework (simulator + device), run `iosSimulatorArm64Test`, build the Xcode project | macOS 15 |
+| CI | Push/PR to master | Compile Desktop + Android, run tests, build APKs | Desktop + Android |
+| CI (iOS) | Push/PR to master | Build the iOS frameworks, run tests on a simulator, build the Xcode project | macOS |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
-> **iOS now runs its test suite in CI.** Both iOS framework compiles (simulator and device) pass, and `iosSimulatorArm64Test` runs the shared `commonTest` + `iosTest` classes on the simulator. Getting there took four fixes, each for a real defect: a test fixture published at the same resource path as production `dosewiki_slim.json` (the native test resource copy cannot deduplicate), a `java.lang.Thread` reference in `commonTest` that Kotlin/Native does not have, YouTrack CMP-10179 (Compose 1.11's prebuilt ui-uikit cache references `UIViewLayoutRegion`, an iOS 26 SDK symbol the runner's default Xcode 16.4 lacks — fixed by pinning Xcode 26), and a resource lookup that assumed `NSBundle.mainBundle` points at the test bundle: the Kotlin/Native test runner is a plain executable, not an `.xctest` bundle, so `pathForResource` never saw `compose-resources/dosewiki_slim.json` beside the test binary and `DoseWikiLookupTest` failed on its first assertion (run 37230976879: 445/446). `readBundledResource` now falls back to the `compose-resources` directory next to the executable, which leaves real app-bundle lookups unchanged. As of run 37292403525 the suite is green: **446 tests, 0 failures** on the iOS simulator.
+> iOS runs its test suite in CI: both framework builds (simulator and device) pass, and `iosSimulatorArm64Test` runs the shared test classes on the simulator, currently **446 tests, 0 failures**.
 
 ---
 
 ## Limitations
 
-- **Android is the only target without runtime coverage.** Desktop runs its full suite in CI and iOS runs `commonTest` + `iosTest` on a simulator (446 tests, green as of run 37292403525), but Android has no instrumentation source set (`composeApp/src/androidTest/` does not exist) and no emulator AVD configured — its unit tests run on the JVM only. Android also requires manual side-loading. The two end-to-end suites above live in `desktopTest`, so neither runs on iOS or Android.
+- **Android is the only target without runtime coverage.** Desktop runs its full suite in CI and iOS runs the shared suite on a simulator (446 tests, green as of run 37292403525), but Android has no instrumentation tests and no emulator configured, so its unit tests run on the JVM only. Android also requires manual side-loading. The two end-to-end suites (first launch and sync fidelity) run on desktop only.
 - **LAN-only sync.** P2P sync works between devices on the same local network. No remote relay or cloud tunnel.
 - **Single-user.** The app has no multi-account or profile system. All data belongs to one user per install.
 - **No encryption at rest.** Journal data is stored as a JSON file on disk. No built-in encryption layer.
-- **Reference data is bundled.** DoseWiki and the ETL seed are pre-processed at build time, not live-fetched. Update frequency depends on pipeline runs.
+- **Reference data is bundled.** DoseWiki and the seed are pre-processed at build time, not live-fetched. Updates ship with releases.
 - **Compose Multiplatform still has platform-specific quirks.** Desktop and Android share most code, but edge cases (file pickers, clipboard, window management, scrollbars) require platform-specific implementations.
 
 ---
