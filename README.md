@@ -114,27 +114,6 @@ Desktop (the primary target), Android, and iOS share one codebase, with platform
 
 ---
 
-## Getting started
-
-### Prerequisites
-
-- JDK 21+ (Temurin recommended)
-- Android SDK (for Android builds)
-- macOS + Xcode (for the iOS target)
-- Gradle wrapper included
-
-### Desktop
-
-`./gradlew composeApp:run` opens a native window (use `gradlew.bat` on Windows). Add `NEPENTHE_TEST_DATA=1` to start with a deterministic sample journal for a look around; without it the app starts empty. Test data is also available from Settings > Developer > "Load Test Data".
-
-Keyboard shortcuts: Ctrl+F opens search, Ctrl+N starts a new live session, Esc goes back.
-
-### Android
-
-`./gradlew composeApp:assembleDebug -x checkDebugAarMetadata` writes an APK to `composeApp/build/outputs/apk/debug/`, ready to side-load over USB or WiFi.
-
----
-
 ## Tech stack
 
 | Layer | Choice |
