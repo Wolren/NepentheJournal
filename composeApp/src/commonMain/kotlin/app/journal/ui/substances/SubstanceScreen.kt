@@ -1,6 +1,7 @@
 package app.journal.ui.substances
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -278,6 +280,10 @@ private fun SubstanceCard(
     lastUsedDaysAgo: Int? = null
 ) {
     val color = app.journal.ui.theme.AdaptiveColors.colorFor(substance.name)
+    val nameStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+    val aliasStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val aliasText = remember(substance.aliases) { substance.aliases.joinToString(", ") }
+    val barColor = remember(color, isDark) { color.getComposeColor(isDark).copy(alpha = 0.85f) }
 
     HoverCard(
         onClick = onClick,
@@ -288,26 +294,24 @@ private fun SubstanceCard(
     ) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                modifier = Modifier.width(3.dp).height(42.dp),
-                shape = RoundedCornerShape(1.5.dp),
-                color = color.getComposeColor(isDark).copy(alpha = 0.85f)
-            ) {}
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(barColor)
+            )
             Spacer(Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 SelectableText(
                     text = substance.name,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    style = nameStyle
                 )
                 if (substance.aliases.isNotEmpty()) {
                     SelectableText(
-                        text = substance.aliases.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
+                        text = aliasText,
+                        style = aliasStyle,
                         maxLines = 1
                     )
                 }

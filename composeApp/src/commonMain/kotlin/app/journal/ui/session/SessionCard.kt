@@ -166,9 +166,10 @@ fun SessionCard(
                             if (subName != null) {
                                 val doseColor = AdaptiveColors.colorFor(subName)
                                 val doseAccent = doseColor.getComposeColor(isDark)
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = doseAccent.copy(alpha = 0.88f)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(doseAccent.copy(alpha = 0.88f))
                                 ) {
                                     val prefix = if (dose.isDoseEstimate) "~" else ""
                                     Text(
@@ -204,15 +205,16 @@ fun SessionCard(
                                     val color = if (subName != null)
                                         AdaptiveColors.colorFor(subName).getComposeColor(isDark)
                                     else MaterialTheme.colorScheme.primary
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .weight(fraction.coerceAtLeast(0.02f)),
-                                        color = color.copy(alpha = 0.85f),
-                                        shape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
+                                    val barShape = if (i == 0) RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)
                                                 else if (i == doses.lastIndex) RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
                                                 else RoundedCornerShape(3.dp)
-                                    ) {}
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .weight(fraction.coerceAtLeast(0.02f))
+                                            .clip(barShape)
+                                            .background(color.copy(alpha = 0.85f))
+                                    )
                                 }
                             }
                         }
