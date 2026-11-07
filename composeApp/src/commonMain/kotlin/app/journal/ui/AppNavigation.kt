@@ -116,6 +116,8 @@ internal fun AppNavigation(
             PendingQuickLog.consume()
             // Wait for the startup snapshot apply: it replaces the repository and would drop these writes.
             app.journal.data.DataInitializer.initializedFlow.first { it }
+            // Substances arrive with the bundled library; a link that lands first would find none.
+            app.journal.data.DataInitializer.libraryReadyFlow.first { it }
             when (val outcome = QuickLog.apply(repo, request)) {
                 is QuickLogOutcome.Logged -> {
                     quickLogStatus = "Logged ${outcome.summary}"

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import app.journal.export.EncryptedBackup
@@ -82,6 +83,12 @@ class AppSmokeTest {
     @Test
     fun quickLogApplyWritesDoseOnDevice() {
         val repo = app.journal.data.JournalRepository.instance
+        // A fresh CI device builds the bundled library in the background; the writer needs its rows.
+        kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeout(120_000) {
+                app.journal.data.DataInitializer.libraryReadyFlow.first { it }
+            }
+        }
         val request = app.journal.data.QuickLog.parse("nepenthe://quicklog?substance=Caffeine&amount=100&unit=mg")!!
         val outcome = app.journal.data.QuickLog.apply(repo, request)
         assertTrue("apply must log, got: $outcome", outcome is app.journal.data.QuickLogOutcome.Logged)
