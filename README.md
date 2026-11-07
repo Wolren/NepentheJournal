@@ -152,10 +152,27 @@ Desktop (the primary target), Android, and iOS share one codebase, with platform
 |----------|---------|---------|--------|
 | CI | Push/PR to master | Compile Desktop + Android, run tests, build APKs | Desktop + Android |
 | CI (iOS) | Push/PR to master | Build the iOS frameworks, run tests on a simulator, build the Xcode project | macOS |
+| iOS visual | Manual | Boot an iPhone simulator, launch the app, upload screenshots and the app log; also screenshots the macOS desktop build | macOS |
 | CodeQL | Push/PR + weekly (Mon) | Security analysis for Java only | Pass |
 | Dependabot | Weekly | Auto-update Gradle + GitHub Actions dependencies | Pass |
 
 > iOS runs its test suite in CI: both framework builds (simulator and device) pass, and `iosSimulatorArm64Test` runs the shared test classes on the simulator, currently **446 tests, 0 failures**.
+
+### iPhone and macOS from a Windows workstation
+
+Three things are true on Windows, and only the third one costs anything:
+
+- **No local iOS compile.** Kotlin/Native disables the iOS targets here: the `securityEx` and `ccGcm` cinterops include Apple SDK headers (`Security/SecKey.h`, `CommonCrypto/CommonCryptor.h`), and cinterop cannot run on a non-Apple host. `sdkman`/WSL do not change this; there is no macOS toolchain to borrow.
+- **No local iOS simulator.** Simulators ship with Xcode only.
+- **The macOS runner is your iPhone.** `iOS visual` boots a real simulator, installs the app, captures a screenshot per second while the first launch builds the library, and uploads them:
+
+  ```powershell
+  ./scripts/ios-visual.ps1 -Appearance dark
+  ```
+
+  It watches the run and drops the PNGs in `%TEMP%\nepenthe-ios-visual`. The same workflow screenshots the desktop build on macOS, so the window you cannot open here can still be looked at.
+
+What this does not cover: tapping through screens. `simctl` has no tap verb, and an XCUITest target is the only way to drive the iOS UI. That is the next step if the screenshots are not enough.
 
 ---
 
