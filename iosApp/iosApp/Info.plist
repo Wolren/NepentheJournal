@@ -39,6 +39,9 @@
     <array>
         <string>armv7</string>
     </array>
+    <!-- Compose aborts at startup without this key: it unlocks 120 Hz on ProMotion iPhones. -->
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
