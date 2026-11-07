@@ -246,7 +246,7 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Intensity", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text("Intensity \u2191", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Intensity", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(8.dp))
             Box(modifier = Modifier.fillMaxWidth().height(80.dp)) {

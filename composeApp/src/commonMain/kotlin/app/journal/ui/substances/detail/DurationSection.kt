@@ -230,7 +230,7 @@ internal fun DurationTimelineSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 }
 
-                Text("↑ Intensity",
+                Text("Intensity",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.align(Alignment.TopEnd))

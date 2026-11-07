@@ -259,12 +259,6 @@ fun SettingsScreen(
             DeveloperCardContent(vm = dataViewModel)
         }
 
-        item {
-            Text("No ads. No subscriptions. No tracking. Your data is yours.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-        }
         item { Spacer(Modifier.height(16.dp)) }
         }
         DesktopScrollbar(scrollState)
