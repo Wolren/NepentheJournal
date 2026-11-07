@@ -60,7 +60,7 @@ actual class LanDiscovery {
     actual fun registerService(port: Int, deviceId: String, fingerprint: String) {
         val info = ServiceInfo.create(
             serviceType,
-            "Nepenthe Journal",
+            platformDeviceName(),
             port, 0, 0,
             mapOf("deviceId" to deviceId, "fingerprint" to fingerprint)
         )

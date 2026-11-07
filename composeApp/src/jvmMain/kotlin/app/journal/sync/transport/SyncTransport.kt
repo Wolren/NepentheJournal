@@ -179,9 +179,14 @@ class SyncTransport(
                                 when (event) {
                                     is LanDiscoveryEvent.PeerFound -> {
                                         appendDebug("mDNS found: ${event.peer.displayName} (${event.peer.host}:${event.peer.port})")
-                                        _discoveredPeers.value = _discoveredPeers.value
-                                            .filter { it.deviceId != event.peer.deviceId }
-                                            .plus(event.peer)
+                                        // A device is on its own network too: never list or sync this device.
+                                        if (event.peer.deviceId == deviceId || event.peer.fingerprint == deviceFingerprint) {
+                                            appendDebug("Ignoring this device's own mDNS record")
+                                        } else {
+                                            _discoveredPeers.value = _discoveredPeers.value
+                                                .filter { it.deviceId != event.peer.deviceId }
+                                                .plus(event.peer)
+                                        }
                                     }
                                     is LanDiscoveryEvent.PeerLost -> {
                                         _discoveredPeers.value = _discoveredPeers.value
@@ -254,6 +259,10 @@ class SyncTransport(
         forceFullPush: Boolean = false,
         peerSeedFingerprint: String? = null,
     ): Result<Unit> {
+        if (peer.deviceId == deviceId || peer.fingerprint == deviceFingerprint) {
+            appendDebug("Refusing to sync with this device (${peer.deviceId ?: peer.fingerprint})")
+            return Result.failure(Exception("That device is this device"))
+        }
         return try {
             val fp = deviceFingerprint // ensure identity
 

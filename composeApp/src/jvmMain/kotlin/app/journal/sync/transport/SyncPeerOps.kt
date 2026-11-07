@@ -52,6 +52,10 @@ internal class SyncPeerOps(
                     }
                     appendDebug("pairWithPeer: host reachable, completing pairing")
                     val info = hostInfo.getOrThrow()
+                    if (info.fingerprint == deviceFingerprint || info.deviceId == deviceId) {
+                        appendDebug("pairWithPeer: host is this device, refusing to pair with itself")
+                        return@withContext Result.failure(Exception("That device is this device"))
+                    }
                     warnOnProtocolMismatch(info, "pairing")
                     val result = client.completePairing(
                         host = peer.host, port = peer.port,

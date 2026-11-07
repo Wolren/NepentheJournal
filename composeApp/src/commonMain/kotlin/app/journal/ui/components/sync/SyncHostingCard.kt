@@ -13,6 +13,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.journal.sync.platformDeviceName
 import androidx.compose.ui.unit.sp
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
@@ -93,9 +94,14 @@ fun SyncHostingCard(
             if (isHosting) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Other devices connect to: ${hostAddress ?: "..."}",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Found on this network as \"${platformDeviceName()}\"",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Address for manual entry: ${hostAddress ?: "..."}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 

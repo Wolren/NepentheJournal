@@ -101,7 +101,7 @@ actual class LanDiscovery {
             "fingerprint" to fingerprint.encodeToByteArray()
         )
         val data = NSNetService.dataFromTXTRecordDictionary(txtDict)
-        val service = NSNetService(domain = "", type = "_nepenthe._tcp", name = "Nepenthe Journal", port = port)
+        val service = NSNetService(domain = "", type = "_nepenthe._tcp", name = platformDeviceName(), port = port)
         if (data != null) service.setTXTRecordData(data)
         service.publish()
     }
