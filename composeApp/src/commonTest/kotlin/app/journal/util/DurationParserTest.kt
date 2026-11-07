@@ -16,7 +16,6 @@ import kotlin.test.assertTrue
  */
 class DurationParserTest {
 
-    // ==================== parseDurationValue ====================
 
     @Test
     fun parseDurationValueEmptyOrNullishInput() {
@@ -30,7 +29,6 @@ class DurationParserTest {
     fun parseDurationValueGarbageInput() {
         assertNull(parseDurationValue("--"), "dashes alone are not a range")
         assertNull(parseDurationValue("?/-"), "symbols carry no number")
-        // Digits with no unit are minutes, but text without digits stays null.
         assertNull(parseDurationValue("a-b-c"), "letters only")
     }
 
@@ -57,7 +55,6 @@ class DurationParserTest {
         assertEquals(Pair(10.0, 20.0), parseDurationValue("10-20"), "unitless range stays minutes")
         assertEquals(Pair(10.0, 20.0), parseDurationValue("10-20 min"), "minute range")
         assertEquals(Pair(30.0, 30.0), parseDurationValue("30 min"), "single bound repeats")
-        // En dash is the range character in the seed data.
         assertEquals(Pair(60.0, 120.0), parseDurationValue("1\u20132 hours"), "en-dash range")
         assertEquals(Pair(2880.0, 2880.0), parseDurationValue("  2  days  "), "surrounding whitespace trimmed")
     }
@@ -68,7 +65,6 @@ class DurationParserTest {
         assertEquals(Pair(3.0, 3.0), parseDurationValue("3 seconds"), "seconds not listed, treated as minutes")
     }
 
-    // ==================== parseDurationProfile ====================
 
     @Test
     fun parseDurationProfileEmptyAndUnknownKeys() {
@@ -105,7 +101,6 @@ class DurationParserTest {
         assertEquals(120.0, phases[2].maxMinutes, "single number yields equal bounds, even in hours")
     }
 
-    // ==================== stageToMinutes ====================
 
     @Test
     fun stageToMinutesBoundaries() {
@@ -126,7 +121,6 @@ class DurationParserTest {
             "missing unit stays minutes")
     }
 
-    // ==================== formatStage ====================
 
     @Test
     fun formatStageRendering() {
@@ -139,13 +133,14 @@ class DurationParserTest {
             "missing unit defaults to min")
         assertEquals("1.0 - 3.0 min", formatStage(DoseWikiStage(min = 1.0, max = 3.0, unit = null)),
             "missing unit on a range defaults to min")
-        assertEquals("2.0 hours", formatStage(DoseWikiStage(min = 2.0, max = 2.0, unit = "hours")),
+        assertEquals("2.0 hr", formatStage(DoseWikiStage(min = 2.0, max = 2.0, unit = "hours")),
             "equal bounds render once")
-        assertEquals("1.0 - 3.0 hours", formatStage(DoseWikiStage(min = 1.0, max = 3.0, unit = "hours")),
+        assertEquals("1.0 - 3.0 hr", formatStage(DoseWikiStage(min = 1.0, max = 3.0, unit = "hours")),
             "range bounds render as a dash range")
+        assertEquals("2.0 min", formatStage(DoseWikiStage(min = 2.0, max = 2.0, unit = "minutes")),
+            "long minute unit compacts to min")
     }
 
-    // ==================== parseDoseWikiDuration / getDoseWikiTotal ====================
 
     private fun stages(
         onset: DoseWikiStage? = null,
@@ -191,7 +186,7 @@ class DurationParserTest {
         assertEquals(listOf("Onset", "Peak", "Afterglow"), phases.map { it.label },
             "only populated stages become phases, in stage order")
         assertEquals(120.0, phases[1].minMinutes, "peak hours converted")
-        assertEquals("2.0 - 3.0 hours", phases[1].display, "peak display keeps raw text")
+        assertEquals("2.0 - 3.0 hr", phases[1].display, "peak display compacts the unit")
 
         val smoked = parseDoseWikiDuration(duration, 1)
         assertEquals(listOf("Onset"), smoked.map { it.label }, "second route parsed independently")
@@ -232,6 +227,6 @@ class DurationParserTest {
         val total = getDoseWikiTotal(duration)
         assertEquals(240.0, total?.first, "total min hours converted")
         assertEquals(360.0, total?.second, "total max hours converted")
-        assertEquals("4.0 - 6.0 hours", total?.third, "total display text")
+        assertEquals("4.0 - 6.0 hr", total?.third, "total display text")
     }
 }

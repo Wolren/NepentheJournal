@@ -27,12 +27,10 @@ import httpx
 import urllib.request
 import urllib.error
 
-# Ensure we can import from wikipedia-mcp tools
 WIKIPEDIA_MCP_DIR = os.path.expanduser("~/wikipedia-mcp")
 if os.path.isdir(WIKIPEDIA_MCP_DIR):
     sys.path.insert(0, WIKIPEDIA_MCP_DIR)
 
-# Use the full extraction from wikipedia-mcp tools when available
 try:
     from tools.pharmacology_table import extract_pharmacology as mcp_extract
     HAS_MCP_EXTRACT = True
@@ -53,9 +51,6 @@ _client = httpx.Client(
     limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
 )
 
-# ---------------------------------------------------------------------------
-# Wikipedia API helpers
-# ---------------------------------------------------------------------------
 
 
 def _urllib_api_call(params: dict[str, str]) -> dict | None:
@@ -70,7 +65,7 @@ def _urllib_api_call(params: dict[str, str]) -> dict | None:
             return data
     except urllib.error.HTTPError as e:
         if e.code == 429:
-            # Rate limited - raise so caller can back off
+            # Rate limited: raise so caller can back off
             raise e
         return None
     except (urllib.error.URLError, json.JSONDecodeError, OSError, TimeoutError):
@@ -101,7 +96,6 @@ def wiki_api_call(params: dict[str, str], retries: int = 2) -> dict | None:
                 time.sleep(wait)
                 continue
 
-        # Fallback: httpx
         if attempt < retries:
             try:
                 resp = _client.get(WIKI_API, params=params)
@@ -153,9 +147,7 @@ def resolve_title(name: str) -> str | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Extraction (mirrors tools/pharmacology_table.py logic but standalone)
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Extraction (mirrors tools/pharmacology_table.py logic but standalone)
 
 
 def clean_cell(text: str) -> str:
@@ -431,9 +423,6 @@ def _standalone_extract(wikitext: str) -> list[dict[str, Any]]:
     return all_records
 
 
-# ---------------------------------------------------------------------------
-# Conversion to Kotlin model format
-# ---------------------------------------------------------------------------
 
 
 def to_wikipedia_record(r: dict[str, Any]) -> dict[str, Any]:
@@ -458,13 +447,9 @@ def to_wikipedia_record(r: dict[str, Any]) -> dict[str, Any]:
         "species": r.get("species_note") or r.get("species"),
         "rawText": r.get("raw_text") or r.get("value_raw"),
     }
-    # Strip None values for cleaner JSON (kotlinx handles null defaults)
     return {k: v for k, v in rec.items() if v is not None}
 
 
-# ---------------------------------------------------------------------------
-# Deduplication
-# ---------------------------------------------------------------------------
 
 
 def _fold_target(name: str) -> str:
@@ -519,7 +504,6 @@ def _target_key(name: str) -> str:
                   if "dopamine" in flat or re.match(r"^d\s*([1-5])$", flat) else None)
     if dm:
         return "drd" + dm
-    # Adrenergic alpha/beta with subtype.
     if any(w in flat for w in ("adrenergic", "adreno", "alpha", "beta")) \
             and "acetylcholine" not in flat and "nicotinic" not in flat:
         a = re.search(r"alpha\s*(\d)\s*([ab]?)", flat)
@@ -534,7 +518,6 @@ def _target_key(name: str) -> str:
     hm = re.search(r"histamine\s*h\s*([1-4])", flat) or re.match(r"^h\s*([1-4])$", flat)
     if hm:
         return "hrh" + hm.group(1)
-    # Monoamine transporters.
     toks = set(flat.split(" "))
     if "sert" in toks or ("serotonin" in flat and "transporter" in flat):
         return "slc6a4"
@@ -543,7 +526,6 @@ def _target_key(name: str) -> str:
     if "net" in toks or "noradrenaline transporter" in flat \
             or "norepinephrine transporter" in flat:
         return "slc6a2"
-    # TAAR, opioid, mGluR, NMDA.
     if "taar" in flat or "trace amine" in flat:
         return "taar1"
     if "opioid" in flat or "opiate" in flat:
@@ -558,7 +540,6 @@ def _target_key(name: str) -> str:
         return "grm" + (mg.group(1) or mg.group(2))
     if "nmda" in flat:
         return "nmda"
-    # Fallback: previous behavior (strip suffix words, html already gone).
     name = re.sub(r"\s*\(?(receptor|transporter|protein|channel|enzyme)\)?\s*$", "", flat)
     return "x:" + re.sub(r"\s+", " ", name).strip()
 
@@ -613,7 +594,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
     """Collect all existing pharmacology records from a substance dict."""
     records = []
 
-    # PDSP records
     pdsp = substance.get("pdspData", {})
     for r in pdsp.get("records", []):
         records.append({
@@ -622,7 +602,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
             "source": "pdsp",
         })
 
-    # BindingDB records
     bdb = substance.get("bindingdbData", {})
     for r in bdb.get("records", []):
         records.append({
@@ -631,7 +610,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
             "source": "bindingdb",
         })
 
-    # ChEMBL records
     chembl = substance.get("chemblData", {})
     for r in chembl.get("bioactivities", []):
         records.append({
@@ -640,7 +618,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
             "source": "chembl",
         })
 
-    # IUPHAR records
     iuphar = substance.get("iupharData", {})
     for r in iuphar.get("interactions", []):
         records.append({
@@ -649,7 +626,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
             "source": "iuphar",
         })
 
-    # Already-existing Wikipedia records
     wp = substance.get("wikipediaData", {})
     for r in wp.get("records", []):
         records.append(r)
@@ -657,12 +633,6 @@ def collect_existing_records(substance: dict) -> list[dict]:
     return records
 
 
-# ---------------------------------------------------------------------------
-# Wikipedia title mapping
-# ---------------------------------------------------------------------------
-
-# Hard-coded overrides for substances whose Wikipedia title differs from
-# the Nepenthe substance name.
 TITLE_OVERRIDES: dict[str, str] = {
     "DXM": "Dextromethorphan",
     "LSA": "Lysergic acid amide",
@@ -715,12 +685,10 @@ def batch_resolve_titles(titles: list[str]) -> dict[str, str]:
                 data = json.loads(resp.read().decode("utf-8"))
             pages = data.get("query", {}).get("pages", [])
 
-            # Build redirect map
             redirect_map: dict[str, str] = {}
             for r in data.get("query", {}).get("redirects", []):
                 redirect_map[r["from"]] = r["to"]
 
-            # Map input → resolved title (or None if missing)
             for title in batch:
                 # Follow redirect chain
                 resolved = title
@@ -729,7 +697,6 @@ def batch_resolve_titles(titles: list[str]) -> dict[str, str]:
                     seen.add(resolved)
                     resolved = redirect_map[resolved]
 
-                # Check if resolved page exists
                 found = False
                 for p in pages:
                     if p.get("title") == resolved and p.get("pageid"):
@@ -761,7 +728,6 @@ def batch_resolve_by_cid(cids: list[int], batch_size: int = 300) -> dict[int, st
         batch = cids[i:i + batch_size]
         cid_values = " ".join(f'"{c}"' for c in batch)
 
-        # Wikidata has strict rate limits - wait generously
         if i > 0:
             time.sleep(15.0)
 
@@ -808,9 +774,6 @@ def batch_resolve_by_cid(cids: list[int], batch_size: int = 300) -> dict[int, st
 args_verbose = False
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 
 def main() -> None:
@@ -837,7 +800,6 @@ def main() -> None:
                         help="Max substances to process (0 = all)")
     args = parser.parse_args()
 
-    # Load seed.json
     with open(args.input, encoding="utf-8") as f:
         snapshot = json.load(f)
 
@@ -857,11 +819,11 @@ def main() -> None:
     global args_verbose
     args_verbose = args.verbose
 
-    # Step 1: build title map using CID-based (via Wikidata) + name-based fallback
+    # Step 1: build title map using cid-based (via Wikidata) + name-based fallback
     if args.verbose:
         print("[*] Resolving Wikipedia titles...")
 
-    # 1a: CID-based resolution via Wikidata SPARQL
+    # 1a: CID-based resolution via Wikidata sparql
     cid_to_title: dict[int, str | None] = {}
     cids_to_resolve = []
     for sub in substances:
@@ -877,13 +839,13 @@ def main() -> None:
         if args.verbose:
             print(f"  {cid_found}/{len(cids_to_resolve)} CIDs resolved to Wikipedia pages")
 
-    # 1b: For substances without resolved CID, try name-based
+    # 1b: For substances without resolved cid, try name-based
     title_map: dict[str, str | None] = {}
     unnamed_subs = 0
     for sub in substances:
         cid = sub.get("cid")
         if cid is not None and cid in cid_to_title and cid_to_title[cid]:
-            # CID resolved - store under name key for lookup
+            # CID resolved: store under name key for lookup
             name = sub.get("name", "")
             if name:
                 title_map[name] = cid_to_title[cid]
@@ -897,9 +859,7 @@ def main() -> None:
         if candidate:
             # Resolve via Wikipedia query (batch)
             title_map[candidate] = None  # Will be batch-resolved below
-        # If not found, title_map won't have it - treated as no page
-
-    # Batch-resolve name-based candidates via Wikipedia API
+        # If not found, title_map won't have it: treated as no page
     name_candidates = [k for k, v in title_map.items() if v is None]
     if name_candidates:
         if args.verbose:
@@ -924,12 +884,10 @@ def main() -> None:
         if not name:
             continue
 
-        # Skip if already have Wikipedia data and --skip-existing
         if args.skip_existing and sub.get("wikipediaData") is not None:
             stats["skipped"] += 1
             continue
 
-        # Look up resolved title - prefer CID-based resolution
         cid = sub.get("cid")
         resolved_title = None
         if cid is not None and cid in cid_to_title and cid_to_title[cid]:
@@ -947,7 +905,6 @@ def main() -> None:
         if args.verbose:
             print(f"  [{i+1}/{len(substances)}] {name} -> Wikipedia: {resolved_title}...", end="")
 
-        # Fetch wikitext
         wikitext = fetch_wikitext(resolved_title)
         if wikitext is None:
             if args.verbose:
@@ -958,7 +915,6 @@ def main() -> None:
         if args.verbose:
             print("", end="")
 
-        # Extract pharmacology data
         if HAS_MCP_EXTRACT:
             result = mcp_extract(wikitext, page_title=resolved_title)
             records = []
@@ -972,7 +928,6 @@ def main() -> None:
             stats["no_table"] += 1
             continue
 
-        # Convert to WikipediaRecord format
         wp_records = [to_wikipedia_record(r) for r in records]
         wp_records = [r for r in wp_records if r.get("targetName")]
 
@@ -982,14 +937,12 @@ def main() -> None:
             stats["no_table"] += 1
             continue
 
-        # Deduplicate against existing pharmacology data
         existing = collect_existing_records(sub)
         new_records = []
         for rec in wp_records:
             if is_duplicate(rec, existing):
                 stats["dup_skipped"] += 1
                 continue
-            # Skip records with no actual affinity data (ND/empty entries)
             if (rec.get("kiNM") is None and rec.get("kiNMMin") is None
                     and rec.get("ec50NM") is None and rec.get("ic50NM") is None):
                 stats["dup_skipped"] += 1
@@ -1003,10 +956,8 @@ def main() -> None:
             stats["no_table"] += 1  # Flag as no net new data
             continue
 
-        # Merge into substance
         if not args.dry_run:
             sub["wikipediaData"] = {"records": new_records}
-            # Add "wikipedia" to sources
             sources = sub.get("sources", [])
             if "wikipedia" not in sources:
                 sources.append("wikipedia")
@@ -1030,7 +981,6 @@ def main() -> None:
 
         time.sleep(args.delay)
 
-    # Final write
     if not args.dry_run:
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, indent=2, ensure_ascii=False)

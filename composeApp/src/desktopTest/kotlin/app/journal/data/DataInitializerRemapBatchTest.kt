@@ -20,7 +20,6 @@ import kotlin.test.assertEquals
  */
 class DataInitializerRemapBatchTest {
 
-    /** Snapshot of what the proxy observed: (applyBatch, upsertDose, upsertInteraction, batches). */
     private data class Observed(
         val applyBatches: Int,
         val upsertDoses: Int,
@@ -45,10 +44,7 @@ class DataInitializerRemapBatchTest {
             when (method.name) {
                 "applyBatch" -> {
                     applyBatches++
-                    // Signature order: sessions(0), doses(1), substances(2),
-                    // effects(3), interactions(4), ...; omitted defaults are
-                    // filled by the Kotlin $default bridge before the proxy
-                    // sees the call, so every slot is populated.
+                    // Signature order: sessions(0), doses(1), substances(2), effects(3), interactions(4), ...
                     val doses = (args?.getOrNull(1) as? List<*>)?.size ?: 0
                     val interactions = (args?.getOrNull(4) as? List<*>)?.size ?: 0
                     batchSizes.add(doses to interactions)
@@ -66,7 +62,6 @@ class DataInitializerRemapBatchTest {
         return proxy
     }
 
-    /** Set by [recordingRepo]; read after the call under test. */
     private var observed: (() -> Observed)? = null
 
     private fun fixture(repo: JournalRepository) {
@@ -123,18 +118,14 @@ class DataInitializerRemapBatchTest {
         assertEquals(0, seen.upsertDoses, "no per-dose upsert during remap")
         assertEquals(0, seen.upsertInteractions, "no per-interaction upsert during remap")
 
-        // Final state through the real repository: identical to the old
-        // per-entity path (also pinned by DataMigrationTest).
         assertEquals(listOf("cid:5761"), real.doses.value.map { it.substanceId }.distinct())
         assertEquals(3, real.doses.value.size, "remap must not drop or duplicate doses")
         val interaction = real.interactions.value.single()
-        // Substance IDs are stored SORTED as a pair (canonical pairing rule,
-        // also pinned by DataMigrationTest): "cid:1615" < "cid:5761".
+        // Substance IDs are stored sorted as a pair (canonical pairing rule, also pinned by DataMigrationTest): "cid:1615" < "cid:5761".
         assertEquals("cid:1615", interaction.substanceAId)
         assertEquals("cid:5761", interaction.substanceBId)
         assertEquals("i:1", interaction.id, "the original interaction ID is preserved")
 
-        // A second run finds nothing to patch: no empty applyBatch is emitted.
         DataInitializer.migrateOldIds(repo)
         assertEquals(1, observed!!.invoke().applyBatches,
             "an idempotent re-run must not issue a batch at all")

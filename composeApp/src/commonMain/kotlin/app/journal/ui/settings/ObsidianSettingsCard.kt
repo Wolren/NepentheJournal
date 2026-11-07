@@ -29,7 +29,6 @@ fun ObsidianSettingsCard(
 
     var obsidianExpanded by remember { mutableStateOf(false) }
 
-    // Reload from repo when expanded - values may have changed since last view
     var vaultPath by remember { mutableStateOf("") }
     var subfolder by remember { mutableStateOf("Nepenthe") }
     var autoExport by remember { mutableStateOf(false) }
@@ -42,8 +41,6 @@ fun ObsidianSettingsCard(
     var isExporting by remember { mutableStateOf(false) }
     var isImporting by remember { mutableStateOf(false) }
 
-    // Load saved values when expanding; suggest the device default location
-    // when nothing was saved yet.
     LaunchedEffect(obsidianExpanded) {
         if (obsidianExpanded) {
             vaultPath = repo.obsidianVaultPath.value.ifBlank { defaultVaultPath() }
@@ -55,7 +52,6 @@ fun ObsidianSettingsCard(
         }
     }
 
-    // Auto-save when toggles change
     fun saveSettings() {
         repo.setObsidianVaultPath(vaultPath)
         repo.setObsidianSubfolder(subfolder)
@@ -92,7 +88,6 @@ fun ObsidianSettingsCard(
                 HorizontalDivider()
                 Spacer(Modifier.height(12.dp))
 
-                // Vault path
                 Text("Vault path", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(4.dp))
                 Row(
@@ -143,7 +138,6 @@ fun ObsidianSettingsCard(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Subfolder
                 Text("Subfolder", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
@@ -163,7 +157,6 @@ fun ObsidianSettingsCard(
 
                 Spacer(Modifier.height(12.dp))
 
-                // File organization
                 Text("File organization", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,7 +180,6 @@ fun ObsidianSettingsCard(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Auto-export toggle (auto-saves on change)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -319,7 +311,6 @@ fun ObsidianSettingsCard(
                     }
                 }
 
-                // Status message
                 val statusMsg = statusText
                 if (statusMsg != null) {
                     Spacer(Modifier.height(8.dp))

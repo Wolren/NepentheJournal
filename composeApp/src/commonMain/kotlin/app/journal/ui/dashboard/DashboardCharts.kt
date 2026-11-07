@@ -93,7 +93,7 @@ fun SessionsTrendChart(
                 ),
                 startAxis = themedStartAxis(formatter = integerFormatter),
                 bottomAxis = HorizontalAxis.rememberBottom(
-                    // Show every ~3rd week label so 12 labels do not collide on mobile
+                    // Show every ~3rd week label so 12 labels don't collide on mobile
                     line = com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisLineComponent(
                         fill = com.patrykandpatrick.vico.compose.common.Fill(
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
@@ -144,7 +144,6 @@ fun TopSubstancesChart(
     if (ranked.isEmpty()) return
     val maxCount = ranked.firstOrNull()?.value?.toFloat() ?: 1f
 
-    // Series derived from the theme accents, so custom palettes recolor the chart.
     val chartColors = chartSeriesColors(8)
 
     ChartCard(

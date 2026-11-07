@@ -48,8 +48,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     onCycleTimeDisplay: () -> Unit = {}
 ) {
     val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
-    // Doses and substance names are collected once here and passed down to
-    // cards, so no card performs repository lookups of its own.
     val allDoses by repo.doses.collectAsState()
     val allSubstances by repo.substances.collectAsState()
     val dosesBySession = remember(allDoses) { allDoses.groupBy { it.sessionId } }
@@ -68,7 +66,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // Search bar with substance filter as trailing icon
             Box {
                 OutlinedTextField(
                     value = searchQuery,
@@ -124,7 +121,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                             DropdownMenuItem(
                                 text = { Text(item.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
-                                    // Keep the menu open so multiple substances can be toggled in one pass
                                     viewModel.toggleSubstance(item.id)
                                 },
                                 leadingIcon = {
@@ -148,13 +144,8 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
 
             Spacer(Modifier.height(6.dp))
 
-            // The empty state - and the count that belongs to it - is held
-            // back until emptiness proves itself: the filtered flow emits an
-            // empty first frame on every tab entry, and painting "No sessions
-            // yet" over that frame is what made tab switches flicker.
             val showEmptyState = rememberEmptyStateVisible(isEmpty = sessions.isEmpty())
 
-            // Count row
             if (sessions.isNotEmpty() || showEmptyState) {
                 Text(
                     text = "${sessions.size} session${if (sessions.size != 1) "s" else ""}",
@@ -165,7 +156,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
 
             Spacer(Modifier.height(4.dp))
 
-            // Session list
             if (sessions.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -220,7 +210,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
             }
         }
 
-        // FABs
         Column(
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -246,7 +235,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
         DesktopScrollbar(scrollState)
     }
 
-    // Live session confirmation dialog
     if (showLiveDialog) {
         AlertDialog(
             onDismissRequest = { showLiveDialog = false },
@@ -268,7 +256,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
             confirmButton = {
                 AppButton(onClick = {
                     showLiveDialog = false
-                    // Create and start the live session with the chosen title
                     val now = currentTimeMillis()
                     val session = Session(
                         id = "session:live:${now}",

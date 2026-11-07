@@ -18,14 +18,12 @@ resolving to unrelated PubChem compounds).
 import json
 import sys
 
-# Rows where an alias legitimately equals another substance's name.
 ALIAS_ALLOWLIST = {
     ("Cocaine", "Coca"),
     ("Banisteriopsis caapi", "Ayahuasca"),
     ("Salvinorin A", "Salvia divinorum"),
 }
 
-# substanceClass keywords that imply at least one nitrogen atom.
 NITROGEN_CLASSES = (
     "tryptamine",
     "amphetamine",

@@ -98,7 +98,6 @@ class IosEcdhIdentityStore(private val dataDir: String) {
     private fun loadOrCreatePrivateKeyB64Locked(): String {
         cachedPrivateKeyB64?.let { return it }
         if (!fileManager.fileExistsAtPath(filePath)) {
-            // First host start: generate the static pair and persist it.
             val privateKey = IosEcdh.generateKey()
                 ?: throw IllegalStateException("Could not generate the host ECDH key pair")
             val exportedExternal = try {
@@ -120,7 +119,6 @@ class IosEcdhIdentityStore(private val dataDir: String) {
         return stored
     }
 
-    /** Decrypt and parse [text], accepting only this file's own format. Throws on failure. */
     @Throws(IllegalStateException::class)
     private fun readAndDecryptText(text: String): IosEcdhKeyFile {
         val key = atRestKey.loadOrNull()

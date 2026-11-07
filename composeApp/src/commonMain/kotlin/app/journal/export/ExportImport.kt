@@ -23,13 +23,10 @@ object ExportImport {
     /** Refuse import payloads larger than 50 MB before decoding. */
     const val MAX_IMPORT_BYTES = 50L * 1024 * 1024
 
-    /** Cap on sessions per import file so one file cannot exhaust memory. */
     const val MAX_IMPORT_SESSIONS = 5000
 
-    /** Cap on doses attached to one session in an import file. */
     const val MAX_IMPORT_DOSES_PER_SESSION = 500
 
-    /** Cap on free-text field lengths accepted from import files. */
     const val MAX_IMPORT_FIELD_LEN = 65536
     const val MAX_IMPORT_TITLE_LEN = 500
     const val MAX_IMPORT_ID_LEN = 128
@@ -46,25 +43,20 @@ object ExportImport {
      */
     const val TIMESTAMP_FUTURE_MARGIN_MS = EntityTimePolicy.FUTURE_MARGIN_MS
 
-    /** Format version written by [exportSessions] and required on import. */
     const val SESSION_EXPORT_VERSION = 1
 
-    /** User-facing outcome of a session-bundle import attempt. */
     data class ImportResult(
         /** Number of sessions imported. Always 0 when [error] is non-null. */
         val count: Int,
-        /** User-facing rejection reason, or null when the import succeeded. */
         val error: String? = null
     )
 
-    /** User-facing outcome of a full-journal backup import attempt. */
     data class FullJournalImportResult(
         val sessions: Int = 0,
         val substances: Int = 0,
         val doses: Int = 0,
         val notes: Int = 0,
         val timelineEvents: Int = 0,
-        /** User-facing rejection reason, or null when the import applied. */
         val error: String? = null
     )
 
@@ -143,8 +135,6 @@ object ExportImport {
             return ImportResult(0, "Not a valid session export file")
         }
 
-        // Version gate (audit "Schema versioning"): never decode-and-apply a
-        // bundle written in a format this build does not understand.
         if (bundle.version != SESSION_EXPORT_VERSION) {
             Log.withTag("ExportImport").w {
                 "Rejecting session export: version ${bundle.version}, expected $SESSION_EXPORT_VERSION"
@@ -166,7 +156,6 @@ object ExportImport {
         bundle.sessions.forEach { swd ->
             val validationErrors = validateSessionWithDoses(swd.session, swd.doses, maxTimestamp)
             if (validationErrors.isNotEmpty()) {
-                // Skip invalid session: prevents data corruption
                 return@forEach
             }
 
@@ -250,7 +239,6 @@ object ExportImport {
         )
     }
 
-    // ---- Shared validation (session bundle + full-journal backup) ----
 
     /**
      * All validation errors for one session plus its doses: empty list means
@@ -260,18 +248,15 @@ object ExportImport {
     private fun validateSessionWithDoses(session: Session, doses: List<Dose>, maxTimestamp: Long): List<String> {
         val errors = mutableListOf<String>()
 
-        // Child count cap per session
         if (doses.size > MAX_IMPORT_DOSES_PER_SESSION) {
             errors.add("too many doses (max $MAX_IMPORT_DOSES_PER_SESSION)")
             return errors
         }
 
-        // Validate session ID
         if (!isValidId(session.id) || session.id.length > MAX_IMPORT_ID_LEN) {
             errors.add("invalid session ID '${session.id}'")
         }
 
-        // Validate field lengths
         if (session.title.length > MAX_IMPORT_TITLE_LEN) {
             errors.add("session title too long")
         }
@@ -286,7 +271,6 @@ object ExportImport {
             errors.add("invalid session rating ${session.rating}")
         }
 
-        // Validate timestamps
         if (session.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
             errors.add("createdAt ${session.createdAt} out of valid range")
         }
@@ -300,14 +284,12 @@ object ExportImport {
             errors.add("endTime ${session.endTime} out of valid range")
         }
 
-        // Validate dose IDs and amounts
         doses.forEachIndexed { idx, dose ->
             errors.addAll(validateDose(dose, maxTimestamp).map { "dose[$idx] $it" })
         }
         return errors
     }
 
-    /** Validation errors for a single dose; empty list means the dose is importable. */
     private fun validateDose(dose: Dose, maxTimestamp: Long): List<String> {
         val errors = mutableListOf<String>()
         if (!isValidId(dose.id) || dose.id.length > MAX_IMPORT_ID_LEN) {
@@ -333,7 +315,6 @@ object ExportImport {
         return errors
     }
 
-    /** Check that an ID is non-blank and contains no path-traversal characters. */
     private fun isValidId(id: String): Boolean {
         return id.isNotBlank() && id.none { c ->
             c == '/' || c == '\\' || c == '.' || c == '\n' || c == '\r' || c == '\t'

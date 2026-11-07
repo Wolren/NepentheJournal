@@ -99,7 +99,6 @@ fun SyncHostingCard(
                 )
             }
 
-            // Pairing token display
             if (isHosting) {
                 Spacer(Modifier.height(12.dp))
                 if (pairingToken != null) {
@@ -109,7 +108,6 @@ fun SyncHostingCard(
                         onCopyToken = onCopyToken
                     )
                 } else {
-                    // Placeholder - token will appear shortly
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -133,7 +131,6 @@ fun SyncHostingCard(
                 }
             }
 
-            // Continuous sync toggle
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -167,7 +164,6 @@ private fun TokenDisplayCard(
     tokenExpiresAt: Long?,
     onCopyToken: () -> Unit
 ) {
-    // Live countdown: how many full seconds remain
     var secondsRemaining by remember { mutableStateOf(0) }
     var expired by remember { mutableStateOf(false) }
 

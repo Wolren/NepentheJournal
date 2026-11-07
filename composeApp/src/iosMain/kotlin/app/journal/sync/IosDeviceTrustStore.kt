@@ -63,7 +63,6 @@ class IosDeviceTrustStore(private val dataDir: String) {
     private val fileJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val atRestKey = IosAtRestKey("journal.trust-store")
 
-    /** In-memory cache of the last known good store; keeps serving when disk reads fail. */
     @kotlin.concurrent.Volatile
     private var cachedStore: IosTrustFile? = null
 
@@ -110,12 +109,7 @@ class IosDeviceTrustStore(private val dataDir: String) {
     }
 
     private fun loadLocked(): IosTrustFile {
-        // Serve the in-memory cache first, exactly like the JVM twin's
-        // DeviceTrustStore.loadStore (first line): per-request getSharedSecret /
-        // isTrustedDeviceId must not re-read, base64-decode, AES-GCM-decrypt and
-        // JSON-parse the file on every call. Every write path (saveLocked)
-        // refreshes cachedStore before touching disk, so the cache never goes
-        // stale within the process.
+        // Serve the in-memory cache first, exactly like the JVM twin's DeviceTrustStore.loadStore (first line)
         cachedStore?.let { return it }
         if (!fileManager.fileExistsAtPath(filePath)) {
             if (fileManager.fileExistsAtPath(backupPath)) {
@@ -178,7 +172,6 @@ class IosDeviceTrustStore(private val dataDir: String) {
                 fileJson.decodeFromString(IosTrustFile.serializer(), storeJson)
             }.getOrNull()?.let { return it }
         }
-        // Migration path: plaintext JSON from installs before at-rest encryption.
         runCatching {
             fileJson.decodeFromString(IosTrustFile.serializer(), text)
         }.getOrNull()?.let { return it }

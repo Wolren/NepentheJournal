@@ -25,7 +25,6 @@ data class ThemeConfig(
     val cornerRadius: CornerRadius = CornerRadius.MEDIUM,
     val fontScale: Float = 1.0f,
     val animationScale: Float = 1.0f,
-    /** Activity grid uses classic GitHub greens instead of the theme accent. */
     val githubGreenActivity: Boolean = false
 ) {
     val primary: Color get() = Color(primaryColor)
@@ -87,14 +86,11 @@ data class ThemePreset(
     val name: String,
     val dark: ThemeConfig,
     val light: ThemeConfig,
-    /** Optional card geometry the preset pairs with; applied on select when non-null. */
     val cardStyle: CardStyle? = null,
     val cornerRadius: CornerRadius? = null
 ) {
-    /** The variant for [isDark] rendering. */
     fun variant(isDark: Boolean): ThemeConfig = if (isDark) dark else light
 
-    /** True when the given edit colors match this preset's variant for [isDark]. */
     fun matches(primary: Long, secondary: Long, tertiary: Long, bg: Long, surface: Long, isDark: Boolean): Boolean {
         val v = variant(isDark)
         return primary == v.primaryColor && secondary == v.secondaryColor &&

@@ -6,7 +6,6 @@ enum class TimelineEventType {
     OBSERVATION, SAFETY_CHECK, SIDE_EFFECT, EMERGENCY, NOTE
 }
 
-/** Conflict: APPEND_ONLY */
 @Serializable
 data class TimelineEvent(
     override val id: String,

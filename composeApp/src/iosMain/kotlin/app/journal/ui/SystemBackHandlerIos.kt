@@ -12,7 +12,4 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 actual fun SystemBackHandler(onBack: () -> Unit) {
-    // iOS handles system back via UIKit. No-op here.
-    // If needed in the future, use UINavigationController delegate or
-    // UIBarButtonItem custom back action.
 }

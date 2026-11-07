@@ -41,14 +41,12 @@ fun SubstanceEditorScreen(
     var toxicityInput by remember { mutableStateOf("") }
     var toxicity by remember { mutableStateOf(substanceToEdit?.toxicity ?: emptyList()) }
 
-    // Dosage bands
     var doseThreshold by remember { mutableStateOf(substanceToEdit?.dosageBands?.get("threshold") ?: "") }
     var doseLight by remember { mutableStateOf(substanceToEdit?.dosageBands?.get("light") ?: "") }
     var doseCommon by remember { mutableStateOf(substanceToEdit?.dosageBands?.get("common") ?: "") }
     var doseStrong by remember { mutableStateOf(substanceToEdit?.dosageBands?.get("strong") ?: "") }
     var doseHeavy by remember { mutableStateOf(substanceToEdit?.dosageBands?.get("heavy") ?: "") }
 
-    // Duration
     var durOnset by remember { mutableStateOf(substanceToEdit?.durationProfile?.get("onset") ?: "") }
     var durComeup by remember { mutableStateOf(substanceToEdit?.durationProfile?.get("comeup") ?: "") }
     var durPeak by remember { mutableStateOf(substanceToEdit?.durationProfile?.get("peak") ?: "") }
@@ -107,7 +105,6 @@ fun SubstanceEditorScreen(
             AppTextButton(onClick = ::save, enabled = name.isNotBlank()) { Text("Save") }
         }
     ) {
-            // Name
             item {
                 OutlinedTextField(
                     value = name,
@@ -118,7 +115,6 @@ fun SubstanceEditorScreen(
                 )
             }
 
-            // Aliases
             item {
                 OutlinedTextField(
                     value = aliases,
@@ -129,7 +125,6 @@ fun SubstanceEditorScreen(
                 )
             }
 
-            // Class
             item {
                 Text("Chemical Class", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -175,7 +170,6 @@ fun SubstanceEditorScreen(
                 }
             }
 
-            // Interaction Classes (Pharmacological)
             item {
                 Spacer(Modifier.height(8.dp))
                 Text("Interaction Classes (Pharmacological)",
@@ -232,7 +226,6 @@ fun SubstanceEditorScreen(
                 }
             }
 
-            // ROAs
             item {
                 Spacer(Modifier.height(8.dp))
                 Text("Routes of Administration", style = MaterialTheme.typography.labelLarge,
@@ -256,7 +249,6 @@ fun SubstanceEditorScreen(
                 }
             }
 
-            // Summary
             item {
                 OutlinedTextField(
                     value = summary,
@@ -267,7 +259,6 @@ fun SubstanceEditorScreen(
                 )
             }
 
-            // Dosage section header
             item {
                 HorizontalDivider()
                 Spacer(Modifier.height(4.dp))
@@ -296,7 +287,6 @@ fun SubstanceEditorScreen(
                     label = { Text("Heavy") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
 
-            // Duration section header
             item {
                 HorizontalDivider()
                 Spacer(Modifier.height(4.dp))
@@ -329,7 +319,6 @@ fun SubstanceEditorScreen(
                 }
             }
 
-            // Addiction potential
             item {
                 OutlinedTextField(
                     value = addictionPotential,
@@ -340,7 +329,6 @@ fun SubstanceEditorScreen(
                 )
             }
 
-            // Toxicity
             item {
                 Text("Toxicity Warnings", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -152,7 +152,6 @@ fun SaferScreen() {
             )
         }
 
-        // External resources section
         item {
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -187,7 +186,6 @@ fun SaferScreen() {
             }
         }
 
-        // Need help section
         item {
             Card(
                 shape = RoundedCornerShape(12.dp),

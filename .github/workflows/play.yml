@@ -4,25 +4,7 @@ concurrency:
   group: play-${{ github.ref }}
   cancel-in-progress: true
 
-# Builds the signed release AAB and uploads it (plus fastlane metadata) to
-# Google Play's internal testing track via Gradle Play Publisher.
-#
 # NOTE: pins Java 17 for the Android toolchain; CI/CodeQL use Java 21.
-#
-# Prerequisites (one-time, see docs/GOOGLE-PLAY.md):
-#   - Play Console app created (app.journal.nepenthe)
-#   - Service account with "Release to production/testing" permission
-#   - Upload keystore generated
-#   - GitHub secrets configured:
-#       PLAY_SERVICE_ACCOUNT_JSON  (base64 of the service account JSON)
-#       KEYSTORE_BASE64            (base64 of the upload keystore)
-#       KEYSTORE_PASSWORD
-#       KEY_ALIAS
-#       KEY_PASSWORD
-#
-# Trigger: manually (workflow_dispatch) or on every v* tag.
-# Uploads go to the INTERNAL TESTING track; promote to production manually
-# in Play Console after review.
 
 on:
   workflow_dispatch:
@@ -42,8 +24,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # android-actions/setup-android@v3 deliberately absent: its default
-      # sdkmanager package list includes the removed 'tools' package; the
+      # android-actions/setup-android@v3 deliberately absent GitHub Ubuntu image already ships a licensed Android SDK.
       # GitHub Ubuntu image already ships a licensed Android SDK.
       - name: Restore signing secrets
         env:

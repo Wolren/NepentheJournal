@@ -11,23 +11,18 @@ package app.journal.ui.components
  * draws is the old prefix character, so rendered output is unchanged.
  */
 sealed class SyncLogEntry {
-    /** Prefix glyph drawn before the text; identical to the old convention. */
     abstract val glyph: Char
 
-    /** The message text, already stripped of any prefix. */
     abstract val text: String
 
-    /** Progress or neutral note: rendered with the "-" glyph. */
     data class Info(override val text: String) : SyncLogEntry() {
         override val glyph: Char = '-'
     }
 
-    /** Completed action: rendered with the "+" glyph in the primary color. */
     data class Success(override val text: String) : SyncLogEntry() {
         override val glyph: Char = '+'
     }
 
-    /** Failed action or invalid input: rendered with the "!" glyph in the error color. */
     data class Error(override val text: String) : SyncLogEntry() {
         override val glyph: Char = '!'
     }

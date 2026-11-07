@@ -26,7 +26,6 @@ data class JournalSnapshot(
      * fall back to [useShulginRating].
      */
     val ratingScaleMode: RatingScaleMode? = null,
-    /** Legacy pre-mode flag, kept for reading old files. Always written false. */
     val useShulginRating: Boolean = false,
     val useSubstanceColors: Boolean = true,
     val welcomeCompleted: Boolean = false,
@@ -67,11 +66,9 @@ expect class JournalStore(repo: IJournalRepository) {
     fun load()
     fun dataPath(): String
 
-    /** Whether the most recent [load] encountered parse issues that required recovery. */
     var lastLoadHadIssues: Boolean
         private set
 
-    /** Human-readable description of issues found during the last [load]. */
     var lastLoadIssueSummary: String
         private set
 

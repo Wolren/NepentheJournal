@@ -24,7 +24,6 @@ data class SyncConfig(
         "sessions", "doses", "timelineEvents", "notes",
         "substances", "effects", "interactions",
         "links", "persons", "attachments", "devices"
-        // syncConfigs deliberately excluded
     )
 ) : VaultDocument {
     companion object {

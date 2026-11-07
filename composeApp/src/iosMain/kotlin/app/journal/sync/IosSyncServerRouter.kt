@@ -50,9 +50,6 @@ class IosSyncServerRouter(
 ) {
     private val json = AppJson.json
 
-    // Per-IP throttles for the authenticated sync surface (one bucket per
-    // endpoint so a pull drain can never starve pairing), mirroring the JVM
-    // KtorSyncServerJvm buckets: push 120/min, pull 200/min, verify 30/min.
     private val pushThrottle = mutableMapOf<String, Pair<Int, Long>>()
     private val pullThrottle = mutableMapOf<String, Pair<Int, Long>>()
     private val verifyThrottle = mutableMapOf<String, Pair<Int, Long>>()
@@ -68,8 +65,6 @@ class IosSyncServerRouter(
                         fingerprint = fingerprint,
                         protocolVersion = 2,
                         wsSupported = false,
-                        // Static host ECDH key (contract g). Throws fail the
-                        // route, so clients only ever see a real key or an error.
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),
                     ContentType.Application.Json
@@ -84,8 +79,6 @@ class IosSyncServerRouter(
                         fingerprint = fingerprint,
                         protocolVersion = 2,
                         wsSupported = false,
-                        // Advertised here too so the client holds the host key
-                        // before the pairing token is entered (contract g).
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),
                     ContentType.Application.Json
@@ -101,17 +94,13 @@ class IosSyncServerRouter(
                     )
                     return@get
                 }
-                // Header first with query fallback, same read order as the
-                // JVM route, so header-style and query-style clients both work.
+                // Header first with query fallback, same read order as the JVM route, so header-style and query-style clients both work.
                 val deviceIdParam = call.request.headers[SyncAuth.DEVICE_ID_HEADER]
                     ?: call.request.queryParameters["deviceId"]
                 val challengeRaw = call.request.headers["X-Sync-Challenge"]
                     ?: call.request.queryParameters["challenge"]
                 val challenge = challengeRaw?.take(MAX_CHALLENGE_LEN)
-                // Uniform failure code: missing params, overlong challenges, and
-                // unknown devices all answer 401 with the SAME empty body, so
-                // this endpoint is not a device-existence oracle. Mirrors
-                // KtorSyncServerJvm exactly.
+                // Uniform failure code: missing params, overlong challenges, and unknown devices all answer 401 with the same empty body
                 if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
                     call.respondText(
                         json.encodeToString(HostChallengeResponse(0, "")),
@@ -134,9 +123,6 @@ class IosSyncServerRouter(
                     )
                     return@get
                 }
-                // Prove knowledge of the shared secret bound to the fresh
-                // client challenge, so a captured response cannot be replayed
-                // against a different challenge.
                 val timestamp = currentTimeMillis()
                 val signature = pairingManager.signChallenge(deviceIdParam, timestamp, challenge, secret)
                 call.respondText(
@@ -154,9 +140,6 @@ class IosSyncServerRouter(
                     return@post
                 }
 
-                // Declared length is enforced BEFORE the body is buffered:
-                // missing, chunked, or oversized bodies are refused unread,
-                // mirroring the JVM pairing route.
                 if (!hasValidContentLength(call, IosPairingManager.MAX_PAIRING_BODY_BYTES.toLong())) {
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Body too large")),
@@ -184,8 +167,6 @@ class IosSyncServerRouter(
                     return@post
                 }
 
-                // Cap identity fields so a client cannot register oversized
-                // display names or ids in the trust store.
                 if (req.clientDeviceId.length > 128 ||
                     req.clientDeviceName.length > 200 ||
                     req.clientFingerprint.length > 128
@@ -197,12 +178,7 @@ class IosSyncServerRouter(
                     return@post
                 }
 
-                // Contract section g: validate the client's EPHEMERAL P-256
-                // key BEFORE the token is consumed, so a malformed key can
-                // never burn a single-use token. Rules match the JVM host:
-                // present, valid base64, 65 bytes, first byte 0x04, and a
-                // point on the curve (SecKeyCreateWithData rejects off-curve
-                // points, so a failed agreement yields null here as well).
+                // Rules match the JVM host: present, valid base64, 65 bytes, first byte 0x04
                 val clientEcdhB64 = req.clientEcdhPublicKeyB64
                 if (clientEcdhB64 == null) {
                     call.respondText(
@@ -222,7 +198,6 @@ class IosSyncServerRouter(
                     )
                     return@post
                 }
-                // ECDH with the STATIC host private key (SecKeyCreateKeyExchange).
                 val ecdhShared = ecdhIdentity.agreeSharedSecret(clientEcdhBytes)
                 if (ecdhShared == null) {
                     call.respondText(
@@ -245,12 +220,7 @@ class IosSyncServerRouter(
                 val clientDeviceId = req.clientDeviceId.ifBlank {
                     "client-${req.clientFingerprint.take(8)}"
                 }
-                // Contract section g: seal the secret under the ECDH-derived
-                // key BEFORE registering the peer, so every failure above
-                // leaves no trust-store side effect. The plaintext
-                // sharedSecret field and the legacy PBKDF2 encSecretB64 wrap
-                // leave the protocol: a LAN observer of this response must not
-                // learn the permanent sync secret.
+                // The plaintext sharedSecret field and the legacy PBKDF2 encSecretB64 wrap leave the protocol
                 val ecdhSecretB64 = try {
                     PairingEcdh.wrapSharedSecret(ecdhShared, secret)
                 } catch (e: Exception) {
@@ -293,9 +263,6 @@ class IosSyncServerRouter(
                     )
                     return@post
                 }
-                // Declared length is enforced BEFORE the body is buffered:
-                // missing, chunked, or oversized bodies are refused unread,
-                // mirroring the JVM push route.
                 if (!hasValidContentLength(call, MAX_SYNC_BODY_BYTES)) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Payload too large")),
@@ -349,8 +316,6 @@ class IosSyncServerRouter(
                     return@post
                 }
 
-                // The batch must identify the authenticated caller, otherwise
-                // a paired device could attribute writes to another device.
                 if (batch.deviceId != callerDeviceId) {
                     call.respondText(
                         json.encodeToString(SyncResponse(false, error = "Device ID mismatch")),
@@ -370,9 +335,7 @@ class IosSyncServerRouter(
 
                 applySyncBatch(batch)
                 trustStore.updateLastSeen(callerDeviceId)
-                // Durability: persist before acknowledging, so a crash after
-                // the response cannot lose data the client believes was
-                // accepted. Mirrors the JVM push route.
+                // Mirrors the JVM push route.
                 persistAfterApply?.invoke()
                 val response = buildSyncResponse(batch.since)
                 val responseJson = json.encodeToString(response)
@@ -407,8 +370,7 @@ class IosSyncServerRouter(
                     )
                     return@get
                 }
-                // Composite resume id (SyncResponse.nextSinceId), bounded
-                // exactly like the JVM pull route; absent from older clients.
+                // Composite resume id (SyncResponse.nextSinceId), bounded exactly like the JVM pull route; absent from older clients.
                 val sinceId = call.request.queryParameters["sinceId"]
                     ?.trim()
                     ?.take(SyncLimits.MAX_ID_LEN)
@@ -462,7 +424,6 @@ class IosSyncServerRouter(
         if (parts.size != 3) return false
         val (timestampStr, nonce, signature) = parts
         val timestamp = timestampStr.toLongOrNull() ?: return false
-        // Timestamp window plus nonce replay protection, never cleared.
         if (!nonceCache.checkAndRecord(nonce, timestamp)) return false
         val payload = "$deviceId:$timestamp:$nonce:$body"
         val expected = hmacSha256Hex(secret, payload.encodeToByteArray())
@@ -513,9 +474,6 @@ class IosSyncServerRouter(
             truncated = truncated
         )
         if (truncated) {
-            // Lexicographic minimum over the per-type cut positions; cuts is
-            // non-empty because truncated is only set inside page() right
-            // before a cut is recorded.
             val minCut = cuts.minWith(compareBy({ it.first }, { it.second }))
                 ?: error("truncated page without a cut position")
             return response.copy(nextSince = minCut.first, nextSinceId = minCut.second)
@@ -524,16 +482,7 @@ class IosSyncServerRouter(
     }
 
     private fun applySyncBatch(batch: SyncBatch) {
-        // Mirror the JVM host push handler (SyncServerHandlers.handlePush):
-        // truncate the peer device name to 200 chars, record the peer's sync
-        // watermark for peer-aware tombstone retention, bulk-apply everything
-        // EXCEPT sessions and notes with last-writer-wins and the batch.since
-        // tombstone cutoff, then route those two collections through the
-        // shared conflict-aware repo APIs. Sessions go through the ONE
-        // commonMain mergeSessionConflict (contract section c item 4, the
-        // same function the JVM host calls), so identical peer data produces
-        // the same journal on iOS as on the JVM host; notes go through
-        // upsertNoteWithConflict.
+        // Sessions go through the one commonMain mergeSessionConflict (contract section c item 4, the same function the JVM host calls)
         val tagged = batch.copy(deviceName = batch.deviceName.take(200))
         PeerSyncWatermarks.recordPeerCursor(tagged.deviceId, tagged.since)
         repo.applyBatch(
@@ -554,9 +503,6 @@ class IosSyncServerRouter(
             deletedCustomUnitIds = tagged.deletedCustomUnitIds,
             tombstoneCutoff = tagged.since
         )
-        // Conflict count is intentionally unused on iOS: this host has no
-        // push-connection banner (unchanged behavior; the JVM host reports
-        // it through onConnection).
         mergeSessionConflict(repo, tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
         tagged.notes.forEach { note ->
             if (note.id in tagged.deletedNoteIds) return@forEach
@@ -581,8 +527,7 @@ class IosSyncServerRouter(
         /** Pull cursors may be at most 1 day in the future (shared EntityTimePolicy margin). */
         const val MAX_FUTURE_SINCE_MS = EntityTimePolicy.FUTURE_MARGIN_MS
 
-        // Per-IP throttle limits, mirroring KtorSyncServerJvm exactly:
-        // 120 pushes, 200 pulls, 30 auth challenges per 60s window.
+        // Per-ip throttle limits, mirroring KtorSyncServerJvm exactly: 120 pushes, 200 pulls, 30 auth challenges per 60s window.
         const val MAX_PUSH_PER_WINDOW = 120
         const val PUSH_WINDOW_MS = 60_000L
         const val MAX_PULL_PER_WINDOW = 200

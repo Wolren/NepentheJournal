@@ -30,7 +30,6 @@ class JournalRepositoryTest {
             routeOfAdministration = "Oral", amount = amount, unit = "mg", timestamp = timestamp
         )
 
-    // ==================== Basic CRUD ====================
 
     @Test
     fun upsertReplacesExistingById() {
@@ -60,7 +59,6 @@ class JournalRepositoryTest {
         assertNull(repo.getEffect("nonexistent"))
     }
 
-    // ==================== Deletion cascades ====================
 
     @Test
     fun deleteSessionRemovesOrphanedDosesAndNotes() {
@@ -129,7 +127,6 @@ class JournalRepositoryTest {
         assertEquals(substancesBefore, repo.substances.value.size)
     }
 
-    // ==================== Index consistency ====================
 
     @Test
     fun dosesForSessionReturnsOnlyThatSessionsDoses() {
@@ -199,7 +196,6 @@ class JournalRepositoryTest {
         assertEquals("s:1", inRange.first())
     }
 
-    // ==================== Preferences ====================
 
     @Test
     fun ratingScaleDefaultsOff() {
@@ -224,7 +220,6 @@ class JournalRepositoryTest {
         assertTrue(repo.useSubstanceColors.value)
     }
 
-    // ==================== Clear ====================
 
     @Test
     fun clearAllEmptiesAllCollections() {
@@ -242,7 +237,6 @@ class JournalRepositoryTest {
         assertTrue(repo.useSubstanceColors.value)
     }
 
-    // ==================== Snapshot roundtrip ====================
 
     @Test
     fun applySnapshotPopulatesAllCollections() {
@@ -259,16 +253,10 @@ class JournalRepositoryTest {
         assertEquals(1, repo.sessions.value.size)
         assertEquals(1, repo.substances.value.size)
         assertEquals(1, repo.doses.value.size)
-        // EXPECTATION CHANGED (hardening, audit tombstone-pref-wipe): applySnapshot
-        // no longer applies the snapshot's preference fields at all. Its only
-        // production caller is the bundled-seed apply, which must never rewrite user
-        // prefs; preference restore belongs to AppJson.apply (disk load / backup
-        // restore), which is untouched. A fresh repo therefore keeps its defaults.
         assertEquals(RatingScaleMode.OFF, repo.ratingScaleMode.value)
         assertTrue(repo.useSubstanceColors.value)
     }
 
-    // ==================== DataFrame export ====================
 
     @Test
     fun sessionsDataFrameHasCorrectShape() {
@@ -292,7 +280,6 @@ class JournalRepositoryTest {
         assertEquals("LSD", df.first().substanceName)
     }
 
-    // ==================== Derived flows ====================
 
     @Test
     fun recentSessionsReturnsMostRecent() = runBlocking {
@@ -310,7 +297,6 @@ class JournalRepositoryTest {
         assertEquals("s:2", recent[4].id)
     }
 
-    // ==================== applyBatch ====================
 
     @Test
     fun applyBatchPopulatesAllCollections() {
@@ -354,9 +340,7 @@ class JournalRepositoryTest {
                 sampleDose("d:2", "sub:2", "s:1", 1500L)
             )
         )
-        // Session indices
         assertEquals(2, repo.sessions.value.size)
-        // Dose indices
         assertEquals(2, repo.dosesForSession("s:1").size)
         assertEquals(1, repo.sessionIdsForSubstance("sub:1").size)
         assertTrue("s:1" in repo.sessionIdsForSubstance("sub:1"))
@@ -380,7 +364,6 @@ class JournalRepositoryTest {
             title = "Newer", startTime = 1000L)
         val older = newer.copy(title = "Older", updatedAt = 1000L)
 
-        // Blind upsert (default) overwrites; seed/restore semantics
         repo.applyBatch(sessions = listOf(newer))
         repo.applyBatch(sessions = listOf(older))
         assertEquals("Older", repo.getSession("s:lww")?.title)
@@ -400,7 +383,6 @@ class JournalRepositoryTest {
         // Equal updatedAt must apply (idempotent re-delivery)
         repo.applyBatch(sessions = listOf(base.copy(title = "Same-ts")), lastWriterWins = true)
         assertEquals("Same-ts", repo.getSession("s:eq")?.title)
-        // Newer must apply
         repo.applyBatch(sessions = listOf(base.copy(title = "New", updatedAt = 3000L)), lastWriterWins = true)
         assertEquals("New", repo.getSession("s:eq")?.title)
     }
@@ -413,14 +395,12 @@ class JournalRepositoryTest {
             sessions = listOf(sampleSession("s:1")),
             doses = listOf(sampleDose("d:1", "sub:1", "s:1", 1000L))
         )
-        // Add a second dose individually
         repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
         assertEquals(2, repo.dosesForSession("s:1").size)
         assertEquals(1, repo.sessionIdsForSubstance("sub:1").size)
         assertTrue("s:1" in repo.sessionIdsForSubstance("sub:1"))
     }
 
-    // ==================== substanceDoseStats ====================
 
     @Test
     fun substanceDoseStatsStartsEmpty() {
@@ -503,7 +483,6 @@ class JournalRepositoryTest {
         assertEquals(2, repo.substanceDoseStats.size)
     }
 
-    // ==================== upsertNoteWithConflict ====================
 
     @Test
     fun upsertNoteWithConflictReturnsNullForNullSessionId() {
@@ -525,9 +504,7 @@ class JournalRepositoryTest {
         val resolved = repo.upsertNoteWithConflict(remote, "remote")
         assertNotNull(resolved)
         assertEquals(1, resolved.conflictSiblings.size)
-        // EXPECTATION CHANGED (hardening, contract c): the sibling is now the LOSING
-        // body, never the winner's own body. The remote note is newer (200 > 100), so
-        // its body wins the merge and the local body is the one preserved.
+        // The remote note is newer (200 > 100)
         assertEquals("local version", resolved.conflictSiblings.first().body)
         assertEquals("remote", resolved.conflictSiblings.first().deviceOrigin)
         assertEquals(100L, resolved.conflictSiblings.first().updatedAt)
@@ -556,14 +533,12 @@ class JournalRepositoryTest {
         val remote = Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "remote",
             sessionId = "s:1", body = "new")
         repo.upsertNoteWithConflict(remote, "remote")
-        // The stored note should have the remote body (last write wins) plus conflict sibling
         val stored = repo.notes.value.find { it.id == "n:1" }
         assertNotNull(stored)
         assertEquals("new", stored.body)
         assertEquals(1, stored.conflictSiblings.size)
     }
 
-    // ==================== upsertTimelineEvent ====================
 
     @Test
     fun upsertTimelineEventIndexesBySession() {
@@ -587,12 +562,9 @@ class JournalRepositoryTest {
             createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
         )
         repo.upsertTimelineEvent(event)
-        // Update with same ID but different session
         val updated = event.copy(sessionId = "s:2", label = "Moved")
         repo.upsertTimelineEvent(updated)
-        // Old session should not have the event
         assertTrue(repo.eventsForSession("s:1").isEmpty())
-        // New session should have it
         assertEquals(1, repo.eventsForSession("s:2").size)
         assertEquals("Moved", repo.eventsForSession("s:2").first().label)
     }
@@ -606,12 +578,10 @@ class JournalRepositoryTest {
             createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
         )
         repo.upsertTimelineEvent(event)
-        // Upsert same event again (same session) - should not duplicate
         repo.upsertTimelineEvent(event)
         assertEquals(1, repo.eventsForSession("s:1").size)
     }
 
-    // ==================== deleteTimelineEvent ====================
 
     @Test
     fun deleteTimelineEventRemovesFromIndex() {
@@ -641,13 +611,11 @@ class JournalRepositoryTest {
             createdAt = 0L, updatedAt = 0L, deviceOrigin = "test"
         ))
         repo.deleteTimelineEvent("e:1")
-        // Second delete should be a no-op
         repo.deleteTimelineEvent("e:1")
         assertTrue(repo.eventsForSession("s:1").isEmpty())
         assertTrue(repo.timelineEvents.value.isEmpty())
     }
 
-    // ==================== substanceDoseStats on deleteSubstance ====================
 
     @Test
     fun deleteSubstanceClearsDoseStats() {
@@ -674,7 +642,6 @@ class JournalRepositoryTest {
         assertTrue(repo.substanceDoseStats.containsKey("sub:2"))
     }
 
-    // ==================== upsertNote index consistency ====================
 
     @Test
     fun upsertNoteWithNullSessionIdDoesNotIndexButStillStores() {
@@ -684,7 +651,6 @@ class JournalRepositoryTest {
         repo.upsertNote(note)
         // Note is stored in the store
         assertEquals(1, repo.notes.value.size)
-        // But not indexed by session
         assertTrue(repo.notesForSession("any").isEmpty())
     }
 
@@ -694,7 +660,6 @@ class JournalRepositoryTest {
         repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:1", body = "a"))
         assertEquals(1, repo.notesForSession("s:1").size)
-        // Move to different session
         repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:2", body = "b"))
         assertTrue(repo.notesForSession("s:1").isEmpty())
@@ -722,7 +687,6 @@ class JournalRepositoryTest {
         assertTrue(hits.none { it.entityId == "s:1" }, "deleted session must vanish from search")
     }
 
-    // ==================== Search index freshness (dirty-flag rebuild) ====================
 
     @Test
     fun searchIndexReflectsJustUpsertedAndDeletedNote() {
@@ -743,7 +707,6 @@ class JournalRepositoryTest {
             "batch-applied substance must be searchable")
     }
 
-    // ==================== upsertSessionChildren (batch save) ====================
 
     @Test
     fun sessionChildrenBatchMatchesPerItemUpserts() {
@@ -814,7 +777,6 @@ class JournalRepositoryTest {
         assertEquals(toleranceBefore, repo.toleranceVersion.value)
     }
 
-    // ==================== Seed apply preserves tombstones + prefs ====================
 
     @Test
     fun applySnapshotPreservesTombstonesAndUserPrefs() {
@@ -827,7 +789,6 @@ class JournalRepositoryTest {
         val tombstonesBefore = repo.exportTombstones()
         assertTrue(tombstonesBefore.isNotEmpty(), "fixture must record a tombstone")
 
-        // A bundled-seed snapshot carries its own (default) prefs and no tombstones.
         repo.applySnapshot(JournalSnapshot(
             savedAt = 1000L,
             substances = listOf(sampleSubstance("sub:1", "LSD")),
@@ -843,11 +804,9 @@ class JournalRepositoryTest {
         assertEquals(RatingScaleMode.NUMERIC, repo.ratingScaleMode.value,
             "user rating preference must survive seed apply")
         assertFalse(repo.useSubstanceColors.value, "user color preference must survive seed apply")
-        // The snapshot's entities still land on top of existing data.
         assertEquals(1, repo.substances.value.size)
     }
 
-    // ==================== Conflict merge (contract c) ====================
 
     @Test
     fun conflictMergeKeepsBothBodiesWhenLocalWins() {
@@ -965,7 +924,6 @@ class JournalRepositoryTest {
         val repo = JournalRepository()
         repo.upsertNote(Note(id = "n:1", createdAt = 0L, updatedAt = 200L, deviceOrigin = "local",
             sessionId = "s:1", body = "stored body"))
-        // Seed/restore path (lastWriterWins = false, the default) stays authoritative.
         repo.applyBatch(notes = listOf(Note(id = "n:1", createdAt = 0L, updatedAt = 100L,
             deviceOrigin = "seed", sessionId = "s:1", body = "seed body")))
         val stored = repo.notes.value.first { it.id == "n:1" }
@@ -973,7 +931,6 @@ class JournalRepositoryTest {
         assertTrue(stored.conflictSiblings.isEmpty(), "authoritative restore must not create conflicts")
     }
 
-    // ==================== Dose index / stat integrity ====================
 
     @Test
     fun upsertDoseReparentUpdatesSessionAndSubstanceIndices() {
@@ -1027,19 +984,16 @@ class JournalRepositoryTest {
         repo.upsertDose(sampleDose("d:2", "sub:1", "s:1", 2000L))
 
         repo.deleteDose("d:1")
-        // The incremental delete path must already be consistent with no rebuild:
-        // the session still holds d:2, so it stays indexed.
+        // The incremental delete path must already be consistent with no rebuild: the session still holds d:2, so it stays indexed.
         assertEquals(setOf("s:1"), repo.sessionIdsForSubstance("sub:1").toSet())
         assertEquals(1, repo.substanceDoseStats["sub:1"]?.first)
 
-        // Re-parent the survivor: incremental stats must shrink to one session again.
         repo.upsertDose(sampleDose("d:2", "sub:1", "s:2", 2000L))
         val statsBefore = repo.substanceDoseStats
         val sessionsBefore = repo.sessionIdsForSubstance("sub:1").toSet()
         assertEquals(setOf("s:2"), sessionsBefore, "stale session must not survive the re-parent")
         assertEquals(1, statsBefore["sub:1"]?.first, "distinct-session count must shrink with the move")
 
-        // Roundtrip: a from-scratch rebuild must reproduce the incremental state.
         repo.rebuildIndices()
         assertEquals(statsBefore, repo.substanceDoseStats,
             "incremental stats must equal rebuildSubstanceDoseStats output")
@@ -1062,7 +1016,6 @@ class JournalRepositoryTest {
             "cascade must run the same invalidation a full rebuild produces")
     }
 
-    // ==================== applyBatch tolerance bump ====================
 
     @Test
     fun applyBatchBumpsToleranceVersionOnceForDoseAndSubstancePuts() {
@@ -1080,7 +1033,6 @@ class JournalRepositoryTest {
         assertEquals(beforeNotes, repo.toleranceVersion.value, "notes do not affect tolerance")
     }
 
-    // ==================== Derived flows for the UI wave ====================
 
     @Test
     fun dosesForSubstanceFlowFilters() = runBlocking {
@@ -1121,20 +1073,7 @@ class JournalRepositoryTest {
         assertNull(repo.substancesById.first()["gone"])
     }
 
-    // ==================== Peer-aware tombstone retention ====================
-    //
-    // The prune rule (JournalTombstones.mayPruneTombstone): a tombstone may
-    // be dropped only when it is OLDER than the 30-day window AND at or
-    // below every locally known peer sync watermark (PeerSyncWatermarks,
-    // fed by both host push handlers from SyncBatch.since). With no
-    // watermark ever observed the rule falls back to a time window alone,
-    // extended to 180 days so the map cannot grow without bound. The old
-    // FLAT 30-day window is gone: no pre-existing test in this suite
-    // encoded it (the only tombstone assertions were about seed-apply
-    // preservation of FRESH tombstones, which is unchanged), so no old
-    // expectation needed rewriting; this section is entirely new.
-
-    /** Run a local delete so recordTombstone() executes a prune pass. */
+    // The old flat 30-day window is gone
     private fun triggerTombstonePrune(repo: JournalRepository) {
         repo.upsertSubstance(sampleSubstance("sub:trigger", "Trigger"))
         repo.upsertSession(sampleSession("s:trigger"))
@@ -1153,9 +1092,7 @@ class JournalRepositoryTest {
 
     @Test
     fun olderTombstoneAboveUnknownWatermarkSurvives() {
-        // Unknown watermark: no peer cursor has ever been observed (fresh
-        // process / never-hosted device). The fallback keeps anything
-        // inside the extended 180-day window, so 40 days is well safe.
+        // The fallback keeps anything inside the extended 180-day window, so 40 days is well safe.
         PeerSyncWatermarks.clear()
         val repo = JournalRepository()
         val dayMs = 86_400_000L
@@ -1175,9 +1112,7 @@ class JournalRepositoryTest {
         val dayMs = 86_400_000L
         val now = currentTimeMillis()
         repo.importTombstones(mapOf("dose:behind-peer" to now - 40 * dayMs))
-        // A peer exists whose cursor is 50 days old: it has NOT drained as
-        // far as this 40-day-old delete, so dropping it would resurrect
-        // the entity on that peer's next stale push.
+        // A peer exists whose cursor is 50 days old: it hasn't drained as far as this 40-day-old delete
         PeerSyncWatermarks.recordPeerCursor("peer-behind", now - 50 * dayMs)
         triggerTombstonePrune(repo)
         assertTrue("dose:behind-peer" in repo.exportTombstones(),
@@ -1193,15 +1128,12 @@ class JournalRepositoryTest {
         repo.importTombstones(mapOf("dose:delivered" to now - 40 * dayMs))
         assertTrue("dose:delivered" in repo.exportTombstones(),
             "fixture import (no watermarks yet) must keep the tombstone")
-        // Two peers, both drained PAST the tombstone; the floor is the
-        // MINIMUM (peer-a, 10 days ago), which is still above the
-        // 40-day-old delete.
+        // Two peers, both drained past the tombstone; the floor is the minimum (peer-a, 10 days ago)
         PeerSyncWatermarks.recordPeerCursor("peer-a", now - 10 * dayMs)
         PeerSyncWatermarks.recordPeerCursor("peer-b", now)
         triggerTombstonePrune(repo)
         assertFalse("dose:delivered" in repo.exportTombstones(),
             "older than the window and at/below every peer watermark must prune")
-        // The same prune pass kept its own fresh tombstone.
         assertTrue("dose:d:trigger" in repo.exportTombstones(),
             "the fresh tombstone created by the same pass must survive")
     }

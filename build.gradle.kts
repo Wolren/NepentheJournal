@@ -12,8 +12,7 @@ buildscript {
             force(
                 "org.jdom:jdom2:2.0.6.1",
                 "org.bitbucket.b_c:jose4j:0.9.7",
-                // AGP tooling ships Bouncy Castle 1.79 / commons-lang3 3.16 on the
-                // plugin classpath; the subprojects block below cannot reach it
+                // AGP tooling ships Bouncy Castle 1.79 / commons-lang3 3.16 on the plugin classpath; the subprojects block below can't reach it
                 "org.bouncycastle:bcprov-jdk18on:1.86",
                 "org.bouncycastle:bcpkix-jdk18on:1.86",
                 "org.bouncycastle:bcutil-jdk18on:1.86",
@@ -27,8 +26,7 @@ subprojects {
     configurations.configureEach {
         resolutionStrategy {
             force(
-                // Netty 4.1.x - fixes 20+ CVEs (SNI, HTTP/2 rapid reset, request smuggling,
-                // decompression bomb, CRLF injection, ipv6 filter bypass, LZ4 OOM, etc.)
+                // Netty 4.1.x: fixes 20+ CVEs (SNI, http/2 rapid reset, request smuggling, decompression bomb, CRLF injection, ipv6 filter bypass).
                 "io.netty:netty-handler:4.2.18.Final",
                 "io.netty:netty-codec-http2:4.2.18.Final",
                 "io.netty:netty-codec-http:4.2.18.Final",
@@ -40,22 +38,19 @@ subprojects {
                 "io.netty:netty-transport-native-unix-common:4.2.18.Final",
                 "io.netty:netty-handler-proxy:4.2.18.Final",
                 "io.netty:netty-codec-socks:4.2.18.Final",
-                // Bouncy Castle - GOST CTR keystream reuse (critical), broken algorithm
+                // Bouncy Castle: GOST CTR keystream reuse (critical), broken algorithm
                 "org.bouncycastle:bcprov-jdk18on:1.86",
                 "org.bouncycastle:bcpkix-jdk18on:1.86",
                 "org.bouncycastle:bcutil-jdk18on:1.86",
-                // Apache HTTP Components - XSS in HttpClient
+                // Apache http Components: XSS in HttpClient
                 "org.apache.httpcomponents:httpclient:4.5.14",
                 "org.apache.httpcomponents:httpmime:4.5.14",
                 "org.apache.httpcomponents:httpcore:4.4.16",
-                // Commons Lang - uncontrolled recursion
                 "org.apache.commons:commons-lang3:3.20.0",
-                // Apache HTTP Components 5 (via ktor-client-apache5 test client) -
-                // HPack header bomb, header-parsing memory exhaustion, connection leak
+                // Apache http Components 5 (via ktor-client-apache5 test client): HPack header bomb, header-parsing memory exhaustion, connection leak.
                 "org.apache.httpcomponents.client5:httpclient5:5.6.4",
                 "org.apache.httpcomponents.core5:httpcore5:5.4.4",
                 "org.apache.httpcomponents.core5:httpcore5-h2:5.4.4",
-                // OpenTelemetry - unbounded baggage allocation (Kotlin SwiftExport worker)
                 "io.opentelemetry:opentelemetry-api:1.66.0"
             )
         }
@@ -66,8 +61,6 @@ subprojects {
     buildscript {
         configurations.classpath {
             resolutionStrategy.force(
-                // Kover's coverage-report drags in vulnerable FreeMarker on the
-                // composeApp plugin classpath
                 "org.freemarker:freemarker:2.3.35"
             )
         }

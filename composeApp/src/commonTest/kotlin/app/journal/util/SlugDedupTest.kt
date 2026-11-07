@@ -16,7 +16,6 @@ import kotlin.test.assertEquals
  */
 class SlugDedupTest {
 
-    /** Verbatim copy of the pre-dedup ObsidianNoteRenderer.slugify body. */
     private fun oldObsidianSlugify(s: String): String {
         val out = StringBuilder()
         var prevDash = false
@@ -33,7 +32,6 @@ class SlugDedupTest {
         return if (out.isEmpty()) "untitled" else out.toString()
     }
 
-    /** Verbatim copy of the pre-dedup DosewikiTaxonomy.slugify body. */
     private fun oldDoseWikiSlugify(name: String): String =
         name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
@@ -87,8 +85,6 @@ class SlugDedupTest {
 
     @Test
     fun packageLocalDelegatesRouteToOneImplementation() {
-        // The names existing (frozen) tests call are zero-logic delegates:
-        // both must agree with the single util implementation for every input.
         for (input in corpus) {
             assertEquals(slugify(input), obsidianSlugify(input),
                 "export.obsidian.slugify must be the util filename form")
@@ -102,9 +98,6 @@ class SlugDedupTest {
 
     @Test
     fun historicPinnedExamplesStayExact() {
-        // Pre-existing expectations from ObsidianNoteRendererTest and
-        // DosewikiTaxonomyTest, restated here so this file alone documents
-        // the rendered-text contract.
         assertEquals("lsd-exploration", slugify("LSD Exploration!"))
         assertEquals("a-wild-trip-2026", slugify("A Wild/Trip: 2026!"))
         assertEquals("untitled", slugify(""))
@@ -116,9 +109,6 @@ class SlugDedupTest {
             "salvinorin-b-methoxymethyl-ether",
             DosewikiTaxonomy.slugify("Salvinorin-B-Methoxymethyl-Ether")
         )
-        // The two forms still differ exactly where they always did. Non-ASCII
-        // is written as \u escapes so the assertions pin NFC input explicitly
-        // (an editor silently rewriting to NFD would otherwise change slugs).
         assertEquals("caf\u00e9", slugify("caf\u00e9"), "filename form keeps Unicode letters")
         assertEquals("caf", DosewikiTaxonomy.slugify("caf\u00e9"), "ascii form strips them")
         assertEquals("untitled", slugify("!!!"), "filename fallback is untitled")

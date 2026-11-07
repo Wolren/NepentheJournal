@@ -3,7 +3,6 @@ import kotlinx.serialization.Serializable
 
 enum class InteractionRisk { DANGEROUS, UNSAFE, UNCERTAIN, LOW, UNKNOWN }
 
-/** Conflict: REMOTE_SOURCE_WINS. Query bidirectionally by substanceAId OR substanceBId. */
 @Serializable
 data class Interaction(
     override val id: String,

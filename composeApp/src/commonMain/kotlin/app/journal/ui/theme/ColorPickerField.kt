@@ -79,13 +79,12 @@ private fun ColorPickerDialog(
 ) {
     var argb by remember { mutableStateOf(initial) }
     val color = Color(argb)
-    // HSV state
     var hue by remember { mutableStateOf(ColorUtils.toHsvHue(color)) }
     var sat by remember { mutableStateOf(ColorUtils.toHsvSat(color)) }
     var valueBri by remember { mutableStateOf(ColorUtils.toHsvVal(color)) }
     var alpha by remember { mutableStateOf((initial ushr 24).toInt().coerceIn(0, 255)) }
 
-    // Keep ARGB in sync with HSV/alpha
+    // Keep argb in sync with HSV/alpha
     fun sync() { argb = ColorUtils.hsvToArgb(hue, sat, valueBri, alpha) }
 
     AlertDialog(
@@ -102,7 +101,6 @@ private fun ColorPickerDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Saturation/Value square
                 val squareSize = 220.dp
                 Box(
                     modifier = Modifier
@@ -135,15 +133,12 @@ private fun ColorPickerDialog(
                     ) {
                         val w = size.width
                         val h = size.height
-                        // white -> hue color across X
                         drawRect(brush = Brush.horizontalGradient(
                             colors = listOf(Color.White, ColorUtils.hueColor(hue))))
-                        // black from bottom (Y inverted)
                         drawRect(brush = Brush.verticalGradient(
                             colors = listOf(Color.Transparent, Color.Black),
                             startY = 0f, endY = h))
                     }
-                    // selector dot
                     val dotX = (sat * squareSize.value).dp
                     val dotY = ((1f - valueBri) * squareSize.value).dp
                     Box(
@@ -156,7 +151,6 @@ private fun ColorPickerDialog(
                     )
                 }
 
-                // Hue slider
                 Slider(
                     value = hue,
                     onValueChange = { hue = it; sync() },
@@ -167,10 +161,8 @@ private fun ColorPickerDialog(
                         activeTrackColor = MaterialTheme.colorScheme.outlineVariant
                     )
                 )
-                // Hue track background
                 HueTrack(Modifier.fillMaxWidth().height(6.dp))
 
-                // Alpha slider
                 Slider(
                     value = alpha.toFloat(),
                     onValueChange = { alpha = it.toInt().coerceIn(0, 255); sync() },
@@ -187,7 +179,6 @@ private fun ColorPickerDialog(
                     Text("${alpha * 100 / 255}%", style = MaterialTheme.typography.labelSmall)
                 }
 
-                // Hex field (live)
                 var hexInput by remember(argb) { mutableStateOf(ColorUtils.toHexColor(argb)) }
                 OutlinedTextField(
                     value = hexInput,
@@ -208,7 +199,6 @@ private fun ColorPickerDialog(
                         keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done)
                 )
 
-                // Preview swatch
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Color(argb),
@@ -220,7 +210,6 @@ private fun ColorPickerDialog(
     )
 }
 
-/** Rainbow track behind the hue slider. */
 @Composable
 private fun HueTrack(modifier: Modifier) {
     Canvas(modifier = modifier) {

@@ -29,10 +29,7 @@ class IosPairingManager {
     /** Generate a 6 char pairing token valid for [ttlSeconds] (default 120s). */
     fun generatePairingToken(ttlSeconds: Long = 120L): String {
         val sb = StringBuilder(6)
-        // Unbiased selection with kotlin.random.Random.nextInt over the
-        // whole alphabet, mirroring the JVM's alpha[secureRandom.nextInt(...)]
-        // shape: a plain byte modulo leaves 256 mod alphabetLength residual
-        // bias in the lower codes.
+        // Unbiased: Random.nextInt over the whole alphabet, not a byte modulo (256 mod alphabetLength bias in the lower codes).
         repeat(6) {
             sb.append(ALPHABET[Random.nextInt(ALPHABET.length)])
         }
@@ -41,7 +38,6 @@ class IosPairingManager {
         return token
     }
 
-    /** Verify a user entered token and invalidate it on success (single use). */
     fun verifyPairingToken(enteredToken: String): Boolean {
         val current = pending ?: return false
         if (current.isExpired(currentTimeMillis())) return false
@@ -54,7 +50,6 @@ class IosPairingManager {
         pending = null
     }
 
-    /** Current pending token, or null when none is active or it expired. */
     fun currentPairingToken(): String? {
         val current = pending ?: return null
         return if (current.isExpired(currentTimeMillis())) null else current.token
@@ -84,7 +79,6 @@ class IosPairingManager {
             "challenge:$deviceId:$timestamp:$challenge".encodeToByteArray()
         )
 
-    /** Constant time comparison to avoid timing side channels. */
     fun constantTimeEquals(a: String, b: String): Boolean {
         if (a.length != b.length) return false
         var result = 0

@@ -26,10 +26,7 @@ actual fun initLogging(appDir: String?) {
         CommonWriter()
     )
     if (appDir != null) {
-        // Same belt as desktop Main.kt: the file writer and crash hook below
-        // swallow IO failures, so a missing data dir on first launch would
-        // silently drop every early log line. createDirectoryAtPath is
-        // idempotent and cheap.
+        // Same belt as desktop Main.kt: the file writer and crash hook below swallow io failures
         try {
             NSFileManager.defaultManager.createDirectoryAtPath(
                 appDir, withIntermediateDirectories = true, attributes = null, error = null
@@ -108,7 +105,6 @@ internal class IosFileLogWriter(private val appDir: String) : LogWriter() {
             val data: NSData? = (line as NSString).dataUsingEncoding(NSUTF8StringEncoding)
                 ?: return
             val handle = NSFileHandle.fileHandleForWritingAtPath(path) ?: run {
-                // Fall back to a full rewrite when the handle cannot open.
                 val existing = NSString.stringWithContentsOfFile(path, encoding = NSUTF8StringEncoding, error = null) as? String ?: ""
                 ((existing + line) as NSString).writeToFile(path, atomically = true, encoding = NSUTF8StringEncoding, error = null)
                 return

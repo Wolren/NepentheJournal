@@ -12,7 +12,6 @@ import app.journal.model.DoseWikiStage
  * no repository, no clock.
  */
 
-/** One phase of a duration profile, with its minute range and raw display text. */
 data class DurationPhase(
     val label: String,
     val minMinutes: Double,
@@ -89,12 +88,17 @@ fun stageToMinutes(stage: DoseWikiStage?): Pair<Double, Double>? {
 fun formatStage(stage: DoseWikiStage?): String {
     if (stage == null) return ""
     val min = stage.min ?: return ""
-    val max = stage.max ?: return "$min ${stage.unit ?: "min"}"
-    val unit = stage.unit ?: "min"
+    val max = stage.max ?: return "$min ${compactUnit(stage.unit ?: "min")}"
+    val unit = compactUnit(stage.unit ?: "min")
     return if (min == max) "$min $unit" else "$min - $max $unit"
 }
 
-/** Stage key to phase label mapping. */
+private fun compactUnit(unit: String): String = when (unit.lowercase()) {
+    "minutes", "minute" -> "min"
+    "hours", "hour" -> "hr"
+    else -> unit
+}
+
 val stageLabelMap = mapOf(
     "onset" to "Onset",
     "come_up" to "Comeup",
@@ -117,7 +121,6 @@ fun parseDoseWikiDuration(
     val stageKeys = listOf("onset", "come_up", "peak", "offset", "after_effects")
     val phaseResults = mutableListOf<DurationPhase>()
 
-    // Return a helper to get stage by key
     fun stageForKey(key: String): DoseWikiStage? = when (key) {
         "onset" -> stages.onset
         "come_up" -> stages.come_up

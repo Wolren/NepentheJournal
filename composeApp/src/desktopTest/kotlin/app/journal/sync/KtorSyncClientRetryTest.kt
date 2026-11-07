@@ -34,7 +34,6 @@ class KtorSyncClientRetryTest {
         val deadPort = freePort()
 
         val repo = JournalRepository()
-        // Non-empty payload so pushChanges actually attempts a slice POST.
         repo.upsertSession(Session(
             id = "s:retry", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
             deviceOrigin = "test", title = "Retry fixture", startTime = 1_700_000_000_000L
@@ -56,9 +55,7 @@ class KtorSyncClientRetryTest {
 
             assertTrue(result.isFailure,
                 "push to a dead port must fail: ${result.exceptionOrNull()?.message}")
-            // retryWithBackoff delays 1000ms after attempt 1 and 2000ms after
-            // attempt 2 (attempt 3 returns the failure). Three real attempts
-            // therefore take >= 3000ms; the floor allows clock granularity.
+            // retryWithBackoff delays 1000ms after attempt 1 and 2000ms after attempt 2 (attempt 3 returns the failure).
             assertTrue(elapsedMs >= 2_900,
                 "expected 3 attempts with 1s+2s backoff (>= 2900ms), took ${elapsedMs}ms; " +
                     "retryWithBackoff did not retry. Last error: " +

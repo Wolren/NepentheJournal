@@ -8,7 +8,6 @@ package app.journal.model
  * receptor 2A" (BindingDB), "5-HT<sub>2A</sub> receptor" (IUPHAR).
  */
 data class NormalizedTarget(
-    /** Lowercase grouping key. Equal keys mean the same target. */
     val key: String,
     /** Short display label, e.g. "5-HT2A", "D2", "SERT". */
     val label: String,
@@ -46,9 +45,6 @@ object TargetNormalizer {
         return NormalizedTarget("x:" + label.lowercase(), label)
     }
 
-    // ------------------------------------------------------------------
-    // Text folding: lowercase, greek to latin, punctuation to spaces.
-    // ------------------------------------------------------------------
 
     private fun fold(s: String): String {
         var t = s.lowercase()
@@ -61,9 +57,6 @@ object TargetNormalizer {
         return spaces.replace(t, " ").trim()
     }
 
-    // ------------------------------------------------------------------
-    // Receptor families. Each returns null when the name is not a member.
-    // ------------------------------------------------------------------
 
     private val serotoninHead = Regex("^(\\d)([a-z]?)(l?)\$")
 
@@ -79,14 +72,11 @@ object TargetNormalizer {
                 flat.replace(Regex("^5\\s*h\\s*t?\\s*"), "").trim()
             else -> return null
         }
-        // Head must start with a digit (the subtype); anything else
-        // ("transporter") is not a serotonin receptor row. Only the
-        // leading token carries the subtype ("2a" in "2a receptor").
+        // Only the leading token carries the subtype ("2a" in "2a receptor").
         val first = head.split(" ").firstOrNull() ?: return null
         if (first.isEmpty() || !first[0].isDigit()) return null
         val m = serotoninHead.find(first) ?: return null
-        // A trailing "l" is an assay label, not a subtype (5-HT7L is
-        // the 5-HT7 receptor); real subtypes never end in L.
+        // A trailing "l" is an assay label, not a subtype (5-HT7L is the 5-HT7 receptor)
         var sub = m.groupValues[1] + m.groupValues[2].uppercase()
         if (sub.length > 1 && sub.endsWith("L")) sub = sub.dropLast(1)
         if (sub.isEmpty()) return null
@@ -98,8 +88,7 @@ object TargetNormalizer {
     private val dopamineBare = Regex("^d\\s*([1-5])$")
 
     private fun dopamine(flat: String): NormalizedTarget? {
-        // A letter after the digit refines the subtype: "1a" is D1, but
-        // "1b" (avian/Xenopus D1B, closer to D5) must not merge into D1.
+        // A letter after the digit refines the subtype: "1a" is D1, but "1b" (avian/Xenopus D1B) must not merge into D1.
         fun digitOf(m: MatchResult?): String? {
             if (m == null) return null
             if (m.groupValues[2].isNotEmpty() && m.groupValues[2] != "a") return null
@@ -119,8 +108,7 @@ object TargetNormalizer {
         if (!flat.contains("adrenergic") && !flat.contains("adreno")
             && !flat.contains("alpha") && !flat.contains("beta")
         ) return null
-        // Reject non-adrenergic alpha/beta uses (e.g. "alpha-2/beta-2"
-        // nicotinic subunits carry "neuronal acetylcholine" context).
+        // Reject non-adrenergic alpha/beta uses: "alpha-2/beta-2" nicotinic subunits carry "neuronal acetylcholine" context.
         if (flat.contains("acetylcholine") || flat.contains("nicotinic")) return null
         val a = alphaSub.find(flat)
         if (a != null && (flat.contains("adrenergic") || flat.contains("adreno") || isBareAdreno(flat, "alpha"))) {
@@ -133,8 +121,6 @@ object TargetNormalizer {
             return NormalizedTarget("adrb$sub", "Beta-$sub")
         }
         if (flat.contains("adrenergic")) {
-            // Generic entry without a subtype: its own group, never
-            // merged into subtyped rows.
             return NormalizedTarget("x:" + flat, titleLabel(flat))
         }
         return null
@@ -208,9 +194,6 @@ object TargetNormalizer {
         return null
     }
 
-    // ------------------------------------------------------------------
-    // Fallback helpers.
-    // ------------------------------------------------------------------
 
     private val suffixWords = Regex("\\s+(receptors?|transporters?|channels?|enzymes?|proteins?|subunits?|subtype)\\s*\$")
     private val parenTail = Regex("\\s*\\([^)]*\\)\\s*\$")

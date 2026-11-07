@@ -88,7 +88,6 @@ class SyncPayloadTest {
         assertEquals(500, decoded.sessions.size)
     }
 
-    // ==================== Conflict resolution ====================
 
     @Test
     fun conflictSiblingSerialization() {
@@ -114,7 +113,6 @@ class SyncPayloadTest {
         assertEquals("Conflict body", decoded.conflictSiblings.first().body)
     }
 
-    // ==================== Composite pull cursor ====================
 
     @Test
     fun syncResponseNextSinceIdRoundtrip() {
@@ -135,9 +133,7 @@ class SyncPayloadTest {
 
     @Test
     fun syncResponseDecodesLegacyJsonWithoutNextSinceId() {
-        // A peer running an older build never sends nextSinceId; decoding
-        // must default it to "" so the client falls back to its timestamp
-        // drain instead of failing the whole response.
+        // A peer running an older build never sends nextSinceId; decoding must default it to ""
         val legacy = """{"success":true,"truncated":true,"nextSince":1234}"""
         val decoded = json.decodeFromString<SyncResponse>(legacy)
         assertTrue(decoded.truncated)
@@ -145,7 +141,6 @@ class SyncPayloadTest {
         assertEquals("", decoded.nextSinceId)
     }
 
-    // ==================== Helpers ====================
 
     private fun session(id: String) = Session(
         id = id, createdAt = now, updatedAt = now, deviceOrigin = "test",

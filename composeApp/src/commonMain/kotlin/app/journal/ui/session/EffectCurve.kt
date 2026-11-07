@@ -69,8 +69,6 @@ fun synthesizedEffectSamples(phases: List<DurationPhase>, anchorMs: Long): List<
         level = target
         add(cursor, level * 10f)
     }
-    // A profile without an afterglow ends mid-air; bleed the tail to zero so
-    // the curve always comes back to the baseline.
     if (level > 0f) {
         val tail = ((cursor - anchorMs) / 4).coerceAtLeast(15 * 60_000L)
         cursor += tail
@@ -79,7 +77,6 @@ fun synthesizedEffectSamples(phases: List<DurationPhase>, anchorMs: Long): List<
     return points
 }
 
-/** Intensity of the curve at [timestampMs], linearly interpolated, clamped outside. */
 fun effectIntensityAt(samples: List<EffectSample>, timestampMs: Long): Float {
     if (samples.isEmpty()) return 0f
     if (timestampMs <= samples.first().timestampMs) return samples.first().intensity

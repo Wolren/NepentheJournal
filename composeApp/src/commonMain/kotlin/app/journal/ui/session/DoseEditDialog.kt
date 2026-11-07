@@ -35,7 +35,6 @@ val ROA_OPTIONS = listOf(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
-/** Route selector: wide dropdown with colored items. */
 @Composable
 fun RoaDropdown(
     selected: String,
@@ -83,7 +82,6 @@ fun RoaDropdown(
     }
 }
 
-/** Common dose unit options for the unit dropdown. */
 val UNIT_OPTIONS = listOf("µg", "mg", "g", "ml", "drops", "IU", "tablets", "blotters", "sprays", "capsules", "hits", "lines", "seeds", "ounces", "grams", "nanograms")
 
 /**
@@ -116,10 +114,6 @@ fun DoseEditDialog(
         mutableStateOf(initialDose?.timestamp ?: sessionStartTime)
     }
 
-    // Substance filter: debounced and remembered so it recomputes only when the
-    // search term or the substance list changes. It used to run inside the
-    // LazyColumn content lambda, which re-executes on every keystroke in any
-    // other field (amount, unit, timestamp, ...).
     var substanceQuery by remember { mutableStateOf("") }
     LaunchedEffect(substanceSearch) {
         if (substanceSearch.isBlank()) {
@@ -172,7 +166,6 @@ fun DoseEditDialog(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Substance selector
                 item {
                     Text("Substance", style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -204,8 +197,6 @@ fun DoseEditDialog(
                         singleLine = true
                     )
                 }
-                // Search results - inline, same window, no popup. `filtered`
-                // is computed (debounced) in the dialog scope above, not here.
                 if (selectedSubstanceId.isEmpty() && substanceQuery.isNotBlank()) {
                     if (filtered.isEmpty()) {
                         item {
@@ -266,7 +257,6 @@ fun DoseEditDialog(
                     }
                 }
 
-                // Amount + Unit
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -337,10 +327,8 @@ fun DoseEditDialog(
                     }
                 }
 
-                // Route of administration
                 item { RoaDropdown(selected = roa, onSelect = { roa = it }, expanded = expandedRoa, onExpandedChange = { expandedRoa = it }) }
 
-                // Dose time
                 item {
                     TimeField(
                         label = "Dose time",
@@ -350,7 +338,6 @@ fun DoseEditDialog(
                     )
                 }
 
-                // Stomach fullness
                 item {
                     Text("Stomach fullness", style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -385,7 +372,6 @@ fun DoseEditDialog(
                     }
                 }
 
-                // Redose toggle
                 item {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -396,7 +382,6 @@ fun DoseEditDialog(
                     }
                 }
 
-                // Estimate toggle
                 item {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -407,7 +392,6 @@ fun DoseEditDialog(
                     }
                 }
 
-                // Std dev field (only when estimate checked)
                 if (isEstimate) {
                     item {
                         OutlinedTextField(

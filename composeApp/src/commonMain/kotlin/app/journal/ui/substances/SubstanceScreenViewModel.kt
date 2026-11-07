@@ -11,10 +11,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Broad category option with the number of matching substances. */
 data class BroadOption(val id: String, val label: String, val count: Int)
 
-/** Specific (raw class) option under the active broad, with match count. */
 data class SpecificOption(val label: String, val count: Int)
 
 /**
@@ -26,10 +24,8 @@ data class SpecificOption(val label: String, val count: Int)
 class SubstanceScreenViewModel(
     private val repo: IJournalRepository
 ) {
-    /** All substances from the repository. */
     val substances: Flow<List<Substance>> = repo.substances
 
-    /** Substances that have at least one route of administration, effect, or dosage band. */
     val realSubstances: Flow<List<Substance>> = substances.map { list ->
         list.filter { sub ->
             sub.routesOfAdministration.isNotEmpty() ||
@@ -77,7 +73,6 @@ class SubstanceScreenViewModel(
         }
     }
 
-    /** Active level-one broad filter, or null for all substances. */
     val activeBroad = MutableStateFlow<String?>(null)
 
     /**
@@ -95,30 +90,23 @@ class SubstanceScreenViewModel(
                 .sortedByDescending { it.count }
         }
 
-    /** Active level-two refinements within the active broad. */
     val activeSpecifics = MutableStateFlow<Set<String>>(emptySet())
 
-    /** Current search query. */
     val query = MutableStateFlow("")
 
-    /** Precomputed dose stats from repository. */
     val substanceDoseStats: Map<String, Pair<Int, Long>>
         get() = repo.substanceDoseStats
 
-    /** Filtered + searched results; the query is debounced so typing recomputes once per pause. */
     @OptIn(FlowPreview::class)
     val results: Flow<List<Substance>> = combine(
         annotatedSubstances, query.debounce(250.milliseconds), activeBroad, activeSpecifics
     ) { annotated, q, broad, specs ->
         var result = annotated
 
-        // Broad filter: a substance matches when ANY of its classes maps there
-        // (or its IUPHAR data shows KOR agonism for Dysdelic).
         if (broad != null) {
             result = result.filter { item ->
                 broad in item.broads
             }
-            // Specific refinement within the broad.
             if (specs.isNotEmpty()) {
                 result = result.filter { item ->
                     item.specificsByBroad[broad].orEmpty().any { it in specs }
@@ -126,7 +114,6 @@ class SubstanceScreenViewModel(
             }
         }
 
-        // Text search
         if (q.isNotBlank()) {
             val lq = q.lowercase()
             result = result.filter { item ->
@@ -155,7 +142,6 @@ class SubstanceScreenViewModel(
         }
     }
 
-    /** All broads for one substance, including Dysdelic from IUPHAR data. */
     private fun vmBroads(sub: Substance): Set<String> =
         SubstanceTaxonomy.broadsFor(
             sub.substanceClass,
@@ -164,7 +150,6 @@ class SubstanceScreenViewModel(
             sub.curatedSections,
         )
 
-    /** Level-two labels of one substance under one broad. */
     private fun vmSpecifics(sub: Substance, broad: String): List<String> =
         SubstanceTaxonomy.specificsFor(
             broad,

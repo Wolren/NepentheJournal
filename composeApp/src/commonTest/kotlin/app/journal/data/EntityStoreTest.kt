@@ -133,11 +133,7 @@ class EntityStoreTest {
 
     @Test
     fun concurrentPutAndReadIsConsistent() = runBlocking {
-        // Coroutines instead of java.lang.Thread: this source set also compiles
-        // for Kotlin/Native (iosSimulatorArm64Test), which has no Thread class.
-        // Dispatchers.Default is a real multi-threaded pool on both JVM and
-        // Native, so the writes below still race across cores the way the old
-        // four-Thread version did.
+        // Coroutines instead of java.lang.Thread: this source set also compiles for Kotlin/Native (iosSimulatorArm64Test), which has no Thread class.
         val store = EntityStore(idOf)
         coroutineScope {
             repeat(4) { i ->
@@ -149,22 +145,7 @@ class EntityStoreTest {
             }
         }
 
-        // Every EntityStore operation takes the store lock (see the class docs:
-        // the old unsynchronized map could lose entries under concurrent resize,
-        // which is exactly what the lock was added to prevent).
-        //
-        // 4 writers x 64 DISTINCT keys = 256 entries, well past a HashMap's
-        // default threshold of 12, so the map really resizes while all four
-        // writers are inside it. Four writers hammering 4 keys (the original
-        // shape) never resizes at all and so never exercised the race this
-        // exists for: measured against a lockless put it caught the mutation
-        // 0/25 runs; this shape catches it 25/25. Do not shrink the key count
-        // back down.
-        //
-        // Nothing here gets a range or a null guard: all 256 keys must survive,
-        // and each must hold the final pass of its own writer. Key e:$i:$j is
-        // written by writer i only, so the expected final value is
-        // deterministic, not "whatever was left behind".
+        // 4 writers x 64 distinct keys = 256 entries, well past a HashMap's default threshold of 12
         assertEquals(256, store.size, "no key may be lost to concurrent put")
         for (i in 0 until 4) {
             for (j in 0 until 64) {

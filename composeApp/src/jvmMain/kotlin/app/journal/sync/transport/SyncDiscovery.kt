@@ -20,7 +20,6 @@ internal class SyncDiscovery(
     private val appendDebug: (String) -> Unit
 ) {
 
-    // ---- WebSocket continuous sync ----
 
     /**
      * One-shot HostInfo probe with its client always closed (audit: leaked
@@ -34,8 +33,6 @@ internal class SyncDiscovery(
             if (info != null) warnOnProtocolMismatch(info, "capability probe")
             info
         } catch (e: CancellationException) {
-            // Cancellation must propagate: it may never become a null probe
-            // result on a cancelled coroutine.
             throw e
         } catch (_: Exception) {
             null

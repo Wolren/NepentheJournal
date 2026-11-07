@@ -68,14 +68,9 @@ object IosEcdh {
         val owned = mutableListOf<COpaquePointer?>()
         try {
             CFDictionaryAddValue(attrs, kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom)
-            // Key type and size are the only required generation attributes
-            // (Apple: "Key Generation Attributes").
             val sizeBits = CFBridgingRetain(NSNumber(int = KEY_BITS)) ?: return@memScoped null
             owned.add(sizeBits)
             CFDictionaryAddValue(attrs, kSecAttrKeySizeInBits, sizeBits)
-            // kSecAttrIsPermanent defaults to true; force false for BOTH keys:
-            // contract g persists the static key as a sandboxed file and the
-            // client key is ephemeral, so nothing may land in the Keychain.
             val privateAttrs = CFDictionaryCreateMutable(null, 0, null, null) ?: return@memScoped null
             owned.add(privateAttrs)
             CFDictionaryAddValue(privateAttrs, kSecAttrIsPermanent, kCFBooleanFalse)
@@ -91,7 +86,6 @@ object IosEcdh {
         }
     }
 
-    /** Client side: a fresh ephemeral keypair for ONE pairing attempt. */
     fun generateEphemeral(): IosEcdhEphemeral? {
         val key = generateKey() ?: return null
         return IosEcdhEphemeral(key)
@@ -264,11 +258,9 @@ class IosEcdhEphemeral internal constructor(
     /** Base64 uncompressed point to send in PairingVerifyRequest.clientEcdhPublicKeyB64. */
     fun publicKeyB64(): String? = IosEcdh.exportPublicKeyB64(privateKey)
 
-    /** Raw ECDH output against the host's STATIC public key. */
     fun agreeWith(hostPublicKeyBytes: ByteArray): ByteArray? =
         IosEcdh.agreeRaw(privateKey, hostPublicKeyBytes)
 
-    /** Release the native key. Idempotent; safe from a finally block. */
     fun close() {
         if (closed) return
         closed = true

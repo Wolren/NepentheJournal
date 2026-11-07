@@ -3,7 +3,6 @@ package app.journal.model
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
-/** Stomach fullness at time of ingestion. Affects absorption rate. */
 enum class StomachFullness(val label: String) {
     EMPTY("Empty"),
     LIGHT("Light snack"),
@@ -11,7 +10,6 @@ enum class StomachFullness(val label: String) {
     FULL("Full meal")
 }
 
-/** Conflict: APPEND_ONLY. Device-keyed IDs prevent structural conflicts */
 @Immutable
 @Serializable
 data class Dose(

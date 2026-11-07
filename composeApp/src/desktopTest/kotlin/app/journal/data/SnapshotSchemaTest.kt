@@ -153,8 +153,6 @@ class SnapshotSchemaTest {
             showSessionsTrendChart = true
         )
         val text = AppJson.json.encodeToString(source)
-        // One broken element forces the whole-file parse to fail, so recovery
-        // runs; the broken element itself is dropped (sessions asserted below).
         val corrupted = text.replaceFirst("\"sessions\":[", "\"sessions\":[{\"__broken\":1},")
         assertNotEquals(text, corrupted, "corruption injection must actually change the text")
         return source to corrupted
@@ -164,19 +162,14 @@ class SnapshotSchemaTest {
     fun recoverSnapshotPreservesEveryFieldExceptVersionAndSavedAt() {
         val (source, corrupted) = sourceSnapshotAndCorruptedText()
 
-        // Sanity: the corruption really does break the strict whole-file parse.
         assertFails { AppJson.json.decodeFromString<JournalSnapshot>(corrupted) }
 
         val recovered = recoverSnapshot(corrupted)
 
-        // The broken element was dropped, the valid session survived.
         assertEquals(1, recovered.sessions.size)
         assertEquals("Kept Session", recovered.sessions.first().title)
 
-        // Descriptor-driven: every JournalSnapshot field except version
-        // (recovery stamps CURRENT_VERSION by design) and savedAt (wall clock
-        // at recovery time) must survive byte-for-byte. This is the guard the
-        // audit asked for: a new field forgotten in recoverSnapshot fails here.
+        // This is the guard the audit asked for: a new field forgotten in recoverSnapshot fails here.
         val descriptor = JournalSnapshot.serializer().descriptor
         val sourceJson = AppJson.pretty.parseToJsonElement(AppJson.json.encodeToString(source)).jsonObject
         val recoveredJson = AppJson.pretty.parseToJsonElement(AppJson.json.encodeToString(recovered)).jsonObject

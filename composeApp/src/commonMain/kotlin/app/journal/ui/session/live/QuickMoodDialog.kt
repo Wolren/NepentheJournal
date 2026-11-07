@@ -27,8 +27,6 @@ import app.journal.util.platformDeviceOrigin
 
 private val MoodOptions = listOf("Calm", "Euphoric", "Anxious", "Focused", "Tired", "Awestruck", "Introspective", "Happy", "Overwhelmed", "Peaceful")
 
-// System emoji render inconsistently across platforms (notably Windows),
-// so effects use themed Material icons instead of unicode emoji.
 private val EffectOptions = listOf(
     "Euphoria" to Icons.Default.SentimentVerySatisfied,
     "Stimulation" to Icons.Default.Bolt,

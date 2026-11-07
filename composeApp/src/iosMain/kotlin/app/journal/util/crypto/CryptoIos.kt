@@ -25,11 +25,6 @@ import platform.posix.memcpy
  * app.journal.sync.SyncCryptoIos.
  */
 
-// ========================================================================
-// Secure random
-// ========================================================================
-
-/** Cryptographically secure random bytes via SecRandomCopyBytes. */
 actual fun secureRandomBytes(size: Int): ByteArray {
     val bytes = ByteArray(size)
     if (bytes.isNotEmpty()) {
@@ -42,9 +37,7 @@ actual fun secureRandomBytes(size: Int): ByteArray {
     return bytes
 }
 
-// ========================================================================
-// SHA-256
-// ========================================================================
+// ======================================================================== SHA-256 ========================================================================
 
 actual fun sha256(data: ByteArray): ByteArray {
     val digest = ByteArray(CC_SHA256_DIGEST_LENGTH)
@@ -52,9 +45,7 @@ actual fun sha256(data: ByteArray): ByteArray {
     return digest
 }
 
-// ========================================================================
-// Base64
-// ========================================================================
+// ======================================================================== Base64 ========================================================================
 
 actual fun base64Encode(data: ByteArray): String {
     val nsData = data.usePinned { pinned ->

@@ -127,7 +127,6 @@ class AppJsonTest {
         AppJson.apply(repo, emptySnap)
 
         assertEquals(1, repo.substances.value.size)
-        // Empty snapshot does not clear existing data (applyBatch with empty lists is no-op)
     }
 
     @Test
@@ -138,7 +137,6 @@ class AppJsonTest {
             sessions = listOf(sampleSession("s:1"))
         )
         val repo = JournalRepository()
-        // Should not throw despite version mismatch
         AppJson.apply(repo, snap)
         assertEquals(1, repo.sessions.value.size)
     }

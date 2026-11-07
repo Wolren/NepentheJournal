@@ -145,9 +145,7 @@ internal fun PharmacologySection(substance: Substance) {
                 )
             )
         }
-        // Group by canonical target key so spelling variants from
-        // different sources ("5-HT2A" vs "5-hydroxytryptamine
-        // receptor 2A") aggregate into one row.
+        // Group by canonical target key so spelling variants from different sources ("5-HT2A" vs "5-hydroxytryptamine receptor 2A") aggregate into one row.
         val byTargetType = raw.groupBy { Pair(it.canonKey, it.affinityType) }
         val aggByTarget = mutableMapOf<String, MutableList<Pair<String, AggEntry>>>()
         byTargetType.forEach { (key, entries) ->
@@ -226,8 +224,7 @@ internal fun PharmacologySection(substance: Substance) {
                 Spacer(Modifier.height(8.dp))
 
                 groups.forEach { (groupKey, entries) ->
-                    // Group key is the gene-style aggregation id (htr1A);
-                    // display the human-readable label carried on the entries.
+                    // Group key is the gene-style aggregation id (htr1A); display the human-readable label carried on the entries.
                     val target = entries.firstOrNull()?.first ?: groupKey
                     val allSpecies = entries.flatMap { (_, a) -> a.species }.toSet()
                     Row(

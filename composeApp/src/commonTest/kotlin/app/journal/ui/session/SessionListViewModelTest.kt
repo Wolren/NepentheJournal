@@ -68,9 +68,7 @@ class SessionListViewModelTest {
             id = "s:4", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Old Session", startTime = 2000L,
         ))
-        // Cannabis substance must have a dose: allSessionSubstances derives
-        // from doses joined against substances, so a substance with no dose
-        // never appears (and a predicate waiting for it would hang forever).
+        // Cannabis substance must have a dose: allSessionSubstances derives from doses joined against substances
         repo.upsertDose(Dose(
             id = "d:4", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             sessionId = "s:1", substanceId = "sub:weed",
@@ -90,7 +88,6 @@ class SessionListViewModelTest {
     @Test
     fun `allSessionSubstances extracts distinct substances`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
-        // combine may need a dispatch; wait for substance count
         val items = vm.allSessionSubstances.first { it.size == 3 }
         assertEquals(3, items.size)
         assertTrue(items.any { it.name == "LSD" })
@@ -182,7 +179,6 @@ class SessionListViewModelTest {
         vm.showFavoritesOnly.value = true
         vm.clearFilters()
         val filtered = vm.filteredSessions.first()
-        // After clear: favorites off, no substance filter, no search
         assertEquals(4, filtered.size)
     }
 }

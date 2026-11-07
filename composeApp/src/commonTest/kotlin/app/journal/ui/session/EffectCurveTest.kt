@@ -35,7 +35,6 @@ class EffectCurveTest {
     private fun checkIn(timestamp: Long, intensity: Float) =
         CheckIn(timestamp = timestamp, overallIntensity = intensity)
 
-    // ==================== loggedEffectSamples ====================
 
     @Test
     fun loggedEffectSamplesMergesEventsAndCheckInsChronologically() {
@@ -66,7 +65,6 @@ class EffectCurveTest {
         assertTrue(loggedEffectSamples(emptyList(), emptyList()).isEmpty(), "no logs, no curve")
     }
 
-    // ==================== effectIntensityAt ====================
 
     @Test
     fun effectIntensityAtInterpolatesBetweenSamples() {
@@ -84,7 +82,6 @@ class EffectCurveTest {
         assertEquals(0f, effectIntensityAt(emptyList(), 100L), 0.001f, "no samples means no intensity")
     }
 
-    // ==================== synthesizedEffectSamples ====================
 
     @Test
     fun synthesizedCurveFollowsTheDurationProfile() {
@@ -121,7 +118,6 @@ class EffectCurveTest {
 
     @Test
     fun synthesizedCurveOfAMeasuredProfileStillStartsAtZero() {
-        // Onset alone: a ramp from nothing to a third of full intensity.
         val phases = parseDurationProfile(mapOf("onset" to "30 min"))
         val samples = synthesizedEffectSamples(phases, anchorMs = 0L)
         assertEquals(0f, samples.first().intensity, 0.001f, "starts at baseline")

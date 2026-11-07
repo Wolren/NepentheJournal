@@ -147,7 +147,6 @@ fun writeCrashLog(appDir: String, threadName: String, detail: String) {
     }
 }
 
-/** Directory the uncaught exception hook writes crash dumps to. */
 @kotlin.concurrent.Volatile
 private var crashReportDir: String? = null
 

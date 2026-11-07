@@ -76,7 +76,6 @@ class SyncTransportLifecycleTest {
         deviceOrigin = "test"
     )
 
-    /** true only once a TCP connect to the loopback port succeeds. */
     private fun canConnect(port: Int): Boolean = try {
         Socket().use { it.connect(InetSocketAddress("127.0.0.1", port), 1_000); true }
     } catch (e: Exception) {
@@ -90,8 +89,7 @@ class SyncTransportLifecycleTest {
         val before = transport.observeStatus().first()
         assertFalse(before.isHosting, "status must start with isHosting=false")
 
-        // Bind failure (port -1 is outside the legal 0..65535 range on every
-        // platform, so the failure does not depend on SO_REUSEADDR semantics).
+        // Bind failure: port -1 is outside the legal 0..65535 range on every platform, so SO_REUSEADDR semantics never matter.
         val failed = withTimeout(60_000) { transport.startHosting(config(-1, "bad")) }
         assertTrue(failed.isFailure, "startHosting must fail when the bind cannot happen")
         val afterFail = transport.observeStatus().first()
@@ -143,16 +141,7 @@ class SyncTransportLifecycleTest {
         val token = hostTransport.observeStatus().first().pairingToken
         assertTrue(token != null, "host must publish a pairing token while hosting")
 
-        // Manual-IP entry point: syncWith -> pairWithPeer ->
-        // syncWithLocked(trusted). The wave4 production defect (the
-        // post-pairing re-dispatch re-entered the non-reentrant syncLock
-        // from the same coroutine, so connectManually never returned) is
-        // FIXED: connectManually is called DIRECTLY with NO timeout bound
-        // of any kind. This is the wave4 120s-bound workaround removed: a
-        // re-introduced re-entrancy hang must hang/kill this test, never
-        // be softened into a timeout failure by a wrapper. The assertions
-        // below are the contract: it RETURNS, pairing lands, and the full
-        // sync cycle completes.
+        // The wave4 production defect (the post-pairing re-dispatch re-entered the non-reentrant syncLock) is fixed: connectManually is called directly, no timeout bound.
         val manual = clientTransport.connectManually("127.0.0.1", bound, token)
         assertTrue(manual.isSuccess,
             "connectManually must pair and complete a full sync cycle: ${manual.exceptionOrNull()?.message}")
@@ -162,9 +151,6 @@ class SyncTransportLifecycleTest {
         assertTrue(hostTransport.trustedDevices().isNotEmpty(),
             "pairing must leave the client in the host trust store")
 
-        // Trusted branch: lookup by stored fingerprint -> push + pull, no
-        // re-dispatch, so this is the branch every later sync takes. Also
-        // unbounded: same no-workaround rule as the connectManually call.
         val hostPeer = clientTransport.trustedDevices().first()
         val synced = clientTransport.syncWith(
             DiscoveredPeer(
@@ -187,9 +173,6 @@ class SyncTransportLifecycleTest {
 
     @Test
     fun stopHostingReleasesThePortForASecondServer() = runBlocking {
-        // No client traffic in this test: the only socket on the port is the
-        // listening one, so a re-bind proves release rather than TIME_WAIT
-        // luck.
         val first = SyncTransport(JournalRepository(), hostDir.absolutePath)
         host = first
         val info = withTimeout(60_000) { first.startHosting(config(0, "first")) }
@@ -242,9 +225,6 @@ class SyncTransportLifecycleTest {
         assertTrue(clientTransport.trustedDevices().isEmpty(),
             "the client starts with no trusted peer")
 
-        // syncLock is private: reach it reflectively so the test can hold it
-        // from the outside and prove both public entry points take it before
-        // doing any work.
         val lock = SyncTransport::class.java
             .getDeclaredField("syncLock")
             .apply { isAccessible = true }
@@ -265,16 +245,9 @@ class SyncTransportLifecycleTest {
             "the second concurrent sync must block on syncLock, not run unlocked")
         lock.unlock()
 
-        // Bounded awaits are a fail-fast GUARD on this new regression (a
-        // future lock-logic bug becomes a clean failure in <=120s instead
-        // of a job-killing suite hang); they are NOT the removed wave4
-        // e2e workaround, which wrapped the production-fixed call chain
-        // itself in pairAndSyncTransfersDataBetweenTwoLiveTransports.
+        // Bounded awaits are a fail-fast guard on this regression (a future lock-logic bug becomes a clean failure in <=120s).
         val a = withTimeout(120_000) { first.await() }
         val b = withTimeout(120_000) { second.await() }
-        // Whichever coroutine won the lock consumes the pairing token; the
-        // loser may fail pairing cleanly, but BOTH must return (the old
-        // re-entrant code could never return at all).
         assertTrue(a.isSuccess || b.isSuccess,
             "the lock winner must pair and complete a full sync cycle: a=$a b=$b")
         assertTrue(clientTransport.trustedDevices().isNotEmpty(),

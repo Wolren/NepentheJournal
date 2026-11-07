@@ -52,7 +52,6 @@ import app.journal.util.crypto.sha256
  * Contract: docs/HARDENING-CONTRACTS-2026-09.md section (g).
  */
 object PairingEcdh {
-    /** Domain separation string mixed into the KDF. Byte-exact on all platforms. */
     const val KDF_INFO = "nepenthe-pairing-ecdh-v1"
 
     /** HostInfo field carrying the host's static P-256 public key (base64). */

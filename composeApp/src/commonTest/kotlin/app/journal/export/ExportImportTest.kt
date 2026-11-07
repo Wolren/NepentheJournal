@@ -33,7 +33,6 @@ class ExportImportTest {
         assertTrue(json.contains("s:1"))
         assertTrue(json.contains("Nepenthe Journal"))
 
-        // Import into a fresh repo
         val repo2 = JournalRepository()
         repo2.upsertSubstance(Substance(
             id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
@@ -90,8 +89,7 @@ class ExportImportTest {
     fun exportEmptyReturnsValidJson() {
         val repo = JournalRepository()
         val json = ExportImport.exportSessions(repo)
-        // Parse the payload (audit C7): substring matching never proved the
-        // document decodes or that the fields hold sensible values.
+        // Parse the payload (audit C7): substring matching never proved the document decodes or that the fields hold sensible values.
         val bundle = app.journal.serde.AppJson.json
             .decodeFromString<ExportImport.SessionExportBundle>(json)
         assertTrue(bundle.sessions.isEmpty(), "empty repo must export zero session bundles")
@@ -106,7 +104,6 @@ class ExportImportTest {
         repo.upsertSession(sampleSession("s:1"))
         val json = ExportImport.exportSessions(repo)
 
-        // Modify, then re-import
         repo.upsertSession(sampleSession("s:1").copy(title = "Modified"))
         ExportImport.importSessions(repo, json)
         assertEquals("Session s:1", repo.sessions.value.first().title)
@@ -116,7 +113,6 @@ class ExportImportTest {
     fun importFixesDoseSessionIdMismatch() {
         val repo = JournalRepository()
         repo.upsertSession(sampleSession("s:1"))
-        // Dose references a session that doesn't exist yet: import should fix via copy(sessionId = ...)
         val bundleJson = """{
             "version": 1,
             "exportedAt": 1000,

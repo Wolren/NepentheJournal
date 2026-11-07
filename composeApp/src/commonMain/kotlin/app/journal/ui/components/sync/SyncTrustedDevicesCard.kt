@@ -158,7 +158,6 @@ fun SyncEventLogCard(
                 )
             }
 
-            // Debug log toggle
             if (showDebug && debugLines.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 HorizontalDivider()

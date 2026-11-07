@@ -32,10 +32,8 @@ import kotlin.math.min
 /** Default window: the 30 days before the session, like the reference. */
 internal const val TOLERANCE_WINDOW_DAYS = 30
 
-/** Horizontal run of days at one tolerance level. Day indices are end-exclusive. */
 internal data class ToleranceSegment(val startDay: Int, val endDay: Int, val level: ToleranceLevel)
 
-/** One substance's row: its name plus every segment drawn on it. */
 internal data class ToleranceChartRow(
     val substanceId: String,
     val name: String,
@@ -139,8 +137,6 @@ internal fun ToleranceBarsChart(
 
     val dayMs = 86_400_000L
     val windowStart = hereMs - days * dayMs
-    // Dates every seventh day, then the end marker pinned to the right edge
-    // where the line is - the reference labels both ends the same way.
     val labelStep = days / 4
     val labels = buildList {
         var day = 0
@@ -185,7 +181,6 @@ internal fun ToleranceBarsChart(
                 }
             }
 
-            // The reference moment ("here"/"today"), at the right edge.
             val hereX = w - 1.dp.toPx() / 2f
             drawLine(
                 color = hereColor,

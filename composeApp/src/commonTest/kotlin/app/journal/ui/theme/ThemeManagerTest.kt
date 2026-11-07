@@ -43,11 +43,6 @@ class ThemeManagerTest {
 
     @Test
     fun cacheKeepsOneHashSlotAcrossArms() {
-        // Prod keeps a SINGLE cachedConfigHash while storing both arms'
-        // schemes: consecutive same-arm calls hit the cache, but flipping
-        // isDark changes the hash and misses. Pinned as-is; if the cache is
-        // ever split per arm (report-only observation, no prod change made),
-        // this test flips loudly.
         val dark1 = manager.colorScheme(true)
         val light1 = manager.colorScheme(false)
         assertFalse(dark1 === light1, "different arms produce different schemes")
@@ -70,7 +65,6 @@ class ThemeManagerTest {
         assertEquals(ThemeDefaults.Dark, manager.config.value)
     }
 
-    // ==================== pure contrast/blend math ====================
 
     @Test
     fun contrastColorPicksReadableForeground() {

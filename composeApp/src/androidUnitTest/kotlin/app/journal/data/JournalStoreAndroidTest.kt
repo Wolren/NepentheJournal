@@ -44,8 +44,6 @@ class JournalStoreAndroidTest {
     @Test
     fun loadResetsTheIssueFlagsBeforeItReachesTheContext() {
         val store = JournalStore(JournalRepository())
-        // load() clears both flags first and only then touches dataPath(),
-        // so the Context requirement is what surfaces here, not recovery.
         val thrown = assertFailsWith<UninitializedPropertyAccessException> {
             store.load()
         }

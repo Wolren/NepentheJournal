@@ -70,18 +70,15 @@ data class DoseWikiTripReport(
     val may_contact: Boolean = false,
     val publish_consent: Boolean = false,
     val age_confirmed: Boolean = false,
-    /** Honeypot. Always empty: any content routes the report to the spam queue. */
     @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val website: String = ""
 ) {
     companion object {
-        /** Exact rejection strings returned by the intake server. */
         const val ERR_TITLE = "Title is required."
         const val ERR_SUBSTANCE = "At least one substance is required."
         const val ERR_CONSENT = "Publish consent is required."
         const val ERR_AGE = "Age confirmation is required."
 
-        /** Narrative floor: intro + phase descriptions + conclusion, joined. */
         const val MIN_NARRATIVE_CHARS = 80
 
         /** Max intake body: 131072 bytes of UTF-8. */
@@ -94,7 +91,6 @@ data class DoseWikiTripReport(
             "has already copied it may keep using it. If I later ask dose.wiki to remove the " +
             "report, that removal applies to dose.wiki only, not to copies made elsewhere."
 
-        /** Age gate wording shown beside the age checkbox. */
         const val AGE_TEXT = "I confirm I am at least 18 years old and can submit this report."
 
         const val CONTACT_TEXT = "Editors may contact me about this report."
@@ -107,7 +103,6 @@ data class DoseWikiTripReport(
     }
 }
 
-/** Pre-export check result. Errors match the server rejections exactly. */
 data class TripReportCheck(
     val errors: List<String> = emptyList(),
     val warnings: List<String> = emptyList()
@@ -124,7 +119,6 @@ private fun formatAmount(amount: Double): String =
     if (amount == kotlin.math.floor(amount) && !amount.isInfinite()) amount.toLong().toString()
     else amount.toString()
 
-/** Elapsed label in the recommended T+H:MM shape, clamped at zero. */
 fun elapsedLabel(startTime: Long, timestamp: Long): String {
     val minutes = maxOf(0L, (timestamp - startTime) / 60_000L)
     val hours = minutes / 60
@@ -227,7 +221,6 @@ fun buildDoseWikiReport(
     )
 }
 
-/** Narrative length as the server computes it: intro, phase descriptions, conclusion. */
 fun TripReportBody.narrativeLength(): Int {
     val parts = mutableListOf<String>()
     introduction?.let { parts.add(it) }
@@ -236,7 +229,6 @@ fun TripReportBody.narrativeLength(): Int {
     return parts.joinToString(" ").trim().length
 }
 
-/** Mirror the four server rejections plus the known advisory warnings. */
 fun DoseWikiTripReport.check(): TripReportCheck {
     val errors = mutableListOf<String>()
     val warnings = mutableListOf<String>()

@@ -53,14 +53,12 @@ fun HoverCard(
         elevation = targetElevation
     }
 
-    // Subtle hover border brightening - elevation is invisible on dark, border does the work
     val hoverBoost by animateFloatAsState(
         targetValue = if (isHovered && !isPressed) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.85f, stiffness = 500f),
         label = "hoverBoost"
     )
     val resolvedBorder = border?.let { b ->
-        // Lift alpha a touch on hover so dark cards still feel interactive without shadow
         if (hoverBoost > 0.01f) BorderStroke(b.width, b.brush) else b
     }
 

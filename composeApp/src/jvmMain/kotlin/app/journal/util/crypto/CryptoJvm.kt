@@ -6,7 +6,6 @@ import java.util.Base64
 
 private val secureRandom = SecureRandom()
 
-/** Cryptographically secure random bytes via java.security.SecureRandom. */
 actual fun secureRandomBytes(size: Int): ByteArray =
     ByteArray(size).also { secureRandom.nextBytes(it) }
 

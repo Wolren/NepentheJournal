@@ -15,7 +15,6 @@ data class PharmacologySources(
     val wikipedia: WikipediaData? = null,
 )
 
-/** Convenience accessor that groups all pharmacology data sources. */
 val Substance.pharmacologySources: PharmacologySources?
     get() {
         val c = chemblData ?: iupharData ?: pdspData ?: bindingdbData ?: wikipediaData

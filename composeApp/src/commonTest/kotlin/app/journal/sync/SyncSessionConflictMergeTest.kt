@@ -43,12 +43,10 @@ class SyncSessionConflictMergeTest {
         val conflicts = mergeSessionConflict(repo, listOf(incoming), emptyList(), "peer-a")
         assertEquals(1, conflicts, "local newer than incoming must resolve as one conflict")
 
-        // The newer LOCAL session is untouched.
         val local = repo.getSession("s:1")
         assertEquals(200L, local?.updatedAt, "the newer local session must not be clobbered")
         assertEquals("local outcome", local?.outcome)
 
-        // Both outcomes survive in the deterministic conflict note.
         val note = repo.notes.value.single { it.id == "conflict:s:1:peer-a" }
         assertEquals("s:1", note.sessionId)
         assertEquals("Sync conflict: Remote title", note.title)

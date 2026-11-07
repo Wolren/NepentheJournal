@@ -31,22 +31,19 @@ private data class FdaInteractionEntry(
  * Pattern: drug class/name followed by colon + description, possibly with section refs like (7.2).
  */
 private fun parseInteractionText(raw: String): List<FdaInteractionEntry> {
-    // Remove the leading "7 DRUG INTERACTIONS" header and preamble
+    // Remove the leading "7 drug interactions" header and preamble
     val text = raw.replaceFirst(Regex("\\d+\\s+DRUG\\s+INTERACTIONS\\s*"), "")
         .trim()
 
     val entries = mutableListOf<FdaInteractionEntry>()
 
-    // Split on likely entry boundaries: word(s) ending with colon
     val regex = Regex("([A-Z][A-Za-z0-9\\s/&,()-]+?):\\s*")
     val parts = regex.split(text)
 
     if (parts.size < 2) {
-        // No parseable structure - return whole text as one entry
         return listOf(FdaInteractionEntry("Overview", text.take(500)))
     }
 
-    // First part is the preamble
     val preamble = parts[0].trim()
     if (preamble.isNotBlank() && preamble.length > 10) {
         entries.add(FdaInteractionEntry("General", preamble))
@@ -106,7 +103,6 @@ fun OpenFdaInteractionCard(
     val data = result ?: return
     if (!data.hasData && !loading) return
 
-    // Parse interaction text into entries
     val interactionEntries = remember(data.drugInteractions) {
         data.drugInteractions.flatMap { parseInteractionText(it) }
     }
@@ -122,7 +118,6 @@ fun OpenFdaInteractionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            // Header - clickable to expand/collapse
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,7 +182,6 @@ fun OpenFdaInteractionCard(
                 return@Column
             }
 
-            // Brand name (always visible)
             if (data.brandName != null && expanded) {
                 Text(
                     text = "Brand: ${data.brandName}",
@@ -197,7 +191,6 @@ fun OpenFdaInteractionCard(
                 )
             }
 
-            // Parsed interaction entries - collapsed by default
             if (expanded) {
                 Column(Modifier.padding(top = 8.dp)) {
                     interactionEntries.forEach { entry ->
@@ -228,7 +221,6 @@ fun OpenFdaInteractionCard(
                         }
                     }
 
-                    // Contraindications section
                     if (data.contraindications.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -247,7 +239,6 @@ fun OpenFdaInteractionCard(
                         }
                     }
 
-                    // Source
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Source: FDA (open.fda.gov)",

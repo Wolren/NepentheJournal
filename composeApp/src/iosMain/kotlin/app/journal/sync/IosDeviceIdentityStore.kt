@@ -73,7 +73,6 @@ class IosDeviceIdentityStore(private val dataDir: String) {
         hexToBytes(stored)
     }
 
-    /** Stable short device id derived from the secret identity bytes. */
     fun deviceId(): String {
         val digest = sha256(identityBytes())
         return "ios-" + digest.toHex().take(16)
@@ -106,7 +105,6 @@ class IosDeviceIdentityStore(private val dataDir: String) {
         throw IllegalStateException("Device identity undecryptable; refusing to reissue identity")
     }
 
-    /** Decrypt [text] (or parse legacy plaintext) into the identity file. Throws on failure. */
     @Throws(IllegalStateException::class)
     private fun readAndDecryptText(text: String): IosIdentityFile {
         val key = atRestKey.loadOrNull()
@@ -175,5 +173,4 @@ class IosDeviceIdentityStore(private val dataDir: String) {
     }
 }
 
-/** Current epoch millis on every platform via the shared TimeProvider. */
 fun iosNowMillis(): Long = currentTimeMillis()

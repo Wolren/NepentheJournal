@@ -14,7 +14,6 @@ import kotlinx.serialization.modules.subclass
  */
 @Serializable
 sealed interface WsMessage {
-    /** Monotonically increasing sequence number per-connection. */
     val seq: Long
 }
 
@@ -63,7 +62,6 @@ data class WsAck(
     val error: String? = null
 ) : WsMessage
 
-/** Serializers module that registers all WsMessage subtypes for polymorphic deserialization. */
 val wsModule = SerializersModule {
     polymorphic(WsMessage::class) {
         subclass(WsPing::class)
@@ -73,7 +71,6 @@ val wsModule = SerializersModule {
     }
 }
 
-/** The JSON serialization instance used for WebSocket frames. */
 val wsJson = Json {
     ignoreUnknownKeys = true
     encodeDefaults = true

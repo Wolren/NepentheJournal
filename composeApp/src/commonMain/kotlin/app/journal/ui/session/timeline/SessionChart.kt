@@ -69,7 +69,6 @@ private fun phaseLabelFor(type: TimelineEventType): String = when (type) {
     else -> "Event"
 }
 
-/** Linear interpolation of sparse samples, densified for a smooth area fill. */
 private fun densify(samples: List<Point<Float, Float>>, step: Float): List<Point<Float, Float>> {
     if (samples.size < 2) return samples
     val out = mutableListOf<Point<Float, Float>>()
@@ -125,15 +124,12 @@ internal fun TimelineBar(
     val totalDuration = (endTime ?: now) - startTime
     val rangeMs = totalDuration.coerceAtLeast(1L)
 
-    // Batch-resolve substance names once per dose list; dose marks reuse the
-    // same map instead of hitting the repository a second time.
     val substanceNameMap = remember(doses) {
         doses.associate { d -> d.substanceId to (repo.getSubstance(d.substanceId)?.name ?: d.substanceId) }
     }
     val substanceNames = remember(substanceNameMap) {
         substanceNameMap.values.distinct()
     }
-    // Plain vals: getComposeColor is @Composable, so this stays out of remember.
     val fallbackPrimary = MaterialTheme.colorScheme.primary
     val subColors = substanceNames.associateWith {
         AdaptiveColors.colorFor(it).getComposeColor(isDark)
@@ -142,7 +138,6 @@ internal fun TimelineBar(
         events.filter { it.eventType in phaseColors }.sortedBy { it.timestamp }
     }
 
-    // Data-fitted window so the chart maps where the data is, not empty margins.
     val dataTimes = remember(doses, events, checkins) {
         buildList {
             doses.forEach { add(it.timestamp) }
@@ -214,8 +209,6 @@ internal fun TimelineBar(
             Triple(x, intensityAt(samples, x, 8f), subColors[name] ?: fallbackPrimary)
         }
     }
-    // Precomputed point triples and color lookup: the symbol lambda below runs
-    // per frame, so it must not scan the mark list with minByOrNull.
     val dosePoints = remember(doseMarks) {
         doseMarks.map { (x, y, _) -> DefaultPoint(x, y) }
     }
@@ -234,7 +227,6 @@ internal fun TimelineBar(
     }
 
     ChartCard(title = "Session Timeline", subtitle = subtitle) {
-        // Phase ribbon: saturated segments, labels hidden when too narrow to read.
         Row(
             modifier = Modifier.fillMaxWidth().height(26.dp).clip(RoundedCornerShape(7.dp))
                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f)),
@@ -273,7 +265,6 @@ internal fun TimelineBar(
                 0f..10f, minimumMajorTickIncrement = 2f,
                 minimumMajorTickSpacing = 22.dp, minorTickCount = 1,
             )
-            // Tap/drag anywhere on the plot inspects that moment.
             XYGraph(
                 xAxisModel = xModel,
                 yAxisModel = yModel,
@@ -309,7 +300,6 @@ internal fun TimelineBar(
                         lineStyle = LineStyle(
                             brush = SolidColor(primary), strokeWidth = 2.dp),
                     )
-                    // Real samples get dots; interpolated fill stays clean.
                     LinePlot(
                         data = samples,
                         lineStyle = null,
@@ -349,7 +339,6 @@ internal fun TimelineBar(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(10.dp))
-            // One legend row: intensity line, then each substance.
             val legendEntries = buildList {
                 if (samples.isNotEmpty()) add("Intensity" to primary)
                 subColors.forEach { (name, color) -> add(name to color) }
@@ -390,7 +379,6 @@ private fun rememberGridStyleCompat(
     )
 }
 
-/** Pick a "nice" tick step for the time axis so labels never duplicate or collide. */
 internal fun axisStepMs(rangeMs: Long): Long {
     val hours = rangeMs / 3_600_000.0
     return when {

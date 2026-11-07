@@ -102,14 +102,12 @@ class SyncWebSocketTest {
 
     @Test
     fun deserializeUnknownTypeUsesIgnoreUnknownKeys() {
-        // Because ignoreUnknownKeys = true, a message with an unknown #type
-        // should fail gracefully rather than crash
+        // Because ignoreUnknownKeys = true, a message with an unknown #type should fail gracefully rather than crash
         val unknownJson = """{"#type":"ws:unknown","seq":1}"""
         try {
             json.decodeFromString(WsMessage.serializer(), unknownJson)
             fail("Should throw on unknown polymorphic type")
         } catch (_: Exception) {
-            // Expected
         }
     }
 }

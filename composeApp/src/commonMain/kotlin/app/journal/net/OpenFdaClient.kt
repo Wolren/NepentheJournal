@@ -30,11 +30,8 @@ object OpenFdaClient {
     data class FdaInteractionResult(
         val brandName: String? = null,
         val genericName: String? = null,
-        /** Full text of the DRUG INTERACTIONS section. */
         val drugInteractions: List<String> = emptyList(),
-        /** Full text of the CONTRAINDICATIONS section. */
         val contraindications: List<String> = emptyList(),
-        /** Full text of WARNINGS AND PRECAUTIONS. */
         val warnings: List<String> = emptyList()
     ) {
         val hasData: Boolean get() = drugInteractions.isNotEmpty()

@@ -14,7 +14,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.TimeoutCancellationException
 
-// ---- WebSocket continuous sync ----
 internal class WsConnection(
     val session: WebSocketSession,
     val client: KtorSyncClient,
@@ -24,7 +23,6 @@ internal class WsConnection(
     val peerFingerprint: String,
     /** Per-connection outgoing seq counter; the first delta sent is seq 1. */
     val seqCounter: AtomicLong = AtomicLong(0L),
-    /** In-flight (seq, cycleStart) pushes awaiting their WsAck. */
     val pendingPushes: PendingWsPushes = PendingWsPushes()
 ) {
     @Volatile
@@ -48,12 +46,10 @@ internal class PendingWsPushes {
     @Synchronized fun cancel(seq: Long) { queue.removeAll { it.first == seq } }
     @Synchronized fun failAll() { queue.clear() }
 
-    /** Consume the ack for [seq]; returns the cursor to advance to, or null. */
     @Synchronized fun ack(seq: Long): Long? {
         val idx = queue.indexOfFirst { it.first == seq }
         if (idx < 0) return null
         if (idx > 0) {
-            // Out-of-order ack: drop it, never advance past an unacked head.
             queue.removeAt(idx)
             return null
         }
@@ -73,16 +69,12 @@ internal class SyncContinuousSession(
     private val updateStatus: () -> Unit
 ) {
 
-    // ---- Helpers ----
 
     fun buildDelta(since: Long, seq: Long): WsDelta {
         val deleted = repo.deletedIdsSince(since)
         return WsDelta(
         seq = seq,
-        // Sender cursor (contract section b): the receiving side applies this
-        // delta's tombstones with the cursor LWW rule instead of
-        // unconditionally. The old default 0 meant "delete whenever absent"
-        // and let an older sender wipe newer local edits.
+        // The old default 0 meant "delete whenever absent" and let an older sender wipe newer local edits.
         since = since,
         sessions = repo.sessions.value.filter { it.updatedAt > since },
         doses = repo.doses.value.filter { it.updatedAt > since },
@@ -112,9 +104,6 @@ internal class SyncContinuousSession(
         d.deletedEffectIds.isEmpty() && d.deletedInteractionIds.isEmpty() &&
         d.deletedTimelineEventIds.isEmpty() && d.deletedCustomUnitIds.isEmpty()
 
-    // ===== WS Heartbeat & Incoming Reader =====
-
-    /** Launch a coroutine that reads incoming WS frames: processes pongs, pings, deltas, acks. */
     fun launchIncomingReader(
         deviceId: String,
         session: WebSocketSession,
@@ -131,11 +120,7 @@ internal class SyncContinuousSession(
                                 wsConnection.lastPongSeq = msg.seq
                             }
                             is WsDelta -> {
-                                // Receiving never advances lastSyncTime: that is
-                                // the OUTGOING cursor and only moves when an ack
-                                // confirms a push (wall-clock receive stamp
-                                // removed per contract d). The delta applies its
-                                // own sender cursor for the tombstone rule.
+                                // Receiving never advances lastSyncTime
                                 val skipped = validateAndApplyDelta(msg)
                                 if (skipped > 0) {
                                     appendDebug("WS delta from $deviceId: $skipped invalid items skipped")
@@ -147,9 +132,7 @@ internal class SyncContinuousSession(
                             }
                         }
                     } catch (e: Exception) {
-                        // Decode failures must be visible: a protocol mismatch
-                        // (e.g. missing discriminator) silently killed the whole
-                        // WS channel before 2026-07-31. Log, never crash.
+                        // Decode failures must be visible: a protocol mismatch (e.g. missing discriminator) silently killed the whole ws channel before 2026-07-31.
                         appendDebug("WS frame decode failed: ${e.message ?: e::class.simpleName}")
                     }
                 }
@@ -200,7 +183,6 @@ internal class SyncContinuousSession(
         }
     }
 
-    // ===== WS Reconnection =====
 
     /**
      * Contract section a: a WsAck only advances the cursor when it reports
@@ -276,9 +258,6 @@ internal class SyncContinuousSession(
         }
     }
 
-    // ===== Data Validation =====
-
-    /** Validate entity timestamps via the shared EntityTimePolicy. */
     private fun isReasonableTimestamp(ts: Long): Boolean =
         EntityTimePolicy.isReasonableEntityTime(ts)
 
@@ -346,10 +325,6 @@ internal class SyncContinuousSession(
             deletedInteractionIds = ids(delta.deletedInteractionIds),
             deletedTimelineEventIds = ids(delta.deletedTimelineEventIds),
             deletedCustomUnitIds = ids(delta.deletedCustomUnitIds),
-            // Contract section b: same cursor LWW rule as every other JVM
-            // apply path. delta.since is the sender's cursor when it built
-            // the delta; the 0 default from older senders collapses to the
-            // conservative "no local entity" rule.
             tombstoneCutoff = delta.since
         )
         // Durability: persist what we just applied (audit D1).
@@ -357,7 +332,6 @@ internal class SyncContinuousSession(
         return skipped
     }
 
-    // ===== Stale Connection Cleanup =====
 
     private var staleCleanupJob: Job? = null
 

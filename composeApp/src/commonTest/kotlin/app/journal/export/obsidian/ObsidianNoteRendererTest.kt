@@ -60,7 +60,6 @@ class ObsidianNoteRendererTest {
             substanceNameResolver = substanceResolver
         )
 
-        // Frontmatter
         assertTrue(note.content.startsWith("---"), "Should start with YAML frontmatter")
         assertTrue(note.content.contains("id: \"s:test-123\""), "Should contain session id")
         assertTrue(note.content.contains("title: \"LSD Exploration\""), "Should contain title")
@@ -69,7 +68,6 @@ class ObsidianNoteRendererTest {
         assertTrue(note.content.contains("  - \"LSD\""), "Should list LSD as substance")
         assertTrue(note.content.contains("\"favorite\""), "Should have favorite tag")
 
-        // Body structure
         assertTrue(note.content.contains("# LSD Exploration"), "Should have title heading")
         assertTrue(note.content.contains("## Set & Setting"), "Should have set/setting section")
         assertTrue(note.content.contains("## Doses"), "Should have doses section")
@@ -84,12 +82,10 @@ class ObsidianNoteRendererTest {
         assertTrue(note.content.contains("## Outcome"), "Should have outcome section")
         assertTrue(note.content.contains("Meaningful insights"), "Should have outcome text")
 
-        // Canonical block
         assertTrue(note.content.contains(BLOCK_OPEN), "Should contain canonical block open marker")
         assertTrue(note.content.contains(BLOCK_CLOSE), "Should contain canonical block close marker")
         assertTrue(note.content.contains("\"version\": 1"), "Canonical block should have version")
 
-        // Filename
         assertTrue(note.fileName.endsWith(".md"), "Filename should end with .md")
         assertTrue(note.fileName.contains("lsd"), "Filename should contain slug 'lsd'")
         assertEquals("s:test-123", note.sessionId, "Should carry session ID")

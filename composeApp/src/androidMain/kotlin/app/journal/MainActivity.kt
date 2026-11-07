@@ -25,7 +25,6 @@ class MainActivity : ComponentActivity() {
 
     private val activityScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    /** Launcher for ACTION_CREATE_DOCUMENT. User picks where to save a file. */
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
@@ -35,7 +34,6 @@ class MainActivity : ComponentActivity() {
         AndroidFilePickerBridge.reset()
     }
 
-    /** Launcher for ACTION_OPEN_DOCUMENT. User picks a file to open. */
     private val openDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -45,7 +43,6 @@ class MainActivity : ComponentActivity() {
         AndroidFilePickerBridge.reset()
     }
 
-    /** Launcher for ACTION_OPEN_DOCUMENT_TREE. User picks a folder. */
     private val openFolderLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -92,15 +89,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize repository off the main thread: megabytes of seed plus
-        // DoseWiki JSON would stall first frame and risk an ANR. The UI
-        // gates on DataInitializer.initializedFlow with a loading screen.
         val repo = JournalRepository.instance
         activityScope.launch {
             DataInitializer.ensureInitialized(repo, activityScope)
         }
 
-        // Wire up the FilePicker bridge so FilePickerAndroid can launch dialogs
         AndroidFilePickerBridge.launchCreateDocument = { _, defaultName ->
             createDocumentLauncher.launch(defaultName)
         }

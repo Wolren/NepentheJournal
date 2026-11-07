@@ -20,13 +20,9 @@ class SyncCursorRulesTest {
 
     private val tied = 1_783_942_757_808L
 
-    // ==================== isAfterPullCursor ====================
 
     @Test
     fun `blank sinceId serves rows at exactly the cursor value`() {
-        // Wall-clock cycle cursor: inclusive, because an entity stamped in
-        // the cursor's millisecond but missed by the last cycle must be
-        // re-served (idempotent) rather than skipped (invisible).
         assertTrue(isAfterPullCursor(tied, "a", since = tied, sinceId = ""))
         assertTrue(isAfterPullCursor(tied + 1, "a", since = tied, sinceId = ""))
         assertFalse(isAfterPullCursor(tied - 1, "a", since = tied, sinceId = ""))
@@ -46,8 +42,7 @@ class SyncCursorRulesTest {
 
     @Test
     fun `composite cursor walk over one tie group terminates and covers all rows`() {
-        // The exact traversal a drain performs over 250 rows sharing one
-        // timestamp with a page cap of 100.
+        // The exact traversal a drain performs over 250 rows sharing one timestamp with a page cap of 100.
         val ids = (1..250).map { "int:$it" }.sorted()
         var since = 0L
         var sinceId = ""
@@ -67,7 +62,6 @@ class SyncCursorRulesTest {
         assertEquals(ids, served.distinct().sorted(), "every row exactly once")
     }
 
-    // ==================== cursorAfterCycle ====================
 
     private val ackOk = listOf(SyncResponse(success = true))
     private val ackFailed = listOf(SyncResponse(success = false, error = "rejected"))
@@ -79,9 +73,6 @@ class SyncCursorRulesTest {
 
     @Test
     fun `incomplete drain holds the cursor even with perfect acks`() {
-        // The push half succeeded, but undelivered pull pages exist behind
-        // the cursor; advancing to cycleStart would skip them for the rest
-        // of the process (they stay unreachable until the next cold start).
         assertEquals(1_000L, cursorAfterCycle(1_000L, 5_000L, ackOk, drainComplete = false),
             "an incomplete pull drain must hold the cursor")
     }

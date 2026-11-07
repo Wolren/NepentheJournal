@@ -83,8 +83,6 @@ internal fun SessionEffectTimeline(
         }
     }
 
-    // Window: at minimum the session itself, stretched by anything that
-    // happened before the start (an early dose) or after the end.
     val startMs = minOf(
         session.startTime,
         doses.minOfOrNull { it.timestamp } ?: Long.MAX_VALUE,
@@ -100,14 +98,10 @@ internal fun SessionEffectTimeline(
     val tickStep = remember(spanMs) { axisStepMs(spanMs) }
     val labels = remember(spanMs, tickStep) {
         val out = mutableListOf<TickLabel>()
-        // Starts at 0 so the scale reads from the origin rather than from the
-        // first step. TickLabelRow clamps into the row, so a 0-fraction label
-        // sits flush against the left edge instead of half-hanging off it.
+        // Starts at 0 so the scale reads from the origin rather than from the first step.
         var offset = 0L
         while (offset < spanMs) {
-            // axisLabel(0) is "0m", which would contradict the "1h 2h ..." it
-            // sits among on an hour-stepped axis. Match the neighbour's unit:
-            // a step of a full hour or more means the axis reads in hours.
+            // axisLabel(0) is "0m", which would contradict the "1h 2h ..." it sits among on an hour-stepped axis.
             val text = if (offset == 0L && tickStep >= 3_600_000L) "0h" else axisLabel(offset)
             out.add(TickLabel(fraction = offset.toFloat() / spanMs, text = text))
             offset += tickStep
@@ -148,12 +142,7 @@ internal fun SessionEffectTimeline(
                 )
             }
         } else {
-            // The chart lives inside a surfaceVariant card, so both the fill
-            // behind it and the marker halos must be that same container color.
             val container = MaterialTheme.colorScheme.surfaceVariant
-            // Resolved out here: getComposeColor is @Composable and the canvas
-            // draw pass is not a composable context. A curve and its dose dots
-            // share one color per substance, so dots read as the legend.
             val colorForSubstance = doses.distinctBy { it.substanceId }.associate { dose ->
                 val name = substancesById[dose.substanceId]?.name ?: dose.substanceId
                 dose.substanceId to AdaptiveColors.colorFor(name).getComposeColor(isDark)
@@ -188,8 +177,6 @@ internal fun SessionEffectTimeline(
                         val y0 = yAt(prev.intensity)
                         val x1 = xAt(cur.timestampMs)
                         val y1 = yAt(cur.intensity)
-                        // Smooth join: control points sit on the horizontal midpoint,
-                        // which rounds the corners the way the reference curve does.
                         val midX = (x0 + x1) / 2f
                         linePath.cubicTo(midX, y0, midX, y1, x1, y1)
                     }
@@ -201,8 +188,6 @@ internal fun SessionEffectTimeline(
                     return linePath to areaPath
                 }
 
-                // Every fill first, then every stroke, so overlapping hills
-                // never have a line buried under a neighbour's wash.
                 val built = layers.map { buildPaths(it.samples) }
                 layers.forEachIndexed { index, _ ->
                     val (_, areaPath) = built[index]
@@ -226,7 +211,6 @@ internal fun SessionEffectTimeline(
                             width = 2.dp.toPx(),
                             cap = StrokeCap.Round,
                             join = StrokeJoin.Round,
-                            // Later curves dash so crossings stay readable.
                             pathEffect = if (index == 0) null else PathEffect.dashPathEffect(
                                 floatArrayOf(9.dp.toPx(), 7.dp.toPx()),
                             ),
@@ -240,10 +224,6 @@ internal fun SessionEffectTimeline(
                     strokeWidth = 1.dp.toPx(),
                 )
 
-                // Dose markers rest on the axis at their own time, tinted with
-                // their substance's color - the reference puts them on the
-                // baseline rather than on the curve, and with several curves
-                // overlapping that is also the only unambiguous place.
                 val markerRadius = 4.5.dp.toPx()
                 val halo = 1.5.dp.toPx()
                 doses.forEach { dose ->
@@ -264,5 +244,4 @@ internal fun SessionEffectTimeline(
     }
 }
 
-/** One drawn curve: which substance it belongs to (null = the logged curve) and its samples. */
 private data class EffectCurveLayer(val substanceId: String?, val samples: List<EffectSample>)

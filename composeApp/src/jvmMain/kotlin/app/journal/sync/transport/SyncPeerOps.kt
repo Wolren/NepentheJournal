@@ -50,8 +50,6 @@ internal class SyncPeerOps(
                             hostInfo.exceptionOrNull() ?: Exception("Could not reach peer for pairing")
                         )
                     }
-                    // Never log the pairing token: the debug log replays to the
-                    // UI viewer, and the token is the secret that wraps the key.
                     appendDebug("pairWithPeer: host reachable, completing pairing")
                     val info = hostInfo.getOrThrow()
                     warnOnProtocolMismatch(info, "pairing")
@@ -61,15 +59,12 @@ internal class SyncPeerOps(
                         clientDeviceId = deviceId,
                         clientDeviceName = deviceDisplayName,
                         clientFingerprint = deviceFingerprint,
-                        // Contract g: reuse the HostInfo key already fetched
-                        // here; no extra round trip and no key material logged.
                         hostEcdhPublicKeyB64 = info.ecdhPublicKeyB64
                     )
 
                     if (result.isSuccess) {
                         val pr = result.getOrThrow()
-                        // Never log secret material, not even truncated: the debug
-                        // log replays 200 lines to the UI viewer.
+                        // Never log secret material, not even truncated: the debug log replays 200 lines to the ui viewer.
                         appendDebug("pairWithPeer: success, hostDeviceId=${pr.hostDeviceId}")
                         trustStore.addPeer(DeviceTrustStore.TrustedPeer(
                             deviceId = pr.hostDeviceId,
@@ -88,8 +83,6 @@ internal class SyncPeerOps(
                     client.close()
                 }
             } catch (e: CancellationException) {
-                // Cancellation must propagate: it may never become a
-                // Result.failure on a cancelled coroutine.
                 throw e
             } catch (e: Exception) {
                 appendDebug("pairWithPeer exception: ${e.message}")

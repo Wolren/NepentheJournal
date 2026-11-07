@@ -24,7 +24,6 @@ import app.journal.util.currentTimeMillis
  * Contract: docs/HARDENING-CONTRACTS-2026-09.md (sections d and e).
  */
 
-// ========== Top-level payload validation ==========
 
 /**
  * Validate a SyncBatch (HTTP push). Returns an error message or null.
@@ -77,7 +76,6 @@ fun validateWsDelta(delta: WsDelta): String? {
     return null
 }
 
-// ========== Client response guard (contract: client-response guard) ==========
 
 /**
  * Result of checking a SyncResponse before it is applied locally.
@@ -136,7 +134,6 @@ fun validateSyncResponse(response: SyncResponse): SyncResponseFilter {
     return SyncResponseFilter(clean, skippedEntities, skippedTombstones)
 }
 
-// ========== Count limits ==========
 
 private fun countCapError(batch: SyncBatch): String? = countCapError(
     batch.sessions.size, batch.doses.size, batch.substances.size,
@@ -159,7 +156,6 @@ private fun countCapError(
     return null
 }
 
-/** Tombstone ID validation: per-type count caps plus ID shape. */
 private fun validateDeletedIds(
     sessions: List<String>,
     doses: List<String>,
@@ -184,7 +180,6 @@ private fun validateDeletedIds(
     return null
 }
 
-// ========== Entity-level field validation ==========
 
 private fun badId(id: String, what: String): String? =
     if (id.isBlank() || id.length > SyncLimits.MAX_ID_LEN) "Invalid $what" else null
@@ -256,8 +251,6 @@ internal fun validateInteraction(i: Interaction): String? {
     badId(i.substanceAId, "interaction substanceAId")?.let { return it }
     badId(i.substanceBId, "interaction substanceBId")?.let { return it }
     if (i.riskLevel.name !in knownRisk) return "Invalid interaction risk"
-    // Never auto downgrade risk: rejecting unknown risk values keeps the
-    // receiver's stored severity intact instead of mapping it to LOW.
     if ((i.description?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "Interaction description too long"
     if (i.sources.size > SyncLimits.MAX_INTERACTION_SOURCES) return "Too many interaction sources"
     if (i.sources.any { it.length > SyncLimits.MAX_INTERACTION_SOURCE_LEN }) return "Interaction source too long"
@@ -293,7 +286,6 @@ internal fun validateCustomUnit(u: CustomUnit): String? {
     return null
 }
 
-// ========== Internal list loops ==========
 
 private fun <T> firstError(items: List<T>, check: (T) -> String?): String? {
     for (item in items) {

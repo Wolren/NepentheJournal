@@ -21,15 +21,12 @@ object ObsidianNoteImporter {
 
     private val json = AppJson.json
 
-    /** Maximum number of child entities allowed per session in an import. */
     private const val MAX_DOSES_PER_SESSION = 500
     private const val MAX_NOTES_PER_SESSION = 200
     private const val MAX_TIMELINE_EVENTS_PER_SESSION = 500
 
-    /** Earliest valid timestamp. Shared with ExportImport. */
     private const val MIN_VALID_TIMESTAMP = ExportImport.MIN_VALID_TIMESTAMP
 
-    /** Maximum allowed margin into the future. Shared with ExportImport. */
     private const val TIMESTAMP_FUTURE_MARGIN_MS = ExportImport.TIMESTAMP_FUTURE_MARGIN_MS
 
     /**
@@ -88,7 +85,6 @@ object ObsidianNoteImporter {
                 val matched = findMatchingSession(repo, session.startTime, session.title)
 
                 if (matched != null) {
-                    // Update existing session: vault version wins
                     val updatedSession = session.copy(
                         id = matched.id,
                         createdAt = matched.createdAt,
@@ -97,11 +93,9 @@ object ObsidianNoteImporter {
                     )
                     repo.upsertSession(updatedSession)
 
-                    // Replace children: delete old, insert from vault
                     replaceChildren(repo, matched.id, block)
                     updated++
                 } else {
-                    // Create new session
                     val newSession = session.copy(
                         createdAt = currentTimeMillis(),
                         updatedAt = currentTimeMillis(),
@@ -147,12 +141,10 @@ object ObsidianNoteImporter {
         sessionId: String,
         block: ObsidianCanonicalBlock
     ) {
-        // Delete existing children, then insert from vault block
         repo.dosesForSession(sessionId).forEach { repo.deleteDose(it.id) }
         repo.notesForSession(sessionId).forEach { repo.deleteNote(it.id) }
         repo.eventsForSession(sessionId).forEach { repo.deleteTimelineEvent(it.id) }
 
-        // Import doses from vault (with correct sessionId)
         for (dose in block.doses) {
             val importedDose = dose.copy(
                 sessionId = sessionId,
@@ -163,7 +155,6 @@ object ObsidianNoteImporter {
             repo.upsertDose(importedDose)
         }
 
-        // Import notes from vault
         for (note in block.notes) {
             val importedNote = note.copy(
                 sessionId = sessionId,
@@ -174,7 +165,6 @@ object ObsidianNoteImporter {
             repo.upsertNote(importedNote)
         }
 
-        // Import timeline events from vault
         for (event in block.timelineEvents) {
             val importedEvent = event.copy(
                 sessionId = sessionId,
@@ -194,7 +184,6 @@ object ObsidianNoteImporter {
     internal fun extractCanonicalBlock(text: String): String? {
         val startIdx = text.indexOf(BLOCK_OPEN)
         if (startIdx < 0) return null
-        // Normalize line endings to \n
         val normalized = text.replace("\r\n", "\n")
         val contentStart = startIdx + BLOCK_OPEN.length
         val rest = normalized.substring(contentStart)
@@ -206,21 +195,16 @@ object ObsidianNoteImporter {
         return afterNewline.substring(0, endIdx)
     }
 
-    // ---- Data validation ----
-
-    /** Validate a parsed [ObsidianCanonicalBlock] before importing it. */
     private fun validateBlock(block: ObsidianCanonicalBlock): List<String> {
         val errors = mutableListOf<String>()
         val now = currentTimeMillis()
         val maxTimestamp = now + TIMESTAMP_FUTURE_MARGIN_MS
         val session = block.session
 
-        // ID format
         if (!isValidId(session.id)) {
             errors.add("invalid session ID '${session.id}'")
         }
 
-        // Timestamp bounds
         if (session.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
             errors.add("createdAt ${session.createdAt} out of valid range")
         }
@@ -234,7 +218,6 @@ object ObsidianNoteImporter {
             errors.add("endTime ${session.endTime} out of valid range")
         }
 
-        // Entity count limits
         if (block.doses.size > MAX_DOSES_PER_SESSION) {
             errors.add("too many doses: ${block.doses.size} > $MAX_DOSES_PER_SESSION")
         }
@@ -248,7 +231,6 @@ object ObsidianNoteImporter {
         return errors
     }
 
-    /** Check that an ID is non-blank and contains no path-traversal characters. */
     private fun isValidId(id: String): Boolean {
         return id.isNotBlank() && id.none { c ->
             c == '/' || c == '\\' || c == '.' || c == '\n' || c == '\r' || c == '\t'

@@ -28,7 +28,6 @@ object ColorUtils {
         return (ai.toLong() shl 24) or (ri.toLong() shl 16) or (gi.toLong() shl 8) or bi.toLong()
     }
 
-    /** Hue-only color for the hue slider track. */
     fun hueColor(h: Float): Color = Color(hsvToArgb(h, 1f, 1f, 255))
 
     fun toHsvHue(color: Color): Float {

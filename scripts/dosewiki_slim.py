@@ -34,7 +34,6 @@ import re
 import urllib.request
 
 SOURCE_URL = "https://dose.wiki/open-data/SubstanceIndex.json"
-# Fallbacks if the live open-data route is unreachable (order matters).
 SOURCE_FALLBACKS = [
     "https://raw.githubusercontent.com/josikinzz/dosewiki/main/public/SubstanceIndex.json",
 ]
@@ -48,7 +47,6 @@ OUTPUT_PATHS = [
     os.path.join(PROJECT, "composeApp", "src", "androidMain", "assets", "dosewiki_slim.json"),
 ]
 
-# Fields from the raw SubstanceIndex.json that we keep
 KEEP_KEYS = {
     "title", "slug", "id", "summary",
     "identification",        # aliases, IUPAC, CAS, SMILES
@@ -72,7 +70,6 @@ def slim_substance(raw: dict) -> dict:
     for key in KEEP_KEYS:
         if key in raw:
             val = raw[key]
-            # Skip empty fields to keep the slim file small
             if val is None or val == "" or val == [] or val == {}:
                 continue
             result[key] = val
@@ -81,11 +78,6 @@ def slim_substance(raw: dict) -> dict:
     return result
 
 
-# Upstream prose carries inline citation placeholders ([citation-needed],
-# [cite:doi-...], [cite:<legal-instrument>...], thousands of occurrences
-# across summary, pharmacology, legality, harm potential). They leak into
-# displayed text, so strip them at the source; the citations list field
-# keeps the real references.
 CITATION_RE = re.compile(r"\[(citation-needed|cite:[^\]]*)\]", re.IGNORECASE)
 
 
@@ -110,8 +102,6 @@ def strip_citation_markup(node):
 
 
 # subjective_effects slots the Kotlin model declares as objects.
-# Upstream sometimes emits them as (empty) lists; those carry no
-# information and would fail strict deserialization, so drop them.
 EFFECT_OBJECT_SLOTS = ("cognitive", "physical", "sensory")
 SENSORY_SUB_SLOTS = (
     "auditory", "gustatory", "tactile", "visual", "olfactory",
@@ -151,8 +141,6 @@ def fetch_url(url: str) -> list:
         if resp.headers.get("Content-Encoding") == "gzip" or raw_bytes[:2] == b"\x1f\x8b":
             raw_bytes = gzip.decompress(raw_bytes)
         data = json.loads(raw_bytes.decode("utf-8"))
-    # Open-data routes wrap records in an envelope. Two shapes exist:
-    # live API routes use {"data": [...]}; the /open-data dumps use
     # {"dataset": ..., "items": [...], "license": ...}.
     if isinstance(data, dict) and isinstance(data.get("data"), list):
         return data["data"]
@@ -189,7 +177,6 @@ def download_source() -> list:
     if not fetched:
         raise RuntimeError("All SubstanceIndex sources failed")
     data = merge_sources(fetched)
-    # Cache the merged download
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
@@ -233,7 +220,6 @@ def main():
         size_kb = os.path.getsize(path) / 1024
         print(f"  -> {path} ({size_kb:.0f} KB)")
 
-    # Count how many substances have subjective effects (our primary data source)
     with_effects = sum(1 for s in slimmed if "subjective_effects" in s)
     with_dosage = sum(1 for s in slimmed if "dosage" in s)
     with_duration = sum(1 for s in slimmed if "duration" in s)

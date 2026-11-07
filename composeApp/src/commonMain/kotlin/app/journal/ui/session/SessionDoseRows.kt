@@ -132,7 +132,7 @@ internal fun SessionDoseRow(
     }
 }
 
-/** "2400 mg oral · Full meal" - the number leads, everything else dims out. */
+/** "2400 mg oral · Full meal": the number leads, everything else dims out. */
 @Composable
 private fun amountWithRoute(dose: Dose): AnnotatedString {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)

@@ -53,7 +53,6 @@ actual object ZipExporter {
         }
     }
 
-    // ---- File-based export ----
 
     private fun exportAllFile(
         repo: JournalRepository,
@@ -89,7 +88,6 @@ actual object ZipExporter {
         }
     }
 
-    // ---- Content URI export (write to temp, copy to URI) ----
 
     private fun exportAllContentUri(
         repo: JournalRepository,
@@ -144,7 +142,6 @@ actual object ZipExporter {
         }
     }
 
-    // ---- Shared zip building ----
 
     private fun buildAllZip(
         repo: JournalRepository,

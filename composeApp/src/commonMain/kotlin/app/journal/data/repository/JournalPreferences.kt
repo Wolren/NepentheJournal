@@ -27,7 +27,6 @@ internal class JournalPreferences(
     private val lock: PlatformLock,
     private val bumpMutationCount: () -> Unit,
 ) {
-    // ---- Preferences ----
     private val _ratingScaleMode = MutableStateFlow(RatingScaleMode.OFF)
     val ratingScaleMode: StateFlow<RatingScaleMode> = _ratingScaleMode.asStateFlow()
 
@@ -40,7 +39,6 @@ internal class JournalPreferences(
     private val _seedFingerprint = MutableStateFlow<String?>(null)
     val seedFingerprint: StateFlow<String?> = _seedFingerprint.asStateFlow()
 
-    // ---- Obsidian vault config ----
     private val _obsidianVaultPath = MutableStateFlow("")
     val obsidianVaultPath: StateFlow<String> = _obsidianVaultPath.asStateFlow()
 
@@ -53,11 +51,9 @@ internal class JournalPreferences(
     private val _obsidianFileOrganization = MutableStateFlow("flat")
     val obsidianFileOrganization: StateFlow<String> = _obsidianFileOrganization.asStateFlow()
 
-    // ---- Display preferences ----
     private val _showSessionsTrendChart = MutableStateFlow(false)
     val showSessionsTrendChart: StateFlow<Boolean> = _showSessionsTrendChart.asStateFlow()
 
-    // ---- Setters (run under the facade lock) ----
     fun setRatingScaleMode(mode: RatingScaleMode) = lock.withLock {
         _ratingScaleMode.value = mode
         bumpMutationCount()
@@ -102,7 +98,6 @@ internal class JournalPreferences(
         bumpMutationCount()
     }
 
-    /** Reset exactly the four preference flows that clearAll() resets. Callers must hold [lock]. */
     internal fun resetForClearAll() {
         _ratingScaleMode.value = RatingScaleMode.OFF
         _useSubstanceColors.value = true

@@ -59,7 +59,6 @@ class FullJournalImportTest {
         assertEquals(1, target.doses.value.size)
         assertEquals(1, target.notes.value.size)
         assertEquals(1, target.substances.value.size)
-        // Preferences ride along through AppJson.apply
         assertEquals(RatingScaleMode.NUMERIC, target.ratingScaleMode.value)
         assertTrue(target.obsidianAutoExport.value)
     }
@@ -103,7 +102,6 @@ class FullJournalImportTest {
     @Test
     fun sessionBundleVersionMismatchIsRejectedWithClearError() {
         val source = populatedRepo()
-        // exportSessions uses the pretty printer, so tolerate both spacing forms.
         val json = ExportImport.exportSessions(source)
             .replace("\"version\":1", "\"version\":99")
             .replace("\"version\": 1", "\"version\": 99")
@@ -144,7 +142,6 @@ class FullJournalImportTest {
     fun timestampBoundsAliasEntityTimePolicy() {
         assertEquals(EntityTimePolicy.MIN_ENTITY_TIMESTAMP, ExportImport.MIN_VALID_TIMESTAMP)
         assertEquals(EntityTimePolicy.FUTURE_MARGIN_MS, ExportImport.TIMESTAMP_FUTURE_MARGIN_MS)
-        // The literals the aliases must pin (contract section e).
         assertEquals(946684800000L, ExportImport.MIN_VALID_TIMESTAMP)
         assertEquals(86_400_000L, ExportImport.TIMESTAMP_FUTURE_MARGIN_MS)
     }

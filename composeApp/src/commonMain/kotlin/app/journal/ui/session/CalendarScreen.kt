@@ -62,7 +62,6 @@ private data class CalendarMonth(val year: Int, val month: Month) {
     private fun isLeapYear(y: Int): Boolean = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
 }
 
-/** Precomputed cell data for the calendar Canvas grid. */
 private data class CalendarCellData(
     val day: Int,
     val date: LocalDate,
@@ -86,7 +85,6 @@ fun CalendarScreen(
     var currentMonth by remember { mutableStateOf(CalendarMonth(today.year, today.month)) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
 
-    // Build session date map (converts timestamps once, not twice)
     val sessionsByDate = remember(sessions) {
         sessions.groupBy { session ->
             Instant.fromEpochMilliseconds(session.startTime).toLocalDateTime(tz).date
@@ -112,9 +110,6 @@ fun CalendarScreen(
             )
         }
     ) { innerPadding ->
-        // Scroll container + the shared desktop scrollbar: this screen
-        // used to be the only one whose plain Column root could overflow
-        // off-screen with no way to reach it.
         val scrollState = rememberLazyListState()
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             LazyColumn(
@@ -125,7 +120,6 @@ fun CalendarScreen(
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                     ) {
-                        // Month navigation
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -152,7 +146,6 @@ fun CalendarScreen(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // Day-of-week headers
                         Row(modifier = Modifier.fillMaxWidth()) {
                             val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                             dayNames.forEach { name ->
@@ -168,7 +161,7 @@ fun CalendarScreen(
 
                         Spacer(Modifier.height(4.dp))
 
-                        // Calendar grid - Canvas for perf (single composable instead of ~42 Boxes)
+                        // Calendar grid: Canvas for perf (single composable instead of ~42 Boxes)
                         val daysInMonth = currentMonth.daysInMonth()
                         val firstDayOfWeek = currentMonth.firstDayOfWeek() // 0=Mon, 6=Sun
                         val totalCells = firstDayOfWeek + daysInMonth
@@ -283,7 +276,6 @@ fun CalendarScreen(
                         HorizontalDivider()
                         Spacer(Modifier.height(8.dp))
 
-                        // Sessions for selected date
                         if (selectedDate != null) {
                             Text(
                                 "${sessionsForDate.size} session${if (sessionsForDate.size != 1) "s" else ""} on ${formatDateShort(selectedDate!!)}",

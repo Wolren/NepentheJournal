@@ -80,9 +80,6 @@ internal fun DataSettingsContent(
                         Text("Import backup", maxLines = 1)
                     }
                 }
-                // Failures all read "... failed"; everything else here is a
-                // success line, so color off the word instead of the prefix
-                // (which "Export failed" and "Import failed" both match).
                 statusText?.let { msg ->
                     Spacer(Modifier.height(4.dp))
                     Text(msg, style = MaterialTheme.typography.labelSmall,

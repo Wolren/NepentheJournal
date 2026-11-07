@@ -26,8 +26,6 @@ data class CheckIn(
     val notes: String? = null
 )
 
-/** Conflict: FIELD_LEVEL_MERGE */
-/** Shulgin rating scale: +/- (not sure), + (mild), ++ (moderate), +++ (strong), ++++ (very strong) */
 @Serializable
 enum class RatingScaleMode(val label: String, val description: String) {
     OFF("Off", "No rating asked on sessions"),
@@ -64,13 +62,9 @@ data class Session(
     val isArchived: Boolean = false,
     val isFavorite: Boolean = false,
     val consumerName: String? = null,
-    /** Individual assigned to this trip. Owns the trip demographics at export time. */
     val personId: String? = null,
     val profile: SessionProfile? = null,
-    /** Free tags for this session; exported to the dose.wiki trip report. */
     val tags: List<String> = emptyList(),
-    /** Live-session pause bookkeeping: ms accumulated in earlier pauses. */
     val pausedMs: Long = 0L,
-    /** Non-null while the live timer is paused: wall time the pause started. */
     val pausedAt: Long? = null
 ) : VaultDocument

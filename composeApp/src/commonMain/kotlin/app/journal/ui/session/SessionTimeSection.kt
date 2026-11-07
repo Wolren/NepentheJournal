@@ -42,7 +42,6 @@ fun SessionTimeSection(
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(start = 4.dp, top = 2.dp))
     }
-    // Duration display
     val durationMs = if (endTime != null && !endTimeError) endTime - startTime else null
     if (durationMs != null && durationMs > 0) {
         val hours = durationMs / 3600000

@@ -11,8 +11,7 @@ import kotlin.math.abs
  */
 object TagColors {
 
-    // Saturated palette. Each entry has high enough luminance contrast
-    // against white text to pass WCAG AA (contrast ratio > 4.5:1)
+    // Each entry has high enough luminance contrast against white text to pass WCAG AA (contrast ratio > 4.5:1)
     private val palette = listOf(
         0xFFD32F2F, // red
         0xFFC2185B, // pink
@@ -41,7 +40,6 @@ object TagColors {
         return Color(palette[idx])
     }
 
-    /** Returns the foreground color with best contrast against the tag background. */
     fun foreground(tag: String): Color {
         val bg = background(tag)
         return if (bg.luminance() > 0.45f) Color.Black else Color.White

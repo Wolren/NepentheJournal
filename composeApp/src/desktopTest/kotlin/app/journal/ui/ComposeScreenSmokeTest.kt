@@ -54,13 +54,9 @@ class ComposeScreenSmokeTest {
             }
             waitForIdle()
 
-            // The count row and the empty state are held back until emptiness
-            // proves itself (an empty repository's first frame looks exactly
-            // like a tab that hasn't emitted yet), so step past the gate.
             mainClock.advanceTimeBy(EMPTY_STATE_DELAY_MS + 100)
             waitForIdle()
 
-            // Search bar structure: substance filter icon lives in its trailing slot.
             assertTrue(
                 onAllNodesWithContentDescription("Filter by substance")
                     .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
@@ -71,7 +67,6 @@ class ComposeScreenSmokeTest {
                 onAllNodesWithText("0 sessions").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SessionListScreen must render the session count row"
             )
-            // Empty state + primary action.
             assertTrue(
                 onAllNodesWithText("No sessions yet").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SessionListScreen must render the empty state"
@@ -125,17 +120,11 @@ class ComposeScreenSmokeTest {
             }
             waitForIdle()
 
-            // First LazyColumn item is ThemeContent; its header is always
-            // composed, so it is a stable structure anchor.
             assertTrue(
                 onAllNodesWithText("Theme").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SettingsScreen must render the Theme card"
             )
-            // The theme BODY (base selector, presets, colors) sits behind
-            // the collapsed "Manage" expander, so only the card header is
-            // guaranteed without interaction. Matcher-based onNode/onAll
-            // are not reachable from this test API version, so structure is
-            // pinned through the header action below instead.
+            // Matcher-based onNode/onAll aren't reachable from this test API version, so structure is pinned through the header action below instead.
             assertTrue(
                 onAllNodesWithText("Manage").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SettingsScreen must render the theme manage action"

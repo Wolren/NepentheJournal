@@ -24,9 +24,7 @@ class DoseWikiIngestorTest {
         DoseWikiIngestor.ensureIngested(repo)
 
         val effects = repo.effects.value
-        // Exact set: TestLSD contributes Euphoria + Stimulation, the
-        // auto-created dw:testmix contributes Clarity (audit C7: isNotEmpty
-        // passed even when ingestion was broken).
+        // Exact set: TestLSD contributes Euphoria + Stimulation, the auto-created dw:testmix contributes Clarity (audit C7).
         assertEquals(3, effects.size, "TestLSD (2) + TestMix (1) effects")
         val effectNames = effects.map { it.name }
         assertTrue("Euphoria" in effectNames, "expected Euphoria effect")
@@ -146,9 +144,7 @@ class DoseWikiIngestorTest {
 
         DoseWikiIngestor.reset()
         DoseWikiIngestor.ensureIngested(repo)
-        // Capture-and-compare (audit C7): the old assertion re-checked
-        // isNotEmpty after reset, which passed even if re-ingestion was a
-        // no-op. The count must be reproduced exactly.
+        // Capture-and-compare (audit C7): the old assertion re-checked isNotEmpty after reset, which passed even if re-ingestion was a no-op.
         assertEquals(countAfterFirst, repo.effects.value.size,
             "re-ingestion after reset must reproduce the same effect count")
     }

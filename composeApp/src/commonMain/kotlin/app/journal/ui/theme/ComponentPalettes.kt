@@ -19,11 +19,8 @@ fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 
 @Composable
 fun activityLevelColors(): List<Color> {
     val scheme = MaterialTheme.colorScheme
-    // Empty-cell base is lifted off surfaceVariant (the card behind the grid
-    // is surfaceVariant too, so a raw surfaceVariant grid goes invisible).
     val base = blend(scheme.surfaceVariant, scheme.onSurfaceVariant, 0.22f)
     if (LocalThemeConfig.current.githubGreenActivity) {
-        // Classic moss greens, dark and light variants.
         val greens = if (isDarkTheme()) listOf(
             Color(0xFF1B4A1B), Color(0xFF2D6A2D), Color(0xFF3D8A3D), Color(0xFF4CAF50)
         ) else listOf(

@@ -25,7 +25,6 @@ fun SessionEventsSection(
     onEventAdded: (TimelineEvent) -> Unit,
     onEventDeleted: (String) -> Unit
 ) {
-    // ── Timeline Events section ──
     HorizontalDivider()
     Spacer(Modifier.height(4.dp))
     Row(
@@ -46,7 +45,6 @@ fun SessionEventsSection(
                 createdAt = now, updatedAt = now,
                 deviceOrigin = "desktop"
             )
-            // Persist immediately so it appears with a real id
             repo.upsertTimelineEvent(newEvent)
             onEventAdded(newEvent)
         }) {
@@ -56,7 +54,6 @@ fun SessionEventsSection(
         }
     }
 
-    // Inline-editable event cards
     Column {
         sessionEvents.sortedBy { it.timestamp }.forEach { event ->
             key(event.id) {

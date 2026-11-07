@@ -41,9 +41,7 @@ class ToleranceBarsTest {
         )
         assertEquals(1, rows.size)
         assertEquals("LSD", rows[0].name)
-        // Day 25's end is the first one that actually reaches the dose (the
-        // day-end timestamp sits a millisecond short of a clean day boundary),
-        // and a lone recent dose is MEDIUM there, staying MEDIUM to the end.
+        // Day 25's end is the first one that reaches the dose (day-end timestamp a millisecond short of the day boundary).
         assertEquals(listOf(ToleranceSegment(25, 30, ToleranceLevel.MEDIUM)), rows[0].segments)
     }
 
@@ -58,15 +56,11 @@ class ToleranceBarsTest {
             substances,
         )
         assertEquals(1, rows.size)
-        // Two doses inside three days is the HIGH branch; days before both
-        // doses are reachable have no segment at all.
         assertEquals(listOf(ToleranceSegment(28, 30, ToleranceLevel.HIGH)), rows[0].segments)
     }
 
     @Test
     fun dosesAfterTheSessionNeverCount() {
-        // A dose from the "future" relative to the session must not paint
-        // tolerance bars onto the past.
         val rows = buildToleranceRows(
             listOf(dose("d:1", "sub:1", here + 2 * dayMs)),
             here,
@@ -87,9 +81,7 @@ class ToleranceBarsTest {
 
     @Test
     fun longWindowReachesTheOldDecayTail() {
-        // A 90-day window has to reach back far enough: the dose sits 10 days
-        // before "here", so only the tail of the window may show anything -
-        // MEDIUM for a week, then LOW until the dose falls out of range.
+        // A 90-day window has to reach back far enough: the dose sits 10 days before "here"
         val rows = buildToleranceRows(
             listOf(dose("d:1", "sub:1", here - 10 * dayMs)),
             here,
@@ -110,8 +102,6 @@ class ToleranceBarsTest {
     fun recentMostActiveSubstanceComesFirstAndRowsAreCapped() {
         val doses = mutableListOf<Dose>()
         val map = mutableMapOf<String, Substance>()
-        // Seven substances, each dosed a day before "here" on a different day
-        // so every one of them has active tolerance.
         for (i in 1..7) {
             val id = "sub:$i"
             map[id] = Substance(
@@ -123,7 +113,6 @@ class ToleranceBarsTest {
         }
         val rows = buildToleranceRows(doses, here, map)
         assertEquals(6, rows.size, "capped at six rows")
-        // Most recent activity first.
         assertEquals("Sub1", rows[0].name)
         assertEquals("Sub6", rows[5].name)
     }

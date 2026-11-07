@@ -115,7 +115,6 @@ internal fun recoverSnapshot(text: String): JournalSnapshot {
     )
 }
 
-/** Decode one top-level list field, dropping individual elements that fail. */
 private fun <T : Any> decodeList(root: JsonObject, key: String, serializer: KSerializer<T>): List<T> {
     return try {
         val arr = root[key]?.jsonArray ?: return emptyList()
@@ -127,18 +126,15 @@ private fun <T : Any> decodeList(root: JsonObject, key: String, serializer: KSer
     } catch (_: Exception) { emptyList() }
 }
 
-/** Decode one top-level boolean field, falling back to [default]. */
 private fun decodeBoolean(root: JsonObject, key: String, default: Boolean): Boolean =
     runCatching { root[key]?.jsonPrimitive?.boolean ?: default }.getOrDefault(default)
 
-/** Decode one top-level string field, falling back to [default]. */
 private fun decodeString(root: JsonObject, key: String, default: String): String =
     runCatching {
         val el = root[key] ?: return@runCatching default
         if (el is JsonNull) default else el.jsonPrimitive.content
     }.getOrDefault(default)
 
-/** Decode one top-level nullable string field. */
 private fun decodeNullableString(root: JsonObject, key: String): String? =
     runCatching {
         val el = root[key] ?: return@runCatching null

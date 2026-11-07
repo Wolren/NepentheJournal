@@ -7,7 +7,6 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
-/** Abbreviated month names for the uniform "DD Mon YYYY" date format. */
 private val SHORT_MONTHS = listOf(
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -26,7 +25,6 @@ fun formatDateShort(date: LocalDate): String =
 
 fun formatDateShort(local: LocalDateTime): String = formatDateShort(local.date)
 
-/** Four time display modes for session timestamps. */
 enum class TimeDisplayMode {
     /** Relative to now, e.g. "2h ago" */
     RELATIVE,

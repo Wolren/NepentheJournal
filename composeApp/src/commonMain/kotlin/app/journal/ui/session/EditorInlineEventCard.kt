@@ -32,14 +32,12 @@ fun EditorInlineEventCard(
     var useIntensity by remember { mutableStateOf(event.intensity != null) }
 
     if (editing) {
-        // INLINE EDIT MODE
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Event type chips
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                     val quickTypes = listOf(
                         TimelineEventType.OBSERVATION to "Obs",
@@ -93,7 +91,6 @@ fun EditorInlineEventCard(
             }
         }
     } else {
-        // VIEW MODE
         val icon = when (event.eventType) {
             TimelineEventType.ONSET -> Icons.Default.ArrowForward
             TimelineEventType.COMEUP -> Icons.Default.TrendingUp

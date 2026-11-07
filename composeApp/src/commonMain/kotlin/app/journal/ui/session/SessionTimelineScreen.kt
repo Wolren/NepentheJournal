@@ -38,10 +38,6 @@ fun SessionTimelineScreen(
     sessionId: String,
     onBack: () -> Unit,
 ) {
-    // Reactive reads: this screen mutates the repository itself (AddEventDialog
-    // confirm, delete confirm), so one-shot reads keyed only on sessionId never
-    // showed the change until the screen was re-entered. Same pattern as
-    // LiveSessionScreen: collect the flows, then filter per session.
     val allSessions by repo.sessions.collectAsState()
     val allEvents by repo.timelineEvents.collectAsState()
     val allDoses by repo.doses.collectAsState()
@@ -82,8 +78,6 @@ fun SessionTimelineScreen(
         return
     }
 
-    // Replayed tolerance over the month before this session: one row per
-    // substance that had any active tolerance in that window.
     val toleranceRows = remember(allDoses, session.startTime, substancesById) {
         buildToleranceRows(allDoses, session.startTime, substancesById)
     }
@@ -127,7 +121,6 @@ fun SessionTimelineScreen(
             }
         }
     ) {
-        // Session header with rating
         item {
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -146,9 +139,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Effect timeline: intensity over the session window, with a marker on
-        // every dose. Logged curve when check-ins exist, otherwise a curve from
-        // the substance's own duration profile.
         item {
             val isDark = isDarkTheme()
             val accentSource = remember(substancesById, sortedDoses, session.title) {
@@ -168,8 +158,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Doses: PsychonautWiki-style rows - accent bar, time, substance,
-        // amount, and a dot meter of the dose against the reference dose.
         if (sortedDoses.isNotEmpty()) {
             item {
                 SessionDetailCard {
@@ -185,9 +173,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Tolerance: how sensitised each substance was at this session, rebuilt
-        // day by day over the month before it (reference: "Tolerance of
-        // ingestions up to here").
         if (toleranceRows.isNotEmpty()) {
             item {
                 SessionDetailCard {
@@ -215,7 +200,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Phase cards
         if (phaseRanges.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -230,7 +214,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Session intention/outcome
         if (!session.intention.isNullOrBlank() || !session.outcome.isNullOrBlank()) {
             item {
                 Card(
@@ -255,7 +238,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Set & Setting
         if (!session.set.isNullOrBlank() || !session.setting.isNullOrBlank()) {
             item {
                 Card(
@@ -280,7 +262,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Demographics / SessionProfile
         val profile = session.profile
         if (profile != null && (profile.age != null || profile.gender != null || profile.heightCm != null || profile.weightKg != null)) {
             item {
@@ -305,7 +286,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Timeline events list with phase headers
         if (combinedItems.isNotEmpty()) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
@@ -365,7 +345,6 @@ fun SessionTimelineScreen(
             }
         }
 
-        // Check-in effect tags
         if (session.checkins.any { it.effectScores.isNotEmpty() }) {
             item { EffectTagCloud(session = session, repo = repo) }
         }

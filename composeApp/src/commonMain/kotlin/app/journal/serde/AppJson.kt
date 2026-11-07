@@ -25,7 +25,6 @@ object AppJson {
         encodeDefaults = true
     }
 
-    /** Pretty-printed variant for user-facing export files. */
     val pretty = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -59,15 +58,8 @@ object AppJson {
     }
 
     fun apply(repo: IJournalRepository, snapshot: JournalSnapshot) {
-        // Explicit version dispatch (audit "Schema versioning"): every arm is an
-        // identity migration today because no field migration has been needed
-        // yet, but the dispatch exists so a future version bump adds its arms
-        // here instead of silently warn-and-continuing. Unknown or newer
-        // versions get a clear warning: the file may come from a future app
-        // version and fields this build does not know are ignored on decode.
         when (val version = snapshot.version) {
             JournalSnapshot.CURRENT_VERSION -> {
-                // Current format: nothing to migrate.
             }
             in 1 until JournalSnapshot.CURRENT_VERSION -> {
                 Log.withTag("JournalStore").w {
@@ -92,8 +84,6 @@ object AppJson {
             interactions = snapshot.interactions,
             effects = snapshot.effects,
             customUnits = snapshot.customUnits,
-            // Persons are device-local snapshot data (never synced): snapshot loads
-            // must restore them, while sync deltas leave the default empty.
             persons = snapshot.persons
         )
         repo.importTombstones(snapshot.tombstones)

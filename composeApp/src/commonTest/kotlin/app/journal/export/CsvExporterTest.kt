@@ -26,7 +26,6 @@ class CsvExporterTest {
         routeOfAdministration = "Oral", amount = 100.0, unit = "mg", timestamp = 2000L
     )
 
-    // ---- Sessions CSV ----
 
     @Test
     fun exportSessionsCsvContainsHeaders() {
@@ -48,10 +47,7 @@ class CsvExporterTest {
 
         val lines = csv.trimEnd().split("\n")
         assertEquals(2, lines.size, "header + exactly one session row, got: $lines")
-        // Exact field-level row (audit C7): substring contains() proved
-        // neither column order nor values. date/start_time mirror the
-        // documented SessionDataRow derivation (ISO from startTime in the
-        // system zone).
+        // Exact field-level row (audit C7)
         val dt = Instant.fromEpochMilliseconds(2000L)
             .toLocalDateTime(TimeZone.currentSystemDefault())
         assertEquals(
@@ -106,7 +102,6 @@ class CsvExporterTest {
         assertFalse(csv.contains("s:2"), "Session s:2 (MDMA) should be filtered out")
     }
 
-    // ---- Doses CSV ----
 
     @Test
     fun exportDosesCsvContainsHeaders() {
@@ -167,7 +162,6 @@ class CsvExporterTest {
         assertFalse(csv.contains("d:2"), "Dose d:2 (MDMA session) should be filtered out")
     }
 
-    // ---- Substances CSV ----
 
     @Test
     fun exportSubstancesCsvContainsHeaders() {
@@ -211,7 +205,6 @@ class CsvExporterTest {
         assertTrue(lines[2].contains("MDMA"))
     }
 
-    // ---- CSV formatting ----
 
     @Test
     fun csvEscapesQuotesInFields() {

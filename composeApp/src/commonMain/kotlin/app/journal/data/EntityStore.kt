@@ -34,24 +34,20 @@ internal class EntityStore<T>(
     private val _flow = MutableStateFlow<List<T>>(emptyList())
     val flow: StateFlow<List<T>> = _flow.asStateFlow()
 
-    /** Insert or replace an entity by its ID. Returns the previous value, or null. */
     fun put(value: T): T? = lock.withLock {
         val prev = map.put(idOf(value), value)
         emit()
         prev
     }
 
-    /** Look up an entity by ID. Returns null if missing. */
     fun get(id: String): T? = lock.withLock { map[id] }
 
-    /** Remove an entity by ID. Returns the removed value, or null. */
     fun remove(id: String): T? = lock.withLock {
         val prev = map.remove(id)
         if (prev != null) emit()
         prev
     }
 
-    /** Remove all entities matching [predicate]. Returns the removed list. */
     fun removeWhere(predicate: (T) -> Boolean): List<T> = lock.withLock {
         val toRemove = map.values.filter(predicate)
         toRemove.forEach { map.remove(idOf(it)) }
@@ -59,7 +55,6 @@ internal class EntityStore<T>(
         toRemove
     }
 
-    /** Insert or replace multiple entities by ID. Single emit; no-op when [items] is empty. */
     fun putAll(items: List<T>) {
         if (items.isEmpty()) return
         lock.withLock {
@@ -68,7 +63,6 @@ internal class EntityStore<T>(
         }
     }
 
-    /** Remove all entities. No-op (no emit) when already empty. */
     fun clear() = lock.withLock {
         if (map.isEmpty()) return@withLock
         map.clear()
@@ -78,7 +72,6 @@ internal class EntityStore<T>(
     val all: List<T> get() = lock.withLock { map.values.toList() }
     val size: Int get() = lock.withLock { map.size }
 
-    /** Iterate over a snapshot of values. Safe during concurrent modification. */
     fun forEachValue(action: (T) -> Unit) {
         lock.withLock { map.values.toList() }.forEach(action)
     }

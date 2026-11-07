@@ -46,8 +46,6 @@ fun SessionCard(
     onToggleFavorite: () -> Unit
 ) {
     val isDark = isDarkTheme()
-    // Card accent follows the session's actual substances, falling back to the
-    // title only for doseless sessions, so every card carries its own color.
     val accentSource = remember(substanceNameMap, doses, session.title) {
         doses.firstOrNull()?.let { substanceNameMap[it.substanceId] } ?: session.title
     }
@@ -64,7 +62,7 @@ fun SessionCard(
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
         ) {
-            // Quiet 4dp accent bar - solid, not gradient soup
+            // Quiet 4dp accent bar: solid, not gradient soup
             Box(
                 Modifier.fillMaxHeight().width(4.dp)
                     .clip(RoundedCornerShape(topEnd = 6.dp, bottomEnd = 6.dp))
@@ -226,7 +224,6 @@ fun SessionCard(
     }
 }
 
-/** Ticking LIVE pill for open sessions: red dot plus elapsed time net of pauses. */
 @Composable
 private fun LiveElapsedLabel(session: Session) {
     var tick by remember(session.id) { mutableStateOf(currentTimeMillis()) }

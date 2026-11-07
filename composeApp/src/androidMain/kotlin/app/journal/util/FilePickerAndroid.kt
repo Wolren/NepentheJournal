@@ -10,7 +10,6 @@ actual object FilePicker {
         description: String,
         extensions: List<String>
     ): String? = suspendCancellableCoroutine { cont ->
-        // In-flight guard: a second pick must not orphan the first continuation.
         if (AndroidFilePickerBridge.continuation != null) {
             cont.resume(null)
             return@suspendCancellableCoroutine
@@ -23,7 +22,6 @@ actual object FilePicker {
         if (launcher != null) {
             launcher("*/*", defaultName)
         } else {
-            // Launcher not set up yet - return null
             AndroidFilePickerBridge.continuation = null
             cont.resume(null)
         }

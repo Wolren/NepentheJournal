@@ -34,8 +34,6 @@ fun LiveSessionScreen(
     val listState = rememberLazyListState()
 
     val allDoses by repo.doses.collectAsState()
-    // Reactive session row: the passed snapshot goes stale after any upsert
-    // (pause, edit), so resolve the live copy for timer and title.
     val allSessions by repo.sessions.collectAsState()
     val live = allSessions.find { it.id == session.id } ?: session
     val sessionDoses = remember(allDoses, live.id) { allDoses.filter { it.sessionId == live.id }.sortedBy { it.timestamp } }
@@ -65,7 +63,6 @@ fun LiveSessionScreen(
             listState.animateScrollToItem(sessionEvents.size - 1)
     }
 
-    // Dialogs
     if (showDoseDialog) { QuickDoseDialog(substances = allSubstances, session = session, repo = repo, onDismiss = { showDoseDialog = false }) }
     if (showMoodDialog) { QuickMoodDialog(session = session, repo = repo, onDismiss = { showMoodDialog = false }) }
     if (showCrisisDialog) { CrisisResourcesDialog(onDismiss = { showCrisisDialog = false }) }
@@ -92,8 +89,6 @@ fun LiveSessionScreen(
             dismissButton = { AppTextButton(onClick = { deletingLiveEvent = null }) { Text("Cancel") } })
     }
 
-    // Unified timeline: one id -> substance map instead of a linear find per
-    // dose (O(doses x substances) per emission).
     val substancesById = remember(allSubstances) { allSubstances.associateBy { it.id } }
     val mergedTimeline = remember(sessionEvents, sessionDoses, substancesById) {
         val eventItems = sessionEvents.map { LiveTimelineItem.Event(it) as LiveTimelineItem }
@@ -119,15 +114,12 @@ fun LiveSessionScreen(
             }
         }
     ) {
-        // Main timer display; stopping happens through the Stop action above.
         item {
             TimerCard(session = live)
         }
 
-        // Interaction warnings
         if (warnings.isNotEmpty()) { item { InteractionWarningsBanner(warnings) } }
 
-        // Quick action buttons
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -166,7 +158,6 @@ fun LiveSessionScreen(
             }
         }
 
-        // Crisis button
         item {
             Spacer(Modifier.height(8.dp))
             AppButton(onClick = { showCrisisDialog = true }, modifier = Modifier.fillMaxWidth().height(48.dp),

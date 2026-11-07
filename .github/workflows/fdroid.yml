@@ -4,16 +4,7 @@ concurrency:
   group: fdroid-${{ github.ref }}
   cancel-in-progress: true
 
-# F-Droid readiness: the release APK must build reproducibly.
-# Two independent clean builds of the same commit must produce byte-identical
-# APKs. F-Droid builds the app itself from source (never trusts uploaded
-# binaries), so a nondeterministic build blocks inclusion.
-#
-# Runs on every push/PR; the real F-Droid gate happens in the fdroiddata repo
-# (see docs/FDROID.md) with fdroidserver build.
-
 # NOTE: fdroid/play pin Java 17 for the Android toolchain while CI and
-# CodeQL run Java 21 for the desktop/KMP build. This split is deliberate.
 
 on:
   push:
@@ -35,11 +26,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # android-actions/setup-android@v3 is deliberately absent: its default
-      # sdkmanager package list includes 'tools', which modern cmdline-tools no
-      # longer ships, so the action always exits 1. The GitHub Ubuntu image
+      # android-actions/setup-android@v3 is deliberately absent: its default sdkmanager package list includes 'tools' ships a licensed Android SDK
       # ships a licensed Android SDK; the CI android-build job builds with no
-      # setup step at all.
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
@@ -62,11 +50,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # android-actions/setup-android@v3 is deliberately absent: its default
-      # sdkmanager package list includes 'tools', which modern cmdline-tools no
-      # longer ships, so the action always exits 1. The GitHub Ubuntu image
+      # android-actions/setup-android@v3 is deliberately absent: its default sdkmanager package list includes 'tools' ships a licensed Android SDK
       # ships a licensed Android SDK; the CI android-build job builds with no
-      # setup step at all.
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace

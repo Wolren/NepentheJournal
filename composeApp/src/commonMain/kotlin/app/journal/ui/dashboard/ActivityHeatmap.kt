@@ -49,12 +49,9 @@ fun ActivityHeatmap(
         map
     }
 
-    // Activity ramp derived from the theme accent, so accent and dark/light
-    // changes recolor the grid instead of the fixed moss greens.
     val levels = activityLevelColors()
     val inactive = levels[0]
     val activeColors = levels.drop(1)
-    // Hoisted: Canvas draw scope is not @Composable.
     val todayRing = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 
     fun colorFor(count: Int): Color = when {

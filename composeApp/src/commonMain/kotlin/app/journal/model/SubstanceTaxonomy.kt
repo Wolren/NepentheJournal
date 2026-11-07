@@ -51,7 +51,6 @@ object SubstanceTaxonomy {
         "cannabinoid" to CANNABINOIDS.id,
         "miscellaneous" to OTHER.id,
     )
-    /** Broads in display order. */
     val broads: List<BroadCategory> = listOf(
         PSYCHEDELICS, ENTACTOGENS, DISSOCIATIVES, DELIRIANTS, DYSDELIC,
         STIMULANTS, DEPRESSANTS, OPIOIDS, CANNABINOIDS,
@@ -74,11 +73,9 @@ object SubstanceTaxonomy {
         if (raw.has("cannabinoid", "naphthoyl", "indazole", "benzoyl", "dibenzopyran", "carboxamide")) {
             out += CANNABINOIDS.id
         }
-        // Salvinorin scaffolds are KOR agonists by definition.
         if (raw.has("salvinorin")) {
             out += DYSDELIC.id
         }
-        // Beta-keto phenethylamines are cathinones, not psychedelics.
         if (!raw.has("keto") && (
             raw.has(
                 "psychedelic", "hallucinogen", "tryptamine", "lysergamide",
@@ -90,7 +87,6 @@ object SubstanceTaxonomy {
         ) {
             out += PSYCHEDELICS.id
         }
-        // Empathogen is the PsychonautWiki spelling of entactogen.
         if (raw.has("entactogen", "empathogen", "mdxx") || raw == "aminoindane") {
             out += ENTACTOGENS.id
         }
@@ -108,13 +104,11 @@ object SubstanceTaxonomy {
             "imidazoline", "oxazoline", "purine", "morpholine",
             "phenylpropylamin",
         ) || raw == "phenylpiperazine" ||
-            // Fentanyl scaffolds contain piperidine/piperazine but are opioids.
             (raw.has("piperidine") && !raw.has("anilid", "anilino", "phenylpiper")) ||
             (raw.has("piperazine") && !raw.has("phenylpiper"))
         ) {
             out += STIMULANTS.id
         }
-        // Antidepressants contain "depressant" as a substring but are medicines.
         if ((raw.has("depressant") && !raw.has("antidepressant")) || raw.has(
             "sedative", "hypnotic", "anxiolytic", "antihistamine", "ethanolamine",
             "gaba", "diazepine", "barbiturate", "barbituric", "quinazolinone", "carbamate",
@@ -156,7 +150,6 @@ object SubstanceTaxonomy {
         return out
     }
 
-    /** Union of [broadsOf] over all raw classes of a substance. */
     fun broadsOfClasses(classes: List<String>): Set<String> {
         if (classes.isEmpty()) return setOf(OTHER.id)
         return classes.flatMapTo(mutableSetOf()) { broadsOf(it) }

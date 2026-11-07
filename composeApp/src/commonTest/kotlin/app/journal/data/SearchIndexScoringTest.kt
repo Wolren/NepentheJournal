@@ -16,7 +16,6 @@ import kotlin.test.assertTrue
  */
 class SearchIndexScoringTest {
 
-    // ---- Mixed fixture: sessions, substances, notes, doses, events, effects ----
 
     private fun session(id: String, title: String, set: String, setting: String, outcome: String) = Session(
         id = id, createdAt = 1000L, updatedAt = 1000L, deviceOrigin = "test",
@@ -83,7 +82,6 @@ class SearchIndexScoringTest {
         return index
     }
 
-    // ---- Verbatim pre-refactor algorithm over an index snapshot ----
 
     private val tokenSeparator =
         Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\\$%^&*+=|~`\\\"'\\u2013\\u2014]+")
@@ -136,7 +134,6 @@ class SearchIndexScoringTest {
             .sortedByDescending { it.score }
             .take(50)
 
-    // ---- Tests ----
 
     @Test
     fun multiTermOrderingMatchesOldRuleOnMixedFixture() {
@@ -168,9 +165,7 @@ class SearchIndexScoringTest {
 
     @Test
     fun explicitExpectedOrderForMultiTermQuery() {
-        // Non-vacuous pin (not just old-vs-new self-consistency): the key is
-        // distinctMatchedTerms * 100 + maxScore, ties keep first-encounter
-        // order of the index's words.
+        // Non-vacuous pin (not just old-vs-new self-consistency): the key is distinctMatchedTerms * 100 + maxScore
         val index = fixtureIndex()
 
         val twoTerm = index.search("acid mountain").map { it.entityId }
@@ -186,9 +181,7 @@ class SearchIndexScoringTest {
                 "tie at 103 and must keep bucket insertion order (d:1 first)"
         )
 
-        // Tie-break pin: both substances match 'classic psychedelic' with the
-        // same key (2 * 100 + 8 = 208); LSD is indexed first, so it must stay
-        // first, with the effect (204) after them.
+        // Tie-break pin: both substances match 'classic psychedelic' with the same key (2 * 100 + 8 = 208)
         val tie = index.search("classic psychedelic").map { it.entityId }
         assertEquals(listOf("sub:lsd", "sub:shroom", "f:1"), tie,
             "equal keys must keep bucket insertion order (stable sort tie-break)")
@@ -215,11 +208,7 @@ class SearchIndexScoringTest {
 
     @Test
     fun scoringRunsOnSnapshotAndSurvivesConcurrentMutation() {
-        // Single-threaded simulation of the wave4 hazard: snapshot taken, the
-        // live index is then rebuilt out from under the scorer, and scoring
-        // must still succeed purely on the snapshot (the old code read the
-        // live index inside its comparator while the repo lock was held, so a
-        // rebuild racing it could throw or rank against half-built state).
+        // Single-threaded simulation of the wave4 hazard: snapshot taken, the live index is then rebuilt out from under the scorer
         val index = fixtureIndex()
         val snapshot = index.snapshotIndex()
 
@@ -242,7 +231,6 @@ class SearchIndexScoringTest {
         assertTrue(result.any { it.entityId == "s:acid" },
             "the pre-mutation snapshot content is what gets ranked")
 
-        // And the live index now answers with the NEW content only.
         assertTrue(index.search("acid").isEmpty(), "rebuilt index dropped the old entities")
         assertTrue(index.search("completely").isNotEmpty(), "rebuilt index answers from new content")
     }

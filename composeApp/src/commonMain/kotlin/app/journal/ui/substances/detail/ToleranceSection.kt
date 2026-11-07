@@ -16,7 +16,6 @@ import app.journal.ui.charts.buildToleranceRows
 import app.journal.ui.charts.toleranceLevelColor
 import app.journal.util.currentTimeMillis
 
-/** Strips wiki markup like [[Target|Display]] or [[Target]] from a string. */
 internal fun cleanWikiMarkup(text: String): String {
     return text.replace(Regex("""\[\[([^|\]]+)\|([^\]]+)\]\]""")) { it.groupValues[2] }
         .replace(Regex("""\[\[([^\]]+)\]\]""")) { it.groupValues[1] }

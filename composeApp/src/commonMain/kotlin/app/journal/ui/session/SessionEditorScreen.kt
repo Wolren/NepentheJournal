@@ -28,8 +28,6 @@ fun SessionEditorScreen(
     sessionToEdit: Session? = null,
     onBack: () -> Unit
 ) {
-    // Form state, validation, session construction and the save pipeline all
-    // live in the view model; this composable only renders and forwards intent.
     val viewModel = remember(repo, sessionToEdit?.id) {
         SessionEditorViewModel.create(repo, sessionToEdit)
     }
@@ -42,7 +40,6 @@ fun SessionEditorScreen(
     val persons by repo.persons.collectAsState()
     val customUnits by repo.customUnits.collectAsState()
 
-    // Form state
     val title by viewModel.title.collectAsState()
     val startTime by viewModel.startTime.collectAsState()
     val endTime by viewModel.endTime.collectAsState()
@@ -58,24 +55,20 @@ fun SessionEditorScreen(
     val rating by viewModel.rating.collectAsState()
     val shulginRating by viewModel.shulginRating.collectAsState()
 
-    // SessionProfile (demographics) state
     var profileExpanded by remember { mutableStateOf(false) }
     val profileAge by viewModel.profileAge.collectAsState()
     val profileGender by viewModel.profileGender.collectAsState()
     val profileHeightCm by viewModel.profileHeightCm.collectAsState()
     val profileWeightKg by viewModel.profileWeightKg.collectAsState()
 
-    // Dose and timeline-event drafts
     var showDoseDialog by remember { mutableStateOf(false) }
     var editingDose by remember { mutableStateOf<Dose?>(null) }
     val sessionDoses by viewModel.sessionDoses.collectAsState()
     val sessionEvents by viewModel.sessionEvents.collectAsState()
 
-    // Discard confirmation
     var showDiscardDialog by remember { mutableStateOf(false) }
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState(initial = false)
 
-    // Interaction warnings keyed on doses + stored interactions (view model).
     val interactionCheckResult by viewModel.interactionCheckResult.collectAsState(
         initial = InteractionCheckResult()
     )
@@ -89,7 +82,6 @@ fun SessionEditorScreen(
         if (hasUnsavedChanges) showDiscardDialog = true else exitEditor()
     }
 
-    // Discard confirmation dialog
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -106,7 +98,6 @@ fun SessionEditorScreen(
         )
     }
 
-    // Dose editor dialog
     if (showDoseDialog) {
         DoseEditDialog(
             substances = substances,
@@ -124,8 +115,6 @@ fun SessionEditorScreen(
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    // Delete confirmation dialog (delete lives here, inside the open
-    // session, never on the list card)
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -146,7 +135,6 @@ fun SessionEditorScreen(
         )
     }
 
-    // Main layout
     ScreenScaffold(
         title = if (isEditing) "Edit Session" else "New Session",
         onBack = ::handleBack,
@@ -171,7 +159,6 @@ fun SessionEditorScreen(
             }) { Text("Save") }
         }
     ) {
-        // Title
         item {
             OutlinedTextField(
                 value = title,
@@ -183,7 +170,6 @@ fun SessionEditorScreen(
             )
         }
 
-        // Individual assigned to this trip (owns the demographics at export time)
         item {
             PersonPickerSection(
                 persons = persons,
@@ -193,7 +179,6 @@ fun SessionEditorScreen(
             )
         }
 
-        // Consumer name fallback, only without an assigned individual
         if (personId == null) {
             item {
                 OutlinedTextField(
@@ -207,7 +192,6 @@ fun SessionEditorScreen(
             }
         }
 
-        // Start / End time
         item {
             SessionTimeSection(
                 startTime = startTime,
@@ -217,7 +201,6 @@ fun SessionEditorScreen(
             )
         }
 
-        // Rating (hidden entirely when the scale is off in settings)
         if (ratingMode != RatingScaleMode.OFF) {
             item {
                 SessionRatingSection(
@@ -230,7 +213,6 @@ fun SessionEditorScreen(
             }
         }
 
-        // Set & Setting, Intention, Outcome, Notes
         item {
             SessionTextFieldsSection(
                 set = set, onSetChange = { viewModel.set.value = it },
@@ -242,8 +224,6 @@ fun SessionEditorScreen(
             )
         }
 
-        // Legacy per-session demographics, only without an assigned individual.
-        // With an individual, demographics live on the individual (Settings, Individuals).
         if (personId == null) {
         item {
             SessionDemographicsSection(
@@ -257,7 +237,6 @@ fun SessionEditorScreen(
         }
         }
 
-        // Doses section
         item {
             SessionDoseSection(
                 sessionDoses = sessionDoses,
@@ -277,7 +256,6 @@ fun SessionEditorScreen(
             )
         }
 
-        // Timeline Events section
         item {
             SessionEventsSection(
                 sessionEvents = sessionEvents,

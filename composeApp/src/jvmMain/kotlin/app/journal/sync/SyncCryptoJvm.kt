@@ -20,7 +20,6 @@ import javax.crypto.spec.SecretKeySpec
 private val aesKeyCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
 private const val MAX_CACHED_AES_KEYS = 64
 
-/** Drop every cached AES key; see [aesKeyCache] for when to call this. */
 fun clearAesKeyCache() {
     aesKeyCache.clear()
 }

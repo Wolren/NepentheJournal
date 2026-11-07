@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.Color
  */
 val toleranceMediumColor = Color(0xFFFF9800)
 
-/** Color mapping for administration routes. Shared across all screens. */
 fun routeColor(route: String): Color {
     return when (route.lowercase()) {
         "oral" -> Color(0xFF66BB6A)
@@ -27,7 +26,6 @@ fun routeColor(route: String): Color {
     }
 }
 
-/** Color mapping for substance classes. Shared across all screens. */
 fun substanceClassColor(cls: String): Color {
     val c = cls.lowercase().trim()
     return when {

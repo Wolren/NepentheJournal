@@ -12,7 +12,6 @@ import app.journal.model.TimelineEventType
  */
 object PhaseColors {
 
-    /** Canonical pastel palette, keyed by event type. Source of truth. */
     val byType: Map<TimelineEventType, Color> = mapOf(
         TimelineEventType.ONSET to Color(0xFF80CBC4),
         TimelineEventType.COMEUP to Color(0xFFA5D6A7),
@@ -31,7 +30,6 @@ object PhaseColors {
         TimelineEventType.AFTERGLOW to "Afterglow",
     )
 
-    /** The same palette addressed by display label, for label-keyed charts. */
     val byLabel: Map<String, Color> = labelByType.entries
         .mapNotNull { (type, label) -> byType[type]?.let { label to it } }
         .toMap()
@@ -51,12 +49,9 @@ object PhaseColors {
         "Afterglow" to Color(0xFF26C6DA),
     )
 
-    /** Canonical color for an event type, null for non-phase types. */
     fun color(type: TimelineEventType): Color? = byType[type]
 
-    /** Canonical color for a display label ("Onset", "Peak", ...), else null. */
     fun color(label: String): Color? = byLabel[label]
 
-    /** Saturated ribbon color for a display label, else null. */
     fun saturated(label: String): Color? = saturatedByLabel[label]
 }

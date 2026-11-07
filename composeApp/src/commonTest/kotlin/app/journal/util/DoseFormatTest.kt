@@ -11,7 +11,6 @@ import kotlin.test.assertNull
  */
 class DoseFormatTest {
 
-    // ==================== parseDoseBand ====================
 
     @Test
     fun parseDoseBandRangesAndSingles() {
@@ -31,7 +30,6 @@ class DoseFormatTest {
         assertNull(parseDoseBand("as needed"), "free text has no number")
     }
 
-    // ==================== normalizeDoseUnit ====================
 
     @Test
     fun normalizeDoseUnitCanonicalSpellings() {
@@ -44,7 +42,6 @@ class DoseFormatTest {
         assertEquals("", normalizeDoseUnit("  "), "blank stays blank")
     }
 
-    // ==================== referenceDoseAmount ====================
 
     private val lsdBands = mapOf(
         "threshold" to "15-25 µg",
@@ -87,7 +84,6 @@ class DoseFormatTest {
         )
     }
 
-    // ==================== formatDoseAmount ====================
 
     @Test
     fun formatDoseAmountDropsFloatNoise() {

@@ -69,18 +69,12 @@ internal class JournalMutations(
         val prev = dosesStore.put(dose)
 
         if (prev != null) {
-            // Re-parent / replace cleanup (audit: a sessionId change skipped index and
-            // stat maintenance): drop the PREVIOUS index rows first, then recompute
-            // this substance's stats from the store that already holds the final dose
-            // (a moved session or a lowered timestamp can shrink them, which a running
-            // incremental max can never do).
             indices.removeDoseFromIndicesLocked(prev)
             indices.rebuildSubstanceDoseStats(prev.substanceId)
             if (dose.substanceId != prev.substanceId) {
                 indices.rebuildSubstanceDoseStats(dose.substanceId)
             }
         } else {
-            // Brand-new dose: incremental add is exact (distinct sessions + max ts).
             indices.updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
         }
         indices._dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
@@ -136,7 +130,6 @@ internal class JournalMutations(
     fun upsertNote(note: Note) = lock.withLock {
         val prev = notesStore.put(note)
         val prevSessionId = prev?.sessionId
-        // Remove previous entry from index to prevent duplicates on update
         if (prevSessionId != null) {
             indices._notesBySession[prevSessionId]?.removeAll { it.id == note.id }
         }
@@ -150,7 +143,6 @@ internal class JournalMutations(
     fun upsertTimelineEvent(event: TimelineEvent) = lock.withLock {
         val prev = timelineEventsStore.put(event)
         val prevSessionId = prev?.sessionId
-        // Remove previous entry from index to prevent duplicates on update
         if (prevSessionId != null) {
             indices._eventsBySession[prevSessionId]?.removeAll { it.id == event.id }
         }

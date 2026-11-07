@@ -13,16 +13,13 @@ class SessionListViewModel(
     @PublishedApi internal val repo: IJournalRepository,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
-    /** All sessions from the repository. */
     val sessions: StateFlow<List<Session>> = repo.sessions
 
-    // ---- Filter state ----
     val filterSubstanceIds = MutableStateFlow<Set<String>>(emptySet())
     val showFavoritesOnly = MutableStateFlow(false)
     val consumerFilter = MutableStateFlow<String?>(null)
     val searchQuery = MutableStateFlow("")
 
-    /** Distinct substances used across all sessions, sorted by name. */
     val allSessionSubstances = combine(repo.doses, repo.substances) { doses, subs ->
         val nameMap = subs.associate { it.id to it.name }
         doses.map { it.substanceId }
@@ -31,19 +28,16 @@ class SessionListViewModel(
             .sortedBy { it.name }
     }
 
-    /** Distinct consumer names across all sessions, sorted. */
     val allConsumers = sessions.map { list ->
         list.mapNotNull { it.consumerName }.distinct().sorted()
     }
 
-    /** Filtered and sorted sessions derived from filter state. */
     val filteredSessions = combine(
         sessions, filterSubstanceIds, showFavoritesOnly,
         consumerFilter, searchQuery
     ) { all: List<Session>, subIds: Set<String>, favsOnly: Boolean, consumer: String?, query: String ->
         val q = if (query.isNotBlank()) query.lowercase() else null
 
-        // Batch-resolve matching session IDs in a single lock acquire via the precomputed index
         val matchingSessionIds = if (subIds.isEmpty()) null
             else repo.sessionIdsForSubstances(subIds)
 

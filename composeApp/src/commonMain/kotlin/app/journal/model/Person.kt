@@ -26,20 +26,15 @@ data class Person(
     val role: PersonRole = PersonRole.PARTICIPANT,
     val notes: String? = null,
     val linkedSessionIds: List<String> = emptyList(),
-    /** Age in years. Rendered as a string on the dose.wiki wire. */
     val age: Int? = null,
-    /** Free text, no option list. */
     val gender: String? = null,
     /** Free text with the unit inside, e.g. "5 ft 8 in" or "175 cm". */
     val height: String? = null,
     /** Free text with the unit inside, e.g. "150 lb" or "68 kg". */
     val weight: String? = null,
-    /** Free prose, e.g. "None" or current prescriptions. */
     val medications: String? = null,
     /** Author contact for dose.wiki editors. Never exported without mayContact. */
     val contactEmail: String? = null,
-    /** Editors may write to [contactEmail] about an exported report. */
     val mayContact: Boolean = false,
-    /** This individual's roster entry is the device owner's own profile. */
     val isSelf: Boolean = false
 ) : VaultDocument

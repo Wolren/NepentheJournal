@@ -59,7 +59,6 @@ class SubstanceTaxonomyTest {
         assertBroad("eugeroic", "nootropics")
         assertBroad("thiobarbituric acid derivative", "depressants")
         assertBroad("piperazinoazepine", "medicines")
-        // Diazepines are depressants even though they contain "azepine".
         assertBroad("benzodiazepine", "depressants")
         assertBroad("benzazepine", "medicines")
     }
@@ -72,16 +71,12 @@ class SubstanceTaxonomyTest {
 
     @Test
     fun ketoAndOpioidScaffoldsDoNotLeak() {
-        // Beta-keto phenethylamine is a cathinone, not a psychedelic.
         assertBroad("β keto phenethylamine", "stimulants")
-        // Fentanyl scaffolds are opioids despite the piperidine/piperazine core.
         assertBroad("anilidopiperidine (opioid)", "opioids")
         assertBroad("anilinopiperidine (opioid)", "opioids")
-        // Synthetic-cannabinoid indoles stay out of psychedelics.
         assertBroad("naphthoylindole (synthetic cannabinoid)", "cannabinoids")
         assertBroad("benzoylindole", "cannabinoids")
         assertBroad("indolecarboxamide", "cannabinoids")
-        // Plain indoles are psychedelic scaffolds.
         assertBroad("indole", "psychedelics")
     }
 
@@ -189,7 +184,6 @@ class SubstanceTaxonomyTest {
     @Test
     fun salviaPlantIsDysdelicWithoutAssayRows() {
         assertEquals(
-            // furanolactone is an unmapped chemistry label, hence Other.
             setOf("psychedelics", "other", "dysdelic"),
             SubstanceTaxonomy.broadsFor(
                 listOf("atypical hallucinogen", "furanolactone", "hallucinogen"),
@@ -206,7 +200,6 @@ class SubstanceTaxonomyTest {
                 "Salvia divinorum",
             ),
         )
-        // Variant spelling of the salvinorin analogue, classes carry no signal.
         assertTrue(
             "dysdelic" in SubstanceTaxonomy.broadsFor(
                 listOf("furanolactone"), emptyList(), "Salvinorin-B-Methoxymethyl-Ether",
@@ -216,7 +209,6 @@ class SubstanceTaxonomyTest {
 
     @Test
     fun diterpeneAloneIsNotDysdelic() {
-        // Grayanotoxin is a diterpene but not a KOR agonist.
         val broads = SubstanceTaxonomy.broadsFor(
             listOf("depressant", "diterpene"), emptyList(), "Grayanotoxin",
         )
@@ -230,7 +222,6 @@ class SubstanceTaxonomyTest {
             setOf("other", "stimulants"),
             SubstanceTaxonomy.broadsFor(listOf("not psychoactive"), emptyList(), "X", curated),
         )
-        // Unknown categories are skipped, never forced into Other.
         val mystery = listOf(CuratedSection("mystery", "x", "X"))
         assertEquals(
             setOf("other"),

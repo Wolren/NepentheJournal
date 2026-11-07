@@ -11,7 +11,7 @@ import kotlin.test.*
  */
 class PairingEcdhTest {
 
-    // Any 32 bytes work as a stand-in for the raw ECDH X coordinate.
+    // Any 32 bytes work as a stand-in for the raw ecdh X coordinate.
     private val sharedSecretX = ByteArray(32) { it.toByte() }
     private val otherSharedSecretX = ByteArray(32) { (it + 1).toByte() }
 
@@ -29,8 +29,6 @@ class PairingEcdhTest {
 
         val sealedWithX = PairingEcdh.wrapSharedSecret(sharedSecretX, "secret-a")
         val sealedWithPoint = PairingEcdh.wrapSharedSecret(prefixed, "secret-a")
-        // Seals are randomized (IV prefix), so compare by cross-unwrapping:
-        // both forms must derive the same key.
         assertEquals("secret-a", PairingEcdh.unwrapSharedSecret(prefixed, sealedWithX))
         assertEquals("secret-a", PairingEcdh.unwrapSharedSecret(sharedSecretX, sealedWithPoint))
     }

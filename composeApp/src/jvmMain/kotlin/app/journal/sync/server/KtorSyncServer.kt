@@ -73,8 +73,7 @@ class KtorSyncServer(
                 }
                 server!!.start(wait = false)
             }
-            // Report what Netty really bound: identical to the configured
-            // port in production, the ephemeral port when port == 0.
+            // Report what Netty really bound: identical to the configured port in production, the ephemeral port when port == 0.
             val resolved = try {
                 server!!.engine.resolvedConnectors().firstOrNull()?.port
             } catch (e: Exception) {

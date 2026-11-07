@@ -16,15 +16,12 @@ class ThemeManager private constructor() {
     private val _config = MutableStateFlow(ThemeDefaults.Dark)
     val config: StateFlow<ThemeConfig> = _config.asStateFlow()
 
-    // Cache computed ColorScheme to avoid blend/contrast math on every
-    // recomposition. Recomputes only when config content changes.
     private var cachedConfigHash: Int = 0
     private var cachedDarkScheme: ColorScheme? = null
     private var cachedLightScheme: ColorScheme? = null
 
     fun update(newConfig: ThemeConfig) {
         _config.value = newConfig
-        // Invalidate cache so next colorScheme() call recomputes
         cachedConfigHash = 0
     }
 
@@ -109,7 +106,6 @@ fun Color.luminance(): Float {
     return 0.2126f * channel(red) + 0.7152f * channel(green) + 0.0722f * channel(blue)
 }
 
-/** Returns black or white depending on which has better contrast against [c]. */
 fun contrastColor(c: Color): Color = if (c.luminance() > 0.45f) Color.Black else Color.White
 
 /** Linearly blends [base] with [overlay] at the given [ratio] (0 = base, 1 = overlay). */

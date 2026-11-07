@@ -40,9 +40,6 @@ fun SearchOverlay(
     val notes by repo.notes.collectAsState()
     val scrollState = rememberLazyListState()
 
-    // Debounce: repo.search scores under the repository lock, so a full search
-    // must not run on every keystroke. Restarting the effect per query change
-    // also cancels the search that has not fired yet.
     LaunchedEffect(query) {
         if (query.length >= 2) {
             delay(200)
@@ -54,7 +51,6 @@ fun SearchOverlay(
         }
     }
 
-    // Grouped once per result set instead of on every recomposition.
     val groupedResults = remember(results) { results.groupBy { it.entityType } }
 
     Scaffold(

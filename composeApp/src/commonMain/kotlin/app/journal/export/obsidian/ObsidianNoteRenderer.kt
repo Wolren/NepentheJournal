@@ -33,7 +33,6 @@ data class ObsidianCanonicalBlock(
     val timelineEvents: List<TimelineEvent> = emptyList()
 )
 
-/** Fence markers for the canonical data block. */
 internal const val BLOCK_OPEN = "```nepenthe"
 internal const val BLOCK_CLOSE = "```"
 
@@ -82,7 +81,6 @@ fun renderSessionToObsidianNote(
     val durationStr = formatDuration(session.startTime, session.endTime)
 
     val content = buildString {
-        // ---- YAML frontmatter ----
         appendLine("---")
         appendLine("id: \"${yamlEscape(session.id)}\"")
         appendLine("title: \"${yamlEscape(titleText)}\"")
@@ -114,12 +112,10 @@ fun renderSessionToObsidianNote(
         appendLine("---")
         appendLine()
 
-        // ---- Title ----
         append("# $titleText: $dateTimeStr")
         appendLine()
         appendLine()
 
-        // ---- Metadata line ----
         append("*Started $dateTimeStr*")
         if (session.endTime != null) {
             val endDt = Instant.fromEpochMilliseconds(session.endTime)
@@ -136,7 +132,6 @@ fun renderSessionToObsidianNote(
         appendLine()
         appendLine()
 
-        // ---- Set & Setting ----
         if (session.set != null || session.setting != null || session.intention != null) {
             appendLine("## Set & Setting")
             appendLine()
@@ -146,7 +141,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Doses ----
         if (doses.isNotEmpty()) {
             appendLine("## Doses")
             appendLine()
@@ -165,7 +159,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Timeline ----
         val sortedEvents = timelineEvents.sortedBy { it.timestamp }
         if (sortedEvents.isNotEmpty()) {
             appendLine("## Timeline")
@@ -183,7 +176,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Checkins ----
         if (session.checkins.isNotEmpty()) {
             appendLine("## Checkins")
             appendLine()
@@ -197,7 +189,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Notes ----
         if (notes.isNotEmpty()) {
             appendLine("## Notes")
             appendLine()
@@ -210,7 +201,6 @@ fun renderSessionToObsidianNote(
             }
         }
 
-        // ---- Outcome ----
         if (!session.outcome.isNullOrBlank()) {
             appendLine("## Outcome")
             appendLine()
@@ -219,7 +209,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Session Notes ----
         if (!session.notes.isNullOrBlank()) {
             appendLine("## Session Notes")
             appendLine()
@@ -228,7 +217,6 @@ fun renderSessionToObsidianNote(
             appendLine()
         }
 
-        // ---- Canonical data block (lossless round-trip) ----
         val canonical = ObsidianCanonicalBlock(
             version = 1,
             exportedAt = currentTimeMillis(),
@@ -257,12 +245,9 @@ fun renderSessionToObsidianNote(
     )
 }
 
-// ---- Helpers ----
-
-/** Slugify a string for use in filenames. Zero-logic delegate: the single implementation lives in util/Slug.kt (the package-local name stays because ObsidianNoteRendererTest calls slugify() unqualified). */
+/** Slugify a string for filenames. Zero-logic delegate: implementation lives in util/Slug.kt (package-local name kept because ObsidianNoteRendererTest calls it unqualified). */
 internal fun slugify(s: String): String = app.journal.util.slugify(s)
 
-/** Strip non-filename-safe chars from a session ID for use in filenames. */
 internal fun sanitizeIdForFilename(id: String): String {
     return id.filter { it.isLetterOrDigit() || it == '-' || it == '_' }
         .take(16)
@@ -272,18 +257,15 @@ internal fun sanitizeIdForFilename(id: String): String {
 /** Pad a positive integer to 2 digits. */
 internal fun pad2(n: Int): String = if (n < 10) "0$n" else n.toString()
 
-/** Escape a string for use inside a double-quoted YAML scalar value (outer quotes excluded). */
 internal fun yamlEscape(s: String?): String {
     val str = s ?: ""
     return str.replace("\\", "\\\\").replace("\"", "\\\"")
 }
 
-/** Escape a markdown table cell value. */
 internal fun mdCell(s: String?): String {
     return (s ?: "").replace("|", "\\|").replace('\n', ' ')
 }
 
-/** Format a timestamp as "HH:MM". */
 internal fun formatTime(timestamp: Long): String {
     val dt = Instant.fromEpochMilliseconds(timestamp)
         .toLocalDateTime(TimeZone.currentSystemDefault())
@@ -303,14 +285,12 @@ internal fun formatDuration(start: Long, end: Long?): String? {
     return app.journal.util.formatDurationCore(diffMs, app.journal.util.DurationStyle.OBSIDIAN_EXPORT)
 }
 
-/** Format duration as decimal hours. */
 internal fun formatDurationHours(start: Long, end: Long): Double {
     val diffMs = end - start
     return if (diffMs < 0) 0.0
     else (diffMs.toDouble() / 3_600_000.0).let { kotlin.math.round(it * 100) / 100 }
 }
 
-/** Format a dose amount + unit. */
 internal fun formatAmount(amount: Double, unit: String): String {
     val amtStr = if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
     return "$amtStr $unit"

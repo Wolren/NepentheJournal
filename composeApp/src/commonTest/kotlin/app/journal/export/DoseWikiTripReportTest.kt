@@ -104,7 +104,6 @@ class DoseWikiTripReportTest {
         assertEquals(1, report.report.offset.size)
         assertEquals("T+4:30", report.report.offset[0].time)
 
-        // Non-phase event folds into the introduction as a T+ paragraph
         assertTrue(report.report.introduction!!.contains("T+0:10: Sitter check: All good."))
         assertEquals("Restful night and an easy morning after.", report.report.conclusion)
 

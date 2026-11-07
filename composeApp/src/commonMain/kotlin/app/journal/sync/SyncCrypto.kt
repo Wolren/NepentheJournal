@@ -1,8 +1,6 @@
 package app.journal.sync
 
-// The generic primitives (secureRandomBytes, sha256, base64Encode,
-// base64Decode) live in app.journal.util.crypto (util/crypto/Crypto.kt);
-// this file keeps only the sync-protocol-specific expect funs below.
+// The generic primitives (secureRandomBytes, sha256, base64Encode, base64Decode) live in app.journal.util.crypto (util/crypto/Crypto.kt); this file keeps only the sync-protocol-specific expect funs below.
 
 /**
  * Derive an AES-256 key from a [password] string using PBKDF2-HMAC-SHA256.

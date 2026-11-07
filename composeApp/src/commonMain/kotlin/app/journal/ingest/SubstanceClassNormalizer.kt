@@ -7,7 +7,6 @@ package app.journal.ingest
 object SubstanceClassNormalizer {
 
     private val canonical: Map<String, String> = buildMap {
-        // Chem/psycho class variants -> canonical lowercase form
         put("psychedelic", "psychedelic"); put("psychedelics", "psychedelic")
         put("stimulant", "stimulant"); put("stimulants", "stimulant")
         put("depressant", "depressant"); put("depressants", "depressant")
@@ -29,13 +28,11 @@ object SubstanceClassNormalizer {
         put("euphoriant", "euphoriant"); put("euphoriants", "euphoriant")
         put("hypnotic", "hypnotic"); put("hypnotics", "hypnotic")
         put("hallucinogen", "hallucinogen"); put("hallucinogens", "hallucinogen")
-        // empathogen / entactogen are used interchangeably in PW data
         put("empathogen", "entactogen"); put("empathogens", "entactogen")
         put("entactogen", "entactogen"); put("entactogens", "entactogen")
         put("supplement", "supplement"); put("supplements", "supplement")
     }
 
-    /** Labels that are metadata/confidence markers, not substance classes. */
     private val noise = setOf("common", "tentative", "experimental", "unconfirmed")
 
     /**

@@ -153,11 +153,9 @@ data class BindingdbData(
 data class WikipediaRecord(
     /** Cleaned target name (e.g. "5-HT2A", "SERT", "NMDA"). */
     val targetName: String? = null,
-    /** Primary Ki value in nM (single value, not a range). */
     val kiNM: Double? = null,
     /** Minimum Ki in nM if the Ki is expressed as a range (e.g. "113-695"). */
     val kiNMMin: Double? = null,
-    /** Maximum Ki in nM if the Ki is expressed as a range. */
     val kiNMMax: Double? = null,
     /** Operator for inequality Ki values (e.g. ">" for ">10,000"). */
     val kiNMOperator: String? = null,
@@ -165,11 +163,8 @@ data class WikipediaRecord(
     val ec50NM: Double? = null,
     /** IC50 value in nM, if present. */
     val ic50NM: Double? = null,
-    /** Maximal efficacy percentage (Emax), if present. */
     val emaxPercent: Double? = null,
-    /** Species annotation if specified (e.g. "rat", "mouse"). */
     val species: String? = null,
-    /** The raw text of the affinity cell for reference. */
     val rawText: String? = null,
 )
 
@@ -190,9 +185,7 @@ data class WikipediaData(
 @Serializable
 data class Substance(
     override val id: String,
-    /** Previous ID (e.g. "pwiki:lsd") - kept for migration of session references. */
     val oldId: String? = null,
-    /** PubChem Compound ID (CID). Null for plants/mixtures without a single compound. */
     val cid: Long? = null,
     
     override val createdAt: Long,
@@ -203,7 +196,6 @@ data class Substance(
     val aliases: List<String> = emptyList(),
     val summary: String? = null,
     val substanceClass: List<String> = emptyList(),
-    /** Curated DoseWiki taxonomy tags (category + section) from the manual index. */
     val curatedSections: List<CuratedSection> = emptyList(),
     val routesOfAdministration: List<String> = emptyList(),
     val dosageBands: Map<String, String> = emptyMap(),
@@ -214,7 +206,6 @@ data class Substance(
     val effects: List<String> = emptyList(),
     val interactionClasses: List<String> = emptyList(),
     val chemicalProperties: ChemicalProperties? = null,
-    // --- Wikidata cross-references ---
     val chemblId: String? = null,
     val drugbankId: String? = null,
     val iupharId: String? = null,
@@ -222,17 +213,11 @@ data class Substance(
     val unii: String? = null,
     val chebiId: String? = null,
     val atcCode: String? = null,
-    // --- ChEMBL bioactivity data ---
     val chemblData: ChemblData? = null,
-    // --- IUPHAR/BPS pharmacology data ---
     val iupharData: IupharData? = null,
-    // --- PDSP Ki database pharmacology data ---
     val pdspData: PdspData? = null,
-    // --- BindingDB pharmacology data ---
     val bindingdbData: BindingdbData? = null,
-    // --- Wikipedia pharmacology data ---
     val wikipediaData: WikipediaData? = null,
-    /** Source attributions: "psychonautwiki", "dosewiki", "pubchem", "tripsit", "wikidata", "chembl", "iuphar", "pdsp", "bindingdb" */
     val sources: List<String> = emptyList(),
     val cachedAt: Long,
     val sourceVersion: String,

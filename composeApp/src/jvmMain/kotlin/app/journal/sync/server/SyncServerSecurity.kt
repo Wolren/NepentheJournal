@@ -36,8 +36,6 @@ internal class SyncServerSecurity(
 
     fun isRateLimited(clientIp: String): Boolean {
         val now = System.currentTimeMillis()
-        // Atomic read-modify-write: ConcurrentHashMap.compute prevents TOCTOU between
-        // reading the current count and writing the updated value.
         val state = pairingAttempts.compute(clientIp) { _, current ->
             val (count, windowStart) = current ?: Pair(0, now)
             if (now - windowStart > 120_000) Pair(1, now) // new window
@@ -46,7 +44,6 @@ internal class SyncServerSecurity(
         return state.first > 5
     }
 
-    /** Drop rate-limit buckets whose window expired so idle IPs never accumulate. */
     fun evictStaleBuckets() {
         val now = System.currentTimeMillis()
         pairingAttempts.entries.removeIf { now - it.value.second > 120_000 }
@@ -121,7 +118,6 @@ internal class SyncServerSecurity(
         } else null
     }
 
-    /** Ensure the host's own peer record exists in the trust store. */
     fun hostSecret(): String {
         return trustStore.getSharedSecret(deviceId)
             ?: authenticator.generateSharedSecret().also {

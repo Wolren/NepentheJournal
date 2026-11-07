@@ -38,7 +38,6 @@ fun ScreenScaffold(
     contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
     content: LazyListScope.() -> Unit
 ) {
-    // Desktop Esc key handler
     val keyHandler = if (onBack != null && isDesktopPlatform()) {
         Modifier.onPreviewKeyEvent { event ->
             if (event.key == Key.Escape) {

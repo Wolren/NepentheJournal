@@ -31,7 +31,6 @@ internal class JournalSearch(
     private val timelineEventsStore: EntityStore<TimelineEvent>,
     private val effectsStore: EntityStore<Effect>,
 ) {
-    // ---- Full-text search index ----
     val searchIndex = SearchIndex()
     /**
      * Set by every single-entity mutation, cleared by
@@ -59,20 +58,16 @@ internal class JournalSearch(
         return scoreSearchSnapshot(query, snapshot)
     }
 
-    /** Rebuild the search index only when a mutation dirtied it. */
     internal fun rebuildSearchIndexIfDirty() = lock.withLock {
         if (searchIndexDirty) rebuildSearchIndexLocked()
     }
 
-    /** Flip the dirty bit instead of tokenizing every entity (callers hold [lock]). */
     internal fun markSearchIndexDirtyLocked() {
         searchIndexDirty = true
     }
 
     internal fun rebuildSearchIndexLocked() {
         searchIndex.rebuild(
-            // EntityStore.all already returns a fresh snapshot per store: the old
-            // extra .toList() copies were redundant.
             sessions = sessionsStore.all,
             substances = substancesStore.all,
             notes = notesStore.all,

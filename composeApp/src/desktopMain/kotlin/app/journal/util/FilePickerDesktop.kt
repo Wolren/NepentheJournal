@@ -14,8 +14,7 @@ actual object FilePicker {
         description: String,
         extensions: List<String>
     ): String? = suspendCancellableCoroutine { cont ->
-        // Swing dialogs must run on the EDT; no repository IO happens here,
-        // so nothing is dispatched to Dispatchers.IO.
+        // Swing dialogs must run on the EDT; no repository io happens here, so nothing is dispatched to Dispatchers.IO.
         SwingUtilities.invokeLater {
             try {
                 val chooser = JFileChooser().apply {
@@ -25,7 +24,6 @@ actual object FilePicker {
                 }
                 if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
                     var file = chooser.selectedFile
-                    // Ensure extension
                     if (!file.name.contains(".")) {
                         file = File(file.absolutePath + ".${extensions.first()}")
                     }

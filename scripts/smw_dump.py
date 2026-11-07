@@ -24,35 +24,25 @@ from typing import Any
 
 import httpx
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
 SMW_API = "https://psychonautwiki.org/w/api.php"
 USER_AGENT = "NepentheJournal/1.0 (+https://github.com/Wolren/psychonaut-journal) dump script"
 REQUEST_DELAY = 0.15  # seconds between smwbrowse calls (polite)
 HTTP_TIMEOUT = 30.0
 
-# Default output lives under scripts/cache/ so the repo root stays clean.
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_OUTPUT = os.path.join(HERE, "cache", "psychonautwiki_dump.json")
 
-# Properties we skip (internal SMW metadata)
 SKIP_PROPS = {"_INST", "_ASK", "_MDAT", "_SKEY", "_TYPE", "_ERRC", "_REDI"}
 
-# Known route prefixes from the SMW schema
 ROUTE_NAMES = [
     "Oral", "Sublingual", "Insufflated", "Inhalation", "Smoked",
     "Intravenous", "Intramuscular", "Subcutaneous", "Rectal",
     "Transdermal", "Buccal", "Topical", "Ophthalmic",
 ]
 
-# Timing phases (in order)
 TIME_PHASES = ["onset", "comeup", "peak", "offset", "afterglow", "total"]
 
-# ---------------------------------------------------------------------------
-# HTTP helpers
-# ---------------------------------------------------------------------------
 
 _client = httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
 
@@ -98,7 +88,6 @@ def get_substance_properties(subject: str) -> dict[str, list[str]]:
         for item in entry["dataitem"]:
             val = item["item"]
             dtype = item["type"]
-            # Strip SMW page/namespace suffix
             if dtype == 9:  # page link
                 val = val.split("#")[0]
             values.append(val)
@@ -139,9 +128,6 @@ def get_summaries(substance_names: list[str]) -> dict[str, str]:
     return summaries
 
 
-# ---------------------------------------------------------------------------
-# SMW -> Substance model mapping
-# ---------------------------------------------------------------------------
 
 def _extract_route_props(
     props: dict[str, list[str]], prefix: str,
@@ -180,7 +166,6 @@ def _extract_route_props(
     if strong_min or strong_max:
         doses["strong"] = _format_range(strong_min, strong_max, units)
 
-    # Duration phases
     for phase in TIME_PHASES:
         phase_units = _first(props, f"{prefix}_{phase}_time_units")
         min_val = _first(props, f"{prefix}_min_{phase}_time")
@@ -201,9 +186,7 @@ def _first(props: dict[str, list[str]], key: str, default: Any | None = None) ->
 def clean_wiki_markup(text: str) -> str:
     """Strip MediaWiki [[Target|Display]] and [[Target]] markup."""
     import re
-    # [[Target|Display]] -> Display
     text = re.sub(r'\[\[([^|\]]+)\|([^\]]+)\]\]', r'\2', text)
-    # [[Target]] -> Target
     text = re.sub(r'\[\[([^\]]+)\]\]', r'\1', text)
     return text
 
@@ -227,11 +210,9 @@ def smw_to_substance(
     name = subject
     sub_id = f"pwiki:{name.lower().replace(' ', '_')}"
 
-    # Aliases from Common_name (skip the primary name)
     common_names = props.get("Common_name", [])
     aliases = [c for c in common_names if c.lower() != name.lower()]
 
-    # Chemical + psychoactive classes
     substance_class: list[str] = []
     chem = props.get("Chemical_class", [])
     if chem:
@@ -240,19 +221,16 @@ def smw_to_substance(
     if psycho:
         substance_class.append(", ".join(psycho))
 
-    # Routes of administration (detected from SMW properties)
     routes: list[str] = []
     for route in ROUTE_NAMES:
         if f"{route}_dose_units" in props or f"{route}_threshold_dose" in props:
             routes.append(route)
 
-    # First route's dose/duration for the "primary" band
     primary_doses: dict[str, str] = {}
     primary_durations: dict[str, str] = {}
     if routes:
         primary_doses, primary_durations = _extract_route_props(props, routes[0])
 
-    # Effects from both Effect and Effects properties
     effects: list[str] = []
     for ef in props.get("Effect", []):
         if isinstance(ef, str):
@@ -261,7 +239,6 @@ def smw_to_substance(
         if isinstance(ef, str):
             effects.append(ef.replace("_", " ").title())
 
-    # Cross-tolerances
     cross_tols: list[str] = []
     ct = _first(props, "Cross-tolerance")
     if ct:
@@ -276,7 +253,6 @@ def smw_to_substance(
     if tht:
         cross_tols.append(f"Half tolerance: {clean_wiki_markup(tht)}")
 
-    # Toxicity (may be multiple)
     toxicity = [str(t) for t in props.get("Toxicity", [])]
 
     return {
@@ -336,9 +312,6 @@ def smw_to_interactions(
     return interactions
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 
 def main() -> None:
@@ -368,7 +341,6 @@ def main() -> None:
         print("[*] Fetching substance list from SMW...", file=sys.stderr)
 
     names = get_all_substance_names()
-    # Filter out Experience: pages (not real substances)
     names = [n for n in names if not n.startswith("Experience:")]
     if args.verbose:
         print(f"[+] Found {len(names)} substances (excluded Experience: pages)", file=sys.stderr)

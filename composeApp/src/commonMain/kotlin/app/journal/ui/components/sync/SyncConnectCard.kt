@@ -107,7 +107,6 @@ fun SyncConnectCard(
                 }
             )
 
-            // LAN scan
             Spacer(Modifier.height(8.dp))
             HorizontalDivider()
             Spacer(Modifier.height(8.dp))
@@ -152,9 +151,6 @@ fun SyncConnectCard(
                             scanJob = scope.launch {
                                 isScanning = true
                                 try {
-                                    // The discovery flow is infinite (callbackFlow);
-                                    // time-box the scan so the button state and
-                                    // discovery lifecycle can actually end.
                                     withTimeoutOrNull(8_000) {
                                         syncEngine.startDiscovery(DiscoveryMode.HYBRID).collect { }
                                     }
@@ -173,7 +169,6 @@ fun SyncConnectCard(
                 }
             }
 
-            // Discovered peers
             if (discoveredPeers.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Text("Discovered devices",

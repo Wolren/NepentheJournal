@@ -35,7 +35,6 @@ class SessionEditorViewModel(
     private val repo: IJournalRepository,
     private val sessionToEdit: Session?,
 ) {
-    // ---- Form state (seeded from the session under edit, else defaults) ----
     val title = MutableStateFlow(sessionToEdit?.title ?: "")
     val startTime = MutableStateFlow(sessionToEdit?.startTime ?: currentTimeMillis())
     val endTime = MutableStateFlow(sessionToEdit?.endTime)
@@ -51,14 +50,12 @@ class SessionEditorViewModel(
     val rating = MutableStateFlow(sessionToEdit?.rating?.toString() ?: "")
     val shulginRating = MutableStateFlow(sessionToEdit?.shulginRating ?: "")
 
-    // Legacy per-session demographics (SessionProfile) fields.
     private val initialProfile: SessionProfile? = sessionToEdit?.profile
     val profileAge = MutableStateFlow(initialProfile?.age?.toString() ?: "")
     val profileGender = MutableStateFlow(initialProfile?.gender ?: "")
     val profileHeightCm = MutableStateFlow(initialProfile?.heightCm?.toString() ?: "")
     val profileWeightKg = MutableStateFlow(initialProfile?.weightKg?.toString() ?: "")
 
-    // ---- Doses and timeline events of the session being edited ----
     val sessionDoses = MutableStateFlow(
         if (sessionToEdit != null) repo.dosesForSession(sessionToEdit.id) else emptyList<Dose>()
     )
@@ -74,18 +71,15 @@ class SessionEditorViewModel(
     val draftSessionId: String =
         "session:draft:${currentTimeMillis()}_${Random.nextInt(0, 0x10000).toString(16)}"
 
-    /** Dose ids the session had when the editor opened, for change detection. */
     private val originalDoseIds: Set<String> =
         sessionToEdit?.let { repo.dosesForSession(it.id).map { d -> d.id }.toSet() } ?: emptySet()
 
-    /** Every form field the dirty check watches; emitted on any edit. */
     private val watchedFields: List<Flow<Any?>> = listOf(
         title, consumerName, personId, set, setting, intention, outcome, notes,
         tags, rating, shulginRating, profileAge, profileGender, profileHeightCm,
         profileWeightKg, sessionDoses,
     )
 
-    /** True when any field or dose differs from the session as opened. */
     val hasUnsavedChanges: Flow<Boolean> = combine(watchedFields) { dirtyNow() }
 
     private fun dirtyNow(): Boolean {
@@ -125,7 +119,6 @@ class SessionEditorViewModel(
             }
         }
 
-    /** Build the legacy demographics block, null when every field is blank. */
     private fun buildProfile(): SessionProfile? {
         val age = profileAge.value.toIntOrNull()
         val height = profileHeightCm.value.toIntOrNull()
@@ -179,7 +172,6 @@ class SessionEditorViewModel(
         )
         repo.upsertSession(session)
 
-        // Auto-export to Obsidian if enabled
         if (repo.obsidianAutoExport.value && repo.obsidianVaultPath.value.isNotBlank()) {
             try {
                 val config = app.journal.export.obsidian.ObsidianExportConfig(
@@ -199,10 +191,7 @@ class SessionEditorViewModel(
         val existingIds = if (sessionToEdit != null)
             repo.dosesForSession(sessionToEdit.id).map { it.id }.toSet() else emptySet()
         val keptIds = doses.map { it.id }.toSet()
-        // One putAll per store + ONE index rebuild instead of a full reindex
-        // per dose/event: a 10-dose/5-event save used to do 15 reindexes under
-        // the repo lock on the UI thread. Draft-id re-parenting of doses and
-        // events happens inside the repository.
+        // One putAll per store + one index rebuild instead of a full reindex per dose/event
         repo.upsertSessionChildren(sessionId, doses, events)
         (existingIds - keptIds).forEach { repo.deleteDose(it) }
     }
@@ -218,12 +207,10 @@ class SessionEditorViewModel(
         }
     }
 
-    /** Delete the open session (delete lives inside the editor, never on the list card). */
     fun deleteSession() {
         sessionToEdit?.let { repo.deleteSession(it.id) }
     }
 
-    /** Add or replace a dose in the draft dose list. */
     fun upsertDose(dose: Dose) {
         val current = sessionDoses.value
         sessionDoses.value = if (current.any { it.id == dose.id })
@@ -231,24 +218,19 @@ class SessionEditorViewModel(
         else current + dose
     }
 
-    /** Drop a not-yet-saved dose from the draft list. */
     fun deleteDose(doseId: String) {
         sessionDoses.value = sessionDoses.value.filter { it.id != doseId }
     }
 
-    /** Append an event added through the events section. */
     fun addEvent(event: TimelineEvent) {
         sessionEvents.value = sessionEvents.value + event
     }
 
     fun deleteEvent(eventId: String) {
-        // Events are persisted on add, so deletion must hit the repo too,
-        // otherwise the event reappears on reopen.
         repo.deleteTimelineEvent(eventId)
         sessionEvents.value = sessionEvents.value.filter { it.id != eventId }
     }
 
-    /** Create an individual and assign it to this session. */
     fun createPerson(person: Person) {
         repo.upsertPerson(person)
         personId.value = person.id

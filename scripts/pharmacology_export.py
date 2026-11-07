@@ -24,17 +24,12 @@ import csv
 import json
 import os
 
-# ---------------------------------------------------------------------------
-# Column names (snake_case, consistent across sources)
-# ---------------------------------------------------------------------------
 
 BASE_COLUMNS = [
-    # Substance identity
     "substance_id",      # cid:5761 or pwiki:salvia_divinorum
     "cid",               # PubChem CID (int) or empty
     "substance_name",    # Display name
     "substance_class",   # Psychoactive class (first one found or empty)
-    # Source provenance
     "source",            # pdsp | iuphar | chembl | bindingdb
 ]
 
@@ -97,9 +92,6 @@ ALL_COLUMNS = [
     "primary_target",
 ]
 
-# ---------------------------------------------------------------------------
-# Extraction helpers
-# ---------------------------------------------------------------------------
 
 
 def first_class(substance: dict) -> str:
@@ -211,9 +203,6 @@ def extract_bindingdb(substance: dict) -> list[dict]:
     return rows
 
 
-# ---------------------------------------------------------------------------
-# Writers
-# ---------------------------------------------------------------------------
 
 
 def write_csv(path: str, columns: list[str], rows: list[dict]):
@@ -225,9 +214,6 @@ def write_csv(path: str, columns: list[str], rows: list[dict]):
     print(f"  {path}  ({len(rows)} rows)")
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 
 def main():
@@ -245,7 +231,6 @@ def main():
     print(f"Loaded {len(substances)} substances from {args.input}")
     print()
 
-    # Extract all rows
     pdsp_rows = []
     iuphar_rows = []
     chembl_rows = []
@@ -267,7 +252,6 @@ def main():
     write_csv(os.path.join(out, "pharmacology_chembl.csv"), CHEMBL_COLUMNS, chembl_rows)
     write_csv(os.path.join(out, "pharmacology_bindingdb.csv"), BINDINGDB_COLUMNS, bdb_rows)
 
-    # Merged all-sources CSV (normalised schema)
     all_rows = []
     for sub in substances:
         for rec in extract_pdsp(sub):
@@ -359,7 +343,6 @@ def main():
     write_csv(os.path.join(out, "pharmacology_all.csv"), ALL_COLUMNS, all_rows)
     print()
 
-    # Summary
     print("Summary:")
     print(f"  PDSP:      {len(pdsp_rows):>6,} Ki binding records ({len(set(r['substance_id'] for r in pdsp_rows))} substances)")
     print(f"  IUPHAR:    {len(iuphar_rows):>6,} ligand-target interactions ({len(set(r['substance_id'] for r in iuphar_rows))} substances)")

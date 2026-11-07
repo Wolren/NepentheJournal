@@ -24,8 +24,6 @@ internal fun InteractionsSection(
     substanceId: String,
     onOpenSubstance: (String) -> Unit = {},
 ) {
-    // Cross-source duplicates (seed class placeholder vs real substance id)
-    // render under the same name: collapse to one row per pair, richer wins.
     val shown = remember(interactions) {
         InteractionDedupe.dedupe(interactions) { interactionSubstanceName(repo, it) }
     }
@@ -95,7 +93,6 @@ private fun InteractionSubgroup(
         val otherId = if (interaction.substanceAId == substanceId)
             interaction.substanceBId else interaction.substanceAId
         val otherName = interactionSubstanceName(repo, otherId)
-        // Only resolvable endpoints navigate; unknown ids stay plain text.
         val canOpen = remember(otherId) { repo.getSubstance(otherId) != null }
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)

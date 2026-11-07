@@ -26,9 +26,7 @@ actual fun hmacSha256Hex(secret: ByteArray, data: ByteArray): String {
 
 private val hexChars = "0123456789abcdef"
 
-// ====================================================================
-// Pure-Kotlin HMAC-SHA256
-// ====================================================================
+// ==================================================================== Pure-Kotlin hmac-SHA256 ====================================================================
 
 private class HmacSha256(key: ByteArray) {
     companion object {
@@ -39,7 +37,6 @@ private class HmacSha256(key: ByteArray) {
     private val opad: ByteArray
 
     init {
-        // If key is longer than block size, hash it first
         val k = if (key.size > BLOCK_SIZE) sha256(key) else key.copyOf()
         val padded = k.copyOf(BLOCK_SIZE)
         ipad = ByteArray(BLOCK_SIZE) { (padded[it].toInt() xor 0x36).toByte() }
@@ -47,7 +44,6 @@ private class HmacSha256(key: ByteArray) {
     }
 
     fun digest(data: ByteArray): ByteArray {
-        // HMAC(K, m) = H((K' ⊕ opad) || H((K' ⊕ ipad) || m))
         val innerHash = sha256(ipad + data)
         return sha256(opad + innerHash)
     }

@@ -22,7 +22,6 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
-/** Month names for date formatting. */
 internal val MONTH_NAMES = listOf(
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
@@ -73,7 +72,6 @@ fun TimeField(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    // Try multiple date formats
     fun parseDate(input: String): Triple<Int, Int, Int>? { // year, month, day
         val trimmed = input.trim()
 
@@ -87,14 +85,14 @@ fun TimeField(
             if (idx >= 0) return Triple(year.toInt(), idx, day.toInt())
         }
 
-        // "2026-01-17" (ISO)
+        // "2026-01-17" (iso)
         val iso = IsoDateRegex.find(trimmed)
         if (iso != null) {
             val (_, y, m, d) = iso.groupValues
             return Triple(y.toInt(), m.toInt() - 1, d.toInt())
         }
 
-        // "17/01/2026" or "01/17/2026" (DD/MM or MM/DD)
+        // "17/01/2026" or "01/17/2026" (dd/mm or mm/dd)
         val slash = SlashDateRegex.find(trimmed)
         if (slash != null) {
             val (_, a, b, y) = slash.groupValues
@@ -126,7 +124,6 @@ fun TimeField(
         }
     }
 
-    // Date picker dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = local?.let { dt ->
@@ -154,7 +151,6 @@ fun TimeField(
         }
     }
 
-    // Time picker dialog
     if (showTimePicker) {
         val currentLocal = local ?: Instant.fromEpochMilliseconds(currentTimeMillis()).toLocalDateTime(tz)
         val timePickerState = rememberTimePickerState(
@@ -200,7 +196,6 @@ fun TimeField(
         Text(label, style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
-        // Date row: text field + calendar button
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedTextField(
                 value = dateStr,
@@ -219,7 +214,6 @@ fun TimeField(
             }
         }
         Spacer(Modifier.height(2.dp))
-        // Time row: text field + clock button
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             OutlinedTextField(
                 value = timeStr,

@@ -44,10 +44,7 @@ actual fun generateSelfSignedP12(
     alias: String,
     password: CharArray
 ) {
-    // On iOS, TLS sync uses plain HTTP + HMAC auth (no TLS certs).
-    // If TLS is needed in the future, implement using Security framework:
-    //   SecKeyGeneratePair → SecCertificateCreateWithData → SecPKCS12Export
-    // For now, create a marker file to indicate TLS is not supported.
+    // If tls is needed in the future, implement using Security framework: SecKeyGeneratePair → SecCertificateCreateWithData → SecPKCS12Export.
     app.journal.log.Log.withTag("Sync").w {
         "iOS: TLS cert generation not implemented - sync uses plain HTTP + HMAC"
     }

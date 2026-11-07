@@ -10,7 +10,7 @@ package app.journal.util
  *  - format an amount for UI text without "2400.0" noise.
  */
 
-/** One parsed dosage band, e.g. "75-150 µg" -> min 75.0, max 150.0, unit "µg". */
+/** One parsed dosage band, e.g. "75-150 µg": min 75.0, max 150.0, unit "µg". */
 data class ParsedDoseBand(val min: Double, val max: Double, val unit: String)
 
 private val numberPattern = Regex("""\d+(?:\.\d+)?""")
@@ -46,7 +46,6 @@ fun normalizeDoseUnit(unit: String): String =
         .replace("mcg", "ug")
         .replace(" ", "")
 
-/** Preference order: the typical dose describes a "normal" amount best. */
 private val referenceBandOrder = listOf("common", "strong", "light", "threshold")
 
 /**

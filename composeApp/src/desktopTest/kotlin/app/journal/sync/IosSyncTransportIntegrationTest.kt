@@ -41,7 +41,6 @@ class IosSyncTransportIntegrationTest {
     @BeforeTest
     fun setUp() { repo.clearAll() }
 
-    // ==========  Sync push contract tests  ==========
 
     @Test
     fun `push with valid HMAC is accepted`() = runBlocking {
@@ -108,7 +107,6 @@ class IosSyncTransportIntegrationTest {
             val batch = SyncBatch(deviceId = testDeviceId, deviceName = "", since = 0L)
             val req = SyncPushRequest.fromBatch(batch, testSecret, testDeviceId)
 
-            // Send the auth header but a DIFFERENT body (tampered in transit)
             val response = client.post("/sync/push") {
                 contentType(ContentType.Application.Json)
                 header(SyncAuth.DEVICE_ID_HEADER, req.deviceId)
@@ -120,7 +118,6 @@ class IosSyncTransportIntegrationTest {
         }
     }
 
-    // ==========  Info endpoint  ==========
 
     @Test
     fun `info returns host metadata`() = runBlocking {
@@ -142,7 +139,6 @@ class IosSyncTransportIntegrationTest {
         }
     }
 
-    // ==========  Wire format compatibility  ==========
 
     @Test
     fun `full sync exchange produces matching SyncBatch and SyncResponse`() = runBlocking {
@@ -172,7 +168,6 @@ class IosSyncTransportIntegrationTest {
         }
     }
 
-    // ==========  Helpers  ==========
 
     /**
      * Hand-written MIRROR of the expected push-handler shape (see the class

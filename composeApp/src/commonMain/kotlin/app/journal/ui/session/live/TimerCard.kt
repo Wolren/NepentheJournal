@@ -25,8 +25,6 @@ internal fun TimerCard(session: Session) {
         }
     }
 
-    // Legacy pause fields stay in the math so timers paused before pause was
-    // removed still show truthful elapsed time.
     val frozenAt = session.pausedAt
     val elapsedMs = (frozenAt ?: nowMs) - session.startTime - session.pausedMs
 

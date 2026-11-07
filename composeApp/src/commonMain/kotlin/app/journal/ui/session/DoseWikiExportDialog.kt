@@ -69,7 +69,6 @@ fun DoseWikiExportDialog(
     )
 
     val check = remember(email) { preview().check() }
-    // Consent and age are collected on the site, so only content errors block.
     val contentErrors = check.errors.filter {
         it != DoseWikiTripReport.ERR_CONSENT && it != DoseWikiTripReport.ERR_AGE
     }

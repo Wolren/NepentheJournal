@@ -48,7 +48,6 @@ import kotlinx.serialization.encodeToString
 class IosSyncTransport(
     private val repo: IJournalRepository,
     private val dataDir: String = platformSyncDataDir(),
-    /** Light persistence callback supplied by the composition root; falls back to a self-built store. */
     private val persistAfterApply: (() -> Unit)? = null
 ) : SyncEngine {
 
@@ -76,12 +75,10 @@ class IosSyncTransport(
 
     internal val identityStore = IosDeviceIdentityStore(dataDir)
     internal val trustStore = IosDeviceTrustStore(dataDir)
-    /** Static host ECDH keypair store (contract section g), file-backed beside the identity. */
     internal val ecdhIdentity = IosEcdhIdentityStore(dataDir)
     internal val pairingManager = IosPairingManager()
     internal val nonceCache = IosNonceReplayCache()
 
-    /** Stable random device id persisted in the app sandbox. */
     internal val deviceId: String by lazy { identityStore.deviceId() }
     /** Public fingerprint: SHA-256 hex of the secret identity bytes. */
     internal val deviceFingerprint: String by lazy { identityStore.fingerprint() }
@@ -91,9 +88,6 @@ class IosSyncTransport(
 
     override suspend fun startHosting(config: SyncConfig): Result<HostingInfo> {
         return try {
-            // Contract section g: generate (first host start) or load the
-            // STATIC ECDH keypair before any route can advertise it; if the
-            // key cannot be created, hosting fails closed.
             ecdhIdentity.publicKeyB64()
             val port = config.listenerPort
             val router = IosSyncServerRouter(
@@ -109,8 +103,7 @@ class IosSyncTransport(
                     _status.update { it.copy(lastError = msg) }
                 },
                 isRateLimited = ::isPairingRateLimited,
-                // Durability: flush the journal to disk after every accepted
-                // push and before the ack goes out (mirrors JVM factories).
+                // Durability: flush the journal to disk after every accepted push and before the ack goes out (mirrors JVM factories).
                 persistAfterApply = this.persistAfterApply ?: { JournalStore(repo).save(fullBackup = false) }
             )
             pairingManager.generatePairingToken()
@@ -122,9 +115,7 @@ class IosSyncTransport(
                     pairedDeviceCount = trustStore.count()
                 )
             }
-            // Restart parity with the JVM host: release a port we already
-            // hold before rebinding, otherwise the rebind fails with
-            // "address already in use".
+            // Restart parity with the JVM host: release a port we already hold before rebinding
             server?.let { previous ->
                 stopQuietly(previous)
                 server = null
@@ -132,20 +123,11 @@ class IosSyncTransport(
             val srv = embeddedServer(CIO, port = port) {
                 router.installRouting(this)
             }
-            // Retain BEFORE starting, so every failure path below can stop
-            // the engine and give the port back.
             server = srv
             try {
-                // startSuspend returns only after the engine finished its
-                // startup, and a bind failure (port taken, permission
-                // denied) reaches the caller as an exception. Nothing below
-                // this line claims hosting until that has happened: the old
-                // code flipped isHosting and reported "0.0.0.0" while the
-                // bind was still running in a discarded coroutine.
+                // Nothing below this line claims hosting until that has happened: the old code flipped isHosting and reported "0.0.0.0"
                 srv.startSuspend(wait = false)
             } catch (e: CancellationException) {
-                // Outer handler stops the engine and lets cancellation
-                // propagate; never swallow it into a status update.
                 throw e
             } catch (e: Exception) {
                 server = null
@@ -153,28 +135,17 @@ class IosSyncTransport(
                 throw e
             }
             Log.withTag("IosSync").i { "iOS sync server bound on :$port" }
-            // Advertised address: the shared LAN resolver (getifaddrs walk
-            // in PlatformSyncIos.kt, expect/actual resolveLocalIpv4) gives
-            // peers a dialable site-local address; fall back to the wildcard
-            // bind only when no suitable IPv4 exists. Peers pair against the
-            // address the user types.
+            // Advertised address: the shared LAN resolver (getifaddrs walk in PlatformSyncIos.kt, expect/actual resolveLocalIpv4) gives peers a dialable site-local address
             val advertisedAddress = resolveLocalIpv4() ?: BIND_ADDRESS
             _status.update { it.copy(isHosting = true, hostAddress = "$advertisedAddress:$port") }
             Result.success(HostingInfo(advertisedAddress, port, deviceFingerprint))
         } catch (e: CancellationException) {
-            // A cancelled start leaves neither a listener nor a claim: the
-            // engine is stopped under NonCancellable, then the cancellation
-            // is rethrown untouched.
             val srv = server
             server = null
             if (srv != null) stopQuietly(srv)
             throw e
         } catch (e: Exception) {
             Log.withTag("IosSync").e(e) { "startHosting failed: ${e.message}" }
-            // Failure travels through the status mechanism this file already
-            // uses (lastError), and no hosting claim survives it: isHosting,
-            // the address and the just published pairing token are withdrawn
-            // because nothing is listening.
             _status.update {
                 it.copy(
                     isHosting = false,
@@ -192,18 +163,10 @@ class IosSyncTransport(
         val srv = server
         if (srv != null) {
             try {
-                // Really stop the engine: stopSuspend shuts it down and
-                // releases the listener port. The previous implementation
-                // only cancelled an already completed Job, so the port stayed
-                // bound for the rest of the process lifetime.
                 srv.stopSuspend(SHUTDOWN_GRACE_MS, SHUTDOWN_TIMEOUT_MS)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Do not report "stopped": the reference and the hosting
-                // flag stay as they are and the failure goes out through
-                // lastError, so the snapshot keeps telling the truth about
-                // a port that may still be bound.
                 Log.withTag("IosSync").e(e) { "stopHosting failed" }
                 _status.update { it.copy(lastError = "Sync server stop failed: ${e.message}") }
                 return
@@ -267,20 +230,12 @@ class IosSyncTransport(
         val aesKey = aesEncryptionKey(secretStr)
         val client = HttpClient(Darwin)
         return try {
-            // Contract section d: capture the candidate cursor BEFORE any
-            // network work. It is written to lastSyncAt ONLY after every push
-            // slice and every pull page has succeeded (audit C2: no silent
-            // cursor move, no success stamp on a failed cycle).
+            // It's written to lastSyncAt only after every push slice and every pull page has succeeded (audit C2).
             val cycleStart = currentTimeMillis()
             val pushSince = _status.value.lastSyncAt ?: 0L
             val batch = buildSyncBatch(repo, deviceId, platformDeviceName(), pushSince)
             var pushResp: SyncResponse? = null
             if (batch != null) {
-                // Slice the outgoing batch through the shared chunker so a
-                // first sync against the 2015-interaction seed cannot deadlock
-                // on the 100-interaction cap (audit C1 applies to iOS pushes
-                // too): slices go out sequentially and the cursor advances
-                // only if ALL of them ack success.
                 val slices = buildPushSlices(batch)
                 for (slice in slices) {
                     val batchJson = json.encodeToString(slice)
@@ -296,9 +251,7 @@ class IosSyncTransport(
                         setBody(bodyStr)
                     }
                     val pushBody = pushResponse.bodyAsText()
-                    // A body that cannot be base64-decoded, decrypted, or
-                    // parsed is a FAILED cycle, never a skip: an unverifiable
-                    // ack must not advance any cursor (contract section d).
+                    // A body that can't be base64-decoded, decrypted, or parsed is a failed cycle, never a skip
                     val syncResp = if (pushBody.isEmpty()) null else try {
                         val encryptedResp = base64Decode(pushBody)
                         val respJson = decryptBody(encryptedResp, aesKey)
@@ -311,9 +264,6 @@ class IosSyncTransport(
                         _status.update { it.copy(lastError = msg) }
                         return Result.failure(Exception(msg))
                     }
-                    // Branch on success BEFORE any cursor move: on false the
-                    // host's own error is surfaced through the status
-                    // snapshot, lastSyncAt is untouched, and the cycle fails.
                     if (!syncResp.success) {
                         val msg = syncResp.error ?: "Push rejected by host"
                         _status.update { it.copy(lastError = msg) }
@@ -325,18 +275,7 @@ class IosSyncTransport(
                 }
             }
 
-            // Pull: sign the exact target including the since param, same as JVM.
-            // Drain while truncated, following the COMPOSITE
-            // (nextSince, nextSinceId) cursor: a timestamp-only cursor cannot
-            // walk inside a group of tied timestamps (the bundled seed's 2015
-            // interactions share one updatedAt), so the id half is required to
-            // make progress without skipping. A failed, missing, undecodable,
-            // rejected, stalled, or over-budget page fails the WHOLE cycle
-            // WITHOUT touching lastSyncAt (contract section d): lastSyncAt is
-            // stamped below only after a fully completed drain, so the next
-            // cycle retries from the old cursor instead of skipping the tail
-            // that never arrived. The 200-page bound mirrors the JVM
-            // KtorSyncClient.maxPullPages.
+            // The 200-page bound mirrors the JVM KtorSyncClient.maxPullPages.
             var pullCursor = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
                 pushResp.nextSince else (_status.value.lastSyncAt ?: 0L)
             var pullCursorId = if (pushResp?.truncated == true && pushResp.nextSince > 0L)
@@ -383,8 +322,7 @@ class IosSyncTransport(
                 return Result.failure(Exception(msg))
             }
 
-            // Reached only when every slice and page succeeded, stamped with
-            // the pre-build cycleStart rather than the ack-time clock.
+            // Reached only when every slice and page succeeded, stamped with the pre-build cycleStart rather than the ack-time clock.
             _status.update { it.copy(lastSyncAt = cycleStart) }
             Log.withTag("IosSync").i { "Sync with ${peer.displayName} completed" }
             Result.success(Unit)
@@ -406,9 +344,7 @@ class IosSyncTransport(
         cursor: Long,
         cursorId: String = ""
     ): SyncResponse? {
-        // Signed verbatim against the request target (same rule as the JVM
-        // client); the id half is query-encoded so '&' or '=' in an id
-        // cannot corrupt the parameter pair.
+        // Signed verbatim against the request target (same rule as the JVM client); the id half is query-encoded
         val idParam = if (cursorId.isEmpty()) "" else "&sinceId=${cursorId.encodeURLParameter()}"
         val target = "${SyncEndpoints.SYNC_PULL}?since=$cursor$idParam"
         val auth = buildAuthHeader(deviceId, target, secret, currentTimeMillis(), generateNonce())
@@ -447,10 +383,7 @@ class IosSyncTransport(
 
     override suspend fun revokeTrustedDevice(deviceId: String) {
         trustStore.revokeDevice(deviceId)
-        // PBKDF2 key-cache purge: the hook SyncCryptoIos.kt documents as
-        // missing. Mirrors jvmMain SyncTransport.revokeDevice exactly: a
-        // revoke can leave no key material for ANY peer resident, not just
-        // the revoked one.
+        // PBKDF2 key-cache purge: the hook SyncCryptoIos.kt documents as missing.
         clearAesKeyCache()
         disconnectFrom(deviceId)
     }
@@ -473,16 +406,13 @@ class IosSyncTransport(
 
     override suspend fun connectManually(host: String, port: Int, token: String?): Result<Unit> {
         val pairingClient = HttpClient(Darwin)
-        // EPHEMERAL client keypair: generated below, discarded in finally so
-        // it cannot outlive a single pairing attempt.
+        // EPHEMERAL client keypair: generated below, discarded in finally so it can't outlive a single pairing attempt.
         var ephemeral: IosEcdhEphemeral? = null
         try {
-            // Start pairing
             val infoResp = pairingClient.get("http://$host:$port${SyncEndpoints.PAIRING_START}")
             val info = json.decodeFromString<HostInfo>(infoResp.bodyAsText())
 
-            // Contract section g: the host must advertise its STATIC P-256 key.
-            // Fail closed when it is absent (pre-ECDH host) or malformed.
+            // Contract section g: the host must advertise its static P-256 key.
             val hostEcdhB64 = info.ecdhPublicKeyB64
                 ?: return Result.failure(Exception("Host does not support ECDH pairing; upgrade the host"))
             val hostEcdhBytes = runCatching { base64Decode(hostEcdhB64) }.getOrNull()
@@ -499,7 +429,6 @@ class IosSyncTransport(
             val clientEcdhPublicKeyB64 = clientEph.publicKeyB64()
                 ?: return Result.failure(Exception("Could not export the ECDH public key"))
 
-            // Complete pairing
             val tokenStr = token ?: return Result.failure(Exception("Pairing token required"))
             val verifyResp = pairingClient.post("http://$host:$port${SyncEndpoints.PAIRING_VERIFY}") {
                 contentType(ContentType.Application.Json)
@@ -514,12 +443,7 @@ class IosSyncTransport(
             val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
             if (!result.success) return Result.failure(Exception(result.error ?: "Pairing failed"))
 
-            // Resolve the secret ONLY from the ECDH-sealed field: agree
-            // first, then unwrap. The legacy sharedSecret and encSecretB64
-            // fields are never read. Absence fails CLOSED; the raw ECDH
-            // output is normalized by unwrapSharedSecret (32-byte X or
-            // 65-byte X9.63 forms from SecKeyCreateKeyExchange). Key
-            // material is never logged.
+            // The legacy sharedSecret and encSecretB64 fields are never read.
             val sealedSecret = result.ecdhSecretB64
                 ?: return Result.failure(Exception("Host does not support ECDH pairing; upgrade the host"))
             val rawShared = clientEph.agreeWith(hostEcdhBytes)
@@ -543,8 +467,6 @@ class IosSyncTransport(
                 )
             )
 
-            // Prove the host knows the secret before syncing against it.
-            // A fingerprint spoofed host cannot answer the challenge.
             val hostProven = verifyHostIdentity(host, port, deviceId, sharedSecret)
             if (!hostProven) {
                 trustStore.revokeDevice(hostId)
@@ -595,11 +517,6 @@ class IosSyncTransport(
     override fun observeStatus(): Flow<SyncStatusSnapshot> = _status.asStateFlow()
 
     fun dispose() {
-        // dispose() is the only teardown hook this transport exposes (it is
-        // not suspend, so the blocking stop is used, same shape as the JVM
-        // KtorSyncServer.stop). Without this the listener survived
-        // scope.cancel() and kept its port bound for the rest of the
-        // process, which is what made a later restart impossible.
         val srv = server
         server = null
         if (srv != null) {
@@ -615,7 +532,6 @@ class IosSyncTransport(
         scope.cancel()
     }
 
-    // ==========  Private helpers  ==========
 
     /**
      * Durability after every applied sync response (push acks and pull
@@ -653,10 +569,8 @@ class IosSyncTransport(
          */
         private const val BIND_ADDRESS = "0.0.0.0"
 
-        /** Grace period handed to the engine stop before connections are cut. */
         private const val SHUTDOWN_GRACE_MS = 1000L
 
-        /** Hard cap on waiting for a graceful stop, so stopping cannot hang. */
         private const val SHUTDOWN_TIMEOUT_MS = 2000L
     }
 }

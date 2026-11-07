@@ -79,7 +79,7 @@ class ToleranceCalculatorTest {
     @Test
     fun exactBoundaryThreeDaysSingleDoseIsMediumNotHigh() {
         val now = 1_700_000_000_000L
-        // 3 days ago, single dose: need BOTH daysSince <= 3 AND dosesLast30Days >= 2 for HIGH
+        // 3 days ago, single dose: need both daysSince <= 3 and dosesLast30Days >= 2 for high
         val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 3 * dayMs), now)
         val info = ToleranceCalculator.calculate(repo, now).first()
         assertEquals(ToleranceLevel.MEDIUM, info.level)

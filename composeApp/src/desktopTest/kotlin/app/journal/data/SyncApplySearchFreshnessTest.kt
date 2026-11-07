@@ -30,7 +30,6 @@ class SyncApplySearchFreshnessTest {
         cachedAt = 1000L, sourceVersion = "test"
     )
 
-    /** Build (and clear) the dirty flag on an empty repository. */
     private fun warmEmptyIndex(repo: JournalRepository) {
         assertTrue(repo.search("warmupquery").isEmpty(),
             "fixture: repository starts empty and the search still builds the index (clearing the dirty flag)")
@@ -41,7 +40,6 @@ class SyncApplySearchFreshnessTest {
         val repo = JournalRepository()
         warmEmptyIndex(repo)
 
-        // A sync pull lands a substance with no other mutation around it.
         repo.applyBatch(substances = listOf(substance("sub:synced", "Zyncfreshin")))
 
         assertTrue(
@@ -55,7 +53,6 @@ class SyncApplySearchFreshnessTest {
         val repo = JournalRepository()
         warmEmptyIndex(repo)
 
-        // A snapshot apply (seed load / restore path) with no other mutation.
         repo.applySnapshot(
             JournalSnapshot(
                 savedAt = 1000L,

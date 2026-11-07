@@ -129,7 +129,6 @@ class SyncContractTest {
         val request = SyncPushRequest.fromBatch(batch!!, testSecret, testDeviceId)
         assertTrue(request.body.length > 0)
 
-        // Full format check: timestamp:nonce:signature (see format test above)
         val parts = request.authHeader.split(":", limit = 3)
         assertEquals(3, parts.size)
         assertTrue(parts[0].toLongOrNull() != null, "timestamp must be numeric")
@@ -313,11 +312,7 @@ class SyncContractTest {
 
     @Test
     fun `applySyncResponse with sender cursor 0 keeps the local copy`() {
-        // Contract section b: cursor 0 means the sender cursor is unknown
-        // (older senders) and takes the CONSERVATIVE rule. An existing local
-        // copy must survive; a tombstone for an id with no local entity is a
-        // no-op. This pins the fix for the legacy "cutoff == 0 deletes
-        // unconditionally" divergence in JournalTombstones.
+        // Contract section b: cursor 0 means the sender cursor is unknown (older senders) and takes the conservative rule.
         val peer = JournalRepository()
         peer.upsertSession(Session(
             id = "s11", title = "Local", createdAt = now, updatedAt = 900L,

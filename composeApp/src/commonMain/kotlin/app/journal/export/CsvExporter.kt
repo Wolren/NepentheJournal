@@ -21,7 +21,6 @@ import app.journal.model.*
  */
 object CsvExporter {
 
-    /** Filter criteria for session subset export. All null = everything. */
     data class CsvExportFilter(
         val dateFrom: String? = null,
         val dateTo: String? = null,
@@ -29,7 +28,6 @@ object CsvExporter {
         val tags: String = ""
     )
 
-    // ---- Table definitions ----
 
     private val sessionTable = CsvTable(listOf(
         "id", "title", "date", "start_time", "end_time",
@@ -97,7 +95,6 @@ object CsvExporter {
         )
     }
 
-    // ---- Public export functions ----
 
     fun exportSessionsCsv(repo: IJournalRepository, filter: CsvExportFilter? = null): String {
         val allRows = repo.sessionsDataFrame()
@@ -133,7 +130,6 @@ object CsvExporter {
         return noteTable.render(filtered)
     }
 
-    // ---- Filter helpers ----
 
     /**
      * Resolves a filter into the set of session IDs that match.

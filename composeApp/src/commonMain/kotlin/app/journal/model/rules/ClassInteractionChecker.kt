@@ -27,7 +27,6 @@ data class ClassBasedWarning(
  */
 object ClassInteractionChecker {
 
-    // (classA, classB, severity, message)
     private val RULES = listOf(
         Rule("maoi", "serotonin_releaser", InteractionWarningLevel.DANGER,
             "MAOI + serotonin releaser (e.g. MDMA): high risk of serotonin syndrome and hypertensive crisis. Contraindicated."),

@@ -47,26 +47,20 @@ internal class JournalIndices(
     fun dosesForSubstance(substanceId: String): Flow<List<Dose>> =
         doses.map { list -> list.filter { it.substanceId == substanceId } }.distinctUntilChanged()
 
-    /** Live id -> Substance map; emits only when membership or content changes. */
     val substancesById: Flow<Map<String, Substance>> =
         substances.map { list -> list.associateBy { it.id } }.distinctUntilChanged()
 
-    /** Live id -> display name map; emits only on add/remove/rename. */
     val substanceNamesById: Flow<Map<String, String>> =
         substancesById.map { byId -> byId.mapValues { (_, substance) -> substance.name } }
             .distinctUntilChanged()
 
-    // ---- Session-child indexes (incrementally updated) ----
     internal val _dosesBySession = mutableMapOf<String, MutableList<Dose>>()
     internal val _notesBySession = mutableMapOf<String, MutableList<Note>>()
     internal val _eventsBySession = mutableMapOf<String, MutableList<TimelineEvent>>()
 
-    // ---- Precomputed query indices ----
     internal val _sessionsByDate = mutableMapOf<LocalDate, MutableList<String>>()
     internal val _sessionsPerSubstance = mutableMapOf<String, MutableSet<String>>()
-    /** substanceId -> list of effects that reference this substance */
     internal val _effectsBySubstance = mutableMapOf<String, MutableList<Effect>>()
-    /** substanceId -> list of custom units */
     internal val _customUnitsBySubstance = mutableMapOf<String, MutableList<CustomUnit>>()
 
     /**
@@ -78,9 +72,6 @@ internal class JournalIndices(
     internal val _substanceDoseStats = mutableMapOf<String, Pair<Int, Long>>()
     internal val _doseStatsSessionIds = mutableMapOf<String, MutableSet<String>>()
 
-    // ========================
-    //  Query index helpers
-    // ========================
 
     private fun sessionDate(session: Session): LocalDate =
         Instant.fromEpochMilliseconds(session.startTime)
@@ -134,7 +125,6 @@ internal class JournalIndices(
         rebuildSearchIndexLocked()
     }
 
-    /** Incrementally update precomputed dose stats for a substance - counts distinct sessions only. */
     internal fun updateDoseStatsForSubstance(substanceId: String, sessionId: String, timestamp: Long) {
         val ids = _doseStatsSessionIds.getOrPut(substanceId) { mutableSetOf() }
         val isNew = ids.add(sessionId)
@@ -144,7 +134,6 @@ internal class JournalIndices(
         _substanceDoseStats[substanceId] = Pair(count, lastUsed)
     }
 
-    /** Recompute dose stats for a single substance from scratch. */
     internal fun rebuildSubstanceDoseStats(substanceId: String) {
         val relevant = dosesStore.all.filter { it.substanceId == substanceId }
         if (relevant.isEmpty()) {
@@ -217,7 +206,6 @@ internal class JournalIndices(
 
     fun rebuildIndices() = lock.withLock { rebuildAllIndices() }
 
-    /** Clear every incremental index. Callers must hold [lock]. */
     internal fun clearAllLocked() {
         _effectsBySubstance.clear()
         _customUnitsBySubstance.clear()

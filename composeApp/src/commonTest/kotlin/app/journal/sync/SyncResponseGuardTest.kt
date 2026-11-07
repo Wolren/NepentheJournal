@@ -60,7 +60,6 @@ class SyncResponseGuardTest {
         ))
         assertEquals(1, filter.skippedEntities)
         assertTrue(filter.response.sessions.isEmpty())
-        // At the boundary the entity is accepted.
         val atCap = validateSyncResponse(SyncResponse(
             success = true,
             sessions = listOf(session("s:cap", title = "A".repeat(SyncLimits.MAX_TITLE_LEN)))
@@ -89,8 +88,7 @@ class SyncResponseGuardTest {
         val filter = validateSyncResponse(SyncResponse(
             success = true,
             sessions = listOf(
-                // +60s of slack: the validator reads its own currentTimeMillis(), so a +1ms fixture
-                // drifts back inside the window whenever >=1ms elapses between the two reads.
+                // +60s of slack: the validator reads its own currentTimeMillis()
                 session("s:future", updatedAt = now + EntityTimePolicy.FUTURE_MARGIN_MS + 60_000),
                 session("s:skew", updatedAt = now + EntityTimePolicy.FUTURE_MARGIN_MS - 60_000)
             )
@@ -125,8 +123,6 @@ class SyncResponseGuardTest {
 
     @Test
     fun `disallowed interaction risk levels are rejected`() {
-        // The allow-list rejects unknown enum names at the batch level; at the
-        // response level the same entity validator runs per interaction.
         val ok = Interaction(
             id = "i:1", createdAt = NOW, updatedAt = NOW, deviceOrigin = "remote",
             substanceAId = "cid:1", substanceBId = "cid:2", riskLevel = InteractionRisk.DANGEROUS

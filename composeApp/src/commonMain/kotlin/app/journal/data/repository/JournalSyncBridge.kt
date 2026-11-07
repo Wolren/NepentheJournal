@@ -92,13 +92,7 @@ internal class JournalSyncBridge(
         val interactionsToPut = newer(interactions, interactionsStore::get, { it.id }, { it.updatedAt })
         val timelineEventsToPut = newer(timelineEvents, timelineEventsStore::get, { it.id }, { it.updatedAt })
         val customUnitsToPut = newer(customUnits, customUnitsStore::get, { it.id }, { it.updatedAt })
-        // Notes on a sync (LWW) path never blind-overwrite: each incoming note goes
-        // through the SAME merge as upsertNoteWithConflict, so the losing body is
-        // preserved as a ConflictSibling. The incoming note's own deviceOrigin is the
-        // batch path's remote attribution (a batch carries no sender id). An identical
-        // body older than the stored one is dropped so updatedAt cannot regress; an
-        // unchanged merged result (idempotent replay) is dropped as a no-op.
-        // Seed/restore paths (lastWriterWins = false) stay authoritative blind writes.
+        // An identical body older than the stored one is dropped so updatedAt can't regress
         val notesToPut: List<Note> =
             if (!lastWriterWins) notes
             else notes.mapNotNull { incoming ->
@@ -106,7 +100,6 @@ internal class JournalSyncBridge(
                 val merged = mergeNoteConflictLocked(existing, incoming, incoming.deviceOrigin)
                 if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
             }
-        // Persons are device-local (never synced, no tombstones): snapshot loads only.
         val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt })
         val anyIndexedPut = bulkPutLocked(
             sessions = sessionsToPut,
@@ -126,23 +119,11 @@ internal class JournalSyncBridge(
             ),
             tombstoneCutoff
         )
-        // Rebuild all indices after bulk upsert to handle updates to existing entities
-        // where old index entries (dates, per-session children) need to be replaced.
-        // Persons need no rebuild: they back no query index.
         if (anyIndexedPut || tombstonesChanged) {
-            // Search freshness for sync applies: rebuildAllIndices() below
-            // also rebuilds the search index eagerly (JournalIndices ends
-            // with rebuildSearchIndexLocked), and the explicit dirty flip
-            // keeps the lazily-rebuilt path correct even if that eager
-            // rebuild ever moves or stops covering search. Set under the
-            // same lock as the rest of the bridge (callers hold [lock]);
-            // O(1), never a rebuild by itself.
+            // Set under the same lock as the rest of the bridge (callers hold [lock]); O(1), never a rebuild by itself.
             indices.rebuildAllIndices()
             markSearchIndexDirtyLocked()
         }
-        // Mirror the per-entity tolerance invalidation exactly once per batch: upsertDose
-        // and upsertSubstance bump per item, tombstone deletes already bump through their
-        // per-entity helpers (deleteDoseLocked / deleteSubstanceLocked).
         if (dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty()) {
             bumpToleranceVersion()
         }
@@ -177,9 +158,6 @@ internal class JournalSyncBridge(
             persons = snapshot.persons,
         )
         if (changed) {
-            // Same freshness rule as applyBatch: rebuildAllIndices also
-            // rebuilds search eagerly, and the explicit O(1) dirty flip
-            // (callers hold [lock]) keeps the lazy path correct regardless.
             indices.rebuildAllIndices()
             markSearchIndexDirtyLocked()
         }
@@ -248,7 +226,6 @@ internal class JournalSyncBridge(
         val incomingWins = incoming.updatedAt >= existing.updatedAt
         val winner = if (incomingWins) incoming else existing
         val loser = if (incomingWins) existing else incoming
-        // Body already preserved: replaying the losing edit is a no-op.
         if (winner.conflictSiblings.any { it.body == loser.body }) return winner
         return winner.copy(
             conflictSiblings = winner.conflictSiblings +
@@ -261,8 +238,6 @@ internal class JournalSyncBridge(
         val existing = notesStore.get(note.id)
         val resolved = if (existing == null) note else mergeNoteConflictLocked(existing, note, remoteDeviceId)
         notesStore.put(resolved)
-        // Re-index under the STORED note's session: when the local copy wins the
-        // merge its sessionId may differ from the incoming note's.
         existing?.sessionId?.let { oldSessionId ->
             indices._notesBySession[oldSessionId]?.removeAll { n -> n.id == note.id }
         }

@@ -20,9 +20,6 @@ private val secureRandom = SecureRandom()
 
 class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
 
-    // ---- Nonce replay protection ----
-    // Bounded set of recently seen nonces to prevent replay attacks within the timestamp window.
-    // Uses ConcurrentHashMap.newKeySet() for thread-safe add-and-check.
     private val seenNonces = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val MAX_SEEN_NONCES = 5_000
 
@@ -33,25 +30,20 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     private fun checkAndRecordNonce(nonce: String, timestamp: Long): Boolean {
         val now = System.currentTimeMillis()
         if (kotlin.math.abs(now - timestamp) > TIMESTAMP_WINDOW_MS) return false
-        // Bound the set: prune entries whose timestamps are already outside the
-        // window, then reject replay only if this exact nonce is still present.
         if (seenNonces.size > MAX_SEEN_NONCES) {
             val cutoff = now - TIMESTAMP_WINDOW_MS
             seenNonces.entries.removeIf { it.value < cutoff }
-            // If still over limit, drop the oldest entries instead of killing the entire set
             while (seenNonces.size > MAX_SEEN_NONCES) {
                 val oldest = seenNonces.minByOrNull { it.value }?.key ?: break
                 seenNonces.remove(oldest)
             }
         }
-        // putIfAbsent returns null only when the nonce was not already present.
+        // putIfAbsent returns null only when the nonce wasn't already present.
         return seenNonces.putIfAbsent(nonce, timestamp) == null
     }
 
-    /** Clear all seen nonces (e.g. on re-pairing). */
     fun clearSeenNonces() { seenNonces.clear() }
 
-    // ---- Pairing tokens ----
 
     private data class PendingPairing(
         val token: String,
@@ -72,7 +64,6 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         return token
     }
 
-    /** Verify a pairing token and invalidate it (single-use). */
     fun verifyPairingToken(enteredToken: String): Boolean {
         val pending = pendingPairing
         if (pending == null || pending.isExpired) return false
@@ -83,13 +74,11 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
 
     fun clearPendingPairing() { pendingPairing = null }
 
-    /** Current pending token, if valid. */
     fun currentPairingToken(): String? {
         val p = pendingPairing
         return if (p != null && !p.isExpired) p.token else null
     }
 
-    // ---- Shared secret generation ----
 
     fun generateSharedSecret(): String {
         val bytes = ByteArray(32)
@@ -97,11 +86,6 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    // ---- HMAC signing ----
-    // signRequest was deleted with this wave's dead-code pass: zero
-    // production callers (proof: repo-wide grep, declaration only) and the
-    // shared commonMain buildAuthHeader/hmacSha256Hex pair is the single
-    // signing implementation for clients and tests alike.
 
     /**
      * Verify a signed request.
@@ -122,19 +106,12 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
         val (timestampStr, nonce, signature) = parts
         val timestamp = timestampStr.toLongOrNull() ?: return false
 
-        // Check timestamp window + nonce replay
         if (!checkAndRecordNonce(nonce, timestamp)) return false
 
-        // Verify HMAC
         val expected = hmac(secret, "$deviceId:$timestamp:$nonce:$body")
         return constantTimeEquals(signature, expected)
     }
 
-    // signPairingResponse and verifyPairingResponse were deleted with this
-    // wave's dead-code pass: zero production callers (proof: repo-wide
-    // grep, declaration only; their two SyncAuthenticatorTest round-trips
-    // were removed with them). Pairing responses are not HMAC-signed by
-    // either platform; the ECDH seal (PairingEcdh) carries their security.
 
     /**
      * Sign a host-identity challenge: HMAC-SHA256 of
@@ -145,7 +122,6 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
     fun signChallenge(deviceId: String, timestamp: Long, challenge: String, secret: String): String =
         hmac(secret, "challenge:$deviceId:$timestamp:$challenge")
 
-    // ---- Private ----
 
     private fun hmac(secret: String, data: String): String {
         val mac = Mac.getInstance("HmacSHA256")
@@ -155,7 +131,6 @@ class SyncAuthenticator(private val trustStore: DeviceTrustStore) {
             .joinToString("") { "%02x".format(it) }
     }
 
-    /** Prevent timing attacks on HMAC comparison. */
     private fun constantTimeEquals(a: String, b: String): Boolean {
         if (a.length != b.length) return false
         var result = 0

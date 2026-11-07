@@ -15,6 +15,5 @@ expect object PlatformFile {
      * ahead of ExportImport's 50 MB check).
      */
     fun size(path: String): Long
-    /** Platform-specific app data directory path. */
     fun dataDir(): String
 }

@@ -159,7 +159,6 @@ class SearchIndex {
     fun sessionId(result: SearchResult): String? =
         if (result.entityType == "session") result.entityId else null
 
-    // ---- Private helpers ----
 
     private fun indexEntity(
         type: String,
@@ -231,10 +230,6 @@ internal fun scoreSearchSnapshot(
         return sortAndDedupe(results)
     }
 
-    // Single pass: for every snapshot word that contains at least one query
-    // term, bucket its results and record WHICH terms hit this entity. The old
-    // code re-scanned the whole index for every (result x term) pair inside the
-    // sort comparator to compute that same per-entity term count.
     val entityBuckets = LinkedHashMap<String, MutableList<SearchResult>>()
     val matchedTermsByEntity = HashMap<String, MutableSet<Int>>()
     for ((word, results) in snapshot) {

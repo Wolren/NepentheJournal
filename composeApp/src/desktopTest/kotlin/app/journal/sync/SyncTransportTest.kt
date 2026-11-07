@@ -78,7 +78,6 @@ class SyncTransportTest {
         }
     }
 
-    // ==================== SyncBatch validation ====================
 
     @Test
     fun validateBatchAcceptsValidData() {
@@ -105,18 +104,15 @@ class SyncTransportTest {
 
     @Test
     fun validateBatchRejectsInvalidEntities() {
-        // Session with blank ID
         val blankIdSession = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
                 id = "", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
                 title = "Blank ID", startTime = 1_700_000_000_000L
             ))
         )
-        // Blank-ID sessions are rejected: SyncValidation.badId rejects any
-        // blank id, so this fixture now must produce an error.
+        // Blank-ID sessions are rejected: SyncValidation.badId rejects any blank id, so this fixture now must produce an error.
         assertNotNull(validateSyncBatch(blankIdSession),
             "session with a blank id must be rejected by validateSyncBatch")
-        // Test with negative dose amount
         val negativeDose = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(Dose(
                 id = "d:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
@@ -124,13 +120,9 @@ class SyncTransportTest {
                 routeOfAdministration = "Oral", amount = -50.0, unit = "mg", timestamp = 1_700_000_000_000L
             ))
         )
-        // Test with far-future timestamp (not directly validated in validateSyncBatch,
-        // so we rely on what the validator actually checks , dose amount)
-        // Amount negative should be caught
         assertNotNull(validateSyncBatch(negativeDose),
             "Negative dose amount should be rejected")
 
-        // Session with rating out of range
         val invalidRating = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
                 id = "s:1", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
@@ -140,7 +132,6 @@ class SyncTransportTest {
         assertNotNull(validateSyncBatch(invalidRating),
             "Session with rating 0 should be rejected")
 
-        // ID exceeding max length
         val longId = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(Session(
                 id = "x".repeat(129), createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test",
@@ -151,26 +142,21 @@ class SyncTransportTest {
             "Session with ID length > 128 should be rejected")
     }
 
-    // ==================== WebSocket serialization roundtrips ====================
 
     @Test
     fun wsPingPongRoundtrip() {
-        // Encode WsPing as polymorphic WsMessage (includes discriminator), decode back
         val ping: WsMessage = WsPing(seq = 42L)
         val pingJson = wsJson.encodeToString(WsMessage.serializer(), ping)
         val pingDecoded = wsJson.decodeFromString<WsMessage>(pingJson)
         assertTrue(pingDecoded is WsPing, "Decoded ping should be WsPing")
         assertEquals(42L, (pingDecoded as WsPing).seq, "WsPing seq should match")
 
-        // Encode WsPong, decode as WsMessage, verify it's WsPong
         val pong: WsMessage = WsPong(seq = 43L)
         val pongJson = wsJson.encodeToString(WsMessage.serializer(), pong)
         val pongDecoded = wsJson.decodeFromString<WsMessage>(pongJson)
         assertTrue(pongDecoded is WsPong, "Decoded pong should be WsPong")
         assertEquals(43L, (pongDecoded as WsPong).seq, "WsPong seq should match")
 
-        // Verify the discriminator value is exact (a #type key with the wrong
-        // value would pass a contains-only check)
         assertTrue(pingJson.contains("\"#type\":\"ws:ping\""), "WsPing JSON should carry the ws:ping discriminator")
         assertTrue(pongJson.contains("\"#type\":\"ws:pong\""), "WsPong JSON should carry the ws:pong discriminator")
     }
@@ -197,11 +183,9 @@ class SyncTransportTest {
             ))
         )
 
-        // Serialize and deserialize through the polymorphic WsMessage serializer
         val json = wsJson.encodeToString(WsMessage.serializer(), delta)
         val decoded = wsJson.decodeFromString<WsMessage>(json) as WsDelta
 
-        // Verify fields match
         assertEquals(1L, decoded.seq, "seq should match after roundtrip")
         assertEquals(1, decoded.sessions.size, "sessions count should match")
         assertEquals("Delta Session", decoded.sessions.first().title, "session title should match")
@@ -214,7 +198,6 @@ class SyncTransportTest {
         assertFalse(decoded.doses.isEmpty(), "Delta should have non-empty dose list")
         assertFalse(decoded.substances.isEmpty(), "Delta should have non-empty substance list")
 
-        // Verify it also round-trips via the polymorphic WsMessage interface
         val asMessage = wsJson.decodeFromString<WsMessage>(json)
         assertTrue(asMessage is WsDelta, "Decoded WsDelta should be WsDelta when read as WsMessage")
         assertEquals(1L, (asMessage as WsDelta).seq, "Polymorphic roundtrip should preserve seq")

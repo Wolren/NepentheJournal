@@ -13,7 +13,6 @@ class TimeFormatTest {
 
     private val now = 1_700_000_000_000L
 
-    // ==================== formatDuration ====================
 
     @Test
     fun formatDurationBoundaries() {
@@ -26,7 +25,6 @@ class TimeFormatTest {
         assertEquals("0m", formatDuration(1_000L, 500L), "negative span clamps to 0m")
     }
 
-    // ==================== formatRelativeTime ====================
 
     @Test
     fun formatRelativeTimePast() {
@@ -43,16 +41,13 @@ class TimeFormatTest {
 
     @Test
     fun formatRelativeTimeFuturePinsCurrentBehavior() {
-        // A future timestamp makes diff negative; every branch guards on
-        // seconds < 60 first, so negatives render "just now". Pinned as-is:
-        // if a future-tense form ("in 5m") is ever added, this flips loudly.
+        // Pinned as-is: if a future-tense form ("in 5m") is ever added, this flips loudly.
         assertEquals("just now", formatRelativeTime(now + 60_000L, now),
             "future input currently falls into the <60s branch")
         assertEquals("just now", formatRelativeTime(now + 400 * 86_400_000L, now),
             "far-future input also lands in the <60s branch")
     }
 
-    // ==================== formatDateShort ====================
 
     @Test
     fun formatDateShortUsesUniformDayMonthYear() {
@@ -61,7 +56,6 @@ class TimeFormatTest {
         assertEquals("1 Mar 2024", formatDateShort(LocalDate(2024, 3, 1)))
     }
 
-    // ==================== formatElapsedSinceStart ====================
 
     @Test
     fun formatElapsedSinceStartBoundaries() {
@@ -85,7 +79,6 @@ class TimeFormatTest {
         return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
     }
 
-    /** Verbatim copy of the pre-dedup ObsidianNoteRenderer.formatDuration body. */
     private fun oldObsidianFormatDuration(start: Long, end: Long?): String? {
         if (end == null) return null
         val diffMs = end - start
@@ -101,7 +94,6 @@ class TimeFormatTest {
         }
     }
 
-    /** Verbatim copy of the pre-dedup util/TimeFormat formatDuration body. */
     private fun oldUiFormatDuration(start: Long, end: Long): String {
         val diff = end - start
         if (diff < 0) return "0m"
@@ -133,9 +125,6 @@ class TimeFormatTest {
 
     @Test
     fun obsidianStyleIsByteForByteIdenticalToPreDedupBody() {
-        // Non-negative spans only: the Obsidian wrapper maps null/negative to
-        // null BEFORE reaching the core (that policy is pinned by
-        // ObsidianNoteRendererTest.formatDurationTests).
         for (span in spanCorpus) {
             if (span < 0) continue
             assertEquals(
@@ -159,8 +148,6 @@ class TimeFormatTest {
                 "timeline duration for span $span must not change"
             )
         }
-        // Explicit historic pins: seconds arm dropped, zero minutes KEPT,
-        // negatives render raw.
         assertEquals("0m", formatDurationCore(45_000, DurationStyle.TIMELINE_PHASE))
         assertEquals("5h 0m", formatDurationCore(18_000_000, DurationStyle.TIMELINE_PHASE))
         assertEquals("30m", formatDurationCore(1_800_000, DurationStyle.TIMELINE_PHASE))

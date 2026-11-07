@@ -45,7 +45,6 @@ class ObsidianNoteImporterTest {
         val content = file.readText()
         assertTrue(content.contains("```nepenthe"), "file should contain canonical block marker")
 
-        // Debug: check what listMdFiles returns
         val listedPaths = ObsidianVaultOps.listMdFiles(vaultDir)
         assertTrue(listedPaths.isNotEmpty(), "listMdFiles should find .md files in $vaultDir, got: $listedPaths")
         val firstPath = listedPaths.first()
@@ -71,7 +70,6 @@ class ObsidianNoteImporterTest {
             deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"),
             cachedAt = 0L, sourceVersion = "test"
         ))
-        // Pre-existing session with same startTime and title
         repo.upsertSession(Session(
             id = "existing:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Deep Dive", startTime = 1720800000000L
@@ -84,7 +82,6 @@ class ObsidianNoteImporterTest {
         assertEquals(1, result.updated, "should update existing session")
         assertEquals(0, result.created)
         assertEquals(1, repo.sessions.value.size)
-        // Verify the updated session kept its original ID
         assertEquals("existing:1", repo.sessions.value.first().id)
     }
 

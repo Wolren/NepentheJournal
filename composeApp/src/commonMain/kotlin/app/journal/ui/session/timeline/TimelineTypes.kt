@@ -36,7 +36,6 @@ internal fun phaseLabelForEntry(type: TimelineEventType): String = when (type) {
     else -> "Event"
 }
 
-/** Canonical phase color for a display label (e.g. "Offset" always yellow). */
 internal fun phaseColorForLabel(label: String): Color? = PhaseColors.color(label)
 
 internal fun phaseLabel(elapsedMs: Long, totalMs: Long): String? {
@@ -101,8 +100,6 @@ internal fun computePhaseRanges(
         result.add(PhaseRange(currentPhase, phaseType, phaseStart, phaseEnd))
     }
 
-    // Extend each range's end to the next range's start (or session end),
-    // so phase cards show the real span instead of zero-width ranges.
     for (i in result.indices) {
         val nextStart = if (i + 1 < result.size) result[i + 1].startTime else startTime + totalDuration
         if (result[i].endTime < nextStart) {

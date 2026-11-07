@@ -10,7 +10,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
 
-/** One axis label at a fractional position across the plot width. */
 internal data class TickLabel(val fraction: Float, val text: String, val emphasis: Boolean = false)
 
 /**

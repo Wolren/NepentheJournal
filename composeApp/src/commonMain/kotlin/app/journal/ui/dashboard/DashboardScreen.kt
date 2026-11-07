@@ -57,8 +57,7 @@ fun DashboardScreen(
     val totalSessions = sessions.size
     val totalSubstances = substances.size
 
-    // One id -> name map per emission instead of repo.getSubstance (a repo
-    // lock acquire) once per dose, twice over the whole journal.
+    // One id gives name map per emission instead of repo.getSubstance (a repo lock acquire) once per dose
     val substanceNames = remember(substances) { substances.associate { it.id to it.name } }
 
     val substanceSessionPairs = remember(doses, substanceNames) {
@@ -174,8 +173,6 @@ fun DashboardScreen(
             }
 
             if (toleranceList.isNotEmpty()) {
-                // Header and cards share one item so the section reads as a block
-                // instead of a loose title floating 12 dp above a card stack.
                 item(key = "tolerance-overview") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
@@ -249,7 +246,6 @@ private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vect
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
         Column(Modifier.padding(14.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Quiet editorial accent - thin rule, not a circled badge
             Box(Modifier.width(24.dp).height(1.5.dp).background(accent.copy(alpha = 0.55f), RoundedCornerShape(1.dp)))
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.01).sp)

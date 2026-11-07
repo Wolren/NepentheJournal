@@ -47,7 +47,6 @@ class EcdhIdentityManager(private val dataDir: String) {
     private val publicFile: File get() = File(dataDir, "ecdh-p256-public.pk8")
     private val atRestKey = AtRestKey(dataDir)
 
-    /** Host static keypair, generated and persisted on first use. */
     val keyPair: KeyPair by lazy { loadOrGenerate() }
 
     /** Base64 of the 65-byte ANSI X9.62 uncompressed point (0x04 || X || Y). */
@@ -57,7 +56,6 @@ class EcdhIdentityManager(private val dataDir: String) {
     fun agreeWith(peerPublicKeyB64: String): ByteArray =
         agree(keyPair.private, peerPublicKeyB64)
 
-    // ---- Private ----
 
     private fun loadOrGenerate(): KeyPair {
         tryLoad()?.let { return it }
@@ -69,8 +67,6 @@ class EcdhIdentityManager(private val dataDir: String) {
             privateFile.writeBytes(encryptPrivate(generated.private.encoded))
             publicFile.writeBytes(generated.public.encoded)
         } catch (e: Exception) {
-            // The in-memory key still serves this process; the next start
-            // retries the write. Never log the key bytes themselves.
             Log.withTag("EcdhIdentity").e(e) { "Could not persist ECDH keypair; continuing in-memory" }
         }
         return generated
@@ -135,9 +131,7 @@ class EcdhIdentityManager(private val dataDir: String) {
 
         private const val NONCE_BYTES = 12
 
-        // NIST P-256 domain parameters, used ONLY for the explicit on-curve
-        // check of an untrusted peer point before it reaches KeyAgreement.
-        // y^2 = x^3 - 3x + b (mod p).
+        // NIST P-256 domain parameters, used only for the explicit on-curve check of an untrusted peer point before it reaches KeyAgreement.
         private val FIELD_P = BigInteger(
             "ffffffff00000001000000000000000000000000ffffffffffffffffffffffff", 16
         )
@@ -146,7 +140,6 @@ class EcdhIdentityManager(private val dataDir: String) {
         )
         private val CURVE_A_NEG_THREE = BigInteger.valueOf(3)
 
-        /** Fresh EPHEMERAL keypair for one pairing attempt; discarded afterwards. */
         fun generateEphemeralKeyPair(): KeyPair {
             val kpg = KeyPairGenerator.getInstance("EC")
             kpg.initialize(ECGenParameterSpec(CURVE_NAME))

@@ -12,7 +12,6 @@ class ObsidianExportManagerTest {
 
     private val testDir = File(System.getProperty("java.io.tmpdir"), "nepenthe-test-export-${System.nanoTime()}")
 
-    /** Replicate the renderer's filename logic so tests pass in any timezone. */
     private fun expectedFilename(startTime: Long, title: String, sessionId: String): String {
         val dt = Instant.fromEpochMilliseconds(startTime)
             .toLocalDateTime(TimeZone.currentSystemDefault())
@@ -89,7 +88,6 @@ class ObsidianExportManagerTest {
 
         assertEquals(2, result.written, "written count, errors: ${result.errors}")
 
-        // Debug: check if resolvedDir() matches expectations
         val cfg = config()
         val resolvedDir = ObsidianExportConfig(
             vaultPath = cfg.vaultPath, subfolder = cfg.subfolder, fileOrganization = cfg.fileOrganization
@@ -105,12 +103,11 @@ class ObsidianExportManagerTest {
 
         assertTrue(dir.exists(), "directory should exist at ${dir.absolutePath}")
         val actualFiles = dir.listFiles()?.map { it.name } ?: emptyList()
-        // Exact count (audit C7): exportAllSessions reported written=2 above,
-        // so exactly two files must exist in a fresh vault folder.
+        // Exact count (audit C7): exportAllSessions reported written=2 above, so exactly two files must exist in a fresh vault folder.
         assertEquals(2, actualFiles.size,
             "exactly two exported files in ${dir.absolutePath}, got: $actualFiles")
 
-        // Filename format: YYYY-MM-DD-HH-MM-slug-sanitizedId.md (timezone-dependent)
+        // Filename format: YYYY-mm-dd-hh-mm-slug-sanitizedId.md (timezone-dependent)
         val expectedFile1 = expectedFilename(1720800000000L, "LSD Trip", "s:1")
         val expectedFile2 = expectedFilename(1720900000000L, "MDMA Session", "s:2")
         val lsdTripFile = File(testDir, "Nepenthe/$expectedFile1")
@@ -160,14 +157,12 @@ class ObsidianExportManagerTest {
     @Test
     fun exportSessionWithEmptyContentReturnsNull() {
         val repo = JournalRepository()
-        // Session with no title, no doses, no nothing: renderer might return blank
         repo.upsertSession(Session(
             id = "s:blank", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "", startTime = 1720800000000L
         ))
 
         val path = ObsidianExportManager.exportSession(repo, "s:blank", config())
-        // Minimal sessions still get rendered (just frontmatter + title)
         assertNotNull(path)
     }
 }

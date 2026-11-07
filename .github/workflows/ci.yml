@@ -63,13 +63,7 @@ jobs:
       - name: Compile common + desktop sources
         run: ./gradlew composeApp:compileKotlinDesktop --no-daemon
 
-      # Run the WHOLE desktopTest task. Hand-inlined --tests filter lists are
-      # BANNED here and in scripts/run-tests.sh: two maintained lists drift
-      # (audit C6). They silently dropped six live test classes, referenced a
-      # class deleted in wave-1 (ManualImportAdapterTest, which fails the run
-      # outright with "No tests found"), and hid integration tests from CI.
-      # A new test class must run in CI the moment it exists: no list to edit
-      # means no list to forget.
+      # Hand-inlined --tests filter lists are banned here and in scripts/run-tests.sh: two maintained lists drift (audit C6).
       - name: Run all unit tests
         run: ./gradlew composeApp:desktopTest --no-daemon
 
@@ -79,10 +73,7 @@ jobs:
             -x checkDebugAarMetadata \
             --no-daemon
 
-      # wave4: androidUnitTest source set (local JVM unit tests for the
-      # Android actuals, which audit 4 scored as zero-covered). Unfiltered
-      # task, same rule as the desktop step: a new androidUnitTest class
-      # runs from the moment it exists.
+      # wave4: androidUnitTest source set (local JVM unit tests for the Android actuals, which audit 4 scored as zero-covered).
       - name: Run Android unit tests
         run: ./gradlew :composeApp:testDebugUnitTest --no-daemon
 
@@ -114,18 +105,7 @@ jobs:
           path: composeApp/build/outputs/apk/debug/*.apk
           retention-days: 7
 
-  # iOS links only on macOS runners and cannot be verified from a Windows
-  # host. Runs on every push/PR like the rest of CI; macOS runners are free
-  # for public repos.
-  #
-  # This job RUNS the iOS tests (iosSimulatorArm64Test) rather than only
-  # linking them. The earlier "proven green" claim covered linkDebugFramework*
-  # + xcodebuild only, so no test in iosTest/commonTest had ever executed on
-  # iOS; actually running them is what surfaced the three failures below.
-  #
-  # Known blocker (YouTrack CMP-10179): Compose 1.11's prebuilt ui-uikit cache
-  # references UIViewLayoutRegion, an iOS 26 SDK symbol, so this job pins
-  # Xcode 26 instead of the image default (16.4 / iOS 18.5 SDK).
+  # This job runs the iOS tests (iosSimulatorArm64Test) rather than only linking them.
   ios-build:
     runs-on: macos-15
     steps:
@@ -141,15 +121,7 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
-      # Compose Multiplatform 1.11 ships a PREBUILT ui-uikit klib cache whose
-      # CMPLayoutRegion.o references _OBJC_CLASS_$_UIViewLayoutRegion. UIKit
-      # only declares that class in the iOS 26 SDK (YouTrack CMP-10179). The
-      # macos-15 image defaults to Xcode 16.4 (iOS 18.5 SDK), so
-      # linkDebugTestIosSimulatorArm64 dies with "Undefined symbols for
-      # architecture arm64" while the production framework links fine against
-      # the same SDK. Pin Xcode 26 so UIKit provides the symbol.
-      # Fails loudly if the image ever drops Xcode 26: silently falling back
-      # to the default would burn a full ~25min run to hit the same error.
+      # UIKit only declares that class in the iOS 26 SDK (YouTrack CMP-10179).
       - name: Pin Xcode 26 (iOS 26 SDK)
         run: |
           XCODE=/Applications/Xcode_26.2.app
@@ -177,13 +149,7 @@ jobs:
         run: |
           ./gradlew :composeApp:linkDebugFrameworkIosArm64 --no-daemon
 
-      # The iosSimulatorArm64Test task existed from the moment the iosTest
-      # source set was wired (build.gradle.kts) but was never invoked by ANY
-      # workflow, so iosTest plus every commonTest class had no iOS run
-      # anywhere. Placed BEFORE the xcodebuild step so a test failure surfaces
-      # on its own instead of being masked by a downstream build failure.
-      # Listed runtimes/devices first: when this task fails the log already
-      # shows what the runner actually had, rather than a bare "no devices".
+      # The iosSimulatorArm64Test task existed from the moment the iosTest source set was wired (build.gradle.kts) but was never invoked
       - name: Show simulator runtimes and devices
         run: |
           xcrun simctl list runtimes
@@ -192,15 +158,7 @@ jobs:
       - name: Run iOS simulator tests (commonTest + iosTest)
         run: ./gradlew :composeApp:iosSimulatorArm64Test --no-daemon
 
-      # No xcpretty: not guaranteed on the runner and, without pipefail, a
-      # successful pipe masks xcodebuild failures. No -destination: simulator
-      # device names drift with runner image updates; -sdk alone selects the
-      # simulator.
-      # ARCHS override: the simulator platform's standard archs are
-      # "arm64 x86_64", and KMP's embedAndSignAppleFrameworkForXcode rejects
-      # x86_64 outright ("Unknown iOS simulator arch"). Kotlin/Native no
-      # longer targets the x86_64 simulator and the runner is Apple Silicon,
-      # so an arm64-only build is the correct and only option.
+      # Kotlin/Native no longer targets the x86_64 simulator and the runner is Apple Silicon
       - name: Verify Xcode project builds
         run: |
           cd iosApp
@@ -210,8 +168,6 @@ jobs:
             ARCHS=arm64 \
             build
 
-      # if: always() so a failed xcodebuild step above does not silently skip
-      # the test report; the XML is what tells you WHICH test failed.
       - name: Upload iOS test results
         if: always()
         uses: actions/upload-artifact@v7

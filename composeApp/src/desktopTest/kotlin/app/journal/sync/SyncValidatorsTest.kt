@@ -53,7 +53,6 @@ class SyncValidatorsTest {
         sessionId = "s:1", body = "Note body"
     )
 
-    // ==================== SyncBatch validation ====================
 
     @Test
     fun validSyncBatchPasses() {
@@ -150,7 +149,6 @@ class SyncValidatorsTest {
             doses = listOf(dose("a".repeat(129), "s:1")))))
     }
 
-    // ==================== Count limits ====================
 
     @Test
     fun tooManySessionsRejected() {
@@ -182,7 +180,6 @@ class SyncValidatorsTest {
         assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L, interactions = interactions)))
     }
 
-    // ==================== Entity-specific field validation ====================
 
     @Test
     fun noteBodyTooLongRejected() {
@@ -226,7 +223,6 @@ class SyncValidatorsTest {
             customUnits = listOf(customUnit("u:1").copy(name = "A".repeat(101))))))
     }
 
-    // ==================== WsDelta validation ====================
 
     @Test
     fun validWsDeltaPasses() {

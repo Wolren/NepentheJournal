@@ -26,34 +26,19 @@ data class InteractionCheckResult(
  */
 object InteractionChecker {
 
-    // ---- Cached index ----
     private var cachedBuilt: Boolean = false
-    /** Source list the cache was built from (identity fast path, see below). */
     private var cachedSource: List<Interaction>? = null
     private var cachedInteractionHash: Int = 0
     private var cachedIndex: Map<InteractionKey, Interaction> = emptyMap()
 
-    /** Counts index rebuilds; test observability for cache-hit assertions. */
     internal var rebuildCount: Int = 0
         private set
 
     private fun indexInteractions(allInteractions: List<Interaction>): Map<InteractionKey, Interaction> {
         if (cachedBuilt && allInteractions === cachedSource) {
-            // Wave4 hash-cost fix: the documented hot path (composable
-            // recomposition) passes the SAME StateFlow list instance until a
-            // mutation replaces it, so identity alone proves content equality
-            // and the O(n) List.hashCode() is skipped entirely. No behavior
-            // change: an identical instance cannot have different content.
-            // The reference is dropped on every rebuild, so at most the
-            // current and previous list stay reachable through this object.
+            // Wave4 hash-cost fix
             return cachedIndex
         }
-        // Content proxy for a DIFFERENT list instance: Kotlin's List carries
-        // no revision/epoch token, so one O(n) hashCode() is the only cheap
-        // way to ask "did the content change?" without an O(n) element-wise
-        // compare (which would cost exactly as much as the hash). Hashing is
-        // therefore kept here deliberately; a true hash collision would serve
-        // the stale index, the same accepted residual as before wave4.
         val hash = allInteractions.hashCode()
         if (cachedBuilt && hash == cachedInteractionHash) {
             cachedSource = allInteractions
@@ -66,8 +51,6 @@ object InteractionChecker {
             if (prev == null) {
                 map[key] = interaction
             } else {
-                // Same id pair from two sources: keep the richer row and say
-                // so, instead of silently keeping whichever arrived first.
                 val winner = InteractionDedupe.richer(prev, interaction)
                 if (winner !== prev) {
                     map[key] = winner

@@ -51,7 +51,6 @@ internal fun RatingBadge(rating: Int?, shulginRating: String?) {
     }
 }
 
-/** Shared event-type glyph, one mapping for every timeline surface. */
 internal fun eventTypeIcon(type: TimelineEventType): ImageVector = when (type) {
     TimelineEventType.ONSET -> Icons.Default.ArrowForward
     TimelineEventType.COMEUP -> Icons.Default.TrendingUp
@@ -127,8 +126,6 @@ internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
 internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJournalRepository, sessionStart: Long) {
     val isDark = ThemeManager.instance.isDarkTheme()
     val grouped = remember(doses) { doses.groupBy { it.substanceId } }
-    // Batch-resolve names once per dose list instead of one repository lookup
-    // per group on every recomposition.
     val substanceNameMap = remember(grouped) {
         grouped.keys.associateWith { id -> repo.getSubstance(id)?.name ?: id }
     }

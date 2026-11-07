@@ -23,7 +23,6 @@ class AtRestKey(private val dataDir: String) {
 
     private val keyFile: File get() = File(dataDir, "at-rest.key")
 
-    /** The key, or null when the file does not exist (legacy store). */
     fun loadOrNull(): ByteArray? {
         if (!keyFile.exists()) return null
         if (keyFile.length() > MAX_KEY_FILE_BYTES) {
@@ -61,7 +60,6 @@ class AtRestKey(private val dataDir: String) {
         return bytes
     }
 
-    /** Hex string of the key, usable as a keystore password. */
     fun toHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 
     /**
@@ -77,7 +75,6 @@ class AtRestKey(private val dataDir: String) {
             )
             true
         } catch (_: UnsupportedOperationException) {
-            // Non-POSIX (Windows): drop inheritance, grant only the current user.
             try {
                 val user = System.getProperty("user.name", "user")
                 val proc = Runtime.getRuntime().exec(

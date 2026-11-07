@@ -41,9 +41,6 @@ internal class JournalTombstones(
     private val bumpToleranceVersion: () -> Unit,
     private val bumpMutationCount: () -> Unit,
 ) {
-    // ========================
-    //  Tombstones (deleted IDs pending propagation to peers)
-    // ========================
 
     /**
      * Tombstone retention window: a delete younger than this is never
@@ -69,7 +66,6 @@ internal class JournalTombstones(
      */
     private val tombstoneRetentionFallbackMs = 180L * 86_400_000L
 
-    /** Deleted entity tombstones: "type:id" to deletion timestamp. Guarded by [lock]. */
     private val _tombstones = mutableMapOf<String, Long>()
 
     private fun tombKey(type: String, id: String) = "$type:$id"
@@ -101,7 +97,6 @@ internal class JournalTombstones(
         }
     }
 
-    /** Record a deletion for propagation. Callers must hold [lock]. */
     private fun recordTombstone(type: String, id: String) {
         pruneTombstonesLocked()
         _tombstones[tombKey(type, id)] = currentTimeMillis()
@@ -147,8 +142,6 @@ internal class JournalTombstones(
         _tombstones.clear()
         val now = currentTimeMillis()
         for ((key, deletedAt) in tombstones) {
-            // Same eligibility rule as pruning: a restore must not smuggle
-            // back a delete the retention policy would immediately drop.
             if (!mayPruneTombstone(deletedAt, now)) _tombstones[key] = deletedAt
         }
     }
@@ -184,7 +177,6 @@ internal class JournalTombstones(
         return changed
     }
 
-    /** Merge a snapshot's tombstones into local state: union, newest timestamp wins, retention-filtered. Callers must hold [lock]. */
     internal fun mergeSnapshotTombstonesLocked(snapshot: JournalSnapshot) {
         pruneTombstonesLocked()
         val now = currentTimeMillis()
@@ -199,14 +191,12 @@ internal class JournalTombstones(
         _tombstones.clear()
     }
 
-    // ---- Delete cascades: every removal records a tombstone. Callers must hold [lock]. ----
     internal fun deleteSessionLocked(id: String) {
         val session = sessionsStore.get(id) ?: return
         sessionsStore.remove(id)
         indices.removeSessionFromIndices(session)
         recordTombstone("session", id)
 
-        // Batch-remove child entities with single emissions per store
         val removedDoses = dosesStore.removeWhere { it.sessionId == id }
         for (dose in removedDoses) recordTombstone("dose", dose.id)
         val removedSubstances = removedDoses.map { it.substanceId }.toSet()
@@ -220,7 +210,6 @@ internal class JournalTombstones(
         val removedEvents = timelineEventsStore.removeWhere { it.sessionId == id }
         for (event in removedEvents) recordTombstone("timelineEvent", event.id)
 
-        // Rebuild dose stats for affected substances
         for (subId in removedSubstances) {
             indices._sessionsPerSubstance[subId]?.remove(id)
             if (indices._sessionsPerSubstance[subId]?.isEmpty() == true)
@@ -259,12 +248,10 @@ internal class JournalTombstones(
         substancesStore.remove(id)
         recordTombstone("substance", id)
 
-        // Cascade: remove all child entities for this substance
         val removedUnits = customUnitsStore.removeWhere { it.substanceId == id }
         for (unit in removedUnits) recordTombstone("customUnit", unit.id)
         indices._customUnitsBySubstance.remove(id)
 
-        // Clean up effect index entries referencing this substance
         effectsStore.forEachValue { effect ->
             if (id in effect.substanceIds) {
                 indices._effectsBySubstance[id]?.removeAll { it.id == effect.id }
@@ -272,7 +259,6 @@ internal class JournalTombstones(
         }
         indices._effectsBySubstance.remove(id)
 
-        // Clean up interactions referencing this substance
         val removedInteractions = interactionsStore.removeWhere {
             id in listOf(it.substanceAId, it.substanceBId)
         }
@@ -384,7 +370,6 @@ internal object PeerSyncWatermarks {
      */
     fun watermarkFloor(): Long? = lock.withLock { watermarks.values.minOrNull() }
 
-    /** Forget every recorded watermark (test isolation; see the tests in commonTest). */
     fun clear() {
         lock.withLock { watermarks.clear() }
     }

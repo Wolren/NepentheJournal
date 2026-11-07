@@ -64,12 +64,8 @@ from datetime import datetime, timezone
 from typing import Any
 import httpx
 
-# All cache files live under scripts/cache/ so the repo root stays clean.
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
 SMW_API = "https://psychonautwiki.org/w/api.php"
 PUBCHEM_BASE = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
@@ -81,10 +77,8 @@ HTTP_TIMEOUT = 60.0
 
 _client = httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT)
 
-# PubChem property names to fetch
 PUBCHEM_PROPS = "MolecularWeight,MolecularFormula,XLogP,HBondDonorCount,HBondAcceptorCount,SMILES,InChIKey,IUPACName"
 
-# TripSit status -> InteractionRisk mapping
 TRIPSIT_RISK_MAP = {
     "Dangerous": "DANGEROUS",
     "Unsafe": "UNSAFE",
@@ -94,16 +88,13 @@ TRIPSIT_RISK_MAP = {
     "Low Risk & Synergy": "LOW",
 }
 
-# Names that PubChem doesn't resolve and need manual CID overrides
 MANUAL_CID_OVERRIDES: dict[str, int] = {
     "PCP": 6449,              # Phencyclidine
     "DXM": 5360696,           # Dextromethorphan
     "THC": 16078,             # Tetrahydrocannabinol (delta-9)
-    # Was 442075: that CID is an unrelated furan natural product
-    # (C20H22O7, no nitrogen) - wrong join, caught by audit_seed.py.
+    # Was 442075: that cid is an unrelated furan natural product (C20H22O7, no nitrogen): wrong join, caught by audit_seed.py.
     "LSA": 442072,            # Lysergic acid amide (ergine), C16H17N3O
-    # PubChem's name endpoint returns tetrachloroethene (31373, C2Cl4) for
-    # "PCE"; the arylcyclohexylamine PCE is eticyclidine, C14H21N.
+    # PubChem's name endpoint returns tetrachloroethene (31373, C2Cl4) for "PCE"; the arylcyclohexylamine PCE is eticyclidine, C14H21N.
     "PCE": 16622,             # Eticyclidine (N-ethylphencyclidine)
     "GHB": 10413,             # Gamma-Hydroxybutyric acid
     "GBL": 7035,              # Gamma-Butyrolactone
@@ -111,26 +102,16 @@ MANUAL_CID_OVERRIDES: dict[str, int] = {
     "Salvinorin A": 128563,   # Salvinorin A
 }
 
-# Curated corrections for PsychonautWiki SMW properties that are corrupted
-# at the source (verified against the live smwbrowse API 2026-10-05: the
-# 1,3-Butanediol page returns DMT's Common_name, Chemical_class,
-# Psychoactive_class AND Effect; its name/summary/ROA/doses are its own).
-# Empty lists mean "honest unknown" - the upstream value belongs to a
-# different substance, so dropping it is more truthful than shipping it.
-# Applied in Stage 0 after load, before CID resolution and the TripSit
-# match, so both --input regenerations and fresh dumps get the correction.
+# Applied in Stage 0 after load, before cid resolution and the TripSit match
 SUBSTANCE_FIELD_OVERRIDES: dict[str, dict[str, Any]] = {
     "1,3-Butanediol": {
         "aliases": [],
-        # PW-level Chemical_class + Psychoactive_class, mirroring the
-        # uncontaminated sibling page 1,4-Butanediol
-        # (["Alkanediol, Diol", "Depressant", ...]).
+        # PW-level Chemical_class + Psychoactive_class, mirroring the uncontaminated sibling page 1,4-Butanediol (["Alkanediol, Diol", "Depressant", ...]).
         "substanceClass": ["Alkanediol, Diol", "Depressant"],
         "effects": [],
     },
 }
 
-# Substances that are mixtures/plants/no single CID
 NO_CID_NAMES: set[str] = {
     "Ayahuasca", "Changa", "Coca", "Cocoa", "Kratom", "Salvia divinorum",
     "Amanita muscaria", "Psilocybe cubensis", "Morning glory",
@@ -141,7 +122,6 @@ NO_CID_NAMES: set[str] = {
     "Atropa belladonna", "Psilocybin mushrooms",
 }
 
-# Names that need alias lookup for PubChem
 PUBCHEM_NAME_OVERRIDES: dict[str, str] = {
     "Nitrous": "nitrous oxide",
     "PMA": "paramethoxyamphetamine",
@@ -160,18 +140,14 @@ PUBCHEM_NAME_OVERRIDES: dict[str, str] = {
     "EPH": "ethylphenidate",
 }
 
-# ---------------------------------------------------------------------------
-# Stage 1: PubChem CID resolution
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Stage 1: PubChem cid resolution
 
 
 def pubchem_cid(name: str) -> int | None:
     """Resolve a substance name to a PubChem CID."""
-    # Check manual overrides first
     if name in MANUAL_CID_OVERRIDES:
         return MANUAL_CID_OVERRIDES[name]
 
-    # Check name override
     query = PUBCHEM_NAME_OVERRIDES.get(name, name)
 
     try:
@@ -227,9 +203,7 @@ def pubchem_property(cid: int) -> dict[str, Any] | None:
         return None
 
 
-# ---------------------------------------------------------------------------
-# Stage 2: TripSit data
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Stage 2: TripSit data
 
 
 def tripsit_get_all_drugs() -> dict[str, Any]:
@@ -266,20 +240,16 @@ def tripsit_name_index(drugs: dict[str, Any]) -> dict[str, str]:
     for key, drug in drugs.items():
         # Lowercase canonical key
         index[key.lower()] = key
-        # Aliases
         aliases = drug.get("aliases", []) if isinstance(drug, dict) else []
         for alias in aliases:
             index[alias.lower().strip()] = key
-        # Pretty name
         pretty = drug.get("pretty_name", "") if isinstance(drug, dict) else ""
         if pretty and pretty.lower() != key.lower():
             index[pretty.lower()] = key
     return index
 
 
-# ---------------------------------------------------------------------------
-# Stage 3: SMW data (load existing seed)
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- Stage 3: SMW data (load existing seed)
 
 
 def load_smw_seed(path: str) -> dict[str, Any]:
@@ -301,9 +271,6 @@ def smw_get_all_substance_names() -> list[str]:
         return []
 
 
-# ---------------------------------------------------------------------------
-# Merging logic
-# ---------------------------------------------------------------------------
 
 
 def build_chemical_properties(pubchem_data: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -321,7 +288,6 @@ def build_chemical_properties(pubchem_data: dict[str, Any] | None) -> dict[str, 
         "hBondDonorCount": pubchem_data.get("HBondDonorCount"),
         "hBondAcceptorCount": pubchem_data.get("HBondAcceptorCount"),
     }
-    # Remove None values
     return {k: v for k, v in cp.items() if v is not None}
 
 
@@ -332,13 +298,11 @@ def match_name_to_tripsit(
     Try to match a substance name or its aliases to a TripSit drug entry.
     Returns (canonical_key, drug_data).
     """
-    # Try primary name
     key = name.lower().strip()
     if key in ts_index:
         ts_key = ts_index[key]
         return ts_key, ts_drugs.get(ts_key)
 
-    # Try aliases
     for alias in aliases:
         alias_key = alias.lower().strip()
         if alias_key in ts_index:
@@ -361,37 +325,31 @@ def merge_substance(
     name = smw_sub["name"]
     old_id = smw_sub["id"]
 
-    # New ID: prefer CID
     new_id = f"cid:{cid}" if cid else old_id
 
-    # Merge aliases from all sources
     aliases = list(smw_sub.get("aliases", []))
     ts_aliases = tripsit_drug.get("aliases", []) if tripsit_drug else []
     for a in ts_aliases:
         if a.lower() != name.lower() and a not in aliases:
             aliases.append(a)
 
-    # Merge effects
     effects = list(smw_sub.get("effects", []))
     ts_effects = tripsit_drug.get("formatted_effects", []) if tripsit_drug else []
     for e in ts_effects:
         if e not in effects:
             effects.append(e)
 
-    # Merge categories/classes
     substance_class = list(smw_sub.get("substanceClass", []))
     ts_categories = tripsit_drug.get("categories", []) if tripsit_drug else []
     if ts_categories:
         substance_class.extend([c for c in ts_categories if c not in substance_class])
 
-    # Add Erowid link from TripSit if available
     erowid_url = ""
     if tripsit_drug:
         links = tripsit_drug.get("links", {})
         if isinstance(links, dict):
             erowid_url = links.get("experiences", "")
 
-    # Track sources
     sources = ["psychonautwiki"]
     if cid:
         sources.append("pubchem")
@@ -461,7 +419,6 @@ def merge_interactions(
             "sources": sources_list or ["psychonautwiki"],
         })
 
-    # Process SMW interactions - map old pwiki: IDs to new cid: IDs
     for interaction in smw_interactions:
         old_a = interaction["substanceAId"]
         old_b = interaction["substanceBId"]
@@ -471,15 +428,12 @@ def merge_interactions(
             new_a, new_b, interaction["riskLevel"],
         )
 
-    # Process TripSit combos
     name_to_id: dict[str, str] = {}
     for orig_name, cid in name_to_cid.items():
         name_lower = orig_name.lower().strip()
         name_to_id[name_lower] = f"cid:{cid}" if cid else f"pwiki:{orig_name.lower().replace(' ', '_')}"
-        # Also add pwiki ID
         name_to_id[orig_name.lower()] = f"cid:{cid}" if cid else f"pwiki:{orig_name.lower().replace(' ', '_')}"
 
-    # Map combo interactions
     for combo_key, combo_targets in combos_data.items():
         sub_a_id = name_to_id.get(combo_key.lower())
         if not sub_a_id:
@@ -502,9 +456,6 @@ def merge_interactions(
     return merged
 
 
-# ---------------------------------------------------------------------------
-# Stage: Wikidata cross-references
-# ---------------------------------------------------------------------------
 
 WIKIDATA_PROPS = {
     "P662": "pubchemCid", "P592": "chemblId", "P715": "drugbankId",
@@ -526,7 +477,7 @@ def wikidata_batch_fetch(cids: list[int], batch_size: int = 30) -> dict[int, dic
 
     def lookup_single(cid: int) -> tuple[int, dict[str, Any]]:
         try:
-            # Step 1: Find QID via haswbstatement search
+            # Step 1: Find qid via haswbstatement search
             r = _client.get(
                 "https://www.wikidata.org/w/api.php",
                 params={"action": "query", "list": "search",
@@ -581,7 +532,6 @@ def wikidata_batch_fetch(cids: list[int], batch_size: int = 30) -> dict[int, dic
 
     result: dict[int, dict[str, Any]] = {}
 
-    # Use ThreadPoolExecutor for concurrent lookups
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         fut_map = {pool.submit(lookup_single, cid): cid for cid in cids}
         done = 0
@@ -618,9 +568,6 @@ def wikidata_fetch_entity(qid: str) -> dict[str, Any]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Stage: ChEMBL bioactivity
-# ---------------------------------------------------------------------------
 
 
 def chembl_fetch(chembl_id: str) -> dict[str, Any]:
@@ -641,7 +588,7 @@ def chembl_fetch(chembl_id: str) -> dict[str, Any]:
             result["alogp"] = props.get("alogp")
             result["psa"] = props.get("psa")
             result["ro5Violations"] = props.get("num_ro5_violations")
-            # maxPhase can be -1.0 (not applicable) - convert to int
+            # maxPhase can be -1.0 (not applicable): convert to int.
             mp = mol.get("max_phase")
             if mp is not None:
                 result["maxPhase"] = int(mp)
@@ -680,9 +627,6 @@ def chembl_fetch(chembl_id: str) -> dict[str, Any]:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Stage: IUPHAR/BPS Guide to PHARMACOLOGY ligand interactions
-# ---------------------------------------------------------------------------
 
 GTOPDB_BASE = "https://www.guidetopharmacology.org"
 GTOPDB_LIGAND_MAPPING = f"{GTOPDB_BASE}/DATA/ligand_id_mapping.csv"
@@ -760,7 +704,6 @@ def iuphar_collect(
             cache = {}
 
     results: dict[int, dict[str, object]] = {}
-    # Only query CIDs we already have in our merged set
     for cid, lid in cid_to_ligand.items():
         cache_key = str(lid)
         if cache_key in cache:
@@ -778,7 +721,6 @@ def iuphar_collect(
                 print(f"    [GtoPdb] {len(cache)} fetched so far", file=sys.stderr)
             time.sleep(0.15)  # be polite
 
-    # Save cache
     try:
         with open(cache_file, "w") as f:
             json.dump(cache, f)
@@ -788,20 +730,7 @@ def iuphar_collect(
     return results
 
 
-# ---------------------------------------------------------------------------
-# Stage: PDSP Ki database (NIMH Psychoactive Drug Screening Program)
-# ---------------------------------------------------------------------------
-# Ki values are binding affinities in nM (nanomolar). Lower values mean
-# stronger binding. The data file was downloaded from pdspdb.unc.edu.
-#
-# Matching strategy (in order):
-#   1. Exact name match (substance name + aliases vs PDSP ligand name)
-#   2. SMILES match (after PubChem properties are fetched)
-# If both fail the substance gets no PDSP data.
-# ---------------------------------------------------------------------------
-
-# Locate the PDSP Ki CSV adjacent to this script so the pipeline is
-# self-contained and replayable on any device without Hermes-specific paths.
+# 1: Exact name match (substance name + aliases vs pdsp ligand name)
 PDSP_DATABASE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "pdsp_ki_database.csv",
@@ -880,7 +809,6 @@ def pdsp_match_ligands(
     Returns {cid: {ligandId, ligandName, records: [...]}}
     where each record has: targetName, gene, species, kiNanoMolar, reference
     """
-    # First pass: match by name
     lid_to_cid: dict[str, int] = {}
     unmatched_ligands: dict[str, dict[str, str]] = {}
 
@@ -896,7 +824,6 @@ def pdsp_match_ligands(
             unmatched_ligands[lid] = {"name": "", "smiles": r.get("SMILES", "").strip()}
             continue
 
-        # Try exact name match
         if lname in name_to_cid:
             lid_to_cid[lid] = name_to_cid[lname]
         else:
@@ -905,7 +832,6 @@ def pdsp_match_ligands(
                 "smiles": r.get("SMILES", "").strip(),
             }
 
-    # Second pass: match remaining by SMILES
     if smiles_to_cid:
         for lid, info in list(unmatched_ligands.items()):
             smi = info.get("smiles", "").replace(" ", "")
@@ -919,7 +845,6 @@ def pdsp_match_ligands(
             file=sys.stderr,
         )
 
-    # Aggregate Ki records per CID
     cid_records: dict[int, list[dict[str, object]]] = {}
     for r in pdsp_rows:
         lid = r["Ligand ID"]
@@ -943,7 +868,6 @@ def pdsp_match_ligands(
         }
         cid_records.setdefault(cid, []).append(record)
 
-    # Build result dict
     result: dict[int, dict[str, object]] = {}
     for cid, records in cid_records.items():
         result[cid] = {
@@ -992,7 +916,6 @@ def pdsp_collect(
 
     result = pdsp_match_ligands(pdsp_rows, name_to_cid, smiles_to_cid, verbose=verbose)
 
-    # Cache
     try:
         with open(cache_file, "w") as f:
             json.dump({str(k): v for k, v in result.items()}, f)
@@ -1002,9 +925,6 @@ def pdsp_collect(
     return result
 
 
-# ---------------------------------------------------------------------------
-# BindingDB integration
-# ---------------------------------------------------------------------------
 
 BINDINGDB_API = "https://bindingdb.org/rest"
 BINDINGDB_DELAY = 1.0  # seconds between API calls
@@ -1032,7 +952,6 @@ def bindingdb_fetch(
             return []
         data = r.json()
 
-        # The response root key varies; find the actual container
         container = None
         for key in ("getLindsByUniprotResponse", "getTargetByCompoundResponse"):
             if key in data:
@@ -1094,7 +1013,6 @@ def bindingdb_collect(
         except Exception:
             cache = {}
 
-    # Collect substances with SMILES and CIDs
     to_query = []
     for sub in substances:
         cid = sub.get("cid")
@@ -1127,7 +1045,6 @@ def bindingdb_collect(
             file=sys.stderr,
         )
 
-    # Cache
     try:
         with open(cache_file, "w") as f:
             json.dump({str(k): v for k, v in result.items()}, f)
@@ -1137,9 +1054,6 @@ def bindingdb_collect(
     return result
 
 
-# ---------------------------------------------------------------------------
-# Main pipeline
-# ---------------------------------------------------------------------------
 
 
 def main():
@@ -1150,7 +1064,6 @@ def main():
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
-    # Refresh: delete all cache files
     if args.refresh:
         for fname in ["pubchem_cid_cache.json", "wikidata_cache.json", "chembl_cache.json"]:
             p = os.path.join(CACHE_DIR, fname)
@@ -1161,7 +1074,7 @@ def main():
 
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
-    # --- Stage 0: Load or fetch SMW data ---
+    # --- Stage 0: Load or fetch smw data
     if args.input:
         if args.verbose:
             print(f"[*] Loading SMW seed from {args.input}", file=sys.stderr)
@@ -1171,7 +1084,6 @@ def main():
     else:
         if args.verbose:
             print("[*] Fetching fresh SMW data from wiki...", file=sys.stderr)
-        # Run the SMW dump inline (simplified: just names + smwbrowse)
         from smw_dump import get_all_substance_names, get_substance_properties, smw_to_substance, smw_to_interactions, get_summaries
         names = get_all_substance_names()
         names = [n for n in names if not n.startswith("Experience:")]
@@ -1194,7 +1106,7 @@ def main():
     if args.verbose:
         print(f"[+] Loaded {len(substances_raw)} substances, {len(interactions_raw)} interactions from SMW", file=sys.stderr)
 
-    # --- Stage 0b: Apply curated upstream-data corrections ---
+    # --- Stage 0b: Apply curated upstream-data corrections
     for ov_name, fields in SUBSTANCE_FIELD_OVERRIDES.items():
         sub = next((s for s in substances_raw if s["name"] == ov_name), None)
         if sub is None:
@@ -1208,11 +1120,10 @@ def main():
                 )
             sub[field] = list(value) if isinstance(value, list) else value
 
-    # --- Stage 1: Resolve PubChem CIDs ---
+    # --- Stage 1: Resolve PubChem CIDs
     if args.verbose:
         print("[*] Resolving PubChem CIDs...", file=sys.stderr)
 
-    # Try loading cached CID map
     pubchem_cid_cache = os.path.join(CACHE_DIR, "pubchem_cid_cache.json")
     name_to_cid: dict[str, int | None] = {}
     cid_to_name: dict[int, str] = {}
@@ -1227,10 +1138,6 @@ def main():
         except Exception:
             name_to_cid = {}
 
-    # Manual CID overrides are authoritative even when already cached: a
-    # wrong resolution persists in pubchem_cid_cache.json forever (LSA was
-    # cached as 442075, PCE as tetrachloroethene 31373). Without this the
-    # cache would win over MANUAL_CID_OVERRIDES on every regeneration.
     for ov_name, ov_cid in MANUAL_CID_OVERRIDES.items():
         if ov_name in name_to_cid and name_to_cid[ov_name] != ov_cid:
             if args.verbose:
@@ -1260,7 +1167,6 @@ def main():
             resolved_count += 1
         time.sleep(PUBCHEM_DELAY)
 
-    # Save cache
     try:
         with open(pubchem_cid_cache, "w") as f:
             json.dump({k: v for k, v in name_to_cid.items()}, f)
@@ -1270,7 +1176,7 @@ def main():
     if args.verbose:
         print(f"[+] Resolved {resolved_count}/{len(substances_raw)} CIDs", file=sys.stderr)
 
-    # --- Stage 2: Fetch PubChem properties (batch) ---
+    # --- Stage 2: Fetch PubChem properties (batch)
     all_cids = [cid for cid in name_to_cid.values() if cid is not None]
     if args.verbose:
         print(f"[*] Fetching PubChem properties for {len(all_cids)} CIDs...", file=sys.stderr)
@@ -1279,7 +1185,7 @@ def main():
     if args.verbose:
         print(f"[+] Got properties for {len(cid_props)}/{len(all_cids)} CIDs", file=sys.stderr)
 
-    # --- Stage 3: Fetch TripSit data ---
+    # --- Stage 3: Fetch TripSit data
     if args.verbose:
         print("[*] Fetching TripSit drugs...", file=sys.stderr)
     ts_drugs = tripsit_get_all_drugs()
@@ -1293,7 +1199,7 @@ def main():
     if args.verbose:
         print(f"[+] TripSit combos: {len(ts_combos)} categories", file=sys.stderr)
 
-    # --- Stage 4: Merge substances ---
+    # --- Stage 4: Merge substances
     if args.verbose:
         print("[*] Merging data sources...", file=sys.stderr)
 
@@ -1316,7 +1222,7 @@ def main():
         print(f"[+] Merged: {len(merged_substances)} substances", file=sys.stderr)
         print(f"    CID: {cid_count} | PubChem props: {pchem_count} | TripSit match: {ts_match_count}", file=sys.stderr)
 
-    # --- Stage 4b: Filter out conceptual categories (keep real compounds + botanicals) ---
+    # --- Stage 4b: Filter out conceptual categories (keep real compounds + botanicals)
     BOTANICALS = {
         "Salvia divinorum", "Kratom", "Amanita muscaria", "Psilocybe cubensis",
         "Banisteriopsis caapi", "Peganum harmala", "Atropa belladonna",
@@ -1348,8 +1254,7 @@ def main():
     if args.verbose:
         print(f"[+] Filtered: removed {excluded_count} category pages, kept {len(merged_substances)}", file=sys.stderr)
 
-    # --- Stage 5: Merge interactions ---
-    # Build old ID -> new ID mapping from merged substances
+    # --- Stage 5: Merge interactions (build the old ID to new ID mapping from merged substances)
     pwiki_to_new_id: dict[str, str] = {}
     for sub in merged_substances:
         old_id = sub.get("oldId")
@@ -1365,11 +1270,10 @@ def main():
     if args.verbose:
         print(f"[+] Interactions: {len(merged_interactions)} (SMW: {len(interactions_raw)} + TripSit combos)", file=sys.stderr)
 
-    # --- Stage 6: Wikidata cross-references + ChEMBL bioactivity ---
+    # --- Stage 6: Wikidata cross-references + ChEMBL bioactivity
     cids_with_chembl = [sub["cid"] for sub in merged_substances if sub.get("cid")]
     wd_map: dict[int, dict[str, Any]] = {}
 
-    # Try loading cached Wikidata results
     wikidata_cache_file = os.path.join(CACHE_DIR, "wikidata_cache.json")
     if os.path.exists(wikidata_cache_file):
         try:
@@ -1380,14 +1284,12 @@ def main():
         except Exception:
             wd_map = {}
 
-    # Fetch missing entries
     missing = [c for c in cids_with_chembl if c not in wd_map]
     if missing:
         if args.verbose:
             print(f"[*] Wikidata lookup for {len(missing)} uncached CIDs...", file=sys.stderr)
         new_wd = wikidata_batch_fetch(missing)
         wd_map.update(new_wd)
-        # Save cache
         try:
             with open(wikidata_cache_file, "w") as f:
                 json.dump({str(k): v for k, v in wd_map.items()}, f)
@@ -1397,7 +1299,6 @@ def main():
     if args.verbose:
         print(f"[+] Wikidata: {len(wd_map)}/{len(cids_with_chembl)}", file=sys.stderr)
 
-    # Fetch ChEMBL for those with ChEMBL IDs
     chembl_cache_file = os.path.join(CACHE_DIR, "chembl_cache.json")
     chembl_cache: dict[str, dict[str, Any]] = {}
     if os.path.exists(chembl_cache_file):
@@ -1426,7 +1327,6 @@ def main():
                 chembl_found += 1
             if len(chembl_cache) % 10 == 0 and args.verbose:
                 print(f"  [ChEMBL] {len(chembl_cache)} fetched so far", file=sys.stderr)
-        # Save cache
         try:
             with open(chembl_cache_file, "w") as f:
                 json.dump(chembl_cache, f)
@@ -1440,7 +1340,6 @@ def main():
         chembl_with_bio = sum(1 for v in chembl_cache.values() if v.get("bioactivities"))
         print(f"[+] ChEMBL bioactivity: {chembl_with_bio} compounds", file=sys.stderr)
 
-    # Merge into substances
     for sub in merged_substances:
         cid = sub.get("cid")
         if cid and cid in wd_map:
@@ -1448,7 +1347,6 @@ def main():
             for key in WIKIDATA_STANDARD_PROPS:
                 if key in wd:
                     sub[key] = wd[key]
-            # Add ChEMBL data
             chembl_id = wd.get("chemblId")
             if chembl_id and chembl_id in chembl_cache:
                 ch = chembl_cache[chembl_id]
@@ -1467,7 +1365,7 @@ def main():
         bc_count = sum(1 for s in merged_substances if s.get("chemblData"))
         print(f"[+] Wikidata cross-refs: {ref_count} | ChEMBL bioactivity: {bc_count}", file=sys.stderr)
 
-    # --- Stage 6b: IUPHAR/BPS Guide to PHARMACOLOGY ---
+    # --- Stage 6b: IUPHAR/BPS Guide to pharmacology
     if args.verbose:
         print("[*] Fetching IUPHAR/BPS GtoPdb ligand interactions...", file=sys.stderr)
 
@@ -1475,14 +1373,12 @@ def main():
     if args.refresh and os.path.exists(iuphar_cache_file):
         os.remove(iuphar_cache_file)
 
-    # Load cached or fresh mapping
     iuphar_data: dict[int, dict[str, object]] = {}
     iuphar_cached = False
     if os.path.exists(iuphar_cache_file):
         try:
             with open(iuphar_cache_file) as f:
                 cached = json.load(f)
-            # Rebuild from cache: {cid: {ligandId, interactions}}
             iuphar_data = {int(k): v for k, v in cached.items() if k.isdigit()}
             iuphar_cached = True
             if args.verbose:
@@ -1492,12 +1388,11 @@ def main():
 
     if not iuphar_cached:
         try:
-            # Build CID -> ligand_id mapping from GtoPdb
+            # Build cid gives ligand_id mapping from GtoPdb
             cid_to_ligand = iuphar_load_mapping()
             if args.verbose:
                 print(f"[*] GtoPdb ligand mapping: {len(cid_to_ligand)} CIDs mapped", file=sys.stderr)
 
-            # Filter to only CIDs we have in merged substances
             our_cids = {s["cid"] for s in merged_substances if s.get("cid")}
             match_cids = {cid: lid for cid, lid in cid_to_ligand.items() if cid in our_cids}
             if args.verbose:
@@ -1511,7 +1406,6 @@ def main():
                     verbose=args.verbose,
                 )
 
-            # Save as full cache (CID-keyed)
             try:
                 with open(iuphar_cache_file, "w") as f:
                     json.dump({str(k): v for k, v in iuphar_data.items()}, f)
@@ -1521,7 +1415,6 @@ def main():
             if args.verbose:
                 print(f"[!] GtoPdb integration failed: {exc}", file=sys.stderr)
 
-    # Merge GtoPdb data into substances
     iuphar_count = 0
     for sub in merged_substances:
         cid = sub.get("cid")
@@ -1538,7 +1431,7 @@ def main():
     if args.verbose:
         print(f"[+] IUPHAR/BPS pharmacology: {iuphar_count} substances with interaction data", file=sys.stderr)
 
-    # --- Stage 6c: PDSP Ki database ---
+    # --- Stage 6c: PDSP Ki database
     if args.verbose:
         print("[*] Fetching PDSP Ki database ligand binding affinities...", file=sys.stderr)
 
@@ -1552,7 +1445,6 @@ def main():
         verbose=args.verbose,
     )
 
-    # Merge PDSP data into substances
     pdsp_records_count = 0
     for sub in merged_substances:
         cid = sub.get("cid")
@@ -1573,7 +1465,7 @@ def main():
             file=sys.stderr,
         )
 
-    # --- Stage 6d: BindingDB ---
+    # --- Stage 6d: BindingDB
     if args.verbose:
         print("[*] Fetching BindingDB affinity data...", file=sys.stderr)
 
@@ -1587,7 +1479,6 @@ def main():
         verbose=args.verbose,
     )
 
-    # Merge BindingDB data into substances
     bindingdb_records_count = 0
     for sub in merged_substances:
         cid = sub.get("cid")
@@ -1608,7 +1499,7 @@ def main():
             file=sys.stderr,
         )
 
-    # --- Stage 7: Write output ---
+    # --- Stage 7: Write output
     snapshot = {
         "version": 3,
         "savedAt": now_ms,

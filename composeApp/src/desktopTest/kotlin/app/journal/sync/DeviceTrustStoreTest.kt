@@ -22,7 +22,6 @@ class DeviceTrustStoreTest {
             pairedAt = System.currentTimeMillis()
         )
 
-    // ==================== CRUD ====================
 
     @Test
     fun addPeerPersistsAndCanBeRetrieved() {
@@ -87,7 +86,6 @@ class DeviceTrustStoreTest {
         assertEquals(2, store.listPeers().size)
     }
 
-    // ==================== Revocation ====================
 
     @Test
     fun revokeDeviceRemovesPeer() {
@@ -105,7 +103,6 @@ class DeviceTrustStoreTest {
         assertEquals(1, store.count())
     }
 
-    // ==================== Last seen ====================
 
     @Test
     fun updateLastSeenUpdatesExisting() {
@@ -123,7 +120,6 @@ class DeviceTrustStoreTest {
         assertEquals(0, store.count())
     }
 
-    // ==================== Clear all ====================
 
     @Test
     fun clearAllEmptiesStore() {
@@ -134,13 +130,11 @@ class DeviceTrustStoreTest {
         assertTrue(store.listPeers().isEmpty())
     }
 
-    // ==================== Persistence ====================
 
     @Test
     fun dataSurvivesStoreRecreation() {
         store.addPeer(samplePeer("dev-1", "fp-1"))
 
-        // Create a new store pointing at the same file
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertEquals(1, store2.count())
         assertTrue(store2.isTrusted("fp-1"))
@@ -152,15 +146,11 @@ class DeviceTrustStoreTest {
         assertEquals(0, store.count())
     }
 
-    // ==================== Corruption ====================
 
     @Test
     fun corruptJsonFailsClosed() {
         testDir.mkdirs()
         File(testDir, "trusted-devices.json").writeText("this is not json{{{")
-        // Fail-closed contract: a corrupt store with no backup and no cache
-        // throws instead of resetting to empty (resetting would silently
-        // unpair every device).
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertFailsWith<IllegalStateException> { store2.count() }
     }
@@ -168,10 +158,8 @@ class DeviceTrustStoreTest {
     @Test
     fun corruptPrimaryRestoresFromBackup() {
         testDir.mkdirs()
-        // Two writes so the first state lands in the .bak backup copy
         store.addPeer(samplePeer("dev-1", "fp-1"))
         store.addPeer(samplePeer("dev-2", "fp-2"))
-        // Corrupt the primary file
         File(testDir, "trusted-devices.json").appendText("\ncorruption")
         val store2 = DeviceTrustStore(testDir.absolutePath)
         // Backup holds the first write: dev-1 survives, nothing is lost silently
@@ -180,7 +168,6 @@ class DeviceTrustStoreTest {
         assertEquals("secret-dev-1", store2.getSharedSecret("dev-1"))
     }
 
-    // ==================== Fingerprint lookup ====================
 
     @Test
     fun getPeerByIdReturnsCorrectPeer() {
@@ -200,7 +187,6 @@ class DeviceTrustStoreTest {
         assertTrue(store.isTrusted("fp-5"))
     }
 
-    // ==================== Encryption ====================
 
     @Test
     fun encryptionRoundtripPreservesSecret() {
@@ -208,27 +194,23 @@ class DeviceTrustStoreTest {
         val peer = samplePeer("dev-enc", "fp-enc").copy(sharedSecret = secret)
         store.addPeer(peer)
 
-        // File on disk must not contain plaintext
         val fileContent = File(testDir, "trusted-devices.json").readText()
         assertFalse(fileContent.contains(secret), "plaintext should NOT appear on disk")
 
-        // Re-read from a fresh store , secret must decrypt correctly
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertEquals(secret, store2.getSharedSecret("dev-enc"))
     }
 
     @Test
     fun encryptionUsesRandomIvPerSave() {
-        // Same peer, same secret, added twice sequentially
         val peer = samplePeer("dev-iv", "fp-iv").copy(sharedSecret = "fixed-secret")
         store.addPeer(peer)
         val fileAfterFirst = File(testDir, "trusted-devices.json").readText()
 
-        // Overwrite with the same peer (same secrets, same everything)
         store.addPeer(peer)
         val fileAfterSecond = File(testDir, "trusted-devices.json").readText()
 
-        // Every save must produce different ciphertext (GCM random IV)
+        // Every save must produce different ciphertext (GCM random iv)
         assertNotEquals(fileAfterFirst, fileAfterSecond,
             "same plaintext peer saved twice must produce different ciphertext (random IV)")
     }
@@ -237,24 +219,19 @@ class DeviceTrustStoreTest {
     fun pbkdf2SaltPersistsAcrossRestarts() {
         store.addPeer(samplePeer("dev-salt", "fp-salt").copy(sharedSecret = "test-secret"))
 
-        // Reload from disk , should use the same salt
         val store2 = DeviceTrustStore(testDir.absolutePath)
         assertEquals("test-secret", store2.getSharedSecret("dev-salt"))
 
-        // Verify the salt is now stored permanently
         val fileContent = File(testDir, "trusted-devices.json").readText()
         assertTrue(fileContent.contains("\"salt\""), "store JSON should contain salt field")
         assertTrue(fileContent.contains("\"version\":2"), "store should be version 2")
 
-        // Another reload , still works
         val store3 = DeviceTrustStore(testDir.absolutePath)
         assertEquals("test-secret", store3.getSharedSecret("dev-salt"))
     }
 
     @Test
     fun plaintextFileFailsClosed() {
-        // A pre-encryption file with a plaintext secret must NOT load: the
-        // legacy passthrough was removed, and fail-closed rejects it.
         testDir.mkdirs()
         val oldJson = """{"version":1,"peers":[{"deviceId":"legacy-dev","displayName":"Old Peer","fingerprint":"fp-old","sharedSecret":"old-plaintext-secret","pairedAt":1000}]}"""
         File(testDir, "trusted-devices.json").writeText(oldJson)
@@ -269,7 +246,6 @@ class DeviceTrustStoreTest {
         val peer = samplePeer("dev-empty", "fp-empty").copy(sharedSecret = "")
         store.addPeer(peer)
 
-        // File must not contain raw empty string in secret position
         val fileContent = File(testDir, "trusted-devices.json").readText()
         assertFalse(fileContent.contains(":\"\",") && fileContent.contains("sharedSecret"),
             "empty secret should also be encrypted on disk")
@@ -278,7 +254,6 @@ class DeviceTrustStoreTest {
         assertEquals("", store2.getSharedSecret("dev-empty"))
     }
 
-    // ==================== Sequential stress ====================
 
     @Test
     fun rapidAddAndRemoveProducesCorrectCount() {

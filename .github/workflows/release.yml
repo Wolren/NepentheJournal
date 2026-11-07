@@ -1,18 +1,6 @@
 name: Release
 
-# Desktop release pipeline: MSI (Windows), DEB (Linux), DMG (macOS).
-#
-# nativeDistributions targetFormats in composeApp/build.gradle.kts = Msi + Deb
-# + Dmg, so one job per format on the matching runner. The Compose Gradle
-# plugin auto-provisions WiX 3.11 (downloadWix/unzipWix tasks) and jpackage
-# comes from the Gradle JVM, so the Windows job only needs a JDK 17 setup;
-# this recipe is the locally proven one (corretto-17.0.13 + plugin WiX).
-#
-# Triggers:
-#   push tag v*  -> build + publish a GitHub Release (guarded: tag must match
-#                   the version in build.gradle.kts and the About card).
-#   workflow_dispatch -> build + upload artifacts only, no release. Use this
-#                   to prove the installers before cutting a tag.
+# The Compose Gradle plugin auto-provisions WiX 3.11 (downloadWix/unzipWix tasks) and jpackage comes from the Gradle JVM
 
 on:
   push:
@@ -20,7 +8,6 @@ on:
   workflow_dispatch:
 
 # Release files only: publishing happens in the publish job with an explicit
-# write grant.
 permissions:
   contents: read
 
@@ -40,9 +27,7 @@ jobs:
       - name: versionName, packageVersion and About card must agree
         run: |
           set -euo pipefail
-          # Anchored to nativeDistributions indentation (12 spaces): the
-          # macOS-block packageVersion override has its own intentional value
-          # and must not be picked up here.
+          # Anchored to nativeDistributions indentation (12 spaces)
           V=$(sed -n 's/^            packageVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts)
           test -n "$V" || { echo "::error::packageVersion not found in build.gradle.kts"; exit 1; }
           echo "packageVersion=$V"
@@ -119,9 +104,6 @@ jobs:
           cache-read-only: true
       - name: Build DMG
         run: ./gradlew :composeApp:packageDmg --no-daemon
-      # jpackage writes its stderr to files under build/compose/logs, which
-      # never reaches the step output; dump them so a failure is debuggable
-      # from the run log alone.
       - name: Dump jpackage logs on failure
         if: failure()
         run: |

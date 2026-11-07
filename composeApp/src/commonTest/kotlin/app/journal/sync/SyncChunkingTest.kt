@@ -72,14 +72,12 @@ class SyncChunkingTest {
             "every slice must respect MAX_INTERACTIONS")
         assertTrue(slices.all { it.interactions.isNotEmpty() }, "no empty middle slice expected")
 
-        // Disjoint ids per slice, union equals the input, order preserved.
         val flattened = slices.flatMap { it.interactions }
         assertEquals(batch.interactions.size, flattened.size, "no entity lost or duplicated")
         assertEquals(flattened.map { it.id }.toSet().size, flattened.size, "ids must be disjoint across slices")
         assertEquals(batch.interactions.map { it.id }, flattened.map { it.id },
             "concatenation must reproduce the input order")
 
-        // Metadata rides on every slice; untouched collections stay empty.
         assertTrue(slices.all { it.deviceId == "d" && it.deviceName == "n" && it.since == 42L })
         assertTrue(slices.all {
             it.sessions.isEmpty() && it.doses.isEmpty() && it.substances.isEmpty() &&
@@ -87,7 +85,6 @@ class SyncChunkingTest {
                 it.customUnits.isEmpty() && it.deletedSessionIds.isEmpty()
         })
 
-        // Every slice passes the real validator (the server-side gate).
         slices.forEach { assertNull(validateSyncBatch(it), "slice must pass validateSyncBatch") }
     }
 
@@ -124,7 +121,6 @@ class SyncChunkingTest {
             assertNull(validateSyncBatch(slice), "slice must pass the unified validator")
         }
 
-        // Union equals input for every collection.
         assertEquals(batch.sessions.map { it.id }, slices.flatMap { it.sessions }.map { it.id })
         assertEquals(batch.doses.map { it.id }, slices.flatMap { it.doses }.map { it.id })
         assertEquals(batch.substances.map { it.id }, slices.flatMap { it.substances }.map { it.id })
@@ -139,8 +135,6 @@ class SyncChunkingTest {
 
     @Test
     fun `empty batch yields a single empty slice`() {
-        // Documented choice: an empty batch still produces exactly one slice
-        // so callers can send slices uniformly and gate the cursor on acks.
         val slices = buildPushSlices(SyncBatch(deviceId = "d", deviceName = "n", since = 0L))
         assertEquals(1, slices.size)
         val only = slices.single()

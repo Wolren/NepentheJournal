@@ -63,7 +63,6 @@ internal class IosAtRestKey(
     @kotlin.concurrent.Volatile
     private var cached: ByteArray? = null
 
-    /** The key, creating and storing it on first use. Throws when the Keychain is unusable. */
     @Throws(IllegalStateException::class)
     fun loadOrCreate(): ByteArray {
         cached?.let { return it }
@@ -77,7 +76,6 @@ internal class IosAtRestKey(
         return fresh
     }
 
-    /** The key, or null when absent or unreadable (never throws). */
     fun loadOrNull(): ByteArray? {
         cached?.let { return it }
         return try {
@@ -190,8 +188,6 @@ internal class IosAtRestKey(
     }
 
     private fun cfString(value: String, scope: MemScope, owned: MutableList<COpaquePointer?>): COpaquePointer? {
-        // The cstr bytes are copied by CFStringCreateWithCString, so the
-        // transient pointer is safe; the created string is owned by us.
         val created = CFStringCreateWithCString(
             null,
             value,

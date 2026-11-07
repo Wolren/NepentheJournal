@@ -27,10 +27,7 @@ internal fun SyncSettingsContent(
     clipboard: ClipboardManager,
     formatTimestamp: (Long) -> String,
 ) {
-    // Contract (HARDENING-CONTRACTS-2026-09, section c item 7): note conflicts
-    // have to be visible somewhere. Quiet count line on the card that already
-    // reports sync state; the sibling bodies are readable on the note's own
-    // card in search results.
+    // Contract (hardening-contracts-2026-09, section c item 7): note conflicts have to be visible somewhere.
     val repo = LocalJournalRepository.current
     val pendingNoteConflicts by repo.pendingConflictCount.collectAsState(initial = 0)
 

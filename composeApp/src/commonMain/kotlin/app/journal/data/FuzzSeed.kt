@@ -15,10 +15,8 @@ object FuzzSeed {
 
     private val rng = Random(42) // deterministic seed for reproducibility
 
-    // Consumer names for multi-consumer testing
     private val consumers = listOf(null, "Alex", "Sam", "Jordan", "Casey")
 
-    // Set/mindset pool
     private val sets = listOf(
         "Curious and open",
         "Anxious but excited",
@@ -32,7 +30,6 @@ object FuzzSeed {
         "Social and talkative"
     )
 
-    // Setting/environment pool
     private val settings = listOf(
         "My apartment, dim lighting, ambient music",
         "Botanical gardens, sunny afternoon",
@@ -46,7 +43,6 @@ object FuzzSeed {
         "Friend's house, comfortable living room"
     )
 
-    // Intention pool
     private val intentions = listOf(
         "Process recent life changes and gain clarity",
         "Explore creative flow for music production",
@@ -60,7 +56,6 @@ object FuzzSeed {
         "Microdose for focus and productivity"
     )
 
-    // Outcome pool
     private val outcomes = listOf(
         "Profound emotional release, cried for 20 minutes, felt lighter afterwards",
         "Beautiful day. Connected deeply with friends. The flowers were breathing fractal patterns.",
@@ -74,7 +69,6 @@ object FuzzSeed {
         "Deep introspective journey. Faced some difficult emotions but came out stronger."
     )
 
-    // ROA pool
     private val roas = listOf("Oral", "Sublingual", "Insufflated", "Vaporized", "Inhaled", "Intramuscular")
 
     /**
@@ -94,7 +88,7 @@ object FuzzSeed {
                 return
             }
 
-            // --- Generate sessions spanning 6 months ---
+            // --- Generate sessions spanning 6 months
             val sixMonthsAgo = now - 180L * dayMs
             val sessionCount = 25 + rng.nextInt(15) // 25-39 sessions
 
@@ -144,7 +138,6 @@ object FuzzSeed {
                 )
                 sessions.add(session)
 
-                // Doses for each substance in the combo
                 comboSubstances.forEachIndexed { idx, sub ->
                     val doseCount = if (rng.nextFloat() < 0.2f) 2 else 1
                     for (d in 0 until doseCount) {
@@ -174,7 +167,6 @@ object FuzzSeed {
                     }
                 }
 
-                // Timeline events for some sessions
                 if (rng.nextFloat() < 0.5f) {
                     val eventTypes = TimelineEventType.entries
                     val baseTime = sessionStart
@@ -196,14 +188,12 @@ object FuzzSeed {
                 }
             }
 
-            // Insert everything in a single bulk pass
             repo.bulkInsert(
                 sessions = sessions,
                 doses = allDoses,
                 timelineEvents = allTimelineEvents
             )
 
-            // Add interactions from the real seed data for substances present
             if (substances.size >= 3) {
                 val shuffled = substances.shuffled(rng)
                 for (i in 0 until (shuffled.size / 2).coerceAtMost(10)) {

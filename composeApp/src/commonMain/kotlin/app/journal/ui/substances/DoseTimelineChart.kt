@@ -40,7 +40,6 @@ fun DoseTimelineChart(
     val now = currentTimeMillis()
     val dayMs = 86400000L
     val isDark = isDarkTheme()
-    // Route series derived from the theme accents.
     val routeColors = chartSeriesColors(8)
 
     val recentDoses = remember(doses, now) {
@@ -83,10 +82,7 @@ fun DoseTimelineChart(
         Spacer(Modifier.height(8.dp))
 
         if (recentDoses.isNotEmpty()) {
-            // Adaptive accent for this substance, not a generic primary wash.
             val accent = AdaptiveColors.colorFor(substanceName).getComposeColor(isDark)
-            // Normalize stick height to the largest dose in the window: a fixed
-            // denominator flattens every substance (20 mg vs 5000 mg scales).
             val windowMax = remember(recentDoses) {
                 recentDoses.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 1.0
             }

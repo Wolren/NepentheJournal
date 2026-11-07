@@ -33,8 +33,6 @@ class SearchIndexFreshnessTest {
     fun justUpsertedEntityIsFoundOnTheNextQuery() {
         val repo = JournalRepository()
         repo.upsertSession(session("s:warm", "Launchpad"))
-        // Warm the index so the dirty flag is cleared: what follows must come
-        // from the rebuild-if-dirty path inside JournalSearch.search.
         assertTrue(repo.search("launchpad").isNotEmpty(), "fixture: index built and warm")
 
         repo.upsertNote(
@@ -71,9 +69,7 @@ class SearchIndexFreshnessTest {
         repo.upsertSession(session("s:batch", "Launchpad two"))
         assertTrue(repo.search("launchpad").isNotEmpty(), "fixture: index built and warm")
 
-        // Task 3: the batch save writes stores directly; before wave4 it never
-        // flipped the dirty flag, so BOTH searches below missed the children
-        // (the index stayed clean from the warm-up query).
+        // Task 3: the batch save writes stores directly; before wave4 it never flipped the dirty flag
         repo.upsertSessionChildren(
             sessionId = "s:batch",
             doses = listOf(dose("d:batch", "draft:other", "sub:x", notes = "xylophonequark")),
@@ -94,7 +90,6 @@ class SearchIndexFreshnessTest {
             repo.search("burbleflux").any { it.entityId == "e:batch" },
             "timeline event saved through upsertSessionChildren must be searchable on the first query"
         )
-        // Re-parenting still happened (draft session id -> real session id).
         assertTrue(
             repo.search("xylophonequark").any { it.entityId == "d:batch" } &&
                 repo.doses.value.first().sessionId == "s:batch",

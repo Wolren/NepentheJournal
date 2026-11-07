@@ -22,7 +22,6 @@ import kotlinx.cinterop.*
  */
 actual object ZipExporter {
 
-    // --- ZIP constants ---
     private const val LOCAL_FILE_HEADER_SIG = 0x04034b50u
     private const val CENTRAL_DIR_HEADER_SIG = 0x02014b50u
     private const val END_CENTRAL_DIR_SIG = 0x06054b50u
@@ -70,7 +69,6 @@ actual object ZipExporter {
         }
     }
 
-    // --- ZIP construction (stored entries, no compression) ---
 
     private data class ZipEntry(
         val name: String,
@@ -98,20 +96,17 @@ actual object ZipExporter {
         val data = NSMutableData()
         val offsets = mutableListOf<ULong>()
 
-        // Write local file headers + file data
         for (entry in entries) {
             offsets.add(data.length.toULong())
             writeLocalFileHeader(data, entry)
             data.appendBytes(entry.data.refTo(0), entry.data.size.toULong())
         }
 
-        // Write central directory
         val centralDirOffset = data.length.toULong()
         for (entry in entries) {
             writeCentralDirEntry(data, entry)
         }
 
-        // Write end of central directory
         val centralDirSize = data.length.toULong() - centralDirOffset
         writeEndCentralDir(data, entries.size.toUShort(), centralDirSize, centralDirOffset)
 
@@ -172,7 +167,7 @@ actual object ZipExporter {
         data.appendLEUint16(0u) // comment length
     }
 
-    // --- CRC-32 calculation (pure Kotlin, no zlib dependency needed) ---
+    // --- crc-32 calculation (pure Kotlin, no zlib dependency needed)
     private val crcTable: UIntArray by lazy {
         UIntArray(256) { i ->
             var crc = i.toUInt()
@@ -196,7 +191,6 @@ actual object ZipExporter {
     }
 }
 
-// --- Binary serialization helpers for NSMutableData ---
 
 private fun NSMutableData.appendLEUint32(value: UInt) {
     val bytes = byteArrayOf(
@@ -216,7 +210,6 @@ private fun NSMutableData.appendLEUint16(value: UShort) {
     this.appendBytes(bytes.refTo(0), 2uL)
 }
 
-/** Utility: get pointer to first element of a ByteArray. */
 private fun ByteArray.refTo(index: Int): CPointer<ByteVar> {
     return this.usePinned { it.addressOf(index) }
 }

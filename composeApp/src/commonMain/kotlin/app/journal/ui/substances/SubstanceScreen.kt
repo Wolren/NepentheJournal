@@ -44,17 +44,12 @@ fun SubstanceScreen(
     val specificOptions by viewModel.specificOptions.collectAsState(initial = emptyList())
     val themeManager = remember { ThemeManager.instance }
     val isDark = themeManager.isDarkTheme()
-    // Repository getter hits a lock; read it only when the result list changes,
-    // not on every recomposition.
     val substanceDoseStats = remember(results) { viewModel.substanceDoseStats }
 
     val query by viewModel.query.collectAsState()
     val activeBroad by viewModel.activeBroad.collectAsState()
     val activeSpecifics by viewModel.activeSpecifics.collectAsState()
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
-    // Whether the nested specifics pane is open. Deliberately separate from
-    // the selection: checking a broad must not drag the nested list open, the
-    // arrow is the only thing that may open it, and it never outlives the menu.
     var showSpecifics by remember { mutableStateOf(false) }
     LaunchedEffect(categoryDropdownExpanded) {
         if (!categoryDropdownExpanded) showSpecifics = false
@@ -63,10 +58,7 @@ fun SubstanceScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            // Search bar with category filter as trailing icon
             BoxWithConstraints {
-                // Wide windows get broads and specifics side by side;
-                // narrow ones stack the panes so nothing overflows.
                 val wideFilterMenu = maxWidth > 700.dp
                 OutlinedTextField(
                     value = query,
@@ -99,11 +91,6 @@ fun SubstanceScreen(
                     onDismissRequest = { categoryDropdownExpanded = false },
                     offset = DpOffset(0.dp, 0.dp),
                 ) {
-                    // One menu, shared panes: broads on the left, the active
-                    // broad's specifics on the right. A single popup means
-                    // picking specifics never dismisses the menu and there
-                    // is no offset math to drift. Narrow windows stack the
-                    // panes instead of overflowing the screen.
                     val wideMenu = wideFilterMenu
                     @Composable
                     fun BroadPane() {
@@ -135,8 +122,6 @@ fun SubstanceScreen(
                                             Text("${broad.label} (${broad.count})",
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                         },
-                                        // Selecting only: the nested pane opens from
-                                        // its arrow, never from the row itself.
                                         onClick = {
                                             viewModel.selectBroad(if (isSelected) null else broad.id)
                                         },
@@ -150,8 +135,6 @@ fun SubstanceScreen(
                                             IconButton(
                                                 onClick = {
                                                     if (!isSelected) {
-                                                        // The pane lists the active broad's
-                                                        // specifics, so open it on this one.
                                                         viewModel.selectBroad(broad.id)
                                                         showSpecifics = true
                                                     } else {
@@ -220,10 +203,6 @@ fun SubstanceScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Results list. The empty screen is held back the same way as on
-            // the sessions tab: the results flow emits an empty first frame
-            // on entry, which used to flash "No substances in database" before
-            // real results arrived.
             if (results.isEmpty()) {
                 val showEmptyState = rememberEmptyStateVisible(isEmpty = results.isEmpty())
                 Box(
@@ -279,7 +258,6 @@ fun SubstanceScreen(
             }
         }
 
-        // FAB
         FloatingActionButton(
             onClick = onNewSubstance,
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
@@ -333,7 +311,6 @@ private fun SubstanceCard(
                         maxLines = 1
                     )
                 }
-                // Usage stats
                 if (sessionCount > 0 || lastUsedDaysAgo != null) {
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

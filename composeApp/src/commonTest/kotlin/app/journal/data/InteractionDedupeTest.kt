@@ -21,7 +21,6 @@ class InteractionDedupeTest {
         description = description, sources = sources
     )
 
-    // Same display name, different id schemes: the lithium pattern.
     private val names = mapOf(
         "cid:1" to "LSD",
         "pwiki:lithium" to "Lithium",
@@ -49,7 +48,6 @@ class InteractionDedupeTest {
         val out = InteractionDedupe.dedupe(rows, nameOf)
         assertEquals(1, out.size)
         assertEquals(InteractionRisk.DANGEROUS, out[0].riskLevel)
-        // Severity wins but the longer description still surfaces.
         assertEquals("Mild concern.", out[0].description)
     }
 

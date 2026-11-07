@@ -8,7 +8,6 @@ actual fun collectLogs(appDir: String): String {
     return try {
         val sb = StringBuilder()
 
-        // Header with app info
         sb.appendLine("=== Nepenthe Journal Crash Log Bundle ===")
         sb.appendLine("Generated: ${System.currentTimeMillis()}")
         sb.appendLine("OS: ${System.getProperty("os.name", "unknown")} ${System.getProperty("os.version", "")}")
@@ -48,7 +47,6 @@ actual fun collectLogs(appDir: String): String {
             sb.appendLine("Log directory $appDir does not exist")
         }
 
-        // Collect crash dump files from crashlogs/ subdirectory
         val crashDir = File(appDir, "crashlogs")
         if (crashDir.isDirectory()) {
             val crashFiles = crashDir.listFiles()

@@ -26,13 +26,11 @@ class SyncAuthenticatorTest {
         authenticator.clearPendingPairing()
     }
 
-    // ==================== Pairing tokens ====================
 
     @Test
     fun generatePairingTokenReturns6CharToken() {
         val token = authenticator.generatePairingToken()
         assertEquals(6, token.length)
-        // Should only contain chars from the allowed alphabet
         assertTrue(token.all { it in "23456789ABCDEFGHJKLMNPQRSTUVWXYZ" })
     }
 
@@ -74,11 +72,9 @@ class SyncAuthenticatorTest {
         assertFalse(authenticator.verifyPairingToken(token))
     }
 
-    // ==================== HMAC signing and verification ====================
 
     @Test
     fun signAndVerifyRoundtrip() {
-        // First pair a device
         val deviceId = "test-device-1"
         val secret = authenticator.generateSharedSecret()
         trustStore.addPeer(DeviceTrustStore.TrustedPeer(
@@ -141,7 +137,6 @@ class SyncAuthenticatorTest {
         assertFalse(authenticator.verifyRequest("untrusted-device", body, authHeader))
     }
 
-    // ==================== Nonce replay protection ====================
 
     @Test
     fun sameNonceIsRejectedOnSecondUse() {
@@ -156,13 +151,10 @@ class SyncAuthenticatorTest {
         val body = "test body"
         val authHeader = sign(deviceId, body, secret)
 
-        // First use should pass
         assertTrue(authenticator.verifyRequest(deviceId, body, authHeader))
-        // Same auth header (same nonce + timestamp) should fail
         assertFalse(authenticator.verifyRequest(deviceId, body, authHeader))
     }
 
-    // ==================== Shared secrets ====================
 
     @Test
     fun sharedSecretIs64HexChars() {
@@ -178,7 +170,6 @@ class SyncAuthenticatorTest {
         assertNotEquals(s1, s2)
     }
 
-    // ==================== Constants ====================
 
     @Test
     fun maxSyncBodyBytesIsReasonable() {

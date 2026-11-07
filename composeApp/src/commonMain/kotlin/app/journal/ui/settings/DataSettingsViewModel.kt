@@ -35,19 +35,14 @@ class DataSettingsViewModel(
     private val repo: IJournalRepository,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
 ) {
-    /** True while the seed reload runs; drives the reload button's enabled state. */
     val isFetching = MutableStateFlow(false)
 
-    /** Status line under "Reset to defaults" in the Substance library card. */
     val fetchStatus = MutableStateFlow<String?>(null)
 
-    /** Status line inside the Data card (export, import, backup, test data). */
     val dataStatus = MutableStateFlow<String?>(null)
 
-    /** Status line under the diagnostics crash-log export. */
     val crashLogStatus = MutableStateFlow<String?>(null)
 
-    // ==================== Substance library ====================
 
     fun reloadDefaultSubstances() {
         scope.launch {
@@ -63,7 +58,6 @@ class DataSettingsViewModel(
         }
     }
 
-    // ==================== Developer ====================
 
     fun resetWithTestData() {
         scope.launch {
@@ -97,7 +91,6 @@ class DataSettingsViewModel(
         }
     }
 
-    // ==================== Data: JSON export / import ====================
 
     fun exportSessionsJson() {
         scope.launch {
@@ -119,10 +112,6 @@ class DataSettingsViewModel(
             val path = FilePicker.openFile("JSON files", listOf("json"))
             if (path != null) {
                 try {
-                    // Check the file length BEFORE readText: the 50 MB
-                    // guard inside ExportImport can only see the content
-                    // once it is already in memory. size() == -1 means
-                    // unknown, which falls through to the decode checks.
                     if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
                         dataStatus.value = "Import failed: file too large (max 50 MB)"
                         return@launch
@@ -159,7 +148,6 @@ class DataSettingsViewModel(
             val path = FilePicker.openFile("JSON files", listOf("json"))
             if (path != null) {
                 try {
-                    // Size check before readText (same as session import).
                     if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
                         dataStatus.value = "Import failed: file too large (max 50 MB)"
                         return@launch
@@ -177,7 +165,6 @@ class DataSettingsViewModel(
         }
     }
 
-    // ==================== Data: CSV / ZIP export ====================
 
     fun exportSessionsCsv() {
         scope.launch {
@@ -238,7 +225,6 @@ class DataSettingsViewModel(
         }
     }
 
-    // ==================== Data: snapshot backup ====================
 
     fun createBackup() {
         scope.launch {

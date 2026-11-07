@@ -9,5 +9,4 @@ actual fun DesktopScrollbar(
     scrollState: LazyListState,
     modifier: Modifier,
 ) {
-    // No-op on iOS: scrollbar is Desktop-only
 }

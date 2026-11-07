@@ -59,8 +59,6 @@ class KtorSyncClientDrainTest {
 
     @Test
     fun `composite cut is forwarded verbatim on every continuation fetch`() = runBlocking {
-        // The tie-group shape: every resume is inside ONE timestamp, so the
-        // id half is the only thing that moves the cursor.
         val p1 = page(truncated = true, nextSince = tied, nextSinceId = "int:100")
         val p2 = page(truncated = true, nextSince = tied, nextSinceId = "int:200")
         val p3 = page(truncated = false)
@@ -89,8 +87,7 @@ class KtorSyncClientDrainTest {
 
     @Test
     fun `page budget exhaustion reports incomplete instead of advancing`() = runBlocking {
-        // limit=2: first page applied (pages=1), one continuation fetched
-        // (pages=2), then the bound trips BEFORE a third page could arrive.
+        // limit=2: first page applied (pages=1), one continuation fetched (pages=2), then the bound trips before a third page could arrive.
         val p1 = page(truncated = true, nextSince = tied, nextSinceId = "int:1")
         val p2 = page(truncated = true, nextSince = tied, nextSinceId = "int:2")
         val fetched = mutableListOf<Pair<Long, String>>()
@@ -113,10 +110,6 @@ class KtorSyncClientDrainTest {
 
     @Test
     fun `cursor that cannot advance stalls the drain as incomplete`() = runBlocking {
-        // An old server that splits a tie group AT the cursor value: it
-        // reports truncated but its nextSince equals the cursor, so the
-        // remaining rows of the group are unreachable by this protocol.
-        // Looping would re-serve page one forever; stopping is correct.
         val first = page(truncated = true, nextSince = 500L, nextSinceId = "")
         var fetches = 0
 

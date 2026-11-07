@@ -33,8 +33,6 @@ actual object FilePicker {
                     controller.dismissViewControllerAnimated(true, completion = null)
                     if (cont.isActive) cont.resume(url)
                 }
-                // The picker keeps only a weak delegate, so retain it in
-                // liveDelegates until the picker finishes or is cancelled.
                 cont.invokeOnCancellation {
                     controller.dismissViewControllerAnimated(true, completion = null)
                 }
@@ -131,7 +129,6 @@ actual object FilePicker {
         return top
     }
 
-    /** Strong refs for live delegates; UIDocumentPicker keeps only a weak delegate. */
     private val liveDelegates = mutableSetOf<ResultDelegate>()
 
     private fun keepAlive(delegate: ResultDelegate) {

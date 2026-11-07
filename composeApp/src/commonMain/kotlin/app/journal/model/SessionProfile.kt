@@ -2,7 +2,6 @@ package app.journal.model
 
 import kotlinx.serialization.Serializable
 
-/** Optional demographics attached to a session describing the individual who took the substance(s). */
 @Serializable
 data class SessionProfile(
     val age: Int? = null,

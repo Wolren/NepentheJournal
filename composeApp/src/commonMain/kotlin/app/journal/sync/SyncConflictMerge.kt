@@ -67,8 +67,6 @@ fun mergeSessionConflict(
                 body = "Remote: ${session.outcome}\n\nLocal: ${existing.outcome}",
                 createdAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
                 updatedAt = session.updatedAt.coerceAtLeast(existing.updatedAt),
-                // Tag interaction provenance: conflict notes always carry
-                // the pushing device so the origin is never ambiguous.
                 deviceOrigin = "sync:$remoteDeviceId"
             ))
             conflicts++

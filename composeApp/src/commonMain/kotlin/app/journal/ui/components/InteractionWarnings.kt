@@ -25,9 +25,6 @@ fun InteractionWarnings(
 ) {
     if (!result.hasIssues && result.uncertain.isEmpty()) return
 
-    // Same cross-source duplicates as the detail list: one pair can arrive
-    // under two id schemes (seed placeholder vs real substance) and render
-    // the same name twice. Dangerous wins over unsafe over uncertain.
     val shown = remember(result, substanceNameLookup) {
         val seen = mutableSetOf<Pair<String, String>>()
         fun dedupe(pairs: List<Pair<String, String>>): List<Pair<String, String>> =

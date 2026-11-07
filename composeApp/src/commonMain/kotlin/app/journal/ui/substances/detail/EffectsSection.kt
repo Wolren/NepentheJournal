@@ -19,7 +19,6 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
     val allEffects by repo.effects.collectAsState()
     var selectedEffect by remember { mutableStateOf<String?>(null) }
 
-    // Categorized effects from DoseWiki pipeline, filtered for this substance
     val categorized = remember(substance.id, allEffects) {
         allEffects.filter { substance.id in it.substanceIds }
             .groupBy { it.category ?: "other" }
@@ -32,7 +31,6 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
             }
     }
 
-    // Fallback: flat SMW effect list if DoseWiki hasn't been ingested
     val flatEffects = substance.effects.filterNot {
         it.matches(Regex(".+effect ?\\\\d+", RegexOption.IGNORE_CASE))
     }.sorted()
@@ -102,19 +100,12 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
     val uriHandler = LocalUriHandler.current
 
     selectedEffect?.let { effectName ->
-        // Resolve the backing record to attribute the right source:
-        // DoseWiki-ingested effects carry effect:dw: ids and often a
-        // description; flat seed strings are PsychonautWiki data.
         val record = allEffects.find { it.name == effectName && substance.id in it.substanceIds }
         val isDoseWiki = record?.id?.startsWith("effect:dw:") == true
         val sourceName = if (isDoseWiki) "DoseWiki" else "PsychonautWiki"
-        // Many per-substance writeups are empty; fall back to the same named
-        // effect documented under another substance before giving up.
         val description = record?.description?.takeIf { it.isNotBlank() }
             ?: allEffects.firstOrNull { it.name == effectName && !it.description.isNullOrBlank() }?.description
-        // PsychonautWiki effect index pages resolve as /wiki/<Name_with_underscores>
-        // (verified 20 Sep 2026: Euphoria, Geometry return 200). DoseWiki effect
-        // writeups are PW-forked content, so the same page applies to both.
+        // PsychonautWiki effect index pages resolve as /wiki/<Name_with_underscores> (verified 20 Sep 2026: Euphoria, Geometry return 200).
         val readMoreUrl = record?.url
             ?: "https://psychonautwiki.org/wiki/${effectName.replace(" ", "_")}"
         AlertDialog(

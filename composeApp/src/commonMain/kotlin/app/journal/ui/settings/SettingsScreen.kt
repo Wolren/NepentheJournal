@@ -54,8 +54,7 @@ fun SettingsScreen(
 
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
-    // Captured at composition: ThemeManager.isDarkTheme is @Composable and
-    // cannot be called from click lambdas.
+    // Captured at composition: ThemeManager.isDarkTheme is @Composable and can't be called from click lambdas.
     val isDarkNow = themeManager.isDarkTheme()
     var themeExpanded by remember { mutableStateOf(false) }
     var editBaseTheme by remember(themeConfig) { mutableStateOf(themeConfig.baseTheme) }
@@ -99,8 +98,6 @@ fun SettingsScreen(
     }
     var trustedDevices by remember { mutableStateOf(syncEngine.trustedDevices()) }
 
-    // Seed reload, test data and every export/import/backup operation live in
-    // the view model; this screen only reads status and calls its methods.
     val dataViewModel = remember(repo, scope) { DataSettingsViewModel.create(repo, scope) }
     val fetchStatus by dataViewModel.fetchStatus.collectAsState()
     val isFetching by dataViewModel.isFetching.collectAsState()
@@ -117,7 +114,6 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             state = scrollState
         ) {
-        // ================ THEME ================
         item { ThemeContent(
             themeConfig = themeConfig, themeManager = themeManager,
             editBaseTheme = editBaseTheme, editPrimary = editPrimary, editSecondary = editSecondary,
@@ -134,8 +130,6 @@ fun SettingsScreen(
             onAnimationScaleChange = { editAnimationScale = it },
             onGithubGreenChange = { editGithubGreen = it },
             onPresetSelect = { preset ->
-                // Apply the preset variant matching the current dark/light mode,
-                // keeping the user's base theme choice (Dark/Light/System).
                 val v = preset.variant(isDarkNow)
                 editPrimary = v.primaryColor
                 editSecondary = v.secondaryColor
@@ -149,7 +143,6 @@ fun SettingsScreen(
             applyTheme = { applyTheme() }
         ) }
 
-        // ================ PREFERENCES ================
         item {
             val prefExpanded = remember { mutableStateOf(false) }
             CollapsibleSettingsCard(
@@ -200,7 +193,6 @@ fun SettingsScreen(
             }
         }
 
-        // ================ DATA ================
         item {
             DataSettingsContent(
                 vm = dataViewModel, sessionCount = sessionCount, substanceCount = substanceCount,
@@ -209,13 +201,10 @@ fun SettingsScreen(
             )
         }
 
-        // ================ PEOPLE ================
         item { PeopleSettingsContent(repo = repo) }
 
-        // ================ OBSIDIAN VAULT ================
         item { ObsidianSettingsCard() }
 
-        // ================ DEVICE SYNC ================
         item {
             SyncSettingsContent(
                 syncEngine = syncEngine, status = status, state = syncState,
@@ -235,7 +224,6 @@ fun SettingsScreen(
             )
         }
 
-        // ================ SUBSTANCE LIBRARY ================
         item {
             CollapsibleSettingsCard(
                 expanded = libraryExpanded,
@@ -261,21 +249,16 @@ fun SettingsScreen(
             }
         }
 
-        // ================ ABOUT ================
         item { AboutCardContent(aboutExpanded = aboutExpanded, onToggle = { aboutExpanded = !aboutExpanded }) }
 
-        // ================ LEGAL ================
         item { LegalCardContent(legalExpanded = legalExpanded, onToggle = { legalExpanded = !legalExpanded }) }
 
-        // ================ PRIVACY ================
         item { PrivacyCardContent(privacyExpanded = privacyExpanded, onToggle = { privacyExpanded = !privacyExpanded }) }
 
-        // ================ DEVELOPER ================
         item {
             DeveloperCardContent(vm = dataViewModel)
         }
 
-        // ================ FOOTER ================
         item {
             Text("No ads. No subscriptions. No tracking. Your data is yours.",
                 style = MaterialTheme.typography.labelSmall,

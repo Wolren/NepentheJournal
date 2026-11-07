@@ -32,7 +32,6 @@ fun SessionDoseSection(
     onEditDose: (Dose) -> Unit,
     onDeleteDose: (String) -> Unit
 ) {
-    // Doses section header
     HorizontalDivider()
     Spacer(Modifier.height(4.dp))
     Row(
@@ -64,7 +63,6 @@ fun SessionDoseSection(
         }
     }
 
-    // Dose list - clickable to edit, delete button inline
     Column {
         sessionDoses.forEach { dose ->
             key(dose.id) {
@@ -86,7 +84,6 @@ fun SessionDoseSection(
                         modifier = Modifier.padding(12.dp).fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Route color indicator
                         Surface(
                             modifier = Modifier.size(4.dp, 40.dp),
                             shape = RoundedCornerShape(2.dp),
@@ -144,7 +141,6 @@ fun SessionDoseSection(
         }
     }
 
-    // Interaction warnings for combined substances
     if (interactionCheckResult.hasIssues || interactionCheckResult.uncertain.isNotEmpty()) {
         InteractionWarnings(
             result = interactionCheckResult,

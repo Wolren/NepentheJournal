@@ -32,7 +32,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, ".."))
 
 RELEASE_ASSETS = [
-    # (relative_path, label)
     ("schemas/journal-snapshot-v5.json", "JSON Schema"),
     ("scripts/seed.json", "Substance database (JournalSnapshot v3)"),
     ("docs/journal-snapshot-spec.md", "Field dictionary"),
@@ -89,7 +88,6 @@ def build_tarball(version: str, output_dir: str) -> str:
     with tarfile.open(tarball_path, "w:gz") as tar:
         for rel_path, _label in RELEASE_ASSETS:
             full = os.path.join(ROOT, rel_path)
-            # Store in tar with prefix: nepenthe-data-{version}/{rel_path}
             arcname = f"nepenthe-data-{version}/{rel_path}"
             tar.add(full, arcname=arcname)
 
@@ -104,7 +102,6 @@ def copy_to_dist(version: str, output_dir: str):
     for rel_path, _label in RELEASE_ASSETS:
         full = os.path.join(ROOT, rel_path)
         dest = os.path.join(dist_dir, os.path.basename(rel_path))
-        # Avoid overwriting when two source paths have the same basename
         if os.path.exists(dest) and os.path.abspath(full) != os.path.abspath(dest):
             # Disambiguate by using the parent dir name
             parent = os.path.basename(os.path.dirname(rel_path))
@@ -147,7 +144,6 @@ def main():
     print(f"Commit: {commit}")
     print()
 
-    # Regenerate pharmacology CSVs unless skipped
     if not args.skip_export:
         print("Regenerating pharmacology CSVs...")
         subprocess.run(
@@ -157,7 +153,6 @@ def main():
         )
         print()
 
-    # Check assets
     missing = ensure_assets_exist()
     if missing:
         print("ERROR: missing assets:")
@@ -165,17 +160,14 @@ def main():
             print(f"  {m}")
         sys.exit(1)
 
-    # Build tarball
     tarball = build_tarball(version, args.output_dir)
     print(f"Tarball: {tarball}")
     tarball_size = os.path.getsize(tarball)
     print(f"  Size: {tarball_size:,} bytes ({tarball_size / 1024 / 1024:.1f} MB)")
 
-    # Copy individual files
     dist_dir = copy_to_dist(version, args.output_dir)
     print(f"Dist dir: {dist_dir}")
 
-    # Print asset manifest for CI
     print()
     print("=== Asset Manifest ===")
     for rel_path, label in RELEASE_ASSETS:

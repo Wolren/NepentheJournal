@@ -1,7 +1,6 @@
 package app.journal.model
 import kotlinx.serialization.Serializable
 
-/** Conflict: REMOTE_SOURCE_WINS */
 @Serializable
 data class Effect(
     override val id: String,

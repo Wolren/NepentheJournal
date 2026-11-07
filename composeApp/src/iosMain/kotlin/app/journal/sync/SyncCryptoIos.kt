@@ -24,9 +24,7 @@ import app.journal.util.PlatformLock
  * SyncCryptoJvm.kt.
  */
 
-// ========================================================================
-// PBKDF2 key derivation (with the JVM-mirrored derived-key cache)
-// ========================================================================
+// ======================================================================== PBKDF2 key derivation (with the JVM-mirrored derived-key cache) ========================================================================
 
 /**
  * Derived AES key cache, mirroring jvmMain SyncCryptoJvm byte for byte in
@@ -53,7 +51,6 @@ private val aesKeyCache = mutableMapOf<String, ByteArray>()
 private val aesKeyCacheLock = PlatformLock()
 private const val MAX_CACHED_AES_KEYS = 64
 
-/** Drop every cached AES key; see [aesKeyCache] for when to call this. */
 fun clearAesKeyCache() {
     aesKeyCacheLock.withLock { aesKeyCache.clear() }
 }
@@ -91,9 +88,7 @@ actual fun aesEncryptionKey(password: String): ByteArray {
     return derivedKey
 }
 
-// ========================================================================
-// AES-256-GCM encrypt
-// ========================================================================
+// ======================================================================== AES-256-GCM encrypt ========================================================================
 
 actual fun encryptBody(body: String, key: ByteArray): ByteArray {
     require(key.size == 32) { "AES-256 key must be 32 bytes, got ${key.size}" }
@@ -103,9 +98,6 @@ actual fun encryptBody(body: String, key: ByteArray): ByteArray {
     val ciphertext = ByteArray(plaintext.size) // GCM output len == plaintext len
     val tag = ByteArray(16) // 128-bit GCM authentication tag
 
-    // Generate random IV via Security framework (crypto-secure random).
-    // Check the status exactly like secureRandomBytes does: an unfilled IV
-    // is all zeros, and reusing one GCM nonce would be catastrophic.
     iv.usePinned { ivPinned ->
         check(SecRandomCopyBytes(null, iv.size.toULong(), ivPinned.addressOf(0)) == 0) {
             "SecRandomCopyBytes failed"
@@ -140,9 +132,7 @@ actual fun encryptBody(body: String, key: ByteArray): ByteArray {
     return iv + ciphertext + tag
 }
 
-// ========================================================================
-// AES-256-GCM decrypt
-// ========================================================================
+// ======================================================================== AES-256-GCM decrypt ========================================================================
 
 actual fun decryptBody(data: ByteArray, key: ByteArray): String {
     require(key.size == 32) { "AES-256 key must be 32 bytes, got ${key.size}" }

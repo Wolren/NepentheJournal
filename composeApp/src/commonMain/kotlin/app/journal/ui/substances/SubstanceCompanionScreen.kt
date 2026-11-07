@@ -42,9 +42,6 @@ fun SubstanceCompanionScreen(
     val sessions by repo.sessions.collectAsState()
     val toleranceVersion by repo.toleranceVersion.collectAsState()
     val calculator = remember { ToleranceCalculator(repo) }
-    // Substance lookup from the repo's id -> substance flow; the store fallback
-    // keeps the first frame correct before the flow's first emission, and a
-    // genuinely missing id still reaches the not-found box below.
     val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
     val substance = substancesById[substanceId] ?: repo.getSubstance(substanceId)
 
@@ -53,10 +50,7 @@ fun SubstanceCompanionScreen(
         return
     }
 
-    // Doses of this substance only: the repo flow is deduplicated, so edits to
-    // other substances stop invalidating this screen. Seeded synchronously so
-    // the first frame and a substanceId switch never render an empty or stale
-    // list while the flow's first emission is in flight.
+    // Seeded synchronously so the first frame and a substanceId switch never render an empty or stale list
     var dosesForSubstance by remember(repo, substanceId) {
         mutableStateOf(repo.doses.value.filter { it.substanceId == substanceId })
     }
@@ -76,13 +70,11 @@ fun SubstanceCompanionScreen(
     val totalSessionCount = sortedSessions.size
     val totalDoseCount = dosesForSubstance.size
 
-    // Cumulative lifetime amount grouped by unit
     val amountsByUnit = remember(dosesForSubstance) {
         dosesForSubstance.groupBy { it.unit }
             .mapValues { (_, ds) -> ds.sumOf { it.amount } }
     }
 
-    // Tolerance info
     val toleranceInfo = remember(substanceId, toleranceVersion) {
         calculator.calculate()
             .find { it.substanceId == substanceId }
@@ -92,7 +84,6 @@ fun SubstanceCompanionScreen(
         title = substance.name,
         onBack = onBack,
     ) {
-        // Summary stats row
         item {
             Card(
                 colors = CardDefaults.cardColors(
@@ -125,7 +116,6 @@ fun SubstanceCompanionScreen(
             }
         }
 
-        // Route frequency breakdown
         if (dosesForSubstance.isNotEmpty()) {
             item {
                 val routeFrequency = remember(dosesForSubstance) {
@@ -172,7 +162,6 @@ fun SubstanceCompanionScreen(
             }
         }
 
-        // Dose Amounts trend chart
         if (dosesForSubstance.isNotEmpty()) {
             item {
                 SectionCard(title = "Dose Amounts") {
@@ -186,9 +175,7 @@ fun SubstanceCompanionScreen(
                         lastDoses.maxOfOrNull { it.amount } ?: 1.0
                     }
 
-                    // Unit colors derived from the theme accents.
                     val palette = chartSeriesColors(6)
-                    // Color per unit
                     val unitColors = remember(lastDoses, palette) {
                         val units = lastDoses.map { it.unit }.distinct()
                         units.mapIndexed { i, u -> u to palette[i % palette.size] }.toMap()
@@ -197,7 +184,6 @@ fun SubstanceCompanionScreen(
                     val tz = TimeZone.currentSystemDefault()
 
                     Column {
-                        // Bar chart
                         Canvas(modifier = Modifier.fillMaxWidth().height(100.dp)) {
                             val w = size.width
                             val h = size.height
@@ -221,7 +207,6 @@ fun SubstanceCompanionScreen(
                             }
                         }
 
-                        // Date labels (first, middle, last)
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -251,7 +236,6 @@ fun SubstanceCompanionScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                         }
 
-                        // Unit legend
                         if (unitColors.size > 1) {
                             Spacer(Modifier.height(4.dp))
                             Row(
@@ -279,7 +263,6 @@ fun SubstanceCompanionScreen(
             }
         }
 
-        // Tolerance section
         if (toleranceInfo != null) {
             item {
                 Card(
@@ -318,7 +301,6 @@ fun SubstanceCompanionScreen(
             }
         }
 
-        // Sessions list header
         if (sortedSessions.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(4.dp))
@@ -331,7 +313,6 @@ fun SubstanceCompanionScreen(
             }
         }
 
-        // Session cards
         items(sortedSessions, key = { it.id }) { session ->
             val doseCountForSession = remember(session.id, dosesForSubstance) {
                 dosesForSubstance.count { it.sessionId == session.id }

@@ -25,10 +25,7 @@ class JournalStoreTest {
 
     @Test
     fun v5EraFixtureLoadsCleanlyAsGoldenFile() = withTempHome { _ ->
-        // Minimal old-shape (v5-era) snapshot: no persons/tombstones/
-        // ratingScaleMode/welcomeCompleted/seedFingerprint, and entities still
-        // carry the legacy docType key the serializer no longer writes. It must
-        // decode as-is (all newer fields default) without tripping recovery.
+        // Minimal old-shape (v5-era) snapshot: no persons/tombstones/ratingScaleMode/welcomeCompleted/seedFingerprint, and entities still carry the legacy docType key the serializer no longer writes.
         val fixture = """
             {"version":5,"savedAt":1700000000000,
              "sessions":[{"id":"s:v5","docType":"session","createdAt":1690000000000,
@@ -50,15 +47,12 @@ class JournalStoreTest {
         assertEquals(1, repo.sessions.value.size)
         assertEquals("V5 Session", repo.sessions.value.first().title)
         assertEquals(1, repo.substances.value.size)
-        // Store must stay fully usable afterwards
         store.save()
         assertTrue(java.io.File(store.dataPath()).readText().contains("V5 Session"))
     }
 
     @Test
     fun unknownFutureSnapshotVersionLoadsBestEffort() = withTempHome { _ ->
-        // Version dispatch: unknown/newer versions warn but still apply
-        // (identity arm today). The file shape is otherwise current.
         val repo0 = JournalRepository()
         repo0.upsertSession(Session(
             id = "s:future", createdAt = 1700000000000L, updatedAt = 1700000000000L,
@@ -191,7 +185,6 @@ class JournalStoreTest {
         val bak2 = File("$path.bak.2")
         assertTrue(bak1.exists(), ".bak.1 should exist after 3 saves")
         assertTrue(bak2.exists(), ".bak.2 should exist after 3 saves")
-        // Verify .bak is also present
         assertTrue(File("$path.bak").exists(), ".bak immediate-previous should exist after 3 saves")
         // Verify content rotation: .bak.2 holds the first save (Session 1)
         assertTrue(bak2.readText().contains("Session 1"), ".bak.2 should contain first-save data")
@@ -218,14 +211,12 @@ class JournalStoreTest {
         store.save()
         val bak1Before = File("$path.bak.1").readText()
 
-        // A light save (sync persist path) must update the main file...
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Synced", startTime = 2000L
         ))
         store.save(fullBackup = false)
         assertTrue(File(path).readText().contains("Synced"), "main file must contain light-saved data")
-        // ...but must NOT rotate the backup chain (that is the autosave's job)
         assertEquals(bak1Before, File("$path.bak.1").readText(), "light save must not touch .bak.1")
         // After two full saves only .bak.1 exists; a light save must not advance the chain
         assertFalse(File("$path.bak.2").exists(), "light save must not create new backup slots")
@@ -268,7 +259,6 @@ class JournalStoreTest {
         assertTrue(files[0].name.matches(Regex("""\d{8}_\d{6}\.json""")),
             "Auto-backup file should match YYYYMMDD_HHmmss.json pattern: ${files[0].name}")
         assertTrue(files[0].length() > 0, "Auto-backup should not be empty")
-        // Verify backup is a valid journal JSON (contains the session title)
         assertTrue(files[0].readText().contains("AutoSave Test"),
             "Auto-backup content should contain saved session data")
     }
@@ -285,7 +275,6 @@ class JournalStoreTest {
         val store = JournalStore(repo)
         store.save()
 
-        // Second save with updated data
         repo.upsertSubstance(Substance(
             id = "sub:2", name = "LSD", createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
             substanceClass = listOf("Classical Psychedelic"), routesOfAdministration = listOf("Oral"),
@@ -294,7 +283,6 @@ class JournalStoreTest {
         ))
         store.save()
 
-        // Reload: should get both substances
         val repo2 = JournalRepository()
         val store2 = JournalStore(repo2)
         store2.load()
@@ -317,11 +305,6 @@ class JournalStoreTest {
         store.save()
         assertTrue(File(path).exists(), "Data file should exist after save")
 
-        // Phase A: a save that cannot even write its temp file (.tmp is a directory
-        // here) must fail without touching the journal - on every platform. Blocking
-        // the rename with a read-only target instead would only produce a real
-        // failure on Windows: POSIX rename ignores the target's mode, so there the
-        // "failed" save would silently succeed and this test would prove nothing.
         val tmp = File("$path.tmp")
         assertTrue(tmp.mkdirs(), "fixture: .tmp must be a directory that blocks the write")
         repo.upsertSession(Session(
@@ -336,11 +319,6 @@ class JournalStoreTest {
                 "not a truncated, empty or mixed file")
         assertTrue(tmp.deleteRecursively(), "fixture cleanup: the .tmp blocker must be removable")
 
-        // Phase B: read-only target exercises the production rename-fallback retry
-        // loop where the platform honours the flag (Windows: rename onto a read-only
-        // file fails, then the direct write fails all three attempts). POSIX ignores
-        // the flag, so the only assertion here is the invariant that holds either
-        // way: the journal must stay a complete, decodable snapshot.
         val dataFile = File(path)
         dataFile.setWritable(false)
         store.save() // Must not throw
@@ -348,7 +326,6 @@ class JournalStoreTest {
         assertTrue(afterReadOnly.sessions.isNotEmpty(),
             "the journal must never be emptied or truncated by a failed save")
 
-        // Make file writable again and save: should succeed
         dataFile.setWritable(true)
         store.save()
 
@@ -380,7 +357,7 @@ class JournalStoreTest {
         assertEquals(15, autoDir.listFiles()?.size ?: 0,
             "Should have 15 pre-existing auto-backups")
 
-        // triggerAutoBackup creates ONE more (16 total) then rotates to 10
+        // triggerAutoBackup creates one more (16 total) then rotates to 10
         store.triggerAutoBackup()
 
         val remaining = autoDir.listFiles()
@@ -389,7 +366,6 @@ class JournalStoreTest {
             ?: emptyList()
         assertEquals(10, remaining.size,
             "Should keep exactly 10 auto-backups after rotation")
-        // The newest file should be the one just created (YYYYMMDD_HHmmss.json pattern)
         assertTrue(remaining.first().name.matches(Regex("""\d{8}_\d{6}\.json""")),
             "Newest file should be the freshly created auto-backup: ${remaining.first().name}")
     }
@@ -402,31 +378,25 @@ class JournalStoreTest {
             title = "Original Data", startTime = 1000L
         ))
         val store = JournalStore(repo)
-        // First save creates the file; second save creates .bak
         store.save()
         store.save()
 
-        // Verify .bak was created
         val bakFile = File(store.dataPath() + ".bak")
         assertTrue(bakFile.exists(), ".bak should exist after save")
 
-        // Corrupt the main data file
         val dataFile = File(store.dataPath())
         dataFile.writeText("CORRUPTED DATA {{{")
         assertTrue(dataFile.readText().contains("CORRUPTED"),
             "Main file should be corrupted for test")
 
-        // Restore from backup
         val restored = store.restoreFromBackup()
         assertTrue(restored, "restoreFromBackup should return true")
 
-        // Verify data was loaded correctly into repo
         assertEquals(1, repo.sessions.value.size,
             "Should have 1 session after restore")
         assertEquals("Original Data", repo.sessions.value.first().title,
             "Session title should match original data")
 
-        // Verify main file is no longer corrupted
         assertFalse(dataFile.readText().contains("CORRUPTED"),
             "Main file should not contain corrupted data after restore")
         assertTrue(dataFile.readText().contains("Original Data"),
@@ -439,7 +409,6 @@ class JournalStoreTest {
         val store = JournalStore(repo)
         val path = store.dataPath()
 
-        // Save once, then plant a stale tmp as if the process died mid-save
         repo.upsertSession(Session(
             id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Survivor", startTime = 1000L
@@ -460,8 +429,6 @@ class JournalStoreTest {
         val store = JournalStore(repo)
         val path = store.dataPath()
 
-        // Write a file that is valid JSON at the start but cut mid-structure,
-        // simulating a torn write that the atomic rename failed to prevent
         File(path).parentFile.mkdirs()
         val full = """{"schemaVersion":2,"sessions":[{"id":"s:1","title":"Torn","startTime":1000}"""
         File(path).writeText(full)
@@ -469,7 +436,6 @@ class JournalStoreTest {
         store.load()
         assertTrue(store.lastLoadHadIssues,
             "lastLoadHadIssues should be true after loading truncated JSON")
-        // The store must remain fully usable after recovery: no crash on save
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "PostRecovery", startTime = 2000L
@@ -501,19 +467,13 @@ class JournalStoreTest {
             store.save()
         }
 
-        // Verify all backup files exist
         assertTrue(File("$path.bak").exists(), ".bak should exist after 6 saves")
         for (i in 1..5) {
             val bakFile = File("$path.bak.$i")
             assertTrue(bakFile.exists(), ".bak.$i should exist after 6 saves")
         }
 
-        // Verify each backup decodes as a real journal snapshot, not merely as
-        // parseable JSON (a assertNotNull on parseToJsonElement can never fail:
-        // it throws on bad input instead of returning null). The rotation is
-        // deterministic: at save k the chain shifts .bak.(n) <- .bak.(n-1) and
-        // then copies the target - the state after save k-1 - into .bak.1/.bak,
-        // so after the 6th save .bak/.bak.1 hold S5, .bak.2 holds S4, ... .bak.5 S1.
+        // The rotation is deterministic: at save k the chain shifts .bak.(n) <- .bak.(n-1) and then copies the target
         val expectedSessionsBySlot = linkedMapOf(
             ".bak" to 5, ".bak.1" to 5, ".bak.2" to 4, ".bak.3" to 3, ".bak.4" to 2, ".bak.5" to 1
         )
@@ -523,7 +483,6 @@ class JournalStoreTest {
                 "$slot must hold exactly the snapshot written by the save that created it")
         }
 
-        // Verify the main file is a complete snapshot of the last save
         val mainSnapshot = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readText())
         assertEquals(6, mainSnapshot.sessions.size, "main file must hold all six saved sessions")
         assertTrue(mainSnapshot.sessions.any { it.title == "Session 6" },
@@ -540,23 +499,18 @@ class JournalStoreTest {
             cachedAt = 0L, sourceVersion = "test"
         ))
         val store = JournalStore(repo)
-        // Save twice: first creates file, second creates .bak
         store.save()
         store.save()
         val path = store.dataPath()
 
-        // Verify the main file contains valid data before corruption
         assertTrue(File(path).readText().contains("LSD"),
             "Main file should contain saved substance before corruption")
 
-        // Corrupt the main journal file with garbage text
         File(path).writeText("NOT VALID JSON {{corrupted data")
 
-        // Attempt restore from backup
         val restored = store.restoreFromBackup()
         assertTrue(restored, "restoreFromBackup should return true when .bak is available")
 
-        // Verify data is intact after restore by loading a fresh store
         val repo2 = JournalRepository()
         val store2 = JournalStore(repo2)
         store2.load()
@@ -574,11 +528,9 @@ class JournalStoreTest {
         val store = JournalStore(repo)
         val path = store.dataPath()
 
-        // Write invalid JSON directly to the data file
         File(path).parentFile.mkdirs()
         File(path).writeText("{corrupt json!!!}}")
 
-        // Load should attempt recovery and set lastLoadHadIssues
         store.load()
         assertTrue(store.lastLoadHadIssues,
             "lastLoadHadIssues should be true after loading corrupt file")
@@ -588,9 +540,7 @@ class JournalStoreTest {
 
     @Test
     fun missingMainFileRecoversFromCleanBakWithoutIssueFlags() = withTempHome { _ ->
-        // Clean .bak + missing main (the audit C3 crash shape): the backup
-        // is a complete restore, so the recovery must load it and leave the
-        // issue flags untouched.
+        // Clean .bak + missing main (the audit C3 crash shape): the backup is a complete restore
         val source = JournalRepository()
         source.upsertSession(Session(
             id = "s:bak", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
@@ -619,8 +569,6 @@ class JournalStoreTest {
 
     @Test
     fun missingMainFileWithGarbageBakSetsPartialRecoveryFlags() = withTempHome { _ ->
-        // Missing main + garbage .bak: nothing decodes, so the salvage path
-        // runs and the issue flags must be set (store stays usable).
         val repo = JournalRepository()
         val store = JournalStore(repo)
         val path = store.dataPath()
@@ -637,7 +585,6 @@ class JournalStoreTest {
         assertTrue(repo.sessions.value.isEmpty(),
             "garbage yields no sessions (partial salvage of a non-JSON body)")
 
-        // The store must remain fully usable after the failed recovery.
         repo.upsertSession(Session(
             id = "s:after", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "PostRecovery", startTime = 5000L
@@ -653,7 +600,6 @@ class JournalStoreTest {
         val store = JournalStore(repo)
         val path = store.dataPath()
 
-        // Add some starting data
         repo.upsertSession(Session(
             id = "s:1", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Initial", startTime = 1000L
@@ -678,26 +624,17 @@ class JournalStoreTest {
         t1.join()
         t2.join()
 
-        // The file must be a complete, decodable journal snapshot after both
-        // saves. (The old assertNotNull(json.parseToJsonElement(...)) could not
-        // assert anything: that call throws on bad input instead of returning
-        // null, so it was a no-op dressed up as an assertion.)
+        // (The old assertNotNull(json.parseToJsonElement(...)) could not assert anything: that call throws on bad input instead of returning null).
         val content = File(path).readText()
         val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(content)
 
-        // Verify data loads without error
         val repo2 = JournalRepository()
         val store2 = JournalStore(repo2)
         store2.load()
         assertFalse(store2.lastLoadHadIssues,
             "No load issues after concurrent saves")
 
-        // save() takes the store lock and snapshots the shared repo, so the file
-        // ends up holding whichever save ran last, and that save ran after its own
-        // thread's upsert. Therefore the seed session (written before either thread
-        // started) can never be lost, and at least one racing session must be in the
-        // final snapshot. The exact count is not pinned (2 or 3 depending on order),
-        // but "the seed alone", which the old `size >= 1` accepted, is not possible.
+        // The exact count isn't pinned (2 or 3 by order), but "the seed alone" (old size >= 1) isn't possible.
         val titles = repo2.sessions.value.map { it.title }
         assertTrue("Initial" in titles, "the seed session must survive concurrent saves")
         assertTrue(titles.any { it == "Thread A" || it == "Thread B" },

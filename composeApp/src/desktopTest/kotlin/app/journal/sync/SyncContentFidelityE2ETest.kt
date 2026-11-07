@@ -85,9 +85,6 @@ class SyncContentFidelityE2ETest {
         clientDir.deleteRecursively()
     }
 
-    // ------------------------------------------------------------------
-    // Fixture
-    // ------------------------------------------------------------------
 
     private data class Pairing(
         val hostRepo: JournalRepository,
@@ -145,7 +142,6 @@ class SyncContentFidelityE2ETest {
         Pairing(hRepo, cRepo, hTransport, cTransport, port)
     }
 
-    /** One trusted client-initiated cycle: push client changes, pull host changes. */
     private fun Pairing.trustedCycle() = runBlocking {
         val trusted = clientTransport.trustedDevices()
         assertTrue(trusted.isNotEmpty(), "fixture: the client must already trust the host")
@@ -167,15 +163,11 @@ class SyncContentFidelityE2ETest {
         )
     }
 
-    /** Strictly greater than the client's current cursor: visible NEXT cycle. */
     private fun Pairing.nextCursorStamp(offsetMs: Long = 10L): Long {
         val cursor = assertNotNull(clientTransport.lastSyncTime, "fixture: a cursor must exist")
         return cursor + offsetMs
     }
 
-    // ------------------------------------------------------------------
-    // Entity builders — every field populated so a lost field breaks equality
-    // ------------------------------------------------------------------
 
     private fun session(id: String, title: String, updatedAt: Long) = Session(
         id = id, createdAt = updatedAt, updatedAt = updatedAt, deviceOrigin = "test",
@@ -262,7 +254,6 @@ class SyncContentFidelityE2ETest {
         medications = "None", contactEmail = "a@b.invalid", mayContact = true, isSelf = true
     )
 
-    /** Seed one of every syncable entity plus a device-local Person. */
     private fun seedFullLibrary(repo: JournalRepository, updatedAt: Long) {
         repo.upsertSession(session("s:one", "Seeded session", updatedAt))
         repo.upsertSubstance(substance("sub:one", "Seeded substance", updatedAt))
@@ -276,9 +267,6 @@ class SyncContentFidelityE2ETest {
         repo.upsertPerson(person("p:one"))
     }
 
-    // ------------------------------------------------------------------
-    // Assertions
-    // ------------------------------------------------------------------
 
     private fun assertSameList(
         label: String,
@@ -292,7 +280,6 @@ class SyncContentFidelityE2ETest {
         )
     }
 
-    /** Whole-library equality across the eight synced collections. */
     private fun assertSameLibrary(hostRepo: JournalRepository, clientRepo: JournalRepository) {
         assertSameList("sessions", hostRepo.sessions.value, clientRepo.sessions.value) { (it as Session).id }
         assertSameList("doses", hostRepo.doses.value, clientRepo.doses.value) { (it as Dose).id }
@@ -310,16 +297,13 @@ class SyncContentFidelityE2ETest {
         ) { (it as CustomUnit).id }
     }
 
-    // ------------------------------------------------------------------
-    // 1. Fidelity
-    // ------------------------------------------------------------------
+    // ---- 1: Fidelity
 
     @Test
     fun everySyncedEntityTypeCrossesTheWireFieldForField() {
         val seedAt = System.currentTimeMillis()
         val t = pair(seedHost = { seedFullLibrary(it, seedAt) })
 
-        // --- sessions ---
         val gotSession = t.clientRepo.sessions.value.singleOrNull { it.id == "s:one" }
         assertNotNull(gotSession, "the session must arrive on the client")
         assertEquals(
@@ -327,7 +311,6 @@ class SyncContentFidelityE2ETest {
             "every Session field must survive the round trip"
         )
 
-        // --- substances ---
         for (id in listOf("sub:one", "sub:two")) {
             val expected = t.hostRepo.substances.value.single { it.id == id }
             assertEquals(
@@ -336,7 +319,6 @@ class SyncContentFidelityE2ETest {
             )
         }
 
-        // --- doses (and their index linkage) ---
         assertEquals(
             t.hostRepo.doses.value.single { it.id == "d:one" },
             t.clientRepo.doses.value.singleOrNull { it.id == "d:one" },
@@ -347,7 +329,6 @@ class SyncContentFidelityE2ETest {
             "the client's session->dose index must be rebuilt from the pulled dose"
         )
 
-        // --- effects / interactions / notes / timeline events / custom units ---
         assertEquals(
             t.hostRepo.effects.value.single { it.id == "fx:one" },
             t.clientRepo.effects.value.singleOrNull { it.id == "fx:one" },
@@ -374,25 +355,20 @@ class SyncContentFidelityE2ETest {
             "every CustomUnit field must survive the round trip"
         )
 
-        // Derived, not just raw storage: the pulled content must be usable.
         assertEquals(1, t.clientRepo.notesForSession("s:one").size,
             "the client's session->note index must be rebuilt from the pulled note")
         assertEquals(1, t.clientRepo.eventsForSession("s:one").size,
             "the client's session->timeline index must be rebuilt from the pulled events")
 
-        // --- device-local data must NOT replicate ---
         assertEquals(
             emptyList<Person>(), t.clientRepo.persons.value,
             "Persons are device-local profile data and must never replicate to a peer"
         )
 
-        // And the host must be untouched by its own seed.
         assertSameLibrary(t.hostRepo, t.clientRepo)
     }
 
-    // ------------------------------------------------------------------
-    // 2. Convergence
-    // ------------------------------------------------------------------
+    // ---- 2: Convergence
 
     @Test
     fun offlineEditsOnBothSidesConvergeAndStayConverged() {
@@ -403,7 +379,6 @@ class SyncContentFidelityE2ETest {
         )
         assertSameLibrary(t.hostRepo, t.clientRepo)
 
-        // ---- offline window: both devices edit with no connection open ----
         val stamp = t.nextCursorStamp()
         t.clientRepo.upsertSession(session("s:client", "ClientSession v2", stamp + 10))
         t.clientRepo.upsertSession(session("s:new-client", "FromClient", stamp + 20))
@@ -412,8 +387,6 @@ class SyncContentFidelityE2ETest {
 
         t.trustedCycle()
 
-        // ONE cycle carries both directions: the client pushes its two edits
-        // and pulls the host's two edits from the same cursor.
         assertSameLibrary(t.hostRepo, t.clientRepo)
         assertEquals(
             "ClientSession v2",
@@ -426,7 +399,7 @@ class SyncContentFidelityE2ETest {
             "a host edit made while disconnected must land on the client"
         )
 
-        // ---- a host edit made AFTER cycle 1 returned must reach cycle 2 ----
+        // ---- a host edit made after cycle 1 returned must reach cycle 2
         val secondStamp = t.nextCursorStamp()
         t.hostRepo.upsertSession(session("s:host", "HostSession v3", secondStamp + 10))
         t.trustedCycle()
@@ -438,14 +411,11 @@ class SyncContentFidelityE2ETest {
         )
         assertSameLibrary(t.hostRepo, t.clientRepo)
 
-        // ---- idempotence: a cycle with nothing new changes nothing ----
         t.trustedCycle()
         assertSameLibrary(t.hostRepo, t.clientRepo)
     }
 
-    // ------------------------------------------------------------------
-    // 3. Deletion
-    // ------------------------------------------------------------------
+    // ---- 3: Deletion
 
     @Test
     fun deletesPropagateInBothDirectionsAndDoNotResurrect() {
@@ -460,21 +430,12 @@ class SyncContentFidelityE2ETest {
         assertEquals(3, t.clientRepo.sessions.value.size, "fixture: all three sessions arrive")
         assertEquals(3, t.hostRepo.sessions.value.size, "fixture")
 
-        // Tombstones are compared against the client's cursor, so the delete
-        // must happen after that cursor was taken. Pairing just finished a
-        // network round trip, so the clock has advanced past it; the sleep
-        // only guards the same-millisecond edge.
         Thread.sleep(5)
 
-        // Fixture precondition, spelled out: the pull below is requested with
-        // the client's CURRENT cursor, so the tombstone has to be newer than
-        // that cursor or the host would legitimately omit it and the assertion
-        // would fail for a clock reason rather than a propagation reason.
         val cursorBeforeHostDelete = assertNotNull(
             t.clientTransport.lastSyncTime, "fixture: pairing must have left a cursor"
         )
 
-        // ---- host -> client (travels on the PULL half) ----
         t.hostRepo.deleteSession("s:host-del")
         assertTrue(
             t.hostRepo.deletedIdsSince(cursorBeforeHostDelete).deletedSessionIds
@@ -489,7 +450,6 @@ class SyncContentFidelityE2ETest {
         assertTrue(t.clientRepo.sessions.value.any { it.id == "s:keep" }, "survivor intact on client")
         assertTrue(t.clientRepo.sessions.value.any { it.id == "s:both" }, "fixture intact on client")
 
-        // ---- client -> host (travels on the PUSH half) ----
         Thread.sleep(5)
         t.clientRepo.deleteSession("s:both")
         t.trustedCycle()
@@ -499,7 +459,6 @@ class SyncContentFidelityE2ETest {
         )
         assertTrue(t.hostRepo.sessions.value.any { it.id == "s:keep" }, "survivor intact on host")
 
-        // ---- no resurrection: an idle repeat cycle must not bring either back ----
         t.trustedCycle()
         assertSameLibrary(t.hostRepo, t.clientRepo)
         for (id in listOf("s:host-del", "s:both")) {
@@ -522,9 +481,7 @@ class SyncContentFidelityE2ETest {
         )
     }
 
-    // ------------------------------------------------------------------
-    // 4. Note conflict: no user body may ever be destroyed
-    // ------------------------------------------------------------------
+    // ---- 4: Note conflict: no user body may ever be destroyed
 
     @Test
     fun divergentNoteEditsKeepBothBodiesAndSurfaceAPendingConflict() = runBlocking {
@@ -538,9 +495,6 @@ class SyncContentFidelityE2ETest {
         assertEquals("host-original", t.clientRepo.notes.value.single { it.id == "n:one" }.body,
             "fixture: the note arrives on the client")
 
-        // Both devices edit the same note while offline. The client's edit is
-        // strictly newer, so it wins on the host and the host's body must be
-        // preserved as a conflict sibling rather than dropped.
         val stamp = t.nextCursorStamp()
         t.hostRepo.upsertNote(note("n:one", "s:one", "host-edit", stamp + 50))
         t.clientRepo.upsertNote(note("n:one", "s:one", "client-edit", stamp + 100))
@@ -563,13 +517,11 @@ class SyncContentFidelityE2ETest {
             "the host must surface exactly one pending conflict"
         )
 
-        // The client converges on the winner without losing anything either.
         assertEquals(
             "client-edit", t.clientRepo.notes.value.single { it.id == "n:one" }.body,
             "the client must converge on the winning body"
         )
 
-        // Repeat cycle: the merge is idempotent, the conflict count must not grow.
         t.trustedCycle()
         assertEquals(
             1, t.hostRepo.pendingConflictCount.first(),

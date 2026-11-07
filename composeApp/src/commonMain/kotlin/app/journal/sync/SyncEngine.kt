@@ -15,7 +15,6 @@ interface SyncEngine {
     suspend fun startHosting(config: SyncConfig): Result<HostingInfo>
     suspend fun stopHosting()
 
-    /** Bulk HTTP sync: push local changes since [since], pull remote changes. */
     suspend fun syncWith(peer: DiscoveredPeer, continuous: Boolean = false): Result<Unit>
 
     /**
@@ -25,34 +24,24 @@ interface SyncEngine {
      */
     suspend fun startContinuousSync(peer: DiscoveredPeer)
 
-    /** Disconnect a continuous sync session. */
     suspend fun stopContinuousSync(deviceId: String)
 
-    /** Disconnect from a peer (both HTTP and WebSocket). */
     suspend fun disconnectFrom(deviceId: String)
 
-    /** Revoke a previously paired device. */
     suspend fun revokeTrustedDevice(deviceId: String) {}
 
-    /** List trusted paired devices. */
     fun trustedDevices(): List<TrustedDeviceInfo> = emptyList()
 
-    /** Start LAN discovery for nearby devices. */
     fun startDiscovery(mode: DiscoveryMode): Flow<LanDiscoveryEvent>
 
-    /** Stop LAN discovery. */
     suspend fun stopDiscovery()
 
-    /** Connect to a manually entered IP:port. */
     suspend fun connectManually(host: String, port: Int, token: String?): Result<Unit>
 
-    /** Observe overall sync status. */
     fun observeStatus(): Flow<SyncStatusSnapshot>
 
-    /** Observe LAN-discovered peers from mDNS scanning. */
     fun observeDiscoveredPeers(): Flow<List<DiscoveredPeer>> = emptyFlow()
 
-    /** Observe debug log lines from sync operations. */
     fun observeDebugLog(): Flow<String> = emptyFlow()
 }
 
@@ -74,7 +63,6 @@ data class SyncStatusSnapshot(
     val pendingConflicts: Int,
     val lastError: String?,
     val pairingToken: String? = null,
-    /** Epoch milliseconds when [pairingToken] expires. Null if no token is active. */
     val tokenExpiresAt: Long? = null,
     val pairedDeviceCount: Int = 0,
     val continuousPeers: Int = 0,

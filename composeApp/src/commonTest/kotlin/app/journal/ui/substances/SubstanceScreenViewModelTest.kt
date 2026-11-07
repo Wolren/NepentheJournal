@@ -13,7 +13,6 @@ class SubstanceScreenViewModelTest {
 
     private fun makeRepo(): JournalRepository {
         val repo = JournalRepository()
-        // Substance with data: appears in "real" list
         repo.upsertSubstance(Substance(
             id = "cid:1", name = "LSD", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("Classical Psychedelic"),
@@ -26,7 +25,6 @@ class SubstanceScreenViewModelTest {
             routesOfAdministration = listOf("Oral"), effects = emptyList(),
             dosageBands = emptyMap(), cachedAt = 0L, sourceVersion = "test"
         ))
-        // Category-only entry: filtered out by realSubstances
         repo.upsertSubstance(Substance(
             id = "cid:3", name = "Stimulants", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("Stimulant"),
@@ -222,7 +220,6 @@ class SubstanceScreenViewModelTest {
                 ),
             ),
         ))
-        // The plant carries no assay rows; only the name marks it.
         repo.upsertSubstance(Substance(
             id = "cid:11", name = "Salvia divinorum", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("atypical hallucinogen", "furanolactone", "hallucinogen"),

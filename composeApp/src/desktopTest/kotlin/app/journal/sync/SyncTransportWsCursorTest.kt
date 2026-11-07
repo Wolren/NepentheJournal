@@ -55,7 +55,6 @@ class SyncTransportWsCursorTest {
 
     @Test
     fun wsAckErrorHoldsCursorAndNextValidDeltaStillLands() = runBlocking {
-        // --- Server side ------------------------------------------------ ---
         val serverRepo = JournalRepository()
         val serverTrust = DeviceTrustStore(serverDir.absolutePath)
         val serverAuth = SyncAuthenticator(serverTrust)
@@ -70,8 +69,6 @@ class SyncTransportWsCursorTest {
         val info = server.start()
         val port = info.port
 
-        // --- Client side: pre-seed identity BEFORE the transport so the
-        // derived device id is known, then trust both directions. ----------
         val clientFingerprint = TlsIdentityManager(clientDir.absolutePath).ensureIdentity()
         val clientId = "device-${clientFingerprint.take(16)}"
 
@@ -99,7 +96,7 @@ class SyncTransportWsCursorTest {
         assertEquals(clientId, transport.deviceId,
             "pre-generated identity must reproduce the transport's device id")
 
-        // Subscribe to the replayed debug log BEFORE connecting: replay = 200.
+        // Subscribe to the replayed debug log before connecting: replay = 200.
         val debugLines = mutableListOf<String>()
         val collector = launch {
             transport.observeDebugLog().collect { debugLines.add(it) }
@@ -113,10 +110,7 @@ class SyncTransportWsCursorTest {
             )
         )
 
-        // Wait for the WS connection to register. updateStatus publishes the
-        // WS registration as status.continuousPeers (activePeers is the HTTP
-        // list and stays empty here). A failed connect surfaces as a
-        // "WS connect:" lastError instead of hanging the wait.
+        // A failed connect surfaces as a "ws connect:" lastError instead of hanging the wait.
         withTimeout(10_000) {
             while (transport.observeStatus().first().continuousPeers < 1) {
                 val err = transport.observeStatus().first().lastError
@@ -127,7 +121,7 @@ class SyncTransportWsCursorTest {
             }
         }
 
-        // --- 1. Trigger a REJECTED delta: negative dose fails validateWsDelta.
+        // --- 1: Trigger a rejected delta, negative dose fails validateWsDelta.
         val now = System.currentTimeMillis()
         val doseBad = Dose(
             id = "d:ws-bad", createdAt = now, updatedAt = now, deviceOrigin = "cursor-test",
@@ -139,11 +133,7 @@ class SyncTransportWsCursorTest {
         assertTrue(clientRepo.mutationCount.value >= 1,
             "upsertDose must bump the shared mutationCount (WS push trigger)")
 
-        // Deadline loop (not withTimeout) so a miss dumps full context
-        // instead of a bare TimeoutCancellationException. The transport's
-        // mutation collector uses drop(1) on a StateFlow: if its subscription
-        // loses the start-up race it can miss the FIRST emission, so give it
-        // a second emission if the line has not appeared after 6s.
+        // The transport's mutation collector uses drop(1) on a StateFlow
         suspend fun dumpCtx(): String = buildString {
             appendLine("debug log (collector):")
             debugLines.forEach { appendLine("  $it") }
@@ -171,7 +161,7 @@ class SyncTransportWsCursorTest {
         assertTrue(heldLine.contains("WS delta rejected"),
             "rejected WsAck must log the held-cursor path: $heldLine")
 
-        // --- 2. The cursor never moved: lastSyncAt is still null. ---------
+        // --- 2: The cursor never moved, lastSyncAt is still null.
         assertNull(
             transport.observeStatus().first().lastSyncAt,
             "a rejected WsAck must NOT advance the sync cursor (lastSyncTime stays null)"
@@ -179,13 +169,9 @@ class SyncTransportWsCursorTest {
         assertTrue(serverRepo.doses.value.none { it.id == "d:ws-bad" },
             "the rejected delta must never reach the server repo")
 
-        // The rejected dose stays in the client repo and every future delta
-        // carries everything with updatedAt > since, so drop it now;
-        // otherwise all later deltas would keep failing validation and stage 3
-        // could never succeed. The delete ships as a tombstone.
         clientRepo.deleteDose("d:ws-bad")
 
-        // --- 3. Pipeline stays alive: the next VALID delta is applied. ----
+        // --- 3: Pipeline stays alive, the next valid delta is applied.
         clientRepo.upsertDose(Dose(
             id = "d:ws-good", createdAt = now, updatedAt = now, deviceOrigin = "cursor-test",
             sessionId = "s:ws", substanceId = "cid:x",
@@ -200,13 +186,9 @@ class SyncTransportWsCursorTest {
         }
         assertNotNull(serverRepo.doses.value.first { it.id == "d:ws-good" })
 
-        // Also pin that the good data arrived as an entity on the client's own
-        // view (sanity: the fixture upsert worked).
         assertTrue(clientRepo.doses.value.any { it.id == "d:ws-good" })
 
         collector.cancel()
         transport.disconnectFrom("device-serverhost")
-        // Keep a live session open for the next assertion-free statement? No:
-        // disconnect above closes it; server.stop runs in tearDown.
     }
 }

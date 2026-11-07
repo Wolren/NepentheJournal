@@ -116,13 +116,10 @@ class InteractionCheckerTest {
         val interactions = listOf(
             interaction("i:1", "cid:1", "cid:2", InteractionRisk.DANGEROUS)
         )
-        // First call builds cache
         val r1 = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
         assertEquals(1, r1.dangerous.size)
-        // Second call uses cached index, same result
         val r2 = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), interactions)
         assertEquals(1, r2.dangerous.size)
-        // Same interactions but different IDs still works (cache rebuilt)
         val r3 = InteractionChecker.checkPairwise(listOf("cid:3", "cid:4"), interactions)
         assertEquals(0, r3.dangerous.size)
     }
@@ -155,17 +152,14 @@ class InteractionCheckerTest {
 
     @Test
     fun emptyInteractionListIsCachedNotRebuilt() {
-        // Seed a known non-empty cache state first.
         val seed = listOf(interaction("i:seed", "cid:1", "cid:2", InteractionRisk.DANGEROUS))
         InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), seed)
         val seeded = InteractionChecker.rebuildCount
 
-        // The first empty lookup builds the index exactly once.
         InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), emptyList())
         val afterFirst = InteractionChecker.rebuildCount
         assertEquals(seeded + 1, afterFirst, "first empty lookup should build the index once")
 
-        // The empty result must be served from cache: no second rebuild.
         val result = InteractionChecker.checkPairwise(listOf("cid:1", "cid:2"), emptyList())
         assertFalse(result.hasIssues)
         assertEquals(afterFirst, InteractionChecker.rebuildCount,

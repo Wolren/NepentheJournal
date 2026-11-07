@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
  */
 data class DoseDots(val filled: Int, val hasPartial: Boolean, val total: Int)
 
-/** Dots per reference dose: four means each dot is a quarter of the typical dose. */
 const val DOSE_DOT_REFERENCE_MULTIPLIER = 4
 
 /** Hard ceiling of the matrix (4 columns x 5 rows). */

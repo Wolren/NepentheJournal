@@ -24,7 +24,6 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
     private val storeFile: File get() = File(dataDir, "identity.p12")
     val alias: String = "nepenthe"
 
-    /** Keystore password from the at-rest key file only, never machine properties. */
     val password: CharArray by lazy {
         val envPw = System.getenv("NEPENTHE_TLS_PASSWORD")
         if (envPw != null && envPw.length >= 8) {
@@ -33,23 +32,17 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
             val atRest = AtRestKey(dataDir)
             val existing = atRest.loadOrNull()
             when {
-                // Key file present: use it (current scheme)
                 existing != null -> atRest.toHex(existing).toCharArray()
-                // Legacy keystore without a key file: fail closed instead of
-                // deriving a weak password from public machine properties.
-                // The old user.home + os.name derivation is retired: anyone
-                // with file access could reproduce it (audit H2/Pitfall 12).
+                // The old user.home + os.name derivation is retired: anyone with file access could reproduce it (audit H2/Pitfall 12).
                 storeFile.exists() -> throw IllegalStateException(
                     "Legacy identity keystore has no at-rest key file; refusing weak fallback. " +
                     "Back up data, delete identity.p12, and re-pair devices."
                 )
-                // Fresh install: create the key file now
                 else -> atRest.toHex(atRest.create()).toCharArray()
             }
         }
     }
 
-    /** Ensure identity exists, generating it if needed. Returns the fingerprint. */
     fun ensureIdentity(): String {
         if (!storeFile.exists()) {
             storeFile.parentFile.mkdirs()
@@ -62,11 +55,6 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
         try {
             return loadFingerprint()
         } catch (e: Exception) {
-            // Regenerate ONLY when the store is unusable: empty file, tampered
-            // file, or password mismatch (e.g. NEPENTHE_TLS_PASSWORD changed).
-            // Any other failure must propagate  -  silently deleting the keystore
-            // on transient IO errors rotates the device identity and forces
-            // every paired client to re-pair.
             val unusable = storeFile.length() == 0L ||
                 e is java.io.IOException ||
                 e is java.security.UnrecoverableKeyException
@@ -87,7 +75,6 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
      */
     val fingerprint: String by lazy { loadFingerprint() }
 
-    // ---- Private ----
 
     private fun loadKeyStore(): KeyStore {
         val ks = KeyStore.getInstance("PKCS12")

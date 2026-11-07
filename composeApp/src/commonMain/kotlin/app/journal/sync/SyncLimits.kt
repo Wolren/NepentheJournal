@@ -15,7 +15,6 @@ import app.journal.util.currentTimeMillis
  * of redeclaring them.
  */
 object SyncLimits {
-    /** Generic per-collection count cap (sessions, doses, notes, events, and their tombstones). */
     const val MAX_ITEMS_DEFAULT = 500
     // Measured seed max is 325 substances; headroom for user customs.
     const val MAX_SUBSTANCES = 1000
@@ -23,7 +22,6 @@ object SyncLimits {
     const val MAX_INTERACTIONS = 100
     const val MAX_CUSTOM_UNITS = 100
 
-    /** Free-text and identifier length caps. */
     const val MAX_FIELD_LEN = 65536
     const val MAX_ID_LEN = 128
     const val MAX_NAME_LEN = 200
@@ -33,13 +31,11 @@ object SyncLimits {
     const val MAX_LABEL_LEN = 200
     const val MAX_UNIT_NAME_LEN = 100
 
-    /** Nested list caps. */
     const val MAX_SUBSTANCE_ALIASES = 100
     const val MAX_INTERACTION_SOURCES = 50
     const val MAX_INTERACTION_SOURCE_LEN = 500
     const val MAX_EFFECT_SUBSTANCE_IDS = 500
 
-    /** Value range caps. */
     const val MAX_DOSE_AMOUNT = 1_000_000
     const val MIN_SESSION_RATING = 1
     const val MAX_SESSION_RATING = 10

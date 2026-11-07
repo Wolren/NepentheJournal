@@ -3,6 +3,8 @@ package app.journal.ui.substances.detail
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +33,6 @@ internal fun DurationTimelineSection(
     profile: Map<String, String>,
     doseWikiDuration: DoseWikiDuration? = null
 ) {
-    // Route selector when DoseWiki carries stages for several routes.
     var routeIndex by remember(doseWikiDuration) { mutableStateOf(0) }
     val dwRoutes = doseWikiDuration?.routes.orEmpty()
     val validRouteIndex = routeIndex.coerceIn(0, maxOf(dwRoutes.size - 1, 0))
@@ -87,7 +88,6 @@ internal fun DurationTimelineSection(
     val barPhases = phases.filter { it.label != "Afterglow" }
     val afterglow = phases.find { it.label == "Afterglow" }
 
-    // Canonical phase palette; this section used to carry its own value set.
     val phaseColors = PhaseColors.byLabel
 
     val timelineSpan = maxOf(totalMax, barPhases.maxOfOrNull { it.maxMinutes } ?: 1.0)
@@ -99,7 +99,6 @@ internal fun DurationTimelineSection(
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Duration", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            // Per-route selector when several DoseWiki routes carry stages.
             if (dwRoutes.size > 1) {
                 Spacer(Modifier.height(8.dp))
                 FlowRow(
@@ -256,9 +255,19 @@ internal fun DurationTimelineSection(
                             Text(phase.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = color, fontWeight = FontWeight.Bold, maxLines = 1)
-                            Text(phase.display,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            // One line: shrink instead of wrap, a wrapped unit hides under maxLines=1.
+                            BasicText(
+                                text = phase.display,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                maxLines = 1,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 7.sp,
+                                    maxFontSize = 11.sp,
+                                    stepSize = 0.5.sp
+                                )
+                            )
                         }
                     }
                 }
@@ -285,7 +294,6 @@ internal fun DurationTimelineSection(
                 }
             }
 
-            // Total - visual bar
             if (totalRaw != null) {
                 Spacer(Modifier.height(8.dp))
 
@@ -343,3 +351,4 @@ internal fun DurationTimelineSection(
         }
     }
 }
+

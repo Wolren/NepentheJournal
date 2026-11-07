@@ -75,7 +75,6 @@ internal fun EventCard(
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(Modifier.fillMaxWidth()) {
-                // Accent capsule with halo
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)) {
                     Box(
                         Modifier.size(26.dp).background(accent.copy(alpha = 0.14f), CircleShape)

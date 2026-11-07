@@ -20,10 +20,6 @@ class NepentheApp : Application() {
         instance = this
         initLogging(filesDir.absolutePath)
 
-        // Global uncaught exception handler -- writes crash to a separate file
-        // so it survives even if the rolling log writer is mid-flush.
-        // Always chains to the previous handler so the platform still
-        // reports the crash instead of silently swallowing it.
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
@@ -45,7 +41,6 @@ class NepentheApp : Application() {
         lateinit var instance: NepentheApp
             private set
 
-        /** Convenience accessor for app-level Context. */
         val appContext: Context get() = instance.applicationContext
     }
 }

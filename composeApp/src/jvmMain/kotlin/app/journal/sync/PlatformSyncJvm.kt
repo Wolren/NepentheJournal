@@ -43,7 +43,6 @@ actual fun resolveLocalIpv4(): String? {
             if (addr is Inet4Address && !addr.isLoopbackAddress) {
                 val host = addr.hostAddress ?: continue
                 if (addr.isSiteLocalAddress) {
-                    // Site-local is the best candidate , return immediately
                     return host
                 }
                 candidates.add(host)
@@ -59,12 +58,7 @@ actual fun generateSelfSignedP12(
     alias: String,
     password: CharArray
 ) {
-    // BouncyCastle X.509 cert builder works without registering the provider.
-    // On Android, BC is already bundled by the OS; registering a second copy
-    // causes conflicts. On Desktop JVM, the JDK's built-in BC suffices for
-    // the cert building APIs (JcaX509v3CertificateBuilder, JcaContentSignerBuilder).
-
-    // Generate RSA 2048-bit key pair using default provider
+    // On Desktop JVM, the JDK's built-in bc suffices for the cert building APIs (JcaX509v3CertificateBuilder, JcaContentSignerBuilder).
     val keyGen = KeyPairGenerator.getInstance("RSA")
     keyGen.initialize(2048, SecureRandom())
     val keyPair = keyGen.generateKeyPair()
@@ -73,8 +67,7 @@ actual fun generateSelfSignedP12(
     val dn = X500Name("CN=Nepenthe Journal, OU=Self-Hosted, O=User, L=Home, ST=Local, C=XX")
     val serial = BigInteger(64, SecureRandom())
     val notBefore = Date(System.currentTimeMillis() - 86400000L) // 1 day in past
-    // 825 days keeps the identity inside the 398-day public-trust ceiling for
-    // each validity period plus renewal margin; fingerprints stay stable.
+    // 825 days keeps the identity inside the 398-day public-trust ceiling for each validity period plus renewal margin; fingerprints stay stable.
     val notAfter = Date(System.currentTimeMillis() + 825L * 86400000L)
 
     val certBuilder = JcaX509v3CertificateBuilder(
@@ -86,7 +79,6 @@ actual fun generateSelfSignedP12(
         keyPair.public
     )
 
-    // Add Subject Alternative Name so Java SSL won't reject connections to localhost
     val san = GeneralNames(GeneralName(GeneralName.dNSName, "localhost"))
     certBuilder.addExtension(Extension.subjectAlternativeName, false, san)
 
