@@ -54,6 +54,9 @@ class ThemeManager private constructor() {
         val surf = cfg.surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
         val d = if (isDark) 0.30f else 0.16f
+        // Container roles lift away from the surface; in dark mode they go toward white, in light toward black.
+        val lift = if (isDark) Color.White else Color.Black
+        val invert = contrastColor(surf)
 
         fun container(accent: Color): Color = blend(bg, accent, d)
         fun surfaceVariant(accent: Color, factor: Float = if (isDark) 0.12f else 0.06f): Color =
@@ -83,7 +86,19 @@ class ThemeManager private constructor() {
             surfaceVariant = surfaceVariant(cfg.primary),
             onSurfaceVariant = contrastColor(surfaceVariant(cfg.primary)),
             outline = surfaceVariant(cfg.primary, if (isDark) 0.28f else 0.18f),
-            outlineVariant = surfaceVariant(cfg.primary, if (isDark) 0.16f else 0.10f)
+            outlineVariant = surfaceVariant(cfg.primary, if (isDark) 0.16f else 0.10f),
+            // Dialogs, sheets, menus and snackbars read these roles; unset, they fall back to the baseline palette.
+            surfaceTint = cfg.primary,
+            surfaceContainerLowest = blend(surf, bg, if (isDark) 0.60f else 0.03f),
+            surfaceContainerLow = blend(surf, bg, if (isDark) 0.35f else 0.02f),
+            surfaceContainer = blend(surf, bg, if (isDark) 0.18f else 0.01f),
+            surfaceContainerHigh = blend(surf, lift, if (isDark) 0.05f else 0.03f),
+            surfaceContainerHighest = blend(surf, lift, if (isDark) 0.09f else 0.06f),
+            surfaceDim = blend(surf, bg, if (isDark) 0.25f else 0.08f),
+            surfaceBright = blend(surf, lift, if (isDark) 0.14f else 0.02f),
+            inverseSurface = blend(surf, invert, 0.88f),
+            inverseOnSurface = surf,
+            inversePrimary = blend(cfg.primary, invert, if (isDark) 0.25f else 0.15f)
         )
     }
 
