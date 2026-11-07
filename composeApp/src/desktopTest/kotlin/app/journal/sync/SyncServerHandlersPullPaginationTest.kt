@@ -29,6 +29,28 @@ class SyncServerHandlersPullPaginationTest {
 
     private fun handlers() = SyncServerHandlers(repo, onConnection = {}, persistAfterApply = null)
 
+    @Test
+    fun matchingBundledFingerprintDropsSystemRowsFromThePullPage() {
+        repo.upsertSubstance(app.journal.model.Substance(
+            id = "dw:bundled", createdAt = base, updatedAt = base, cachedAt = base,
+            sourceVersion = "dw-v1", name = "Bundled", deviceOrigin = "system"
+        ))
+        repo.upsertSubstance(app.journal.model.Substance(
+            id = "dw:mine", createdAt = base, updatedAt = base, cachedAt = base,
+            sourceVersion = "dw-v1", name = "Mine", deviceOrigin = "phone"
+        ))
+
+        val all = handlers().handlePull(0L)
+        assertTrue(all.substances.any { it.id == "dw:bundled" },
+            "without the header every row travels")
+
+        val lean = handlers().handlePull(0L, skipBundled = true)
+        assertTrue(lean.substances.none { it.deviceOrigin == "system" },
+            "a matching bundled fingerprint must drop system rows")
+        assertTrue(lean.substances.any { it.id == "dw:mine" },
+            "user rows must still travel")
+    }
+
     private fun seedTiedInteractions(count: Int, stamp: Long = tied) {
         repeat(count) { i ->
             repo.upsertInteraction(Interaction(
@@ -44,7 +66,6 @@ class SyncServerHandlersPullPaginationTest {
         }
     }
 
-    /** Walk pages the way a client does; fails if the walk cannot terminate. */
     private fun drain(startSince: Long = 0L, startSinceId: String = "", pageBudget: Int = 50): List<SyncResponse> {
         val h = handlers()
         val pages = mutableListOf<SyncResponse>()
@@ -87,9 +108,6 @@ class SyncServerHandlersPullPaginationTest {
         val served = allInteractionIds(pages)
         assertEquals(250, served.size,
             "every tied row must cross the drain (previous cursor stopped at 100)")
-        // Pages after the first may re-serve rows of OTHER types, but within
-        // this single-type drain each row must be cut-progressively: no page
-        // may be empty while truncated (the old silent-stall signature).
         pages.dropLast(1).forEachIndexed { index, p ->
             assertTrue(p.interactions.isNotEmpty(),
                 "page ${index + 2} must contain rows; an empty truncated page means the tie group stalled")
@@ -117,9 +135,6 @@ class SyncServerHandlersPullPaginationTest {
 
     @Test
     fun `mixed types are all delivered when only one type truncates`() {
-        // Two sessions at distinct timestamps + a tied interaction group
-        // that truncates. The low-water cut must not strand the sessions or
-        // the tail of the tie group.
         repo.upsertSession(Session(
             id = "s:early", title = "Early", startTime = base,
             createdAt = base, updatedAt = base, deviceOrigin = "host"
@@ -139,8 +154,6 @@ class SyncServerHandlersPullPaginationTest {
 
     @Test
     fun `wall-clock cursor is inclusive for rows stamped at exactly since`() {
-        // An entity stamped in the cursor's millisecond but missed by the
-        // previous cycle would be invisible to a strict `>` filter.
         repo.upsertSession(Session(
             id = "s:edge", title = "Edge", startTime = base,
             createdAt = base, updatedAt = base, deviceOrigin = "host"
@@ -148,7 +161,6 @@ class SyncServerHandlersPullPaginationTest {
         val page = handlers().handlePull(base)
         assertEquals(listOf("s:edge"), page.sessions.map { it.id },
             "updatedAt == since must be served when the cursor has no id half")
-        // A composite cursor, in contrast, is strictly after the cut row.
         val none = handlers().handlePull(base, "s:edge")
         assertTrue(none.sessions.isEmpty())
     }

@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.sync.DiscoveryMode
@@ -31,33 +32,39 @@ class SyncTransport(
     private val persistAfterApply: (() -> Unit)? = null
 ) : SyncEngine {
 
-    // Persistent infrastructure
     private val tlsIdentity = TlsIdentityManager(dataDir)
     // Static P-256 pairing key (contract g), persisted next to identity.p12.
     private val ecdhIdentity = EcdhIdentityManager(dataDir)
     private val trustStore = DeviceTrustStore(dataDir)
     private val authenticator = SyncAuthenticator(trustStore)
 
-    // Derived identity
     private val deviceFingerprint: String by lazy { tlsIdentity.ensureIdentity() }
     val deviceId: String by lazy { "device-${deviceFingerprint.take(16)}" }
     val deviceDisplayName: String by lazy { platformDeviceName() }
 
     private var server: KtorSyncServer? = null
-    internal var lastSyncTime: Long? = null
+    private val cursorStore = SyncCursorStore(dataDir)
+
+    /** Per-peer bundled-library fingerprint from /info, so a repeat sync does not ask again. */
+    private val peerSeedFingerprints = ConcurrentHashMap<String, String>()
+
+    /** This device's own cursor; persists across launches so a restart resumes instead of re-pushing everything. */
+    internal var lastSyncTime: Long?
+        get() = cursorStore.read()
+        set(value) {
+            if (value != null) cursorStore.write(value)
+        }
+
     private var activePeers = Collections.synchronizedList(mutableListOf<ConnectedPeer>())
     private var tokenRefreshJob: Job? = null
 
-    // Background coroutine scope for mDNS and other long-lived tasks
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    // Mutual exclusion for sync operations; prevents concurrent pairing/trust-store races.
     private val syncLock = Mutex()
 
-    // Active discovered peers from LAN scanning
     private val _discoveredPeers = MutableStateFlow<List<DiscoveredPeer>>(emptyList())
 
-    // Debug log: keeps the last 200 sync-related events for the UI debug viewer
+    // Debug log: keeps the last 200 sync-related events for the ui debug viewer
     private val _debugLog = MutableSharedFlow<String>(replay = 200)
     private fun appendDebug(msg: String) {
         Log.withTag("SyncTransport").i { msg }
@@ -68,22 +75,17 @@ class SyncTransport(
 
     private val _status = MutableStateFlow(SyncStatusSnapshot(
         isHosting = false, hostAddress = null,
-        activeConnections = emptyList(), lastSyncAt = null,
+        activeConnections = emptyList(), lastSyncAt = cursorStore.read(),
         pendingConflicts = 0, lastError = null,
         pairingToken = null, pairedDeviceCount = 0
     ))
 
-    /** Current pairing token, if hosting and waiting for pairing. */
     val pairingToken: String? get() = _status.value.pairingToken
     private val wsConnections = ConcurrentHashMap<String, WsConnection>()
 
-    // ---- LAN discovery ----
     private var lanDiscovery: LanDiscovery? = null
 
-    // wave2 file split (file-size-governor): cohesive private-method groups
-    // moved verbatim into helper classes this transport owns; state is
-    // passed by reference (same instances), including bound private helpers,
-    // so cursors, throttles, and connections behave identically.
+    // wave2 file split (file-size-governor): cohesive private-method groups moved verbatim into helper classes this transport owns
     private val discoveryOps = SyncDiscovery(
         repo = repo, tlsIdentity = tlsIdentity, _status = _status,
         appendDebug = ::appendDebug
@@ -102,18 +104,11 @@ class SyncTransport(
         activePeers, trustStore, _status, ::appendDebug, ::updateStatus
     )
 
-    /** Revoke a previously paired device. */
     fun revokeDevice(deviceId: String) {
         trustStore.revokeDevice(deviceId)
-        // PBKDF2 key cache invalidation (audit perf note): cached AES keys are
-        // only ever looked up by their own secret, so a revoked secret can
-        // never be queried again; purging here also drops any OTHER peer's
-        // cached derivation so a revoke cannot leave key material resident.
+        // PBKDF2 key cache invalidation (audit perf note): cached AES keys are only ever looked up by their own secret
         clearAesKeyCache()
         activePeers.removeAll { it.deviceId == deviceId }
-        // Drop the client-side WS connection, if any, using the same
-        // teardown as stopContinuousSync (suspending close runs off-thread:
-        // revoke is called from UI event handlers, never suspend).
         wsConnections.remove(deviceId)?.let { conn ->
             conn.mutationJob.cancel()
             conn.heartbeatJob?.cancel()
@@ -123,8 +118,6 @@ class SyncTransport(
                 try { conn.client.close() } catch (_: Exception) {}
             }
         }
-        // Drop live server-side WS sessions for the revoked device, so an
-        // open /sync/ws cannot keep pushing after revocation.
         backgroundScope.launch {
             try { server?.closeDeviceSessions(deviceId) } catch (_: Exception) {}
         }
@@ -161,7 +154,7 @@ class SyncTransport(
                     hostAddress = "${info.address}:${info.port}",
                     pairingToken = token,
                     tokenExpiresAt = now + 120_000L,
-                    pairedDeviceCount = trustStore.count()
+                    pairedDeviceCount = trustStore.count(excluding = deviceId)
                 )
                 appendDebug("Server started on ${info.address}:${info.port} (fp=$fp)")
                 tokenRefreshJob?.cancel()
@@ -255,11 +248,15 @@ class SyncTransport(
      * [syncWith] (it holds no lock itself), so every external entry point
      * acquires exactly one lock per cycle.
      */
-    private suspend fun syncWithLocked(peer: DiscoveredPeer, continuous: Boolean): Result<Unit> {
+    private suspend fun syncWithLocked(
+        peer: DiscoveredPeer,
+        continuous: Boolean,
+        forceFullPush: Boolean = false,
+        peerSeedFingerprint: String? = null,
+    ): Result<Unit> {
         return try {
             val fp = deviceFingerprint // ensure identity
 
-            // Try to find an existing trusted peer by fingerprint or deviceId
             val existingPeer = peer.fingerprint?.let { trustStore.getPeer(it) }
                 ?: (peer.deviceId?.let { trustStore.getPeerById(it) })
 
@@ -277,11 +274,18 @@ class SyncTransport(
                     persistAfterApply = persistAfterApply
                 )
                 try {
-                    val since = lastSyncTime ?: 0L
-                    appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since")
+                    // One cursor is shared by every peer, so a newly paired device has to be sent the whole library once.
+                    val since = if (forceFullPush) 0L else (lastSyncTime ?: 0L)
+                    val peerSeed = peerSeedFingerprint
+                        ?: peerSeedFingerprints[existingPeer.deviceId]
+                        ?: discoveryOps.probeHostInfo(peer)?.seedFingerprint
+                            ?.also { peerSeedFingerprints[existingPeer.deviceId] = it }
+                    val skipBundled = peerSeed != null && peerSeed == SEED_BUNDLED_FINGERPRINT
+                    appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since (bundled rows ${if (skipBundled) "skipped" else "included"})")
                     val exchange = client.pushChanges(
                         host = peer.host, port = peer.port,
-                        deviceId = deviceId, deviceName = deviceDisplayName, since = since
+                        deviceId = deviceId, deviceName = deviceDisplayName, since = since,
+                        skipBundled = skipBundled
                     )
                     if (exchange.isFailure) {
                         val error = exchange.exceptionOrNull()
@@ -290,20 +294,6 @@ class SyncTransport(
                         return Result.failure(error ?: Exception("Sync exchange failed"))
                     }
 
-                    // Contract d pin_deviation_flag: the ONLY wall-clock
-                    // value allowed to become the cursor is
-                    // ChunkedPushResult.cycleStart, captured BEFORE the
-                    // batch was built, and it is applied exclusively
-                    // through cursorAfterCycle over the real per-slice acks
-                    // AND the pull-drain completion flag. A partial push
-                    // keeps the old cursor so the unconfirmed remainder is
-                    // resent next cycle; an incomplete PULL drain holds it
-                    // too, because this cursor is also the next cycle's
-                    // pull starting point and advancing it would skip the
-                    // pages that never arrived (they would stay
-                    // unreachable until the next cold start, which is
-                    // exactly the silent-tail bug cursorAfterCycle exists
-                    // to prevent).
                     val push = exchange.getOrThrow()
                     lastSyncTime = cursorAfterCycle(since, push.cycleStart, push.acks, push.drainComplete)
                     if (!push.drainComplete) {
@@ -329,60 +319,59 @@ class SyncTransport(
             } else {
                 appendDebug("No existing peer by fingerprint/deviceId for ${peer.host}:${peer.port}")
 
-                // If no pairing token was provided, try to identify the host by fingerprint
-                if (peer.pairingToken.isNullOrBlank()) {
-                    appendDebug("No pairing token: attempting fingerprint-based re-connect")
+                // Probe even when a token is typed: a manual host:port carries no fingerprint, and a left-over
+                // token is usually stale by the second press, so pairing first fails what trust could resume.
+                appendDebug("Attempting fingerprint-based re-connect")
+                try {
+                    val probeClient = KtorSyncClient(
+                        repo = repo,
+                        tlsIdentity = tlsIdentity,
+                        trustedFingerprint = null,
+                        persistAfterApply = persistAfterApply
+                    )
                     try {
-                        val probeClient = KtorSyncClient(
-                            repo = repo,
-                            tlsIdentity = tlsIdentity,
-                            trustedFingerprint = null,
-                            persistAfterApply = persistAfterApply
-                        )
-                        try {
-                            val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
-                            if (hostInfo.isSuccess) {
-                                val info = hostInfo.getOrThrow()
-                                appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
-                                discoveryOps.warnOnProtocolMismatch(info, "first sync probe")
-                                val knownPeer = trustStore.getPeer(info.fingerprint)
-                                if (knownPeer != null) {
-                                    // Challenge the host before re-using the stored secret:
-                                    // mDNS is unauthenticated and fingerprints are public,
-                                    // so a spoofed host must prove it knows the secret.
-                                    val hostProven = probeClient.verifyHostIdentity(
-                                        peer.host, peer.port, deviceId, knownPeer.sharedSecret
+                        val hostInfo = probeClient.requestHostInfo(peer.host, peer.port)
+                        if (hostInfo.isSuccess) {
+                            val info = hostInfo.getOrThrow()
+                            appendDebug("Host at ${peer.host}:${peer.port} has fp=${info.fingerprint.take(8)}...")
+                            discoveryOps.warnOnProtocolMismatch(info, "first sync probe")
+                            val knownPeer = trustStore.getPeer(info.fingerprint)
+                            if (knownPeer != null) {
+                                val hostProven = probeClient.verifyHostIdentity(
+                                    peer.host, peer.port, deviceId, knownPeer.sharedSecret
+                                )
+                                if (hostProven) {
+                                    appendDebug("Host identity verified (challenge-response): re-using stored secret for ${knownPeer.displayName}")
+                                    info.seedFingerprint?.let { peerSeedFingerprints[knownPeer.deviceId] = it }
+                                    val trustedPeer = DiscoveredPeer(
+                                        deviceId = knownPeer.deviceId,
+                                        displayName = knownPeer.displayName,
+                                        host = peer.host,
+                                        port = peer.port,
+                                        isTrusted = true,
+                                        fingerprint = knownPeer.fingerprint
                                     )
-                                    if (hostProven) {
-                                        appendDebug("Host identity verified (challenge-response): re-using stored secret for ${knownPeer.displayName}")
-                                        val trustedPeer = DiscoveredPeer(
-                                            deviceId = knownPeer.deviceId,
-                                            displayName = knownPeer.displayName,
-                                            host = peer.host,
-                                            port = peer.port,
-                                            isTrusted = true,
-                                            fingerprint = knownPeer.fingerprint
-                                        )
-                                        return syncWithLocked(trustedPeer, continuous)
-                                    }
-                                    appendDebug("Host failed identity challenge: NOT re-using stored secret, needs re-pairing")
-                                } else {
-                                    appendDebug("Host fingerprint not in trust store: needs pairing")
+                                    return syncWithLocked(
+                                        trustedPeer, continuous,
+                                        peerSeedFingerprint = info.seedFingerprint
+                                    )
                                 }
+                                appendDebug("Host failed identity challenge: NOT re-using stored secret, needs re-pairing")
                             } else {
-                                appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
+                                appendDebug("Host fingerprint not in trust store: needs pairing")
                             }
-                        } finally {
-                            probeClient.close()
+                        } else {
+                            appendDebug("Could not reach ${peer.host}:${peer.port} for fingerprint probe")
                         }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        appendDebug("Fingerprint probe failed: ${e.message}")
+                    } finally {
+                        probeClient.close()
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    appendDebug("Fingerprint probe failed: ${e.message}")
                 }
 
-                // Standard pairing flow
                 val pairResult = peerOps.pairWithPeer(peer)
                 if (pairResult.isFailure) {
                     val error = pairResult.exceptionOrNull()
@@ -402,15 +391,13 @@ class SyncTransport(
                         fingerprint = nowTrusted.fingerprint
                     )
                     appendDebug("Re-syncing with trusted peer ${nowTrusted.displayName}")
-                    return syncWithLocked(trustedPeer, continuous)
+                    return syncWithLocked(trustedPeer, continuous, forceFullPush = true)
                 }
                 appendDebug("CRITICAL: Peer stored during pairing but not found by hostDeviceId")
                 Result.failure(Exception("Pairing completed but device not found in trust store"))
             }
         } catch (e: CancellationException) {
-            // Cancellation must propagate: it may never become a
-            // Result.failure (or a clobbered lastError) on a
-            // cancelled coroutine.
+            // Cancellation must propagate: it may never become a Result.failure (or a clobbered lastError) on a cancelled coroutine.
             throw e
         } catch (e: Exception) {
             appendDebug("syncWith exception: ${e.message}")
@@ -435,14 +422,8 @@ class SyncTransport(
                 ?: (peer.deviceId?.let { trustStore.getPeerById(it) })
                 ?: return@withContext
 
-            // Close existing connection to this peer if any
             stopContinuousSync(existingPeer.deviceId)
 
-            // Contract section f: ask the host BEFORE opening a socket. iOS
-            // hosts advertise wsSupported=false; reconnecting blindly would
-            // burn the whole retry budget against a port that never answers.
-            // An unreachable host leaves the capability unknown; proceed and
-            // let the connect error surface as before.
             val hostInfo = discoveryOps.probeHostInfo(peer)
             if (hostInfo?.wsSupported == false) {
                 appendDebug(
@@ -468,13 +449,9 @@ class SyncTransport(
             try {
             val session = client.connectWs(peer.host, peer.port) { /* incoming frames handled by launchIncomingReader */ }
 
-            // Per-connection seq counter and in-flight push ledger: both live
-            // on the WsConnection so every reconnect starts a fresh epoch
-            // (contract section a: first delta is seq 1).
             val seqCounter = AtomicLong(0L)
             val pendingPushes = PendingWsPushes()
 
-            // Subscribe to local mutations and push over WebSocket
             val mutationJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
                 repo.mutationCount
                     .drop(1)
@@ -482,9 +459,6 @@ class SyncTransport(
                     .collect { _ ->
                         val since = lastSyncTime ?: 0L
                         val seq = seqCounter.incrementAndGet()
-                        // Contract d: cycleStart is captured BEFORE the delta is
-                        // built and is the only wall-clock value that may ever
-                        // move lastSyncTime; it does so only via the server ack.
                         val cycleStart = System.currentTimeMillis()
                         val delta = continuousOps.buildDelta(since, seq)
                         if (continuousOps.isEmptyDelta(delta)) return@collect
@@ -492,11 +466,7 @@ class SyncTransport(
                             pendingPushes.push(seq, cycleStart)
                             client.sendDelta(session, delta)
                         } catch (_: Exception) {
-                            // Never sent: drop the ledger entry so it cannot
-                            // block later ack advances; the data is resent by
-                            // the next mutation cycle or the HTTP push.
                             pendingPushes.cancel(seq)
-                            // WS disconnected; mutation job will be recreated on next reconnect
                         }
                     }
             }
@@ -512,7 +482,6 @@ class SyncTransport(
                 pendingPushes = pendingPushes
             )
 
-            // Launch incoming frame reader (handles WsPong, WsDelta from server)
             wsConnection.incomingJob = continuousOps.launchIncomingReader(existingPeer.deviceId, session, wsConnection)
             // Launch heartbeat (sends WsPing every 30s, triggers reconnect if no pong in 10s)
             wsConnection.heartbeatJob = continuousOps.launchHeartbeat(existingPeer.deviceId, session, wsConnection)
@@ -520,15 +489,11 @@ class SyncTransport(
             wsConnections[existingPeer.deviceId] = wsConnection
             registered = true
             } finally {
-                // Audit leak fix: a failed handshake or setup must close the
-                // CIO engine. Once registered, the connection owns its own
-                // teardown (stopContinuousSync / revoke / stale cleanup).
                 if (!registered) {
                     try { client.close() } catch (_: Exception) {}
                 }
             }
 
-            // Ensure stale cleanup is running
             continuousOps.startStaleCleanup()
 
             val cp = ConnectedPeer(existingPeer.deviceId, existingPeer.displayName, SyncDirection.PUSH_PULL)
@@ -551,7 +516,6 @@ class SyncTransport(
         updateStatus()
     }
 
-    // ---- LAN discovery ----
 
     override fun startDiscovery(mode: DiscoveryMode): Flow<LanDiscoveryEvent> {
         lanDiscovery?.stop()
@@ -562,13 +526,10 @@ class SyncTransport(
         if (srv != null && srv.isRunning) {
             discovery.registerService(srv.actualPort, deviceId, deviceFingerprint)
         }
-        // Route events into the shared discovered-peers state for screens to observe
         return rawFlow.onEach { event ->
             when (event) {
                 is LanDiscoveryEvent.PeerFound -> {
-                    // isTrusted must reflect the trust store, not mDNS metadata:
-                    // every host publishes a fingerprint, so the presence of one
-                    // says nothing about pairing state.
+                    // isTrusted must reflect the trust store, not mDNS metadata: every host publishes a fingerprint
                     val trusted = event.peer.deviceId != null &&
                         trustStore.isTrustedDeviceId(event.peer.deviceId)
                     val enriched = event.peer.copy(isTrusted = trusted)
@@ -591,7 +552,6 @@ class SyncTransport(
             lanDiscovery?.stop()
             lanDiscovery = null
         }
-        // If server is still running, keep LanDiscovery alive for mDNS service registration
     }
 
     override suspend fun connectManually(host: String, port: Int, token: String?): Result<Unit> {
@@ -607,7 +567,6 @@ class SyncTransport(
         return syncWith(peer, continuous = false)
     }
 
-    // ---- Status ----
 
     override fun observeDebugLog(): Flow<String> = _debugLog
 
@@ -617,7 +576,7 @@ class SyncTransport(
     override fun observeStatus(): Flow<SyncStatusSnapshot> = _status.asStateFlow()
 
     override fun trustedDevices(): List<TrustedDeviceInfo> =
-        trustStore.listPeers().map { peer ->
+        trustStore.listPeers().filter { it.deviceId != deviceId }.map { peer ->
             TrustedDeviceInfo(
                 deviceId = peer.deviceId,
                 displayName = peer.displayName,
@@ -635,7 +594,7 @@ class SyncTransport(
             pendingConflicts = repo.notes.value.count { it.conflictSiblings.isNotEmpty() },
             pairingToken = authenticator.currentPairingToken(),
             tokenExpiresAt = if (authenticator.currentPairingToken() != null) now + 120_000L else null,
-            pairedDeviceCount = trustStore.count(),
+            pairedDeviceCount = trustStore.count(excluding = deviceId),
             continuousPeers = wsConnections.size
         )
     }

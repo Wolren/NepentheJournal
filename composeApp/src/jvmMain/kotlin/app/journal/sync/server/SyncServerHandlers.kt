@@ -35,13 +35,6 @@ internal class SyncServerHandlers(
     fun handlePush(batch: SyncBatch) {
         var conflicts = 0
         val tagged = batch.copy(deviceName = batch.deviceName.take(200))
-        // Peer-aware tombstone retention: batch.since is the SENDER's sync
-        // cursor (contract sections b/d), i.e. this peer's high-water mark
-        // of settled data. Recorded only after the router authenticated the
-        // caller and proved batch.deviceId == caller (SyncServerRouting push
-        // route), so the device id is trustworthy. Recording happens before
-        // apply only as bookkeeping: a stale/low cursor can only make
-        // pruning MORE conservative, never less.
         PeerSyncWatermarks.recordPeerCursor(tagged.deviceId, tagged.since)
         repo.applyBatch(
             substances = tagged.substances,
@@ -61,10 +54,7 @@ internal class SyncServerHandlers(
             deletedCustomUnitIds = tagged.deletedCustomUnitIds,
             tombstoneCutoff = batch.since
         )
-        // Sessions and notes are NOT handed to applyBatch: both go through
-        // the shared merge routes below, exactly like the WS delta path.
-        // Sessions route through the ONE commonMain mergeSessionConflict
-        // (contract section c item 4); both hosts call it.
+        // Sessions route through the one commonMain mergeSessionConflict (contract section c item 4); both hosts call it.
         conflicts += mergeSessionConflict(repo, tagged.sessions, tagged.deletedSessionIds, tagged.deviceId)
         conflicts += applyNotesWithConflict(tagged.notes, tagged.deletedNoteIds, tagged.deviceId)
         onConnection(if (conflicts > 0) "$conflicts conflict(s)" else "Synced from ${tagged.deviceName}")
@@ -128,12 +118,20 @@ internal class SyncServerHandlers(
      * re-serve rows the client already saw (harmless LWW duplicates), while
      * no type can sit behind the shared cursor.
      */
-    fun handlePull(since: Long, sinceId: String = ""): SyncResponse {
+    fun handlePull(since: Long, sinceId: String = "", skipBundled: Boolean = false): SyncResponse {
         val deleted = repo.deletedIdsSince(since)
         var truncated = false
         val cuts = mutableListOf<Pair<Long, String>>()
-        fun <T> page(items: List<T>, max: Int, id: (T) -> String, updatedAt: (T) -> Long): List<T> {
-            val fresh = items
+        fun <T> page(
+            items: List<T>,
+            max: Int,
+            id: (T) -> String,
+            updatedAt: (T) -> Long,
+            isBundled: (T) -> Boolean = { false },
+        ): List<T> {
+            // Identical bundled fingerprint: the peer already holds every "system" row.
+            val pool = if (skipBundled) items.filterNot(isBundled) else items
+            val fresh = pool
                 .filter { isAfterPullCursor(updatedAt(it), id(it), since, sinceId) }
                 .sortedWith(compareBy({ updatedAt(it) }, { id(it) }))
             if (fresh.size <= max) return fresh
@@ -145,14 +143,14 @@ internal class SyncServerHandlers(
         }
         val response = SyncResponse(
         success = true,
-        sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
-        doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
-        substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES, { it.id }) { it.updatedAt },
-        interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS, { it.id }) { it.updatedAt },
-        notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
-        timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }) { it.updatedAt },
-        effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS, { it.id }) { it.updatedAt },
-        customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS, { it.id }) { it.updatedAt },
+        sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
+        doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
+        substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES, { it.id }, { it.updatedAt }) { it.deviceOrigin == "system" },
+        interactions = page(repo.interactions.value, SyncLimits.MAX_INTERACTIONS, { it.id }, { it.updatedAt }) { it.deviceOrigin == "system" },
+        notes = page(repo.notes.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
+        timelineEvents = page(repo.timelineEvents.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
+        effects = page(repo.effects.value, SyncLimits.MAX_EFFECTS, { it.id }, { it.updatedAt }) { it.deviceOrigin == "system" },
+        customUnits = page(repo.customUnits.value, SyncLimits.MAX_CUSTOM_UNITS, { it.id }, { it.updatedAt }),
         deletedSessionIds = deleted.deletedSessionIds,
         deletedDoseIds = deleted.deletedDoseIds,
         deletedNoteIds = deleted.deletedNoteIds,
@@ -164,10 +162,6 @@ internal class SyncServerHandlers(
         truncated = truncated
     )
         if (truncated) {
-            // Lexicographic minimum over the per-type cut positions; cuts is
-            // non-empty because truncated is only set inside page() right
-            // before a cut is recorded (minWith throws otherwise, which
-            // would be a bug in page(), not a protocol condition).
             val minCut = cuts.minWith(compareBy({ it.first }, { it.second }))
             return response.copy(nextSince = minCut.first, nextSinceId = minCut.second)
         }

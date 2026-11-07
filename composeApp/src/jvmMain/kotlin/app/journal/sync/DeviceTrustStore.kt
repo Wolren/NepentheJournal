@@ -64,14 +64,11 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
      */
     private val atRestKey = AtRestKey(dataDir)
 
-    /** In-memory cache of the DECRYPTED store: loaded once, invalidated on writes. */
     @Volatile
     private var cachedStore: TrustStore? = null
 
-    /** True when [cachedStore] holds lastSeenAt updates not yet written to disk. Guarded by [lock]. */
     private var lastSeenDirty = false
 
-    /** When the trust file was last written by [updateLastSeen]. Guarded by [lock]. */
     private var lastSeenFlushedAt = 0L
 
     /** The current PBKDF2 salt (stable while the store file exists). */
@@ -79,8 +76,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     private var currentSalt: String? = null
 
     init {
-        // Flush coalesced lastSeenAt updates on JVM shutdown ("load-close"):
-        // the dirty flag is written out once more so a clean exit loses nothing.
+        // Flush coalesced lastSeenAt updates on JVM shutdown ("load-close"): the dirty flag is written out once more
         Runtime.getRuntime().addShutdownHook(Thread {
             synchronized(lock) {
                 if (lastSeenDirty) {
@@ -102,11 +98,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         val updated = store.copy(peers = store.peers.map {
             if (it.deviceId == deviceId) it.copy(lastSeenAt = at) else it
         })
-        // Coalesced write (audit F-row): serve the mutation from memory now and
-        // flush to disk at most once per LAST_SEEN_FLUSH_INTERVAL_MS. Every
-        // full save (addPeer, revokeDevice, clearAll) and the shutdown hook
-        // below also flush pending state. Crash contract: only the most recent
-        // lastSeenAt values can be lost; trust decisions never read lastSeenAt.
+        // Crash contract: only the most recent lastSeenAt values can be lost; trust decisions never read lastSeenAt.
         cachedStore = updated
         lastSeenDirty = true
         if (System.currentTimeMillis() - lastSeenFlushedAt >= LAST_SEEN_FLUSH_INTERVAL_MS) {
@@ -147,11 +139,15 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         saveStore(TrustStore(salt = generateSalt()))
     }
 
-    fun count(): Int = synchronized(lock) {
-        loadStore().peers.size
+    /**
+     * Trusted peers, optionally excluding this host's own self entry.
+     * SyncServerSecurity.hostSecret stores that self entry as a peer, so a
+     * raw count reports one device too many.
+     */
+    fun count(excluding: String? = null): Int = synchronized(lock) {
+        loadStore().peers.count { excluding == null || it.deviceId != excluding }
     }
 
-    // ---- Private ----
 
     /**
      * Load the trust store from disk (or cache).
@@ -170,7 +166,6 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
     private fun loadStore(): TrustStore {
         cachedStore?.let { return it }
 
-        // Clean up orphaned temp file from prior crash
         if (tmpFile.exists()) {
             Log.withTag("DeviceTrustStore").w { "Cleaning orphaned temp file from prior save" }
             tmpFile.delete()
@@ -210,7 +205,6 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
             cachedStore = decrypted
             decrypted
         } catch (e: Exception) {
-            // Retry once (transient IO), then try the backup. Never reset.
             Log.withTag("DeviceTrustStore").w { "Trust store read failed (${e.message}); retrying" }
             try {
                 Thread.sleep(100)
@@ -259,7 +253,6 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         return raw.copy(salt = storeSalt, peers = decryptedPeers)
     }
 
-    /** Encrypt [store] and write it atomically, keeping the prior file as backup. */
     private fun writeEncrypted(store: TrustStore) {
         file.parentFile.mkdirs()
         val encrypted = encryptStore(store)
@@ -283,12 +276,10 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         cachedStore = salted
         currentSalt = salted.salt
         writeEncrypted(salted)
-        // This full write also persists any coalesced lastSeenAt mutation.
         lastSeenDirty = false
         lastSeenFlushedAt = System.currentTimeMillis()
     }
 
-    /** Encrypt every peer's sharedSecret using the store's salt. */
     private fun encryptStore(store: TrustStore): TrustStore {
         val salt = store.salt.ifBlank { currentSalt ?: generateSalt() }
         val key = encryptionKey(salt)
@@ -306,7 +297,6 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
      */
     private fun encryptionKey(salt: String): SecretKey {
         atRestKey.loadOrNull()?.let { return SecretKeySpec(it, "AES") }
-        // create() throws when the key file cannot be stored securely.
         return SecretKeySpec(atRestKey.create(), "AES")
     }
 
@@ -319,7 +309,7 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
      * knowledge recover every secret, which defeats at-rest encryption.
      */
     private fun decryptToPlaintext(encrypted: String): String {
-        // Non-Base64 content is not a ciphertext of this scheme: fail closed.
+        // Non-Base64 content isn't a ciphertext of this scheme: fail closed.
         try {
             Base64.getDecoder().decode(encrypted)
         } catch (_: Exception) {
@@ -339,7 +329,6 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         /** Cap on the trust-store file so a corrupt file can never OOM the reader. */
         const val MAX_TRUST_FILE_BYTES = 10L * 1024 * 1024
 
-        /** Minimum interval between trust-file writes triggered by [updateLastSeen]. */
         const val LAST_SEEN_FLUSH_INTERVAL_MS = 60_000L
 
         private fun generateSalt(): String {

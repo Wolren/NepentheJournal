@@ -25,7 +25,6 @@ import kotlinx.serialization.encodeToString
  * expect/actual encryption primitives.
  */
 
-// ========== Endpoint paths ==========
 
 /**
  * Wire protocol version this build speaks and serves. Both hosts advertise
@@ -52,9 +51,24 @@ object SyncEndpoints {
     const val SYNC_PUSH = "/sync/push"
     const val SYNC_PULL = "/sync/pull"
     const val SYNC_WS = "/sync/ws"
+
+    /**
+     * Chunked push phase, sent once per slice. The host persists and builds a
+     * pull page only when the header is absent (pre-chunking clients) or
+     * final; one 54-slice first sync used to do 54 full journal writes.
+     */
+    const val PUSH_PHASE_HEADER = "X-Sync-Push-Phase"
+    const val PUSH_PHASE_INTERIM = "interim"
+    const val PUSH_PHASE_FINAL = "final"
+
+    /**
+     * Caller's bundled-library fingerprint on push and pull requests. The host
+     * compares it with its own and, on a match, leaves deviceOrigin "system"
+     * rows out of the pull page. Absent header keeps the full transfer.
+     */
+    const val SEED_FINGERPRINT_HEADER = "X-Sync-Seed"
 }
 
-// ========== Auth header constants ==========
 
 object SyncAuth {
     const val AUTH_HEADER = "X-Sync-Auth"
@@ -68,7 +82,6 @@ object SyncAuth {
  */
 expect fun hmacSha256Hex(secret: ByteArray, data: ByteArray): String
 
-/** Build the auth header value: "timestamp:nonce:hex-signature". */
 fun buildAuthHeader(deviceId: String, body: String, secret: ByteArray, timestamp: Long, nonce: String): String {
     val payload = "$deviceId:$timestamp:$nonce:$body"
     val signature = hmacSha256Hex(secret, payload.encodeToByteArray())
@@ -91,7 +104,6 @@ fun generateNonce(): String {
     return sb.toString()
 }
 
-// ========== Request builders ==========
 
 /**
  * Build a SyncBatch from entities that changed after [since].
@@ -272,7 +284,6 @@ data class SyncPushRequest(
     val bodyBytes: ByteArray get() = body.encodeToByteArray()
 
     companion object {
-        /** Build a signed push request from a SyncBatch. */
         fun fromBatch(
             batch: SyncBatch,
             secret: ByteArray,

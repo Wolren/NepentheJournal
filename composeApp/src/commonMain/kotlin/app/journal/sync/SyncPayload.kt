@@ -50,9 +50,7 @@ data class SyncResponse(
     val deletedInteractionIds: List<String> = emptyList(),
     val deletedTimelineEventIds: List<String> = emptyList(),
     val deletedCustomUnitIds: List<String> = emptyList(),
-    /** True when per-type caps cut this page; the client must keep pulling. */
     val truncated: Boolean = false,
-    /** Low-water cursor for the next page. Valid only when [truncated]. */
     val nextSince: Long = 0L,
     /**
      * Composite id half of the low-water cursor: the id of the LAST row
@@ -95,7 +93,14 @@ data class HostInfo(
      * ECDH pairing contract; clients MUST refuse to pair when it is absent.
      * Field name PairingEcdh.HOST_PUBLIC_KEY_FIELD. Contract section g.
      */
-    val ecdhPublicKeyB64: String? = null
+    val ecdhPublicKeyB64: String? = null,
+    /**
+     * Fingerprint of the host's bundled library (DataInitializer.SEED_BUNDLED_FINGERPRINT).
+     * When it equals the client's, both sides hold the same bundled rows, so
+     * sync skips every substance, effect and interaction with deviceOrigin
+     * "system" instead of moving 7600 identical rows.
+     */
+    val seedFingerprint: String? = null
 )
 
 /**

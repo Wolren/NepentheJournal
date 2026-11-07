@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
@@ -56,9 +57,6 @@ class KtorSyncClient(
     private val json = AppJson.json
     private val canSign: Boolean get() = sharedSecret != null
 
-    // Plain HTTP client. Encryption + HMAC secures data on LAN; the scheme
-    // is built from SyncEndpoints.URL_SCHEME so a future TLS phase flips one
-    // constant (contract section g).
     private val client: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) { json(json) }
         install(WebSockets)
@@ -73,7 +71,6 @@ class KtorSyncClient(
     private fun endpoint(host: String, port: Int): String =
         "${SyncEndpoints.URL_SCHEME}://$host:$port"
 
-    // ---- Pairing endpoints (no auth needed) ----
 
     suspend fun requestHostInfo(host: String, port: Int): Result<HostInfo> =
         withContext(Dispatchers.IO) {
@@ -149,8 +146,6 @@ class KtorSyncClient(
             val secret = try {
                 PairingEcdh.unwrapSharedSecret(ecdhSharedSecret, sealed)
             } catch (e: Exception) {
-                // Fail closed: wrong key, tampered ciphertext, or a host that
-                // only populated the legacy fields. Never fall back to them.
                 return@withContext Result.failure(
                     Exception("ECDH pairing secret could not be unwrapped; refusing legacy fields")
                 )
@@ -169,7 +164,6 @@ class KtorSyncClient(
         }
     }
 
-    // ---- Authenticated sync endpoints ----
 
     /**
      * Max pull pages per sync cycle. One page carries EVERY collection up to
@@ -187,18 +181,13 @@ class KtorSyncClient(
     private val maxPullPages = 200
 
     private suspend fun fetchPullPage(host: String, port: Int, cursor: Long, cursorId: String): SyncResponse {
-        // The GET signature covers the request URI verbatim
-        // (SyncServerSecurity.verifyRequest signs call.request.uri), so
-        // build the URI ONCE and use it for both the request and the HMAC.
-        // The id half is query-encoded: an id containing '&' or '=' would
-        // otherwise corrupt the parameter pair, and the host decodes the
-        // value before comparing ids.
         val idParam = if (cursorId.isEmpty()) "" else "&sinceId=${cursorId.encodeURLParameter()}"
         val uri = "${SyncEndpoints.SYNC_PULL}?since=$cursor$idParam"
         val authHeader = authenticateRequest(deviceId, uri)
         val httpResponse = client.get("${endpoint(host, port)}$uri") {
             header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
             header(SyncAuthenticator.AUTH_HEADER, authHeader)
+            header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SEED_BUNDLED_FINGERPRINT)
         }
         val rawBody = httpResponse.bodyAsText()
         val aesKey = aesEncryptionKey(sharedSecret!!)
@@ -243,19 +232,13 @@ class KtorSyncClient(
                 }
                 return PullDrainResult(page, complete = false)
             }
-            // Resume position: the composite cut. nextSince=0 with
-            // truncated=true is an ancient host that does not paginate by
-            // cursor, so fall back to the page's own max updatedAt (legacy
-            // behaviour) with a blank id half.
+            // Resume position: the composite cut. nextSince=0 with truncated=true is an ancient host that doesn't paginate by cursor
             val hasNextSince = page.nextSince > 0L
             val nextTs = if (hasNextSince) page.nextSince else page.maxUpdatedAt()
             val nextId = if (hasNextSince) page.nextSinceId else ""
             val progressed = nextTs > cursorTs || (nextTs == cursorTs && nextId > cursorId)
             if (!progressed) {
-                // Stalls when a pre-nextSinceId host splits a tie group at
-                // the cursor value (it cannot express progress inside one).
-                // Stopping is correct there: those rows are unreachable by
-                // this protocol version, and looping would re-serve them.
+                // Stalls when a pre-nextSinceId host splits a tie group at the cursor value (it can't express progress inside one).
                 Log.withTag("SyncClient").w {
                     "pull cursor stalled at $cursorTs/$cursorId; stopping INCOMPLETE"
                 }
@@ -278,20 +261,33 @@ class KtorSyncClient(
         return PullDrainResult(page, complete = true)
     }
 
-    /** Apply the first page, then keep pulling while truncated. */
     private suspend fun applyAndDrain(
         host: String, port: Int,
         first: SyncResponse,
         firstSince: Long,
         firstSinceId: String = ""
-    ): PullDrainResult = drainPullPages(
-        first = first,
-        firstSince = firstSince,
-        firstSinceId = firstSinceId,
-        pageLimit = maxPullPages,
-        fetchPage = { ts, id -> retryWithBackoff { fetchPullPage(host, port, ts, id) } },
-        applyPage = { page, since -> applyPull(page, since) }
-    )
+    ): PullDrainResult {
+        var applied = false
+        repo.setAutosaveSuppressed(true)
+        try {
+            val result = drainPullPages(
+                first = first,
+                firstSince = firstSince,
+                firstSinceId = firstSinceId,
+                pageLimit = maxPullPages,
+                fetchPage = { ts, id -> retryWithBackoff { fetchPullPage(host, port, ts, id) } },
+                applyPage = { page, since ->
+                    applyPull(page, since, persist = false)
+                    applied = true
+                }
+            )
+            // One write per drain: the pull cursor only moves on a complete drain, so a crash replays the pages.
+            if (applied) persistAfterApply?.invoke()
+            return result
+        } finally {
+            repo.setAutosaveSuppressed(false)
+        }
+    }
 
     /**
      * Outcome of one chunked push cycle (contract section d).
@@ -335,24 +331,27 @@ class KtorSyncClient(
     suspend fun pushChanges(
         host: String, port: Int,
         deviceId: String, deviceName: String,
-        since: Long
+        since: Long,
+        skipBundled: Boolean = false
     ): Result<ChunkedPushResult> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
 
-        // Contract d.4: captured BEFORE the batch is built. This is the only
-        // wall-clock value allowed to become the push cursor.
+        // Contract d.4: captured before the batch is built.
         val cycleStart = System.currentTimeMillis()
 
         val deleted = repo.deletedIdsSince(since)
+        // Same bundled fingerprint on both ends: every "system" row is already there, so never send it.
+        fun <T> payload(items: List<T>, origin: (T) -> String): List<T> =
+            if (skipBundled) items.filter { origin(it) != "system" } else items
         val batch = SyncBatch(
             deviceId = deviceId,
             deviceName = deviceName,
             since = since,
             sessions = changed(repo.sessions.value, since) { it.updatedAt },
             doses = changed(repo.doses.value, since) { it.updatedAt },
-            substances = changed(repo.substances.value, since) { it.updatedAt },
-            effects = changed(repo.effects.value, since) { it.updatedAt },
-            interactions = changed(repo.interactions.value, since) { it.updatedAt },
+            substances = payload(changed(repo.substances.value, since) { it.updatedAt }) { it.deviceOrigin },
+            effects = payload(changed(repo.effects.value, since) { it.updatedAt }) { it.deviceOrigin },
+            interactions = payload(changed(repo.interactions.value, since) { it.updatedAt }) { it.deviceOrigin },
             notes = changed(repo.notes.value, since) { it.updatedAt },
             timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt },
             customUnits = changed(repo.customUnits.value, since) { it.updatedAt },
@@ -374,12 +373,20 @@ class KtorSyncClient(
             // Encrypt body with AES-256-GCM, then base64-encode for transport
             val encryptedBody = base64Encode(encryptBody(bodyText, aesKey))
             val authHeader = authenticateRequest(deviceId, encryptedBody)
+            // The host persists once per cycle and skips the unused pull page on interim slices.
+            val pushPhase = if (index == slices.lastIndex) {
+                SyncEndpoints.PUSH_PHASE_FINAL
+            } else {
+                SyncEndpoints.PUSH_PHASE_INTERIM
+            }
 
             val sliceResult = retryWithBackoff {
                 val httpResponse = client.post("${endpoint(host, port)}${SyncEndpoints.SYNC_PUSH}") {
                     contentType(ContentType.Application.Json)
                     header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                     header(SyncAuthenticator.AUTH_HEADER, authHeader)
+                    header(SyncEndpoints.PUSH_PHASE_HEADER, pushPhase)
+                    header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SEED_BUNDLED_FINGERPRINT)
                     setBody(encryptedBody)
                 }
                 // Read raw body, base64-decode, decrypt, then deserialize
@@ -393,26 +400,17 @@ class KtorSyncClient(
             }
             acks += ack
             if (!ack.success) {
-                // Stop immediately: later slices must not be sent, and the
-                // cursor stays where it was so everything not confirmed is
-                // resent next cycle.
                 Log.withTag("SyncClient").w { "push slice $index/${slices.size} rejected: ${ack.error}" }
                 return@withContext Result.failure(Exception(ack.error ?: "Push slice rejected"))
             }
         }
 
-        // Every slice acked success=true. Apply the exchange data: the final
-        // ack is the freshest snapshot of the same since cursor, and
-        // applyAndDrain follows its pagination from there.
         try {
             val drain = applyAndDrain(host, port, acks.last(), since)
             if (!drain.lastPage.success) {
                 return@withContext Result.failure(Exception(drain.lastPage.error ?: "Push failed"))
             }
             if (!drain.complete) {
-                // Not an error for this cycle (the push half is durable and
-                // applied pages are persisted), but the caller must hold its
-                // cursor; say so where operators can see it.
                 Log.withTag("SyncClient").w { "pull drain incomplete; sync cursor will hold at since=$since" }
             }
             Result.success(ChunkedPushResult(
@@ -465,10 +463,7 @@ class KtorSyncClient(
         return constantTimeEquals(data.signature, expected)
     }
 
-    private suspend fun applyPull(response: SyncResponse, since: Long) {
-        // Client-response guard (contract): the shared validateSyncResponse
-        // filters the raw lists before they touch the store, and the skip
-        // counts are logged with their totals instead of being applied blind.
+    private suspend fun applyPull(response: SyncResponse, since: Long, persist: Boolean) {
         val applied = applySyncResponse(repo, response, since)
         if (applied.skippedEntities > 0 || applied.skippedTombstones > 0) {
             Log.withTag("SyncClient").w {
@@ -476,10 +471,8 @@ class KtorSyncClient(
                     "${applied.skippedTombstones} invalid tombstone IDs (since=$since)"
             }
         }
-        // Persist pulled data immediately (audit D1): the pull cursor advances
-        // after this response, so a crash before the debounced autosave would
-        // skip re-fetching this data on the next sync.
-        persistAfterApply?.invoke()
+        // audit D1 holds at drain granularity: the caller persists once, before the cursor can move.
+        if (persist) persistAfterApply?.invoke()
     }
 
     /**
@@ -498,7 +491,6 @@ class KtorSyncClient(
         )
     }
 
-    /** Constant-time comparison to avoid timing side channels on HMAC checks. */
     private fun constantTimeEquals(a: String, b: String): Boolean {
         if (a.length != b.length) return false
         var result = 0
@@ -515,11 +507,7 @@ class KtorSyncClient(
         if (!canSign) throw IllegalStateException("No shared secret, pair this device first")
 
         val authHeader = authenticateRequest(callerDeviceId, "ws")
-        // Header-only auth: query strings leak into access logs and crash
-        // reports. webSocketSession takes a request builder, so headers ride
-        // the handshake instead of the URL. The ws scheme is fixed here:
-        // SyncEndpoints.URL_SCHEME is the HTTP scheme used by every REST
-        // endpoint above.
+        // Header-only auth: query strings leak into access logs and crash reports. webSocketSession takes a request builder
         return client.webSocketSession({
             url("ws://$host:$port${SyncEndpoints.SYNC_WS}")
             header(SyncAuthenticator.DEVICE_ID_HEADER, callerDeviceId)
@@ -528,9 +516,6 @@ class KtorSyncClient(
     }
 
     suspend fun sendDelta(session: WebSocketSession, delta: WsDelta) {
-        // Encode polymorphically: the server decodes frames as WsMessage and
-        // needs the #type discriminator (concrete encoding silently failed
-        // server-side decode; WS protocol bug fixed 2026-07-31).
         val text = wsJson.encodeToString(WsMessage.serializer(), delta)
         if (sharedSecret != null) {
             val aesKey = aesEncryptionKey(sharedSecret)

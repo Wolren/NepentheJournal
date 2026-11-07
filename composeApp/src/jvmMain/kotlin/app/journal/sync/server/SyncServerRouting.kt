@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
@@ -50,8 +51,6 @@ class SyncServerRouter(
     private val json = AppJson.json
     private val pairingAttempts = ConcurrentHashMap<String, Pair<Int, Long>>()
 
-    // Per-IP throttles for the authenticated sync surface (buckets are
-    // per-endpoint so a pull drain can never starve pairing, etc.).
     private val pushThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
     private val pullThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
     private val verifyThrottle = ConcurrentHashMap<String, Pair<Int, Long>>()
@@ -62,7 +61,6 @@ class SyncServerRouter(
     private val MAX_VERIFY_PER_WINDOW = 30
     private val VERIFY_WINDOW_MS = 60_000L
 
-    /** Live server-side WS sessions per device, so revocation can drop them. */
     private val wsSessions = ConcurrentHashMap<String, MutableSet<DefaultWebSocketServerSession>>()
 
     /** Per-connection WS sequence state: highest accepted seq plus a small reorder buffer. */
@@ -73,10 +71,7 @@ class SyncServerRouter(
         val recent: java.util.LinkedHashSet<Long> = java.util.LinkedHashSet()
     }
 
-    // wave2 file split (file-size-governor): cohesive private-method groups
-    // moved verbatim into helpers this router owns; state is passed by
-    // reference (same instances) so rate limits, sessions, and sequence
-    // state behave identically to the pre-split single file.
+    // wave2 file split (file-size-governor): cohesive private-method groups moved verbatim into helpers this router owns
     private val security = SyncServerSecurity(
         trustStore = trustStore, authenticator = authenticator,
         deviceId = deviceId, deviceName = deviceName, fingerprint = fingerprint,
@@ -86,6 +81,13 @@ class SyncServerRouter(
         repo = repo, onConnection = onConnection, persistAfterApply = persistAfterApply
     )
 
+    /**
+     * True when the caller ships the same bundled library, so this host can omit every
+     * deviceOrigin "system" row from a pull page. A missing header keeps the full transfer.
+     */
+    private fun sameBundledLibrary(call: ApplicationCall): Boolean =
+        call.request.headers[SyncEndpoints.SEED_FINGERPRINT_HEADER] == SEED_BUNDLED_FINGERPRINT
+
     fun installRouting(app: Application) {
         app.install(WebSockets) {
             pingPeriod = 15.seconds
@@ -94,15 +96,15 @@ class SyncServerRouter(
         }
 
         app.routing {
-            get(SyncEndpoints.INFO) {
-                call.respondText(
+            get(SyncEndpoints.INFO) {                call.respondText(
                     json.encodeToString(HostInfo(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
-                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
+                        seedFingerprint = SEED_BUNDLED_FINGERPRINT
                     )),
                     ContentType.Application.Json
                 )
@@ -116,7 +118,8 @@ class SyncServerRouter(
                         fingerprint = fingerprint,
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
-                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64
+                        ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
+                        seedFingerprint = SEED_BUNDLED_FINGERPRINT
                     )),
                     ContentType.Application.Json
                 )
@@ -138,9 +141,7 @@ class SyncServerRouter(
                 val challengeRaw = call.request.headers["X-Sync-Challenge"]
                     ?: call.request.queryParameters["challenge"]
                 val challenge = challengeRaw?.take(MAX_CHALLENGE_LEN)
-                // Uniform failure code: missing params, overlong challenges,
-                // and unknown devices all return 401 with the same body, so
-                // the endpoint is not a device-existence oracle.
+                // Uniform failure code: missing params, overlong challenges, and unknown devices all return 401 with the same body
                 if (deviceIdParam.isNullOrBlank() || challenge.isNullOrBlank()) {
                     security.warnAuth(call, deviceIdParam, SyncEndpoints.AUTH_VERIFY, "missing device or challenge")
                     call.respondText(
@@ -166,9 +167,6 @@ class SyncServerRouter(
                     )
                     return@get
                 }
-                // Prove knowledge of the shared secret without revealing it.
-                // Bound to a fresh client-supplied challenge, so a captured
-                // response cannot be replayed against a different challenge.
                 val timestamp = System.currentTimeMillis()
                 val signature = authenticator.signChallenge(deviceIdParam, timestamp, challenge, secret)
                 call.respondText(
@@ -178,12 +176,7 @@ class SyncServerRouter(
             }
 
             post(SyncEndpoints.PAIRING_VERIFY) {
-                // Socket-level remote address. X-Forwarded-For is deliberately
-                // NOT trusted: this server is directly reachable on the LAN with
-                // no proxy, so the header is client-controlled and would let an
-                // attacker rotate the rate-limit bucket per request.
-                // Verified empirically on Ktor 3.5.1 Netty: local.remoteHost
-                // carries the peer address (the 0.0.0.0 bind is NOT returned).
+                // Verified empirically on Ktor 3.5.1 Netty: local.remoteHost carries the peer address (the 0.0.0.0 bind isn't returned).
                 val clientIp = call.request.local.remoteHost
                 security.evictStaleBuckets()
                 if (security.isRateLimited(clientIp)) {
@@ -222,8 +215,6 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // Cap identity fields so a client cannot register oversized
-                // display names / ids in the trust store (4KB body allows it).
                 if (verifyReq.clientDeviceId.length > 128 ||
                     verifyReq.clientDeviceName.length > 200 ||
                     verifyReq.clientFingerprint.length > 128
@@ -244,10 +235,7 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // Contract section g (ECDH): the permanent secret is ONLY
-                // delivered sealed under an ECDH-derived key. Reject the
-                // pairing when the client key is missing, not valid base64,
-                // not 65 bytes, not prefixed 0x04, or not on the curve.
+                // Reject the pairing when the client key is missing, not valid base64, not 65 bytes, not prefixed 0x04
                 val clientEcdhPublicKeyB64 = verifyReq.clientEcdhPublicKeyB64
                 if (clientEcdhPublicKeyB64 == null) {
                     security.warnAuth(call, verifyReq.clientDeviceId, SyncEndpoints.PAIRING_VERIFY, "missing ECDH public key")
@@ -268,11 +256,7 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // One shared secret for this client: mint it, seal it under
-                // the ECDH-derived key, then store it. The legacy plaintext
-                // sharedSecret and PBKDF2 encSecretB64 fields are NOT
-                // populated anymore: a LAN observer of this response must
-                // not learn the permanent sync secret (audit C4).
+                // The legacy plaintext sharedSecret and PBKDF2 encSecretB64 fields aren't populated anymore
                 val sharedSecret = authenticator.generateSharedSecret()
                 val clientDeviceId = verifyReq.clientDeviceId.ifBlank {
                     "client-${verifyReq.clientFingerprint.take(8)}"
@@ -280,8 +264,6 @@ class SyncServerRouter(
                 val ecdhSecretB64 = try {
                     PairingEcdh.wrapSharedSecret(ecdhSharedSecret, sharedSecret)
                 } catch (e: Exception) {
-                    // Fail closed: never fall back to emitting the secret in
-                    // the clear when the seal cannot be produced.
                     Log.withTag("KtorSyncServer").e(e) { "ECDH pairing seal failed" }
                     call.respondText(
                         json.encodeToString(PairingResultResponse(false, error = "Pairing seal failed")),
@@ -300,7 +282,6 @@ class SyncServerRouter(
                     pairedAt = System.currentTimeMillis()
                 ))
 
-                // Also ensure the host has its own record (same shared secret or separate)
                 security.hostSecret() // ensures host peer exists
 
                 call.respondText(
@@ -329,8 +310,6 @@ class SyncServerRouter(
                     )
                     return@post
                 }
-                // Declared length is enforced BEFORE the body is buffered:
-                // missing, chunked, or oversized bodies are refused unread.
                 if (!security.hasValidContentLength(call, MAX_BODY_BYTES)) {
                     security.warnAuth(call, call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER], SyncEndpoints.SYNC_PUSH, "missing or oversized content length")
                     call.respondText(
@@ -359,7 +338,6 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // Decrypt the encrypted body before processing
                 val callerSecret = trustStore.getSharedSecret(callerDeviceId)
                 if (callerSecret == null) {
                     security.warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PUSH, "unknown device")
@@ -390,9 +368,7 @@ class SyncServerRouter(
                     return@post
                 }
 
-                // The batch must identify the authenticated caller. Otherwise a
-                // paired device could attribute writes / conflict notes to
-                // another device (audit L8).
+                // Otherwise a paired device could attribute writes / conflict notes to another device (audit L8).
                 if (batch.deviceId != callerDeviceId) {
                     security.warnAuth(call, callerDeviceId, SyncEndpoints.SYNC_PUSH, "device ID mismatch")
                     call.respondText(
@@ -411,14 +387,21 @@ class SyncServerRouter(
                     return@post
                 }
 
+                val pushPhase = call.request.headers[SyncEndpoints.PUSH_PHASE_HEADER]
+                val interimSlice = pushPhase == SyncEndpoints.PUSH_PHASE_INTERIM
+
                 handlers.handlePush(batch)
                 trustStore.updateLastSeen(callerDeviceId)
-                // Durability: persist before acknowledging, so a crash after the
-                // response cannot lose data the client believes was accepted.
-                // The client advances its sync cursor on a successful response,
-                // so an unpersisted ack would lose the pushed data forever.
-                persistAfterApply?.invoke()
-                val exchangeResponse = handlers.handlePull(batch.since)
+                // A chunked cycle persists once, on its final slice; the client holds its cursor until every ack.
+                if (!interimSlice) {
+                    persistAfterApply?.invoke()
+                }
+                // The client drains only the last slice's page, so an interim slice answers with an empty one.
+                val exchangeResponse = if (interimSlice) {
+                    SyncResponse(success = true)
+                } else {
+                    handlers.handlePull(batch.since, skipBundled = sameBundledLibrary(call))
+                }
                 // Encrypt the response: encryptBody + base64Encode
                 val encryptedResponse = base64Encode(encryptBody(
                     json.encodeToString(exchangeResponse), aesKey
@@ -457,11 +440,6 @@ class SyncServerRouter(
                     )
                     return@get
                 }
-                // Composite resume id (SyncResponse.nextSinceId). Bounded to
-                // MAX_ID_LEN and blanked when malformed, so a hostile client
-                // cannot smuggle an oversized cursor component into logs or
-                // comparisons; an unknown parameter from an older client
-                // simply stays "".
                 val sinceId = call.request.queryParameters["sinceId"]
                     ?.trim()
                     ?.take(SyncLimits.MAX_ID_LEN)
@@ -477,7 +455,7 @@ class SyncServerRouter(
                     return@get
                 }
 
-                val response = handlers.handlePull(since, sinceId)
+                val response = handlers.handlePull(since, sinceId, skipBundled = sameBundledLibrary(call))
                 trustStore.updateLastSeen(callerDeviceId)
                 val aesKey = aesEncryptionKey(callerSecret)
                 val encryptedResponse = base64Encode(encryptBody(
@@ -487,9 +465,6 @@ class SyncServerRouter(
             }
 
             webSocket(SyncEndpoints.SYNC_WS) {
-                // Header-only auth: query strings leak into logs, caches, and
-                // history. Older query-based clients are rejected, not
-                // downgraded.
                 val callerDeviceId = call.request.headers[SyncAuthenticator.DEVICE_ID_HEADER]
                 val authHeader = call.request.headers[SyncAuthenticator.AUTH_HEADER]
                 if (callerDeviceId == null || authHeader == null) {
@@ -506,16 +481,10 @@ class SyncServerRouter(
                     return@webSocket
                 }
 
-                // Contract section a.3: every authenticated handshake is a NEW
-                // EPOCH for this device. Discard all prior sequence state so a
-                // stale/replayed seq from an earlier connection can never
-                // reject a frame of this one (and client reboot resets that
-                // used to stall sync forever after nanoTime restarts).
+                // Contract section a.3: every authenticated handshake is a new epoch for this device.
                 wsSeqState.remove(callerDeviceId)
 
-                // Derive AES key for decrypting WsDelta frames. Once keyed,
-                // plaintext deltas are refused: every WsDelta frame must be
-                // AES-GCM ciphertext (base64 of encryptBody output).
+                // Once keyed, plaintext deltas are refused: every WsDelta frame must be AES-GCM ciphertext (base64 of encryptBody output).
                 val wsAesKey = trustStore.getSharedSecret(callerDeviceId)?.let { aesEncryptionKey(it) }
                 if (wsAesKey == null) {
                     Log.withTag("KtorSyncServer").w { "WS keyed check failed peer=$callerDeviceId endpoint=/sync/ws" }
@@ -523,16 +492,10 @@ class SyncServerRouter(
                     return@webSocket
                 }
 
-                // Track this live session so revocation can drop it immediately.
-                // Indentation inside the try is intentionally flat: Kotlin does
-                // not care, and this keeps the diff reviewable.
                 val serverSession: DefaultWebSocketServerSession = this
                 wsSessions.getOrPut(callerDeviceId) { ConcurrentHashMap.newKeySet() }.add(serverSession)
                 try {
                 for (frame in incoming) {
-                    // Revocation takes effect on live connections: a device
-                    // revoked mid-session is closed on its next frame, and
-                    // closeDeviceSessions handles idle connections.
                     if (!trustStore.isTrustedDeviceId(callerDeviceId)) {
                         close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Device revoked"))
                         return@webSocket
@@ -552,9 +515,7 @@ class SyncServerRouter(
                             ))
                             continue
                         }
-                        // WsDelta frames must arrive encrypted. tryDecryptWsMessage
-                        // only returns a delta when AES-GCM decryption succeeded;
-                        // plaintext on a keyed connection yields null above.
+                        // WsDelta frames must arrive encrypted. tryDecryptWsMessage only returns a delta when AES-GCM decryption succeeded
                         when (msg) {
                             is WsDelta -> {
                                 if (!checkWsSeq(callerDeviceId, msg.seq)) {
@@ -586,23 +547,14 @@ class SyncServerRouter(
                                     deletedInteractionIds = msg.deletedInteractionIds,
                                     deletedTimelineEventIds = msg.deletedTimelineEventIds,
                                     deletedCustomUnitIds = msg.deletedCustomUnitIds,
-                                    // Contract section b row 2: same cursor LWW rule as
-                                    // the HTTP push path. Transport choice must not
-                                    // change delete semantics (the old unconditional 0
-                                    // let an older WS delete wipe a newer local edit).
-                                    // Older senders leave since at its 0 default, which
-                                    // yields the conservative "no local entity" rule.
+                                    // Contract section b row 2: same cursor lww rule as the http push path.
                                     tombstoneCutoff = msg.since
                                 )
-                                // Contract section c: sessions and notes take the SAME
-                                // shared-merge routes as the HTTP push path. The note
-                                // merge is the repo's upsertNoteWithConflict, never a
-                                // platform-local branch.
+                                // The note merge is the repo's upsertNoteWithConflict, never a platform-local branch.
                                 val conflicts =
                                     handlers.applySessionsWithConflict(msg.sessions, msg.deletedSessionIds, callerDeviceId) +
                                         handlers.applyNotesWithConflict(msg.notes, msg.deletedNoteIds, callerDeviceId)
-                                // Persist before acking the delta (same rule as
-                                // the push route; see audit D1).
+                                // Persist before acking the delta (same rule as the push route; see audit D1).
                                 persistAfterApply?.invoke()
                                 if (conflicts > 0) onConnection("$conflicts conflict(s)")
                                 outgoing.send(Frame.Text(
@@ -632,9 +584,7 @@ class SyncServerRouter(
      * in the WS route covers connections with traffic).
      */
     suspend fun closeDeviceSessions(deviceId: String) {
-        // Contract section a.5: evict the sequence state together with the
-        // sessions, so the per-device map cannot grow forever after
-        // revocations and disconnects.
+        // Contract section a.5: evict the sequence state together with the sessions
         wsSeqState.remove(deviceId)
         val sessions = wsSessions.remove(deviceId) ?: return
         for (session in sessions.toList()) {
@@ -659,9 +609,6 @@ class SyncServerRouter(
         } catch (_: Exception) {
             Log.withTag("KtorSyncServer").d { "WS frame is not decryptable ciphertext, trying cleartext control frames" }
         }
-        // Cleartext fallback for control frames only. A plaintext WsDelta is
-        // refused (returns null): on a keyed connection every delta must be
-        // encrypted, otherwise a LAN observer could inject unsigned batches.
         return try {
             when (val msg = wsJson.decodeFromString<WsMessage>(text)) {
                 is WsPing, is WsPong, is WsAck -> msg
@@ -684,7 +631,6 @@ class SyncServerRouter(
         val state = wsSeqState.computeIfAbsent(deviceId) { WsSeqState() }
         synchronized(state) {
             if (seq > state.highestSeq) {
-                // Slide the window forward, remembering skipped values.
                 var s = state.highestSeq + 1
                 while (s < seq) {
                     state.recent.add(s)
@@ -697,7 +643,6 @@ class SyncServerRouter(
                 state.recent.remove(seq)
                 return true
             }
-            // Within the reorder window and not seen before: accept once.
             if (seq > state.highestSeq - WS_REORDER_WINDOW && state.recent.remove(seq)) {
                 return true
             }

@@ -1,12 +1,14 @@
 package app.journal.sync
 
 import app.journal.data.JournalRepository
+import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.model.Dose
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
 import app.journal.model.Session
 import app.journal.sync.DeviceTrustStore.TrustedPeer
 import app.journal.sync.aesEncryptionKey
+import app.journal.util.crypto.base64Decode
 import app.journal.util.crypto.base64Encode
 import app.journal.sync.encryptBody
 import kotlinx.coroutines.flow.first
@@ -50,14 +52,11 @@ class KtorSyncServerIntegrationTest {
             application { installRouter() }
             val resp = client.get("/info")
             assertEquals(HttpStatusCode.OK, resp.status)
-            // Decode the typed payload instead of raw-substring matching
-            // (audit C7): every advertised field is asserted by name.
+            // Decode the typed payload instead of raw-substring matching (audit C7): every advertised field is asserted by name.
             val info = app.journal.serde.AppJson.json.decodeFromString<HostInfo>(resp.bodyAsText())
             assertEquals("test-device-abc123", info.deviceId)
             assertEquals("Test Device", info.deviceName)
             assertEquals("abc123def456", info.fingerprint)
-            // Contract g/f: both HostInfo sites advertise the static ECDH
-            // public point, serve the pinned protocol version, and keep WS.
             assertNotNull(info.ecdhPublicKeyB64,
                 "HostInfo must advertise ecdhPublicKeyB64")
             assertEquals(SYNC_PROTOCOL_VERSION, info.protocolVersion,
@@ -71,7 +70,6 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             application { installRouter() }
             val secret = client.pairEcdh("test-client", "Client", "client789xyz")
-            // The host stored the very secret it sealed under the ECDH key.
             assertEquals(secret, trustStore.getSharedSecret("test-client"))
         }
     }
@@ -114,7 +112,6 @@ class KtorSyncServerIntegrationTest {
             val sharedSecret = client.pairEcdh("paired-client", "Client", "client789xyz")
 
             val plainBody = """{"deviceId":"paired-client","deviceName":"Client","since":0,"substances":[],"doses":[],"sessions":[],"interactions":[],"notes":[],"timelineEvents":[],"effects":[],"customUnits":[]}"""
-            // Encrypt the body the same way the real client does
             val aesKey = aesEncryptionKey(sharedSecret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
             val authValue = sign("paired-client", encryptedBody, sharedSecret)
@@ -145,7 +142,6 @@ class KtorSyncServerIntegrationTest {
     fun `auth verify proves host knows the secret`() {
         testApplication {
             application { installRouter() }
-            // Pair a client through the real ECDH endpoint
             val secret = client.pairEcdh("challenge-client", "Client", "cfp")
 
             val challenge = "0123456789abcdef0123456789abcdef"
@@ -154,7 +150,6 @@ class KtorSyncServerIntegrationTest {
             val data = app.journal.serde.AppJson.json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
             assertTrue(kotlin.math.abs(System.currentTimeMillis() - data.timestamp) < 45_000)
 
-            // Recompute the expected signature with the shared secret
             val expected = hmacSha256Hex(
                 secret.encodeToByteArray(),
                 "challenge:challenge-client:${data.timestamp}:$challenge".encodeToByteArray()
@@ -168,8 +163,7 @@ class KtorSyncServerIntegrationTest {
         testApplication {
             application { installRouter() }
             val resp = client.get("/auth/verify?deviceId=unknown&challenge=abc")
-            // Uniform 401: missing params, overlong challenges, and unknown
-            // devices share one code so the endpoint is not an oracle.
+            // Uniform 401: missing params, overlong challenges, and unknown devices share one code so the endpoint isn't an oracle.
             assertEquals(HttpStatusCode.Unauthorized, resp.status)
         }
     }
@@ -188,7 +182,6 @@ class KtorSyncServerIntegrationTest {
             application { installRouter() }
             val secret = client.pairEcdh("real-client", "Client", "cfp")
 
-            // Batch claims a DIFFERENT device than the authenticated header
             val plainBody = """{"deviceId":"other-device","deviceName":"Client","since":0}"""
             val aesKey = aesEncryptionKey(secret)
             val encryptedBody = base64Encode(encryptBody(plainBody, aesKey))
@@ -319,8 +312,74 @@ class KtorSyncServerIntegrationTest {
                 setBody(encryptedBody)
             }
             assertEquals(HttpStatusCode.OK, push.status)
-            // The durability callback must have run before the ack returned
             assertEquals(1, persistCount, "persistAfterApply must fire on every accepted push")
+        }
+    }
+
+    @Test
+    fun `interim push slices defer the persist and the pull page to the final slice`() {
+        testApplication {
+            var persistCount = 0
+            application { installRouter(persistAfterApply = { persistCount++ }) }
+            val secret = client.pairEcdh("chunk-client", "Client", "cfp")
+            val aesKey = aesEncryptionKey(secret)
+
+            suspend fun push(index: Int, phase: String?): SyncResponse {
+                val plainBody = """{"deviceId":"chunk-client","deviceName":"Client","since":0,""" +
+                    """"sessions":[{"id":"s:chunk-$index","title":"Chunk","startTime":1700000000000,""" +
+                    """"createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test"}]}"""
+                val encrypted = base64Encode(encryptBody(plainBody, aesKey))
+                val resp = client.post("/sync/push") {
+                    header("X-Sync-Device", "chunk-client")
+                    header("X-Sync-Auth", sign("chunk-client", encrypted, secret))
+                    if (phase != null) header(SyncEndpoints.PUSH_PHASE_HEADER, phase)
+                    contentType(ContentType.Application.Json)
+                    setBody(encrypted)
+                }
+                assertEquals(HttpStatusCode.OK, resp.status)
+                val decrypted = decryptBody(base64Decode(resp.bodyAsText()), aesKey)
+                return app.journal.serde.AppJson.json.decodeFromString<SyncResponse>(decrypted)
+            }
+
+            val first = push(1, SyncEndpoints.PUSH_PHASE_INTERIM)
+            val second = push(2, SyncEndpoints.PUSH_PHASE_INTERIM)
+            assertEquals(0, persistCount, "interim slices must not write the journal")
+            assertTrue(first.sessions.isEmpty() && first.substances.isEmpty(),
+                "interim slice must answer with an empty pull page")
+            assertTrue(second.sessions.isEmpty(),
+                "every interim slice must answer with an empty pull page")
+
+            val final = push(3, SyncEndpoints.PUSH_PHASE_FINAL)
+            assertEquals(1, persistCount, "the final slice persists the whole cycle exactly once")
+            assertTrue(final.sessions.isNotEmpty(), "the final slice carries the pull page")
+        }
+    }
+
+    @Test
+    fun `pushes without the phase header keep persisting per slice`() {
+        testApplication {
+            var persistCount = 0
+            application { installRouter(persistAfterApply = { persistCount++ }) }
+            val secret = client.pairEcdh("legacy-client", "Legacy", "lfp")
+            val aesKey = aesEncryptionKey(secret)
+
+            suspend fun push(index: Int) {
+                val plainBody = """{"deviceId":"legacy-client","deviceName":"Legacy","since":0,""" +
+                    """"sessions":[{"id":"s:legacy-$index","title":"Legacy","startTime":1700000000000,""" +
+                    """"createdAt":1700000000000,"updatedAt":1700000000000,"deviceOrigin":"test"}]}"""
+                val encrypted = base64Encode(encryptBody(plainBody, aesKey))
+                val resp = client.post("/sync/push") {
+                    header("X-Sync-Device", "legacy-client")
+                    header("X-Sync-Auth", sign("legacy-client", encrypted, secret))
+                    contentType(ContentType.Application.Json)
+                    setBody(encrypted)
+                }
+                assertEquals(HttpStatusCode.OK, resp.status)
+            }
+
+            push(1)
+            push(2)
+            assertEquals(2, persistCount, "a client without the phase header keeps a persist per request")
         }
     }
 
@@ -331,7 +390,6 @@ class KtorSyncServerIntegrationTest {
             application { installRouter(persistAfterApply = { persistCount++ }) }
             val secret = client.pairEcdh("ws-client", "Client", "cfp")
 
-            // The WS handshake auth signs the literal body "ws" (production contract)
             val authValue = sign("ws-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
 
@@ -346,8 +404,7 @@ class KtorSyncServerIntegrationTest {
                         createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L, deviceOrigin = "test"
                     ))
                 )
-                // Keyed connections only accept encrypted deltas: encode,
-                // AES-GCM encrypt, then base64, same as the real client.
+                // Keyed connections only accept encrypted deltas: encode, AES-GCM encrypt, then base64, same as the real client.
                 val encoded = wsJson.encodeToString(WsMessage.serializer(), delta)
                 val wsAesKey = aesEncryptionKey(secret)
                 send(Frame.Text(base64Encode(encryptBody(encoded, wsAesKey))))
@@ -416,8 +473,7 @@ class KtorSyncServerIntegrationTest {
                         deviceOrigin = "test"
                     ))
                 )
-                // Real client path: polymorphic encode, then AES-GCM encrypt,
-                // then base64. The server must decrypt and apply it.
+                // Real client path: polymorphic encode, then AES-GCM encrypt, then base64.
                 val plaintext = wsJson.encodeToString(WsMessage.serializer(), delta)
                 val aesKey = aesEncryptionKey(secret)
                 val encrypted = base64Encode(encryptBody(plaintext, aesKey))
@@ -475,9 +531,7 @@ class KtorSyncServerIntegrationTest {
                 }
                 assertNotEquals(HttpStatusCode.TooManyRequests, r.status)
             }
-            // Same client with a spoofed XFF header: must STILL be rate limited.
-            // X-Forwarded-For is client-controlled on direct LAN connections and
-            // must never act as the rate-limit bucket key (audit H1).
+            // X-Forwarded-For is client-controlled on direct LAN connections and must never act as the rate-limit bucket key (audit H1).
             val r = client.post("/pairing/verify") {
                 header("X-Forwarded-For", "9.9.9.9")
                 contentType(ContentType.Application.Json)
@@ -495,6 +549,7 @@ class KtorSyncServerIntegrationTest {
      */
     @Test
     fun `2015 interaction push advances cursor only after all slices ack`() = runBlocking {
+        var persistCount = 0
         val server = KtorSyncServer(
             repo = repo,
             port = 0, // ephemeral: never collide with concurrently running sibling test JVMs
@@ -502,7 +557,8 @@ class KtorSyncServerIntegrationTest {
             ecdhIdentity = EcdhIdentityManager(testDir.absolutePath),
             trustStore = trustStore,
             authenticator = authenticator,
-            onConnection = {}
+            onConnection = {},
+            persistAfterApply = { persistCount++ }
         )
         val info = server.start()
         val port = info.port
@@ -522,7 +578,6 @@ class KtorSyncServerIntegrationTest {
                 ))
             }
 
-            // Real contract-g ECDH pairing against the real server.
             val bootstrap = KtorSyncClient(
                 repo = clientRepo, deviceId = "chunk-client", deviceName = "Chunker"
             )
@@ -560,9 +615,9 @@ class KtorSyncServerIntegrationTest {
                 assertTrue(result.acks.all { it.success }, "every slice must ack success=true")
                 assertEquals(2015, repo.interactions.value.size,
                     "every slice must be applied to the server repo")
+                assertEquals(1, persistCount,
+                    "a chunked cycle must write the host journal once, not once per slice")
 
-                // The pinned cursor rule over the REAL ack list of this push:
-                // advance to cycleStart only with a complete success set.
                 val previous = 1_700_000_000_000L
                 assertEquals(result.cycleStart,
                     advanceCursorIfAllSucceeded(previous, result.cycleStart, result.acks),
@@ -653,7 +708,6 @@ class KtorSyncServerIntegrationTest {
                         "connection is accepted; got error: ${ack.error}")
             }
 
-            // Both epochs' payloads landed exactly once each.
             val epochIds = repo.sessions.value.map { it.id }
                 .filter { it.startsWith("s:epoch-") }.toSet()
             assertEquals(setOf("s:epoch-1", "s:epoch-2", "s:epoch-new"), epochIds,
@@ -724,7 +778,7 @@ class KtorSyncServerIntegrationTest {
             assertEquals(HttpStatusCode.OK, push.status, push.bodyAsText())
             assertRule("http", "HTTP push")
 
-            // Path 2: WS delta with the SAME cursor and tombstone list
+            // Path 2: WS delta with the same cursor and tombstone list
             seed("ws")
             val authValue = sign("parity-client", "ws", secret)
             val wsClient = createClient { install(WebSockets) }
@@ -745,7 +799,6 @@ class KtorSyncServerIntegrationTest {
             }
             assertRule("ws", "WS apply")
 
-            // Cross-path parity: identical outcomes on both transports.
             assertEquals(outcome("http"), outcome("ws"),
                 "HTTP push and WS apply must produce identical tombstone-cutoff outcomes")
         }
@@ -768,7 +821,6 @@ class KtorSyncServerIntegrationTest {
             application { installRouter() }
             val secret = client.pairEcdh("conflict-client", "Client", "cfp")
 
-            // Local copy is NEWER than the peer's incoming session.
             repo.upsertSession(Session(
                 id = "s:conflict", title = "Local title", startTime = 1_700_000_000_000L,
                 createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_050_000L,
@@ -794,13 +846,11 @@ class KtorSyncServerIntegrationTest {
 
             assertEquals(HttpStatusCode.OK, pushBatch(), "conflicting push must be accepted")
 
-            // The newer LOCAL session survives untouched...
             val local = repo.getSession("s:conflict")
             assertNotNull(local, "the newer local session must never be clobbered")
             assertEquals(1_700_000_050_000L, local.updatedAt, "local updatedAt must not move")
             assertEquals("local outcome", local.outcome, "local outcome must be preserved")
 
-            // ...and the peer's outcome survives as a conflict note.
             val conflict = repo.notes.value.single { it.id == "conflict:s:conflict:conflict-client" }
             assertEquals("s:conflict", conflict.sessionId)
             assertEquals("Sync conflict: Remote title", conflict.title)
@@ -810,12 +860,9 @@ class KtorSyncServerIntegrationTest {
                 "the conflict note is stamped with the newer of the two timestamps")
             assertTrue(conflict.conflictSiblings.isEmpty(),
                 "session conflicts are standalone notes, not sibling-carrying note merges")
-            // Contract c5: pendingConflictCount counts sibling-carrying NOTE
-            // merges only, so a session-outcome conflict must not inflate it
-            // (the host banner counts session conflicts separately).
+            // Contract c5: pendingConflictCount counts sibling-carrying note merges only
             assertEquals(0, runBlocking { repo.pendingConflictCount.first() })
 
-            // Idempotent replay: an identical second push changes nothing.
             assertEquals(HttpStatusCode.OK, pushBatch(), "replayed push must still be accepted")
             assertEquals(1, repo.notes.value.count { it.id == "conflict:s:conflict:conflict-client" },
                 "replaying the batch must never duplicate the conflict note")
@@ -846,12 +893,13 @@ class KtorSyncServerIntegrationTest {
         val port = info.port
         val tied = 1_783_942_757_808L
         try {
-            // Host side: the real seed shape, every row on one timestamp.
             repeat(2015) { i ->
+                // deviceOrigin "host": a system origin would classify these as bundled rows and the client now skips those.
                 repo.upsertInteraction(Interaction(
                     id = "int:$i",
                     createdAt = tied,
                     updatedAt = tied,
+                    deviceOrigin = "host",
                     substanceAId = "sub:a",
                     substanceBId = "sub:b",
                     riskLevel = InteractionRisk.LOW,
@@ -859,7 +907,6 @@ class KtorSyncServerIntegrationTest {
                 ))
             }
 
-            // Pair a fresh, EMPTY client through the real contract-g flow.
             val clientRepo = JournalRepository()
             val bootstrap = KtorSyncClient(
                 repo = clientRepo, deviceId = "tie-client", deviceName = "Tie"
@@ -882,8 +929,6 @@ class KtorSyncServerIntegrationTest {
                 sharedSecret = secret
             )
             try {
-                // Empty client push (one no-op slice) whose ack carries the
-                // first pull page, then the drain walks the rest.
                 val push = client.pushChanges(
                     host = "127.0.0.1", port = port,
                     deviceId = "tie-client", deviceName = "Tie", since = 0L
@@ -895,6 +940,90 @@ class KtorSyncServerIntegrationTest {
                     "the pull drain must run all the way to an untruncated page")
                 assertEquals(2015, clientRepo.interactions.value.size,
                     "every tied-timestamp interaction must cross the pull (the old cursor stopped at 100)")
+            } finally {
+                client.close()
+            }
+        } finally {
+            server.stop()
+        }
+    }
+    /**
+     * End-to-end proof of the bundled-library shortcut over a real socket: both
+     * ends share the seed fingerprint, so no deviceOrigin "system" row may cross
+     * either direction while user rows still flow both ways.
+     */
+    @Test
+    fun `bundled rows stay home when both ends share the fingerprint`() = runBlocking {
+        val server = KtorSyncServer(
+            repo = repo,
+            port = 0,
+            tlsIdentity = TlsIdentityManager(testDir.absolutePath),
+            ecdhIdentity = EcdhIdentityManager(testDir.absolutePath),
+            trustStore = trustStore,
+            authenticator = authenticator,
+            onConnection = {}
+        )
+        val info = server.start()
+        val port = info.port
+        try {
+            repo.upsertInteraction(Interaction(
+                id = "int:host-bundled", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
+                substanceAId = "sub:a", substanceBId = "sub:b",
+                riskLevel = InteractionRisk.LOW, description = "host bundled row"
+            ))
+            repo.upsertSession(Session(
+                id = "s:from-desktop", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
+                deviceOrigin = "desktop", title = "FROM-DESKTOP", startTime = 1_700_000_000_000L
+            ))
+
+            val clientRepo = JournalRepository()
+            repeat(300) { i ->
+                clientRepo.upsertInteraction(Interaction(
+                    id = "int:client-bundled-$i",
+                    createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
+                    substanceAId = "sub:a", substanceBId = "sub:b",
+                    riskLevel = InteractionRisk.LOW, description = "phone bundled row $i"
+                ))
+            }
+            clientRepo.upsertSession(Session(
+                id = "s:from-phone", createdAt = 1_700_000_000_000L, updatedAt = 1_700_000_000_000L,
+                deviceOrigin = "phone", title = "FROM-PHONE", startTime = 1_700_000_000_000L
+            ))
+
+            val bootstrap = KtorSyncClient(repo = clientRepo, deviceId = "skip-client", deviceName = "Skip")
+            val hostInfo = bootstrap.requestHostInfo("127.0.0.1", port).getOrThrow()
+            assertEquals(SEED_BUNDLED_FINGERPRINT, hostInfo.seedFingerprint,
+                "the host must advertise its bundled-library fingerprint")
+            val token = authenticator.generatePairingToken()
+            val pairing = bootstrap.completePairing(
+                host = "127.0.0.1", port = port, token = token,
+                clientDeviceId = "skip-client", clientDeviceName = "Skip",
+                clientFingerprint = "skip-fp",
+                hostEcdhPublicKeyB64 = hostInfo.ecdhPublicKeyB64
+            )
+            bootstrap.close()
+            val client = KtorSyncClient(
+                repo = clientRepo, deviceId = "skip-client",
+                deviceFingerprint = "skip-fp", deviceName = "Skip",
+                sharedSecret = pairing.getOrThrow().sharedSecret
+            )
+            try {
+                val push = client.pushChanges(
+                    host = "127.0.0.1", port = port,
+                    deviceId = "skip-client", deviceName = "Skip", since = 0L,
+                    skipBundled = hostInfo.seedFingerprint == SEED_BUNDLED_FINGERPRINT
+                )
+                assertTrue(push.isSuccess, "push must succeed: ${push.exceptionOrNull()?.message}")
+                assertTrue(repo.interactions.value.none { it.id.startsWith("int:client-bundled-") },
+                    "no bundled row may be pushed to a peer that ships the same library")
+                assertTrue(repo.sessions.value.any { it.title == "FROM-PHONE" },
+                    "user sessions must still cross the push")
+                assertTrue(clientRepo.sessions.value.any { it.title == "FROM-DESKTOP" },
+                    "user sessions must still cross the pull")
+                assertTrue(clientRepo.interactions.value.none { it.id == "int:host-bundled" },
+                    "no bundled row may be pulled from a peer that ships the same library")
+                assertEquals(300, clientRepo.interactions.value.count { it.id.startsWith("int:client-bundled-") },
+                    "the local bundled rows must stay intact")
             } finally {
                 client.close()
             }

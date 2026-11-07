@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface IJournalRepository {
 
-    // ---- StateFlows (read-only snapshots after each mutation) ----
     val sessions: StateFlow<List<Session>>
     val doses: StateFlow<List<Dose>>
     val substances: StateFlow<List<Substance>>
@@ -43,13 +42,11 @@ interface IJournalRepository {
     val toleranceVersion: StateFlow<Int>
     val mutationCount: StateFlow<Long>
 
-    // ---- Obsidian vault config ----
     val obsidianVaultPath: StateFlow<String>
     val obsidianAutoExport: StateFlow<Boolean>
     val obsidianSubfolder: StateFlow<String>
     val obsidianFileOrganization: StateFlow<String>
 
-    // ---- Display preferences ----
     val showSessionsTrendChart: StateFlow<Boolean>
 
     fun setObsidianVaultPath(path: String)
@@ -59,7 +56,6 @@ interface IJournalRepository {
 
     fun setShowSessionsTrendChart(enabled: Boolean)
 
-    // ---- Derived flows ----
     val recentSessions: Flow<List<Session>>
     val totalSessionCount: Flow<Int>
     val totalSubstanceCount: Flow<Int>
@@ -84,24 +80,19 @@ interface IJournalRepository {
      */
     fun dosesForSubstance(substanceId: String): Flow<List<Dose>>
 
-    // ---- Bulk apply ----
     fun fullSnapshot(): JournalSnapshot
     fun applySnapshot(snapshot: JournalSnapshot)
 
-    // ---- Sessions ----
     fun upsertSession(session: Session)
     fun getSession(id: String): Session?
-    /** Flips the favorite flag, no-op for unknown ids. */
     fun toggleFavorite(sessionId: String)
     fun deleteSession(id: String)
 
-    // ---- Individuals (device-local, never synced) ----
     val persons: StateFlow<List<Person>>
     fun upsertPerson(person: Person)
     fun getPerson(id: String): Person?
     fun deletePerson(id: String)
 
-    // ---- Doses ----
     fun upsertDose(dose: Dose)
     fun dosesForSession(sessionId: String): List<Dose>
     fun deleteDose(id: String)
@@ -120,34 +111,28 @@ interface IJournalRepository {
         timelineEvents: List<TimelineEvent>
     )
 
-    // ---- Substances ----
     fun upsertSubstance(substance: Substance)
     fun getSubstance(id: String): Substance?
     fun deleteSubstance(id: String)
 
-    // ---- Interactions ----
     fun upsertInteraction(interaction: Interaction)
     fun getInteraction(id: String): Interaction?
     fun deleteInteraction(id: String)
 
-    // ---- Effects ----
     fun upsertEffect(effect: Effect)
     fun getEffect(id: String): Effect?
     fun effectsForSubstance(substanceId: String): List<Effect>
     fun deleteEffect(id: String)
 
-    // ---- Custom Units ----
     fun upsertCustomUnit(unit: CustomUnit)
     fun deleteCustomUnit(id: String)
     fun customUnitsForSubstance(substanceId: String): List<CustomUnit>
 
-    // ---- Preferences ----
     fun setRatingScaleMode(mode: RatingScaleMode)
     fun setSubstanceColors(enabled: Boolean)
     fun setWelcomeCompleted(completed: Boolean)
     fun setSeedFingerprint(fingerprint: String?)
 
-    // ---- Notes ----
     fun upsertNote(note: Note)
     fun deleteNote(id: String)
     fun notesForSession(sessionId: String): List<Note>
@@ -163,12 +148,10 @@ interface IJournalRepository {
      */
     fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note?
 
-    // ---- Timeline Events ----
     fun upsertTimelineEvent(event: TimelineEvent)
     fun deleteTimelineEvent(id: String)
     fun eventsForSession(sessionId: String): List<TimelineEvent>
 
-    // ---- Query indices ----
     fun sessionIdsOnDateRange(fromDate: String? = null, toDate: String? = null): List<String>
     fun sessionIdsForSubstance(substanceId: String): List<String>
 
@@ -185,7 +168,6 @@ interface IJournalRepository {
      */
     val substanceDoseStats: Map<String, Pair<Int, Long>>
 
-    // ---- DataFrame export ----
     fun sessionsDataFrame(): List<SessionDataRow>
     fun dosesDataFrame(): List<DoseDataRow>
     fun substancesDataFrame(): List<SubstanceDataRow>
@@ -196,7 +178,6 @@ interface IJournalRepository {
      */
     fun exportSessionBundles(): List<SessionBundle>
 
-    // ---- Bulk insert (batch ops) ----
     fun bulkInsert(
         sessions: List<Session> = emptyList(),
         doses: List<Dose> = emptyList(),
@@ -204,7 +185,6 @@ interface IJournalRepository {
         interactions: List<Interaction> = emptyList()
     )
 
-    // ---- Bulk apply (sync deltas, seed load) ----
     /**
      * Bulk-apply entities. Snapshot loads pass [persons]; sync deltas leave the
      * default empty so device-local persons are never overwritten by peers.
@@ -237,17 +217,12 @@ interface IJournalRepository {
         tombstoneCutoff: Long = 0L
     )
 
-    // ---- Full-text search ----
     fun search(query: String): List<SearchResult>
     fun rebuildSearchIndex()
-    /** Deleted IDs newer than [since], grouped by entity type. */
     fun deletedIdsSince(since: Long): DeletedIds
-    /** All live tombstones as storage keys to deletion timestamps. */
     fun exportTombstones(): Map<String, Long>
-    /** Replace the tombstone journal (snapshot restore). */
     fun importTombstones(tombstones: Map<String, Long>)
 
-    // ---- Lifecycle ----
     /**
      * Debounced auto-save loop: after a quiet period following each mutation,
      * invoke [save] (the caller owns persistence, so this interface never
@@ -255,5 +230,12 @@ interface IJournalRepository {
      * refreshes the full-text search index when mutations dirtied it.
      */
     fun autoSave(scope: CoroutineScope, save: () -> Unit): Job
+
+    /**
+     * Skips autosave while a sync drain applies pages; the drain persists once at the end,
+     * so a page-by-page autosave would write the whole journal per page.
+     */
+    fun setAutosaveSuppressed(suppressed: Boolean) {}
+
     fun clearAll()
 }

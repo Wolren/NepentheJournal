@@ -32,7 +32,6 @@ import app.journal.util.currentTimeMillis
  */
 class JournalRepository internal constructor() : IJournalRepository {
 
-    // ---- Self-contained EntityStore instances (each owns its StateFlow) ----
     override val sessions: StateFlow<List<Session>>
         get() = sessionsStore.flow
     override val doses: StateFlow<List<Dose>>
@@ -62,17 +61,16 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val customUnitsStore = EntityStore(CustomUnit::id)
     private val personsStore = EntityStore(Person::id)
 
-    // ---- Version counter for tolerance recalculation ----
     private val _toleranceVersion = MutableStateFlow(0)
     override val toleranceVersion: StateFlow<Int> = _toleranceVersion.asStateFlow()
     private fun bumpToleranceVersion() { _toleranceVersion.update { it + 1 } }
 
-    // ---- Mutation counter for auto-save debounce ----
     private val _mutationCount = MutableStateFlow(0L)
     override val mutationCount: StateFlow<Long> = _mutationCount.asStateFlow()
+    @kotlin.concurrent.Volatile
+    private var autosaveSuppressed = false
     private fun bumpMutationCount() { _mutationCount.update { it + 1 } }
 
-    // ---- Derived flows ----
     override val recentSessions: Flow<List<Session>> =
         sessions.map { it.sortedByDescending { s -> s.startTime }.take(5) }
 
@@ -81,7 +79,7 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     private val lock = PlatformLock()
 
-    // ---- Focused components: same lock, shared store instances (wave2 split) ----
+    // ---- Focused components: same lock, shared store instances (wave2 split)
     private val searchEngine = JournalSearch(
         lock, sessionsStore, substancesStore, notesStore, dosesStore, timelineEventsStore, effectsStore,
     )
@@ -110,7 +108,6 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
     )
 
-    // ---- Preferences (state lives in JournalPreferences) ----
     override val ratingScaleMode: StateFlow<RatingScaleMode> = prefs.ratingScaleMode
     override val useSubstanceColors: StateFlow<Boolean> = prefs.useSubstanceColors
     override val welcomeCompleted: StateFlow<Boolean> = prefs.welcomeCompleted
@@ -121,7 +118,6 @@ class JournalRepository internal constructor() : IJournalRepository {
     override val obsidianFileOrganization: StateFlow<String> = prefs.obsidianFileOrganization
     override val showSessionsTrendChart: StateFlow<Boolean> = prefs.showSessionsTrendChart
 
-    // ---- Derived flows and indices (delegated) ----
     override val pendingConflictCount: Flow<Int> = syncBridge.pendingConflictCount
     override fun dosesForSubstance(substanceId: String): Flow<List<Dose>> = indices.dosesForSubstance(substanceId)
     override val substancesById: Flow<Map<String, Substance>> = indices.substancesById
@@ -129,9 +125,6 @@ class JournalRepository internal constructor() : IJournalRepository {
     override val substanceDoseStats: Map<String, Pair<Int, Long>> get() = indices.substanceDoseStats
     val searchIndex: SearchIndex get() = searchEngine.searchIndex
 
-    // ========================
-    //  Bulk apply (seed load)
-    // ========================
 
     override fun applyBatch(
         sessions: List<Session>,
@@ -166,9 +159,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun applySnapshot(snapshot: JournalSnapshot) = syncBridge.applySnapshot(snapshot)
 
-    // ========================
-    //  Individuals (device-local, never synced, no tombstones)
-    // ========================
 
     override fun upsertPerson(person: Person) = mutations.upsertPerson(person)
 
@@ -176,9 +166,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deletePerson(id: String) = mutations.deletePerson(id)
 
-    // ========================
-    //  Sessions
-    // ========================
 
     override fun upsertSession(session: Session) = mutations.upsertSession(session)
 
@@ -188,9 +175,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deleteSession(id: String) = lock.withLock { tombstones.deleteSessionLocked(id); searchEngine.markSearchIndexDirtyLocked() }
 
-    // ========================
-    //  Doses
-    // ========================
 
     override fun upsertDose(dose: Dose) = mutations.upsertDose(dose)
 
@@ -202,9 +186,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deleteTimelineEvent(id: String) = lock.withLock { tombstones.deleteTimelineEventLocked(id); searchEngine.markSearchIndexDirtyLocked() }
 
-    // ========================
-    //  Substances
-    // ========================
 
     override fun upsertSubstance(substance: Substance) = mutations.upsertSubstance(substance)
 
@@ -212,17 +193,11 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deleteSubstance(id: String) = lock.withLock { tombstones.deleteSubstanceLocked(id); searchEngine.markSearchIndexDirtyLocked() }
 
-    // ========================
-    //  Interactions
-    // ========================
 
     override fun upsertInteraction(interaction: Interaction) = mutations.upsertInteraction(interaction)
 
     override fun getInteraction(id: String): Interaction? = lock.withLock { interactionsStore.get(id) }
 
-    // ========================
-    //  Effects
-    // ========================
 
     override fun upsertEffect(effect: Effect) = mutations.upsertEffect(effect)
 
@@ -230,9 +205,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun effectsForSubstance(substanceId: String): List<Effect> = indices.effectsForSubstance(substanceId)
 
-    // ========================
-    //  Custom Units
-    // ========================
 
     override fun upsertCustomUnit(unit: CustomUnit) = mutations.upsertCustomUnit(unit)
 
@@ -244,9 +216,6 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun deleteInteraction(id: String) = lock.withLock { tombstones.deleteInteractionLocked(id); searchEngine.markSearchIndexDirtyLocked() }
 
-    // ========================
-    //  Preferences
-    // ========================
 
     override fun setRatingScaleMode(mode: RatingScaleMode) = prefs.setRatingScaleMode(mode)
     override fun setSubstanceColors(enabled: Boolean) = prefs.setSubstanceColors(enabled)
@@ -258,18 +227,12 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun setObsidianFileOrganization(org: String) = prefs.setObsidianFileOrganization(org)
     override fun setShowSessionsTrendChart(enabled: Boolean) = prefs.setShowSessionsTrendChart(enabled)
 
-    // ========================
-    //  Notes
-    // ========================
 
     override fun upsertNote(note: Note) = mutations.upsertNote(note)
     override fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = syncBridge.upsertNoteWithConflict(note, remoteDeviceId)
 
     override fun notesForSession(sessionId: String): List<Note> = indices.notesForSession(sessionId)
 
-    // ========================
-    //  Timeline Events
-    // ========================
 
     override fun upsertTimelineEvent(event: TimelineEvent) = mutations.upsertTimelineEvent(event)
 
@@ -281,26 +244,17 @@ class JournalRepository internal constructor() : IJournalRepository {
         timelineEvents: List<TimelineEvent>
     ) = mutations.upsertSessionChildren(sessionId, doses, timelineEvents)
 
-    // ========================
-    //  Query indices (public)
-    // ========================
 
     override fun sessionIdsOnDateRange(fromDate: String?, toDate: String?): List<String> = indices.sessionIdsOnDateRange(fromDate, toDate)
     override fun sessionIdsForSubstance(substanceId: String): List<String> = indices.sessionIdsForSubstance(substanceId)
     override fun sessionIdsForSubstances(substanceIds: Set<String>): Set<String> = indices.sessionIdsForSubstances(substanceIds)
     override fun rebuildIndices() = indices.rebuildIndices()
 
-    // ========================
-    //  DataFrame export
-    // ========================
     override fun sessionsDataFrame(): List<SessionDataRow> = frames.sessionsDataFrame()
     override fun dosesDataFrame(): List<DoseDataRow> = frames.dosesDataFrame()
     override fun substancesDataFrame(): List<SubstanceDataRow> = frames.substancesDataFrame()
     override fun exportSessionBundles(): List<SessionBundle> = frames.exportSessionBundles()
 
-    // ========================
-    //  Auto-save
-    // ========================
 
     override fun autoSave(scope: CoroutineScope, save: () -> Unit): Job {
         return scope.launch {
@@ -308,10 +262,12 @@ class JournalRepository internal constructor() : IJournalRepository {
                 .drop(1)
                 .debounce(2000)
                 .collect {
+                    // A sync drain persists once itself; a page-by-page autosave would encode the journal per page.
+                    if (autosaveSuppressed) {
+                        Log.withTag("Repo").v { "Auto-save skipped during sync apply (mutation #$it)" }
+                        return@collect
+                    }
                     try {
-                        // Same quiet-period tail as the save: mutations only mark the
-                        // search index dirty, so one idle rebuild covers a whole burst
-                        // of edits instead of a rebuild per keystroke afterward.
                         searchEngine.rebuildSearchIndexIfDirty()
                         save()
                         Log.withTag("Repo").v { "Auto-saved (mutation #$it)" }
@@ -322,9 +278,6 @@ class JournalRepository internal constructor() : IJournalRepository {
         }
     }
 
-    // ========================
-    //  Bulk insert (batch ops)
-    // ========================
 
     /**
      * Bulk-insert entities with a single sync pass instead of one
@@ -343,9 +296,6 @@ class JournalRepository internal constructor() : IJournalRepository {
         interactions = interactions
     )
 
-    // ========================
-    //  Clear
-    // ========================
 
     override fun clearAll() = lock.withLock {
         Log.withTag("Repo").w { "clearAll: wiping all journal data" }
@@ -366,12 +316,12 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpMutationCount()
     }
 
-    // ========================
-    //  Full-text search
-    // ========================
 
     override fun search(query: String): List<SearchResult> = searchEngine.search(query)
     override fun rebuildSearchIndex() = searchEngine.rebuildSearchIndex()
+    override fun setAutosaveSuppressed(suppressed: Boolean) {
+        autosaveSuppressed = suppressed
+    }
     override fun deletedIdsSince(since: Long): DeletedIds = tombstones.deletedIdsSince(since)
     override fun exportTombstones(): Map<String, Long> = tombstones.exportTombstones()
     override fun importTombstones(tombstones: Map<String, Long>) = this.tombstones.importTombstones(tombstones)
