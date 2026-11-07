@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.journal.export.EncryptedBackup
 import app.journal.ui.components.*
 import app.journal.ui.settings.DataSettingsViewModel
 
@@ -26,6 +28,7 @@ internal fun DataSettingsContent(
     onDataExpanded: () -> Unit,
 ) {
     val statusText by vm.dataStatus.collectAsState()
+    var passphraseAction by remember { mutableStateOf<PassphraseAction?>(null) }
 
     Card(modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -80,6 +83,32 @@ internal fun DataSettingsContent(
                         Text("Import backup", maxLines = 1)
                     }
                 }
+                Spacer(Modifier.height(4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppOutlinedButton(
+                        onClick = { passphraseAction = PassphraseAction.SEAL },
+                        enabled = EncryptedBackup.isSupported,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Seal backup", maxLines = 1)
+                    }
+                    AppOutlinedButton(
+                        onClick = { passphraseAction = PassphraseAction.RESTORE },
+                        enabled = EncryptedBackup.isSupported,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Restore sealed", maxLines = 1)
+                    }
+                }
+                Text(
+                    "A sealed backup is zstd-compressed and encrypted with your passphrase, so it is safe to store off-device.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 statusText?.let { msg ->
                     Spacer(Modifier.height(4.dp))
                     Text(msg, style = MaterialTheme.typography.labelSmall,
@@ -123,4 +152,76 @@ internal fun DataSettingsContent(
             }
         }
     }
+
+    passphraseAction?.let { action ->
+        PassphraseDialog(
+            action = action,
+            onDismiss = { passphraseAction = null },
+            onConfirm = { passphrase ->
+                passphraseAction = null
+                if (action == PassphraseAction.SEAL) vm.exportEncryptedBackup(passphrase)
+                else vm.importEncryptedBackup(passphrase)
+            }
+        )
+    }
+}
+
+internal enum class PassphraseAction { SEAL, RESTORE }
+
+/** Asks for the backup passphrase; sealing asks twice so a typo cannot lock the file. */
+@Composable
+private fun PassphraseDialog(
+    action: PassphraseAction,
+    onDismiss: () -> Unit,
+    onConfirm: (CharArray) -> Unit,
+) {
+    var first by remember { mutableStateOf("") }
+    var second by remember { mutableStateOf("") }
+    val sealing = action == PassphraseAction.SEAL
+    val tooShort = first.length < 8
+    val mismatch = sealing && first != second
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (sealing) "Seal a backup" else "Restore a sealed backup") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    if (sealing) "Choose a passphrase of at least 8 characters. Without it the backup cannot be opened."
+                    else "Enter the passphrase this backup was sealed with.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value = first,
+                    onValueChange = { first = it },
+                    label = { Text("Passphrase") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (sealing) {
+                    OutlinedTextField(
+                        value = second,
+                        onValueChange = { second = it },
+                        label = { Text("Repeat passphrase") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        isError = mismatch,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (mismatch) {
+                    Text("The passphrases differ", color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = first.isNotEmpty() && !tooShort && !mismatch,
+                onClick = { onConfirm(first.toCharArray()) }
+            ) { Text(if (sealing) "Seal" else "Restore") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }

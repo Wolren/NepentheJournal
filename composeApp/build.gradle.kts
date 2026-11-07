@@ -90,6 +90,8 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.ktor.client.cio)
                 implementation(libs.logback.classic)
+                // zstd for the sealed backup; this jar carries the desktop natives only.
+                implementation(libs.zstd.jni)
             }
         }
         val desktopTest = getByName("desktopTest") {
@@ -128,6 +130,12 @@ kotlin {
                 implementation(libs.ktor.client.websockets)
                 implementation(libs.ktor.client.cio)
                 implementation(libs.kermit.io)
+            }
+        }
+        getByName("androidMain") {
+            dependencies {
+                // Android natives ship in the -jni AAR, not in the jar the desktop uses.
+                implementation("com.github.luben:zstd-jni:1.5.7-2@aar")
             }
         }
         androidMain.dependsOn(jvmMain)

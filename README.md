@@ -99,6 +99,21 @@ P2P sync copies your journal between your own devices on the same local network:
 
 ---
 
+## Backups and automation
+
+- The journal, its backups and its temp file are sealed at rest with AES-256-GCM under a device-held key.
+- **Seal backup** in Settings > Data writes a zstd-compressed, passphrase-sealed `.nepbak` file you can store anywhere; **Restore sealed** brings it back. A wrong passphrase fails the tag check before any data is touched. iOS has no zstd yet, so the buttons stay disabled there.
+- Android takes `nepenthe://quicklog` links, so a shortcut, a script or another app can log a dose without the editor:
+
+  ```
+  adb shell am start -a android.intent.action.VIEW \
+    -d 'nepenthe://quicklog?substance=Caffeine&amount=100&unit=mg&route=oral&time=2026-10-18T09:30:00Z&notes=late'
+  ```
+
+  `time` accepts ISO 8601 or epoch seconds, `meal` is `EMPTY`, `LIGHT`, `MODERATE` or `FULL`, and the dose lands in a new session that opens on arrival.
+
+---
+
 ## Themes
 
 - Six presets to start from: Forest, Ocean, Sunset, Ember, Midnight, Mono

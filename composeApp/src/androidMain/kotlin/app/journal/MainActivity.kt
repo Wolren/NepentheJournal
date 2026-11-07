@@ -14,6 +14,7 @@ import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
 import app.journal.ui.App
 import app.journal.util.AndroidFilePickerBridge
+import app.journal.util.PendingQuickLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -104,7 +105,15 @@ class MainActivity : ComponentActivity() {
             openFolderLauncher.launch(null)
         }
 
+        PendingQuickLog.offer(intent?.dataString)
+
         setContent { App() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        PendingQuickLog.offer(intent.dataString)
     }
 
     override fun onDestroy() {

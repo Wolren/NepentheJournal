@@ -8,6 +8,8 @@ package app.journal.util
 expect object PlatformFile {
     fun writeText(path: String, content: String)
     fun readText(path: String): String
+    fun writeBytes(path: String, content: ByteArray)
+    fun readBytes(path: String): ByteArray
     /**
      * Size of the file at [path] in bytes, or -1 when it does not exist / the
      * size cannot be determined. Lets callers refuse oversized files BEFORE

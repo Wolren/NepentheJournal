@@ -2,12 +2,16 @@
 
 package app.journal.util
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import platform.Foundation.*
 import app.journal.log.Log
 
 /**
  * iOS platform file operations using NSFileManager.
  */
+@OptIn(ExperimentalForeignApi::class)
 actual object PlatformFile {
     private val fileManager = NSFileManager.defaultManager
 
@@ -26,6 +30,28 @@ actual object PlatformFile {
     actual fun readText(path: String): String {
         return NSString.stringWithContentsOfFile(path, encoding = NSUTF8StringEncoding, error = null)
             ?: throw Error("File not found or unreadable: $path")
+    }
+
+    actual fun writeBytes(path: String, content: ByteArray) {
+        val data = if (content.isEmpty()) {
+            NSData()  // addressOf(0) is invalid on an empty array
+        } else {
+            content.usePinned { pinned ->
+                NSData.create(bytes = pinned.addressOf(0), length = content.size.toULong())
+            }
+        }
+        if (!data.writeToFile(path, atomically = true)) {
+            throw Error("Cannot write file: $path")
+        }
+    }
+
+    actual fun readBytes(path: String): ByteArray {
+        val data = NSData.dataWithContentsOfFile(path) ?: throw Error("File not found or unreadable: ${'$'}path")
+        val bytes = ByteArray(data.length.toInt())
+        if (bytes.isNotEmpty()) {
+            bytes.usePinned { pinned -> platform.posix.memcpy(pinned.addressOf(0), data.bytes, data.length) }
+        }
+        return bytes
     }
 
     actual fun size(path: String): Long {

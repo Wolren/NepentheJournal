@@ -11,6 +11,14 @@ actual object PlatformFile {
         return File(path).readText()
     }
 
+    actual fun writeBytes(path: String, content: ByteArray) {
+        File(path).writeBytes(content)
+    }
+
+    actual fun readBytes(path: String): ByteArray {
+        return File(path).readBytes()
+    }
+
     actual fun size(path: String): Long {
         val file = File(path)
         return if (file.exists()) file.length() else -1L

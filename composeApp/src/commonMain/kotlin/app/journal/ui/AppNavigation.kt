@@ -50,8 +50,11 @@ import androidx.compose.ui.input.key.type
 import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
+import app.journal.data.QuickLog
+import app.journal.data.QuickLogOutcome
 import app.journal.model.Session
 import app.journal.sync.createSyncEngine
+import app.journal.util.PendingQuickLog
 import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
@@ -74,6 +77,8 @@ import app.journal.ui.substances.SubstanceCompanionScreen
 import app.journal.ui.substances.SubstanceScreen
 import app.journal.ui.theme.BackgroundImage
 import app.journal.ui.theme.ThemeConfig
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 enum class Screen(
     val label: String,
@@ -96,12 +101,36 @@ internal fun AppNavigation(
     colorScheme: ColorScheme,
 ) {
     var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    var quickLogStatus by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
     var editingSessionId by remember { mutableStateOf<String?>(null) }
     var selectedTimelineSessionId by remember { mutableStateOf<String?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
+    // A nepenthe://quicklog link logs its dose on arrival, then opens that session.
+    LaunchedEffect(Unit) {
+        PendingQuickLog.uri.filterNotNull().collect { raw ->
+            val request = QuickLog.parse(raw) ?: return@collect
+            PendingQuickLog.consume()
+            // Wait for the startup snapshot apply: it replaces the repository and would drop these writes.
+            app.journal.data.DataInitializer.initializedFlow.first { it }
+            when (val outcome = QuickLog.apply(repo, request)) {
+                is QuickLogOutcome.Logged -> {
+                    quickLogStatus = "Logged ${outcome.summary}"
+                    selectedTimelineSessionId = outcome.sessionId
+                }
+                is QuickLogOutcome.Failed -> quickLogStatus = outcome.reason
+            }
+        }
+    }
+    LaunchedEffect(quickLogStatus) {
+        quickLogStatus?.let {
+            snackbarHostState.showSnackbar(it)
+            quickLogStatus = null
+        }
+    }
     var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember(repo) {

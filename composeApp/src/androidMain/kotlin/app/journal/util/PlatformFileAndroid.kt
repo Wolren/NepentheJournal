@@ -29,6 +29,27 @@ actual object PlatformFile {
         }
     }
 
+    actual fun writeBytes(path: String, content: ByteArray) {
+        if (path.startsWith("content://")) {
+            val uri = Uri.parse(path)
+            NepentheApp.appContext.contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(content)
+            } ?: throw IllegalStateException("Cannot open output stream for $path")
+        } else {
+            File(path).writeBytes(content)
+        }
+    }
+
+    actual fun readBytes(path: String): ByteArray {
+        if (path.startsWith("content://")) {
+            val uri = Uri.parse(path)
+            NepentheApp.appContext.contentResolver.openInputStream(uri)?.use { input ->
+                return input.readBytes()
+            } ?: throw IllegalStateException("Cannot open input stream for $path")
+        }
+        return File(path).readBytes()
+    }
+
     actual fun size(path: String): Long {
         if (path.startsWith("content://")) {
             val uri = Uri.parse(path)

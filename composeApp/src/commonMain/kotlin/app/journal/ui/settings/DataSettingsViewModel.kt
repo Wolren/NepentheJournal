@@ -5,6 +5,7 @@ import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
 import app.journal.export.CsvExporter
+import app.journal.export.EncryptedBackup
 import app.journal.export.ExportImport
 import app.journal.export.ZipExporter
 import app.journal.log.Log
@@ -138,8 +139,7 @@ class DataSettingsViewModel(
                     dataStatus.value = "Exported full journal backup (backup format; restore with Import backup)"
                 } catch (e: Exception) {
                     dataStatus.value = userMessage("Data", "Full JSON export failed", e)
-                }
-            }
+                }            }
         }
     }
 
@@ -161,6 +161,54 @@ class DataSettingsViewModel(
                 } catch (e: Exception) {
                     dataStatus.value = userMessage("Data", "Import failed", e)
                 }
+            }
+        }
+    }
+
+    /** Writes a zstd-compressed, passphrase-sealed backup that is safe to store off-device. */
+    fun exportEncryptedBackup(passphrase: CharArray) {
+        scope.launch {
+            if (!EncryptedBackup.isSupported) {
+                dataStatus.value = "Encrypted backups are not available on this platform yet"
+                return@launch
+            }
+            val name = "nepenthe-backup-${currentTimeMillis()}.${EncryptedBackup.EXTENSION}"
+            val path = FilePicker.saveFile(name, "Encrypted backup", listOf(EncryptedBackup.EXTENSION))
+            if (path == null) return@launch
+            try {
+                val json = ExportImport.exportFullJournal(repo)
+                val sealed = EncryptedBackup.seal(json, passphrase)
+                PlatformFile.writeBytes(path, sealed)
+                val percent = if (json.isEmpty()) 0 else sealed.size * 100 / json.length
+                dataStatus.value =
+                    "Encrypted backup written (${sealed.size / 1024} KB, $percent% of the JSON size)"
+            } catch (e: Exception) {
+                dataStatus.value = userMessage("Data", "Encrypted backup failed", e)
+            }
+        }
+    }
+
+    /** Restores a sealed backup; a wrong passphrase fails the tag check before any data is touched. */
+    fun importEncryptedBackup(passphrase: CharArray) {
+        scope.launch {
+            if (!EncryptedBackup.isSupported) {
+                dataStatus.value = "Encrypted backups are not available on this platform yet"
+                return@launch
+            }
+            val path = FilePicker.openFile("Encrypted backup", listOf(EncryptedBackup.EXTENSION))
+            if (path == null) return@launch
+            try {
+                if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
+                    dataStatus.value = "Restore failed: file too large (max 50 MB)"
+                    return@launch
+                }
+                val json = EncryptedBackup.open(PlatformFile.readBytes(path), passphrase)
+                val result = ExportImport.importFullJournal(repo, json)
+                dataStatus.value = if (result.error != null) "Restore failed: ${result.error}"
+                else "Restored encrypted backup: ${result.sessions} sessions, " +
+                    "${result.substances} substances, ${result.doses} doses"
+            } catch (e: Exception) {
+                dataStatus.value = "Restore failed: wrong passphrase or damaged file"
             }
         }
     }

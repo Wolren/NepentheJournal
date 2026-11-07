@@ -47,6 +47,7 @@ ktor-server-websockets  = { module = "io.ktor:ktor-server-websockets",        ve
 ktor-client-websockets  = { module = "io.ktor:ktor-client-websockets",        version.ref = "ktor" }
 kermit-core             = { module = "co.touchlab:kermit",                   version.ref = "kermit" }
 kermit-io               = { module = "co.touchlab:kermit-io",                version.ref = "kermit" }
+zstd-jni               = { module = "com.github.luben:zstd-jni",             version = "1.5.7-2" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 
 [plugins]
