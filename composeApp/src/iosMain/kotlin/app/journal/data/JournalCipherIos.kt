@@ -66,8 +66,8 @@ internal actual fun journalOpen(sealed: ByteArray): ByteArray {
                             ivPinned.addressOf(0), iv.size.toULong(),
                             null, 0uL,
                             ctPinned.addressOf(0), ciphertext.size.toULong(),
-                            tagPinned.addressOf(0), tag.size.toULong(),
-                            ptPinned.addressOf(0)
+                            ptPinned.addressOf(0),
+                            tagPinned.addressOf(0), tag.size.toULong()
                         )
                         check(status == 0) { "CCCryptorGCMOneshotDecrypt failed: $status" }
                     }
