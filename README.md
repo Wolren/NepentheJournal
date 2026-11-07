@@ -122,7 +122,7 @@ Desktop (the primary target), Android, and iOS share one codebase, with platform
 | Language | Kotlin 2.4.20 |
 | Build System | Gradle 9.7.1 + AGP 9.3.1 |
 | Reference Data | DoseWiki (CC0, 577 substances) + PsychonautWiki-derived seed (325 substances) |
-| Persistence | JSON file via kotlinx.serialization, atomic writes + backup rotation |
+| Persistence | JSON via kotlinx.serialization, sealed at rest with AES-256-GCM, atomic writes + backup rotation |
 | Networking | Ktor 3.6.0 (client + server) |
 | Charts | Vico 3.3.1 |
 | Image Loading | Coil 3.6.3 |
@@ -146,10 +146,10 @@ Desktop (the primary target), Android, and iOS share one codebase, with platform
 
 ## Limitations
 
-- **Android is the only target without runtime coverage.** Desktop runs its full suite in CI and iOS runs the shared suite on a simulator (446 tests, green as of run 37292403525), but Android has no instrumentation tests and no emulator configured, so its unit tests run on the JVM only. Android also requires manual side-loading. The two end-to-end suites (first launch and sync fidelity) run on desktop only.
+- **Android runtime coverage runs in CI.** A dedicated job boots an emulator and runs the instrumented smoke suite: Activity start, the first frame, the tabs. Android still requires manual side-loading.
 - **LAN-only sync.** P2P sync works between devices on the same local network. No remote relay or cloud tunnel.
 - **Single-user.** The app has no multi-account or profile system. All data belongs to one user per install.
-- **No encryption at rest.** Journal data is stored as a JSON file on disk. No built-in encryption layer.
+- **At-rest encryption uses a device-held key.** The journal, its backups and its temp file are AES-256-GCM sealed under a key held by the Android Keystore, the iOS Keychain, or a 0600 key file beside the journal on desktop. It protects a copied file, a pulled backup, or a synced folder; it does not protect against a compromised device, and the key has no passphrase. Exports stay plaintext so other tools can read them.
 - **Reference data is bundled.** DoseWiki and the seed are pre-processed at build time, not live-fetched. Updates ship with releases.
 - **Compose Multiplatform still has platform-specific quirks.** Desktop and Android share most code, but edge cases (file pickers, clipboard, window management, scrollbars) require platform-specific implementations.
 

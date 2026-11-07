@@ -129,7 +129,7 @@ class FirstLaunchE2ETest {
         val path = JournalStore(repo).dataPath()
         val file = File(path)
         assertTrue(file.exists(), "a cold start must write $path")
-        val decoded = decodeSnapshot(file.readText())
+        val decoded = decodeSnapshot(file.readJournal())
         assertTrue(decoded.isSuccess, "the written journal must parse: ${decoded.exceptionOrNull()}")
         val snapshot = decoded.getOrThrow()
         assertEquals(JournalSnapshot.CURRENT_VERSION, snapshot.version,
@@ -169,7 +169,7 @@ class FirstLaunchE2ETest {
         )
         JournalStore(first).save()
         assertTrue(
-            File(JournalStore(first).dataPath()).readText().contains(marker),
+            File(JournalStore(first).dataPath()).readJournal().contains(marker),
             "fixture: the marker must be on disk before the restart"
         )
 
@@ -254,7 +254,7 @@ class FirstLaunchE2ETest {
         val hostFile = File(store.dataPath())
         assertTrue(hostFile.exists(), "the host journal file must exist after a sync write")
         assertTrue(
-            hostFile.readText().contains("\"s:synced-in\""),
+            hostFile.readJournal().contains("\"s:synced-in\""),
             "the peer's session must already be on DISK before the ack " +
                 "(persistAfterApply, audit D1) — otherwise a crash here loses " +
                 "content the peer believes was accepted"

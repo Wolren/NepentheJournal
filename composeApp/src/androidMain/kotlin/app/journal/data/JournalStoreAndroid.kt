@@ -53,7 +53,8 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             return@withLock
         }
         try {
-            val text = target.readText()
+            val raw = target.readBytes()
+            val text = if (JournalAtRest.looksEncrypted(raw)) JournalAtRest.open(raw) else raw.decodeToString()
             // Same recovery path + issue flags as JournalStoreDesktop so the App.kt recovery banner works on Android too (audit high).
             val decoded = decodeSnapshotWithRecovery(text)
             if (decoded.parseError != null) {
@@ -85,7 +86,8 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             val size = file.length()
             if (size < 0 || size > 50_000_000) continue
             val text = try {
-                file.readText()
+                val raw = file.readBytes()
+                if (JournalAtRest.looksEncrypted(raw)) JournalAtRest.open(raw) else raw.decodeToString()
             } catch (e: Exception) {
                 Log.withTag("JournalStore").w { "Unreadable $label candidate: ${e.message}" }
                 continue
@@ -132,7 +134,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            tmp.writeText(text)
+            tmp.writeBytes(JournalAtRest.seal(text))
             if (!tmp.exists()) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tmp.absolutePath}" }
                 return@withLock
@@ -151,7 +153,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                         if (attempt > 1) {
                             Thread.sleep(100L)
                         }
-                        target.writeText(text)
+                        target.writeBytes(JournalAtRest.seal(text))
                         success = true
                         break
                     } catch (e: IOException) {

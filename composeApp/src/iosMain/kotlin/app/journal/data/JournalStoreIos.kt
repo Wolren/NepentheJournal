@@ -4,8 +4,33 @@ import app.journal.log.Log
 import app.journal.serde.AppJson
 import app.journal.util.PlatformLock
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import kotlinx.serialization.json.*
 import platform.Foundation.*
+
+/** Reads a journal file, decrypting it when it carries the at-rest envelope. */
+@OptIn(ExperimentalForeignApi::class)
+private fun readMaybeEncrypted(path: String): String? {
+    val data = NSData.dataWithContentsOfFile(path) ?: return null
+    val bytes = ByteArray(data.length.toInt())
+    if (bytes.isNotEmpty()) {
+        bytes.usePinned { pinned ->
+            platform.posix.memcpy(pinned.addressOf(0), data.bytes, data.length)
+        }
+    }
+    return if (JournalAtRest.looksEncrypted(bytes)) JournalAtRest.open(bytes) else bytes.decodeToString()
+}
+
+/** Writes the journal sealed at rest; Foundation's atomically flag keeps the temp-then-rename guarantee. */
+@OptIn(ExperimentalForeignApi::class)
+private fun writeSealed(text: String, path: String): Boolean {
+    val sealed = JournalAtRest.seal(text)
+    val data = sealed.usePinned { pinned ->
+        NSData.create(bytes = pinned.addressOf(0), length = sealed.size.toULong())
+    }
+    return data.writeToFile(path, atomically = true)
+}
 
 @OptIn(ExperimentalForeignApi::class)
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
@@ -63,7 +88,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
 
         try {
-            val text = NSString.stringWithContentsOfFile(dataPath(), encoding = NSUTF8StringEncoding, error = null) ?: return@withLock
+            val text = readMaybeEncrypted(dataPath()) ?: return@withLock
             val decoded = decodeSnapshotWithRecovery(text)
             if (decoded.parseError != null) {
                 lastLoadHadIssues = true
@@ -89,7 +114,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             if (!fileManager.fileExistsAtPath(path)) continue
             val size = fileSize(path)
             if (size < 0 || size > 50_000_000) continue
-            val text = NSString.stringWithContentsOfFile(path, encoding = NSUTF8StringEncoding, error = null) ?: continue
+            val text = readMaybeEncrypted(path) ?: continue
             val clean = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }.getOrNull()
             if (clean != null) {
                 Log.withTag("JournalStore").w { "Journal file missing; recovered from $label backup" }
@@ -221,7 +246,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            val tmpWritten = (text as NSString).writeToFile(tempPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
+            val tmpWritten = writeSealed(text, tempPath())
             if (!tmpWritten) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tempPath()}" }
                 return@withLock
@@ -242,7 +267,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
 
             if (!fileManager.moveItemAtPath(tempPath(), toPath = dataPath(), error = null)) {
                 Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
-                val direct = (text as NSString).writeToFile(dataPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
+                val direct = writeSealed(text, dataPath())
                 if (direct) {
                     if (fileManager.fileExistsAtPath(tempPath())) {
                         fileManager.removeItemAtPath(tempPath(), null)

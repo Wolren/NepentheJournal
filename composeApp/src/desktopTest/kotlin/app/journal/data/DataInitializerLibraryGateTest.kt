@@ -85,7 +85,7 @@ class DataInitializerLibraryGateTest {
 
         assertTrue(DataInitializer.libraryReadyFlow.value)
         val path = JournalStore(repo).dataPath()
-        val snapshot = decodeSnapshot(File(path).readText()).getOrThrow()
+        val snapshot = decodeSnapshot(File(path).readJournal()).getOrThrow()
         assertEquals(repo.substances.value.size, snapshot.substances.size,
             "the persisted library must match memory when the gate opens")
         assertNotNull(snapshot.seedFingerprint,
@@ -114,7 +114,7 @@ class DataInitializerLibraryGateTest {
         )
         JournalStore(repo).save()
         assertTrue(
-            File(JournalStore(repo).dataPath()).readText().contains("s:after-failed-build"),
+            File(JournalStore(repo).dataPath()).readJournal().contains("s:after-failed-build"),
             "the journal must stay writable after a failed library build"
         )
     }

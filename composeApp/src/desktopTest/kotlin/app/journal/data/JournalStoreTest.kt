@@ -48,7 +48,7 @@ class JournalStoreTest {
         assertEquals("V5 Session", repo.sessions.value.first().title)
         assertEquals(1, repo.substances.value.size)
         store.save()
-        assertTrue(java.io.File(store.dataPath()).readText().contains("V5 Session"))
+        assertTrue(java.io.File(store.dataPath()).readJournal().contains("V5 Session"))
     }
 
     @Test
@@ -187,9 +187,9 @@ class JournalStoreTest {
         assertTrue(bak2.exists(), ".bak.2 should exist after 3 saves")
         assertTrue(File("$path.bak").exists(), ".bak immediate-previous should exist after 3 saves")
         // Verify content rotation: .bak.2 holds the first save (Session 1)
-        assertTrue(bak2.readText().contains("Session 1"), ".bak.2 should contain first-save data")
+        assertTrue(bak2.readJournal().contains("Session 1"), ".bak.2 should contain first-save data")
         // .bak.1 holds the second save (Session 2)
-        assertTrue(bak1.readText().contains("Session 2"), ".bak.1 should contain second-save data")
+        assertTrue(bak1.readJournal().contains("Session 2"), ".bak.1 should contain second-save data")
     }
 
     @Test
@@ -209,15 +209,15 @@ class JournalStoreTest {
             title = "Baseline 2", startTime = 1000L
         ))
         store.save()
-        val bak1Before = File("$path.bak.1").readText()
+        val bak1Before = File("$path.bak.1").readJournal()
 
         repo.upsertSession(Session(
             id = "s:2", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             title = "Synced", startTime = 2000L
         ))
         store.save(fullBackup = false)
-        assertTrue(File(path).readText().contains("Synced"), "main file must contain light-saved data")
-        assertEquals(bak1Before, File("$path.bak.1").readText(), "light save must not touch .bak.1")
+        assertTrue(File(path).readJournal().contains("Synced"), "main file must contain light-saved data")
+        assertEquals(bak1Before, File("$path.bak.1").readJournal(), "light save must not touch .bak.1")
         // After two full saves only .bak.1 exists; a light save must not advance the chain
         assertFalse(File("$path.bak.2").exists(), "light save must not create new backup slots")
     }
@@ -259,7 +259,7 @@ class JournalStoreTest {
         assertTrue(files[0].name.matches(Regex("""\d{8}_\d{6}\.json""")),
             "Auto-backup file should match YYYYMMDD_HHmmss.json pattern: ${files[0].name}")
         assertTrue(files[0].length() > 0, "Auto-backup should not be empty")
-        assertTrue(files[0].readText().contains("AutoSave Test"),
+        assertTrue(files[0].readJournal().contains("AutoSave Test"),
             "Auto-backup content should contain saved session data")
     }
 
@@ -313,7 +313,7 @@ class JournalStoreTest {
         ))
         store.save() // Must not throw
         assertTrue(tmp.isDirectory, "the blocker must survive the failed save")
-        val afterBlocked = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readText())
+        val afterBlocked = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readJournal())
         assertEquals(listOf("Retry Test"), afterBlocked.sessions.map { it.title },
             "a save that fails mid-flight must leave the previous snapshot intact, " +
                 "not a truncated, empty or mixed file")
@@ -322,7 +322,7 @@ class JournalStoreTest {
         val dataFile = File(path)
         dataFile.setWritable(false)
         store.save() // Must not throw
-        val afterReadOnly = AppJson.json.decodeFromString<JournalSnapshot>(dataFile.readText())
+        val afterReadOnly = AppJson.json.decodeFromString<JournalSnapshot>(dataFile.readJournal())
         assertTrue(afterReadOnly.sessions.isNotEmpty(),
             "the journal must never be emptied or truncated by a failed save")
 
@@ -386,7 +386,7 @@ class JournalStoreTest {
 
         val dataFile = File(store.dataPath())
         dataFile.writeText("CORRUPTED DATA {{{")
-        assertTrue(dataFile.readText().contains("CORRUPTED"),
+        assertTrue(dataFile.readJournal().contains("CORRUPTED"),
             "Main file should be corrupted for test")
 
         val restored = store.restoreFromBackup()
@@ -397,9 +397,9 @@ class JournalStoreTest {
         assertEquals("Original Data", repo.sessions.value.first().title,
             "Session title should match original data")
 
-        assertFalse(dataFile.readText().contains("CORRUPTED"),
+        assertFalse(dataFile.readJournal().contains("CORRUPTED"),
             "Main file should not contain corrupted data after restore")
-        assertTrue(dataFile.readText().contains("Original Data"),
+        assertTrue(dataFile.readJournal().contains("Original Data"),
             "Main file should contain original data after restore")
     }
 
@@ -441,7 +441,7 @@ class JournalStoreTest {
             title = "PostRecovery", startTime = 2000L
         ))
         store.save()
-        assertTrue(File(path).readText().contains("PostRecovery"),
+        assertTrue(File(path).readJournal().contains("PostRecovery"),
             "store must be writable after a torn-load recovery")
     }
 
@@ -478,12 +478,12 @@ class JournalStoreTest {
             ".bak" to 5, ".bak.1" to 5, ".bak.2" to 4, ".bak.3" to 3, ".bak.4" to 2, ".bak.5" to 1
         )
         for ((slot, expected) in expectedSessionsBySlot) {
-            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(File("$path$slot").readText())
+            val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(File("$path$slot").readJournal())
             assertEquals(expected, snapshot.sessions.size,
                 "$slot must hold exactly the snapshot written by the save that created it")
         }
 
-        val mainSnapshot = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readText())
+        val mainSnapshot = AppJson.json.decodeFromString<JournalSnapshot>(File(path).readJournal())
         assertEquals(6, mainSnapshot.sessions.size, "main file must hold all six saved sessions")
         assertTrue(mainSnapshot.sessions.any { it.title == "Session 6" },
             "Main file should contain data from last save")
@@ -503,7 +503,7 @@ class JournalStoreTest {
         store.save()
         val path = store.dataPath()
 
-        assertTrue(File(path).readText().contains("LSD"),
+        assertTrue(File(path).readJournal().contains("LSD"),
             "Main file should contain saved substance before corruption")
 
         File(path).writeText("NOT VALID JSON {{corrupted data")
@@ -590,7 +590,7 @@ class JournalStoreTest {
             title = "PostRecovery", startTime = 5000L
         ))
         store.save()
-        assertTrue(File(path).readText().contains("PostRecovery"),
+        assertTrue(File(path).readJournal().contains("PostRecovery"),
             "the store must be writable after a missing-main recovery")
     }
 
@@ -625,7 +625,7 @@ class JournalStoreTest {
         t2.join()
 
         // (The old assertNotNull(json.parseToJsonElement(...)) could not assert anything: that call throws on bad input instead of returning null).
-        val content = File(path).readText()
+        val content = File(path).readJournal()
         val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(content)
 
         val repo2 = JournalRepository()

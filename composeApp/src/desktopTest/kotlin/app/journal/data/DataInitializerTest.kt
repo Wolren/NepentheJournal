@@ -97,7 +97,7 @@ class DataInitializerTest {
         assertTrue(repo.substances.value.isNotEmpty(), "seed still loads")
 
         JournalStore(repo).save()
-        assertTrue(dataFile.readText().contains("substances"),
+        assertTrue(dataFile.readJournal().contains("substances"),
             "init + save must leave a valid journal file")
     }
 
