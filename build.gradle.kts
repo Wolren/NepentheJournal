@@ -32,7 +32,7 @@ subprojects {
                 "io.netty:netty-codec-http:4.2.18.Final",
                 "io.netty:netty-codec:4.2.18.Final",
                 "io.netty:netty-common:4.2.18.Final",
-                "io.netty:netty-buffer:4.2.18.Final",
+                "io.netty:netty-buffer:4.2.20.Final",
                 "io.netty:netty-transport:4.2.18.Final",
                 "io.netty:netty-resolver:4.2.18.Final",
                 "io.netty:netty-transport-native-unix-common:4.2.18.Final",
