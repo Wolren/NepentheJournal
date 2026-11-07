@@ -175,6 +175,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // Duplicate META-INF files from netty-codec-native-quic platform jars (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the 2026-09 ktor/netty bumps; dedupe license copies.
     packaging {
@@ -215,6 +216,14 @@ tasks.withType<Test>().configureEach {
             excludeTestsMatching("app.journal.data.DoseWikiLookupTest")
         }
     }
+}
+
+// Device-level smoke coverage for the Android runtime path that no unit test reaches.
+dependencies {
+    "androidTestImplementation"("androidx.compose.ui:ui-test-junit4:1.12.1")
+    "androidTestImplementation"("androidx.test.ext:junit:1.2.1")
+    "androidTestImplementation"("androidx.test:runner:1.6.2")
+    "debugImplementation"("androidx.compose.ui:ui-test-manifest:1.12.1")
 }
 
 play {
