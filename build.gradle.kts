@@ -37,7 +37,7 @@ subprojects {
                 "io.netty:netty-resolver:4.2.18.Final",
                 "io.netty:netty-transport-native-unix-common:4.2.18.Final",
                 "io.netty:netty-handler-proxy:4.2.18.Final",
-                "io.netty:netty-codec-socks:4.2.18.Final",
+                "io.netty:netty-codec-socks:4.2.20.Final",
                 // Bouncy Castle: GOST CTR keystream reuse (critical), broken algorithm
                 "org.bouncycastle:bcprov-jdk18on:1.86",
                 "org.bouncycastle:bcpkix-jdk18on:1.86",
