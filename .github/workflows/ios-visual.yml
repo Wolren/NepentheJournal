@@ -84,9 +84,12 @@ jobs:
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl ui "$UDID" appearance "${{ inputs.appearance }}"
           set +e
-          xcrun simctl launch "$UDID" app.journal.nepenthe > artifacts/launch.txt 2>&1
+          # --console-pty keeps stderr, where an uncaught Kotlin exception prints its message.
+          ( xcrun simctl launch --console-pty "$UDID" app.journal.nepenthe \
+              > artifacts/launch-console.txt 2>&1 & )
+          sleep 3
           set -e
-          cat artifacts/launch.txt
+          head -c 4000 artifacts/launch-console.txt || true
           # A pid means the process stayed up; anything else is the crash to explain.
           for i in $(seq 1 "${{ inputs.settle_seconds }}"); do
             sleep 1
