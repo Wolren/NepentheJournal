@@ -19,9 +19,21 @@ object DoseWikiLookup {
     @kotlin.concurrent.Volatile
     private var substances: List<DoseWikiSubstance>? = null
 
-    /** Number of successful cache loads; test observability for reset() proofs. */
+    @kotlin.concurrent.Volatile
+    private var byTitle: Map<String, DoseWikiSubstance>? = null
+
     internal var loadCount: Int = 0
         private set
+
+    /**
+     * Takes over the list the startup ingest already parsed. Without this the
+     * first substance detail open re-reads and re-parses the 7.7 MB asset on
+     * the UI thread.
+     */
+    internal fun adopt(parsed: List<DoseWikiSubstance>) {
+        substances = parsed
+        byTitle = parsed.associateBy { it.title.lowercase() }
+    }
 
     private fun ensureLoaded(): List<DoseWikiSubstance>? {
         val cached = substances
@@ -40,7 +52,7 @@ object DoseWikiLookup {
             return null
         }
 
-        substances = parsed
+        adopt(parsed)
         loadCount++
         Log.withTag("DoseWikiLookup").i { "Loaded ${parsed.size} substances" }
         return parsed
@@ -52,6 +64,7 @@ object DoseWikiLookup {
      */
     internal fun reset() {
         substances = null
+        byTitle = null
     }
 
     /**
@@ -61,7 +74,8 @@ object DoseWikiLookup {
     fun getSubstance(substanceName: String): DoseWikiSubstance? {
         val list = ensureLoaded() ?: return null
         val key = substanceName.lowercase()
-        return list.find { it.title.lowercase() == key }
+        val index = byTitle ?: list.associateBy { it.title.lowercase() }.also { byTitle = it }
+        return index[key]
     }
 
     /**

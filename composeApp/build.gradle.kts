@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -12,7 +13,6 @@ plugins {
     alias(libs.plugins.kover)
 }
 
-// Force latest stable Netty to fix Dependabot vulnerabilities
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group.startsWith("io.netty")) {
@@ -29,9 +29,7 @@ kotlin {
     jvm("desktop")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { iosTarget ->
         iosTarget.binaries.framework { baseName = "composeApp"; isStatic = true }
-        // SecKeyCopyKeyExchangeResult is missing from Kotlin's platform.Security bindings;
-        // bind it from the SDK header under its own package. The CommonCrypto GCM
-        // oneshot SPI has no public SDK header, so it is declared by a local shim.
+        // SecKeyCopyKeyExchangeResult is missing from Kotlin's platform.Security bindings; bind it from the SDK header under its own package.
         iosTarget.compilations.getByName("main").cinterops.create("securityEx") {
             defFile(project.file("src/nativeInterop/cinterop/SecurityEx.def"))
             packageName = "platform.SecurityEx"
@@ -80,28 +78,13 @@ kotlin {
             }
         }
 
-        // wave4: local JVM unit tests for the Android actuals. The
-        // androidUnitTest source set is created by the android target; it is
-        // wired to commonTest by hand because the default hierarchy template
-        // is disabled in this project (same reason iosMain is wired below).
-        // Run with: ./gradlew :composeApp:testDebugUnitTest
+        // wave4: local JVM unit tests for the Android actuals.
         val androidUnitTest = getByName("androidUnitTest") {
             dependsOn(commonTest)
             dependencies { implementation(kotlin("test")) }
         }
 
-        // Wiring androidUnitTest -> commonTest runs the WHOLE commonTest
-        // suite against the Android actuals in :composeApp:testDebugUnitTest
-        // (409 tests instead of 2: every common test now exercises the
-        // Android actuals, which audit 4 scored as zero-covered).
-        // One class cannot run there and is excluded below: the Android
-        // actual of readBundledResource reads NepentheApp.appContext.assets,
-        // and a local JVM unit test has no AssetManager/Context (AGP's
-        // mockable android.jar stubs every Context method; Robolectric is
-        // deliberately not used here). The class keeps running green in
-        // desktopTest, so excluding it from the Android task loses no
-        // coverage, it only stops a platform-impossible assertion from
-        // failing the gate.
+        // Wiring androidUnitTest runs the whole commonTest suite against the Android actuals in :composeApp:testDebugUnitTest (409 tests instead of 2).
         val desktopMain = getByName("desktopMain") {
             dependencies {
                 implementation(compose.desktop.currentOs)
@@ -113,15 +96,11 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.ktor.client.cio)
-                // ktor-server-netty is declared at project level (bottom of this
-                // file) with an exclude for netty-codec-http3 — do not add it here.
+                // ktor-server-netty is declared at project level (bottom of this file) with an exclude for netty-codec-http3: don't add another edge.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.test.host)
                 implementation(libs.ktor.serialization)
-                // wave4 stretch: compose ui-test infra for the desktop smoke
-                // tests (ComposeScreenSmokeTest); the first ui-test dependency
-                // this project has had (audit 4, item 9). Catalog coordinate,
-                // not compose.uiTest, which is a deprecated accessor.
+                // wave4 stretch: compose ui-test infra for the desktop smoke tests (ComposeScreenSmokeTest)
                 implementation(libs.compose.ui.test)
             }
         }
@@ -139,8 +118,7 @@ kotlin {
         val jvmMain = create("jvmMain") {
             dependsOn(commonMain)
             dependencies {
-                // ktor-server-netty is declared at project level (bottom of this
-                // file) with an exclude for netty-codec-http3 — do not add it here.
+                // ktor-server-netty is declared at project level (bottom of this file) with an exclude for netty-codec-http3: don't add another edge.
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.serialization)
                 implementation(libs.ktor.server.websockets)
@@ -152,41 +130,25 @@ kotlin {
                 implementation(libs.kermit.io)
             }
         }
-        // Wire jvmMain into both Android and Desktop
         androidMain.dependsOn(jvmMain)
         desktopMain.dependsOn(jvmMain)
-        // Wire iosMain explicitly (default hierarchy template disabled)
         val iosMain = getByName("iosMain") { dependsOn(commonMain) }
-        // Connect iOS leaf targets to iosMain
         listOf(iosArm64(), iosSimulatorArm64()).forEach {
             getByName("${it.name}Main").dependsOn(iosMain)
         }
 
-        // wave4: intermediate iosTest source set, mirroring the manual
-        // iosMain wiring above (default hierarchy template disabled).
-        // Config-only verification on Windows: this host must never run an
-        // ios compile/test task. Its smoke test (composeApp/src/iosTest)
-        // is compiled and run by mac CI only (iosSimulatorArm64Test), never
-        // here.
+        // Its smoke test (composeApp/src/iosTest) is compiled and run by mac CI only (iosSimulatorArm64Test), never here.
         val iosTest = create("iosTest") {
             dependsOn(commonTest)
             dependencies { implementation(kotlin("test")) }
         }
-        // Connect iOS leaf targets to iosTest
         listOf(iosArm64(), iosSimulatorArm64()).forEach {
             getByName("${it.name}Test").dependsOn(iosTest)
         }
     }
 }
 
-// ktor 3.6.0 pulls netty-codec-http3 → netty-codec-native-quic (5 platform-
-// native jars carrying byte-identical META-INF entries, which fail Android's
-// mergeReleaseJavaResource). LAN sync uses plain HTTP/WS — HTTP/3 is unused.
-// Declared HERE because the KMP sourceSet dependencies{} DSL has no
-// per-dependency exclusion lambda and catalog dependencies are immutable.
-// Both former edges (jvmMainImplementation, desktopTestImplementation) were
-// removed from sourceSets; keeping any unexcluded edge would re-add http3 to
-// the merged graph.
+// LAN sync uses plain http/ws: http/3 is unused.
 dependencies {
     "jvmMainImplementation"(libs.ktor.server.netty) {
         exclude(group = "io.netty", module = "netty-codec-http3")
@@ -196,37 +158,12 @@ dependencies {
     }
 }
 
-// KMP test tasks (desktopTest) are NOT standard Gradle Test tasks,
-// so tasks.withType<Test>() does not match them. BOTH test entry points
-// (scripts/run-tests.sh and the CI test step in .github/workflows/ci.yml)
-// therefore run the BARE desktopTest task. Hand-inlined --tests filter
-// lists are banned (audit C6): the old FAST/ALL lists drifted from the
-// real test tree and hid live classes from CI. Do not reintroduce them.
-//
-// Usage:
-//   ./scripts/run-tests.sh           -- whole desktopTest suite (all classes)
-//   ./scripts/run-tests.sh --list    -- list test source files
-//   ./gradlew composeApp:desktopTest --no-daemon   (unfiltered, same as CI)
-//
-// Prerequisites:
-//   - gradle.properties sets org.gradle.daemon=false and in-process Kotlin compiler
-//   - run-tests.sh raises ulimit -u 16384 (git-bash default 256 is too low)
-//
-// NOTE: SessionListViewModelTest was previously excluded because it appeared
-// to deadlock (combine + runBlocking). Root cause was a bad test predicate:
-// it waited for 3 substances while the fixture had no dose for Cannabis.
-// Fixed 2026-07-31; the class now runs in the suite.
-
-// Google Play upload signing: applied ONLY when keystore.properties exists
-// (local dev or Play CI). F-Droid builds from source without secrets and must
-// stay unsigned here; they sign with their own key. See docs/GOOGLE-PLAY.md.
+// NOTE: SessionListViewModelTest was previously excluded because it appeared to deadlock (combine + runBlocking); fixed 2026-07-31, the class now runs in the suite.
 val uploadKeystoreFile = rootProject.file("keystore.properties")
 val hasUploadKeystore = uploadKeystoreFile.exists()
 
 android {
     namespace = "app.journal"
-    // 37 required since the 2026-09 dep bumps: vico 3.3.1, coil 3.6.3 and
-    // compose 1.12.x AARs fail checkReleaseAarMetadata on compileSdk < 37.
     // targetSdk stays 36 deliberately (runtime behavior change, separate).
     compileSdk = 37
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
@@ -239,9 +176,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
-    // duplicate META-INF files from netty-codec-native-quic platform jars
-    // (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the
-    // 2026-09 ktor/netty bumps; dedupe license copies.
+    // Duplicate META-INF files from netty-codec-native-quic platform jars (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the 2026-09 ktor/netty bumps; dedupe license copies.
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1,INDEX.LIST,LICENSE.md,LICENSE.txt,NOTICE.md,*.properties,license/*}"
@@ -264,8 +199,6 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            // No signingConfig when the keystore is absent: F-Droid signs the
-            // unsigned build with its own key.
             if (hasUploadKeystore) signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -275,10 +208,7 @@ android {
     }
 }
 
-// wave4: exclusions for AGP local unit test tasks ONLY (name ends with
-// UnitTest, so desktopTest/allTests are untouched and still run everything).
-// See the androidUnitTest comment above: DoseWikiLookupTest needs a real
-// Android Context (assets), which a JVM unit test cannot provide.
+// wave4: exclusions for agp local unit test tasks only (name ends with UnitTest, so desktopTest and allTests still run everything).
 tasks.withType<Test>().configureEach {
     if (name.endsWith("UnitTest")) {
         filter {
@@ -287,9 +217,6 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Gradle Play Publisher: uploads AABs + fastlane metadata to Google Play.
-// Credentials are only set when the service account file exists, so plain
-// builds (and F-Droid) never touch them.
 play {
     if (rootProject.file("play-service-account.json").exists()) {
         serviceAccountCredentials.set(rootProject.file("play-service-account.json"))
@@ -301,9 +228,7 @@ play {
 compose.desktop {
     application {
         mainClass = "app.journal.MainKt"
-        // Empty assistive_technologies: a stale system-wide Java Access Bridge
-        // registration makes AWT abort startup (AWTError, no window). Empty
-        // means load no legacy bridge; native accessibility is unaffected.
+        // Empty assistive_technologies: a stale system-wide Java Access Bridge registration makes AWT abort startup (AWTError, no window).
         jvmArgs("-Djavax.accessibility.assistive_technologies=")
         nativeDistributions {
             targetFormats(
@@ -320,13 +245,8 @@ compose.desktop {
             licenseFile.set(rootProject.file("LICENSE"))
             windows {
                 iconFile.set(project.file("src/desktopMain/resources/icon.ico"))
-                // Without these, the MSI installs with no Start Menu entry and
-                // no desktop shortcut: the app is unlaunchable from the UI.
                 menu = true
                 shortcut = true
-                // jpackage otherwise derives the MSI upgrade code from vendor +
-                // name; pinning keeps future installs upgrading in place even if
-                // vendor or package name is ever edited.
                 upgradeUuid = "D07ABD38-858F-464A-ABF6-9405C622BB14"
             }
             linux {
@@ -334,14 +254,55 @@ compose.desktop {
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
-                // jpackage mirrors Apple's CFBundleShortVersionString rule and
-                // rejects a leading zero ("The first number in an app-version
-                // cannot be zero"), which kills the app-image before DMG
-                // creation. The macOS-scoped override feeds only the Apple
-                // bundlers; global packageVersion, versionName, the About card
-                // and the release tag stay 0.1.0.
+                // The macOS-scoped override feeds only the Apple bundlers; global packageVersion, versionName, the About card and the release tag stay 0.1.0.
                 packageVersion = "1.0.0"
             }
         }
     }
 }
+
+// Startup must not hash 13 MB of bundled JSON on every launch (it measured ~114 ms desktop, seconds on a phone).
+// The fingerprint is computed here instead, once per build, from the canonical resource copy.
+val generateSeedFingerprint by tasks.registering {
+    description = "Generates SEED_BUNDLED_FINGERPRINT from the bundled seed and DoseWiki resources."
+    val srcRoot = file("src")
+    val canonicalDir = File(srcRoot, "desktopMain/resources")
+    val resourceNames = listOf("psychonautwiki_seed.json", "dosewiki_slim.json")
+    val mirroredDirs = listOf("androidMain/assets", "iosMain/resources", "jvmMain/resources")
+    val outDir = layout.buildDirectory.dir("generated/seedFingerprint").get().asFile
+    inputs.files(resourceNames.map { File(canonicalDir, it) })
+    inputs.files(mirroredDirs.flatMap { dir -> resourceNames.map { File(File(srcRoot, dir), it) } })
+    outputs.dir(outDir)
+    doLast {
+        val canonical = resourceNames.map { File(canonicalDir, it) }
+        val missing = canonical.filterNot { it.isFile }
+        if (missing.isNotEmpty()) {
+            throw GradleException("Missing bundled resources: ${missing.joinToString { it.path }}")
+        }
+        mirroredDirs.forEach { dir ->
+            resourceNames.forEachIndexed { index, name ->
+                val copy = File(File(srcRoot, dir), name)
+                if (copy.isFile && !copy.readBytes().contentEquals(canonical[index].readBytes())) {
+                    throw GradleException(
+                        "$dir/$name differs from desktopMain/resources/$name; keep every bundled copy byte-identical."
+                    )
+                }
+            }
+        }
+        val seedText = canonical[0].readText(Charsets.UTF_8)
+        val doseText = canonical[1].readText(Charsets.UTF_8)
+        val hex = MessageDigest.getInstance("SHA-256")
+            .digest((seedText + doseText).toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> byte.toInt().and(0xFF).toString(16).padStart(2, '0') }
+        val target = File(outDir, "app/journal/data/SeedFingerprint.kt")
+        target.parentFile.mkdirs()
+        target.writeText(
+            "package app.journal.data\n\n" +
+                "// Generated by generateSeedFingerprint from the bundled resources; do not edit.\n" +
+                "internal const val SEED_BUNDLED_FINGERPRINT: String = " +
+                "\"${seedText.length}:${doseText.length}:$hex\"\n"
+        )
+    }
+}
+
+kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(generateSeedFingerprint)

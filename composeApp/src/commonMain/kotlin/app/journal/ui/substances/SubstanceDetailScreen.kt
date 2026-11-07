@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,6 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.data.DoseWikiLookup
@@ -63,14 +68,9 @@ fun SubstanceDetailScreen(
 ) {
     val allInteractions by repo.interactions.collectAsState()
     val allSessions by repo.sessions.collectAsState()
-    // Substance lookups come from the repo's id -> substance flow. The store
-    // fallback keeps the first frame correct before that flow emits and
-    // preserves the not-found box for ids missing from both.
     val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
     val substance = substancesById[substanceId] ?: repo.getSubstance(substanceId)
     val sessionById = remember(allSessions) { allSessions.associateBy { it.id } }
-    // Name lookup for cross-tolerance chips: exact match first, then
-    // case-insensitive, so resolvable chips navigate to that substance.
     val substanceIdByName = remember(substancesById) {
         buildMap {
             substancesById.values.forEach { put(it.name, it.id) }
@@ -90,9 +90,7 @@ fun SubstanceDetailScreen(
         }
     }
 
-    // Substance-scoped dose flow: edits to other substances no longer
-    // invalidate this screen. Seeded synchronously so the first frame and a
-    // substanceId switch never render an empty or stale list.
+    // Seeded synchronously so the first frame and a substanceId switch never render an empty or stale list.
     var allDosesForSubstance by remember(repo, substanceId) {
         mutableStateOf(repo.doses.value.filter { it.substanceId == substanceId })
     }
@@ -106,9 +104,12 @@ fun SubstanceDetailScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    // Pre-load DoseWiki duration data for the duration curve
-    val doseWikiDuration = remember(substance.name) {
-        DoseWikiLookup.getDuration(substance.name)
+    // Resolved off the main thread: the first lookup parses the 7.7 MB bundled asset.
+    var doseWikiDuration by remember(substance.name) { mutableStateOf<DoseWikiDuration?>(null) }
+    LaunchedEffect(substance.name) {
+        doseWikiDuration = withContext(Dispatchers.Default) {
+            DoseWikiLookup.getDuration(substance.name)
+        }
     }
 
     ScreenScaffold(
@@ -145,12 +146,8 @@ fun SubstanceDetailScreen(
             }
         }
     ) {
-        // Greeting / top section
         item {
             Spacer(Modifier.height(4.dp))
-            // DoseWiki rows carry the exact site slug in dw:{slug}; other rows
-            // fall back to a slugified name (verified pattern: dose.wiki/<slug>
-            // returns 200, e.g. /lsd).
             val dwSlug = remember(substance.id, substance.name) {
                 if (substance.id.startsWith("dw:")) substance.id.removePrefix("dw:")
                 else substance.name.lowercase()
@@ -221,7 +218,6 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Summary
         if (!substance.summary.isNullOrBlank()) {
             item {
                 Card(
@@ -243,7 +239,6 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Dosage
         if (substance.dosageBands.isNotEmpty()) {
             item {
                 SectionCard(title = "Dosage") {
@@ -264,12 +259,19 @@ fun SubstanceDetailScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text(
-                                        value,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = color,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
+                                    // Shrink to fit: "10-15 mg" wraps and drops the unit in narrow columns.
+                                    BasicText(
+                                        text = value,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            color = color,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        maxLines = 1,
+                                        autoSize = TextAutoSize.StepBased(
+                                            minFontSize = 8.sp,
+                                            maxFontSize = 12.sp,
+                                            stepSize = 0.5.sp
+                                        )
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     Surface(
@@ -299,15 +301,12 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Duration
         if (substance.durationProfile.isNotEmpty() || doseWikiDuration != null) {
             item { DurationTimelineSection(profile = substance.durationProfile, doseWikiDuration = doseWikiDuration) }
         }
 
-        // Pharmacology
         item { PharmacologySection(substance = substance) }
 
-        // Routes
         if (substance.routesOfAdministration.isNotEmpty()) {
             item {
                 SectionCard(title = "Routes of Administration") {
@@ -324,7 +323,6 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Drug testing (class-based reagent suggestions, general principles only)
         item {
             val reagents = reagentSuggestions(substance)
             if (reagents.isNotEmpty()) {
@@ -368,18 +366,14 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Effects
         item { EffectsSection(repo = repo, substance = substance) }
 
-        // Interactions
         if (relatedInteractions.isNotEmpty()) {
             item { InteractionsSection(repo = repo, interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
         }
 
-        // FDA drug interaction data
         item { OpenFdaInteractionCard(repo = repo, substanceId = substanceId, substanceName = substance.name) }
 
-        // Cross-tolerances
         if (substance.crossTolerances.isNotEmpty()) {
             item {
                 val toleranceTimes = remember(substance.crossTolerances) {
@@ -462,7 +456,6 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Addiction potential
         if (substance.addictionPotential != null) {
             item {
                 val apText = substance.addictionPotential ?: ""
@@ -507,7 +500,6 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Toxicity
         if (substance.toxicity.isNotEmpty()) {
             item {
                 SectionCard(title = "Toxicity", danger = true) {
@@ -527,23 +519,26 @@ fun SubstanceDetailScreen(
             }
         }
 
-        // Ingestion history chart
         item {
-            if (allDosesForSubstance.isNotEmpty()) {
-                SectionCard(title = "Ingestion History") {
+            SectionCard(title = "Ingestion History") {
+                if (allDosesForSubstance.isNotEmpty()) {
                     DoseTimelineChart(doses = allDosesForSubstance, substanceName = substance.name)
+                } else {
+                    Text(
+                        "No doses recorded for this substance yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
 
-        // Tolerance timeline
         item {
             if (allDosesForSubstance.isNotEmpty()) {
                 ToleranceTimelineSection(doses = allDosesForSubstance)
             }
         }
 
-        // Dose history
         item {
             if (allDosesForSubstance.isNotEmpty()) {
                 Text("Dose History", style = MaterialTheme.typography.titleSmall,

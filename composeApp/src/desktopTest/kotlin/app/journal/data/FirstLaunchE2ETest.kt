@@ -69,6 +69,12 @@ class FirstLaunchE2ETest {
     private var clientDir: File? = null
     private var transport: SyncTransport? = null
 
+    /** Runs startup and waits for the bundled library build, which is asynchronous by design. */
+    private fun ensureInitialized(repo: IJournalRepository) {
+        DataInitializer.ensureInitialized(repo)
+        runBlocking { withTimeout(120_000) { DataInitializer.awaitLibraryBuild() } }
+    }
+
     @BeforeTest
     fun resetBefore() {
         DataInitializer.reset()
@@ -90,7 +96,6 @@ class FirstLaunchE2ETest {
         DoseWikiIngestor.reset()
     }
 
-    /** Simulates the app process going away: drop all in-memory state. */
     private fun simulateRestart() {
         DataInitializer.reset()
         DoseWikiIngestor.reset()
@@ -108,23 +113,19 @@ class FirstLaunchE2ETest {
         deviceId = "device-$name", displayName = name, listenerPort = port
     )
 
-    // ------------------------------------------------------------------
-    // 1. Cold start
-    // ------------------------------------------------------------------
+    // ---- 1: Cold start
 
     @Test
     fun coldStartOnAnEmptyHomeSeedsTheLibraryAndWritesAVersionedStore() = withTempHome { home ->
         val repo = JournalRepository()
         assertFalse(File(home, ".nepenthe").exists(), "fixture: the home starts empty")
 
-        DataInitializer.ensureInitialized(repo)
+        ensureInitialized(repo)
 
         assertTrue(DataInitializer.initializedFlow.value, "the UI gate must open")
         assertTrue(repo.substances.value.isNotEmpty(), "a cold start must load the bundled seed")
         assertNotNull(repo.seedFingerprint.value, "a successful seed load stamps the fingerprint")
 
-        // The store file must exist and decode at the CURRENT schema version,
-        // not at some stale or forward version a downgrade could not read.
         val path = JournalStore(repo).dataPath()
         val file = File(path)
         assertTrue(file.exists(), "a cold start must write $path")
@@ -137,7 +138,6 @@ class FirstLaunchE2ETest {
             "everything the seed loaded must be on disk")
         assertTrue(snapshot.sessions.isEmpty(), "fixture: no sessions on a cold start")
 
-        // ...and the next reader (a fresh repo) gets the same library back.
         val reread = JournalRepository()
         JournalStore(reread).load()
         assertEquals(repo.substances.value.map { it.id }.sorted(),
@@ -145,20 +145,17 @@ class FirstLaunchE2ETest {
             "a plain load must reproduce the seeded library exactly")
     }
 
-    // ------------------------------------------------------------------
-    // 2. Second launch skips re-ingest and keeps user data
-    // ------------------------------------------------------------------
+    // ---- 2: Second launch skips re-ingest and keeps user data
 
     @Test
     fun secondLaunchReadsFromDiskAndSkipsReingestWithoutLosingUserEdits() = withTempHome { _ ->
-        // ---- launch 1 ----
+        // ---- launch 1
         val first = JournalRepository()
-        DataInitializer.ensureInitialized(first)
+        ensureInitialized(first)
         assertTrue(first.substances.value.isNotEmpty(), "fixture: launch 1 seeds the library")
         val seedCount = first.substances.value.size
         val fingerprint = assertNotNull(first.seedFingerprint.value, "fixture: fingerprint stamped")
 
-        // A user edit the seed does NOT contain, plus a user session.
         val marker = "UserRenamedMarker"
         val victim = first.substances.value.first()
         first.upsertSubstance(victim.copy(name = marker, deviceOrigin = "user"))
@@ -176,29 +173,23 @@ class FirstLaunchE2ETest {
             "fixture: the marker must be on disk before the restart"
         )
 
-        // ---- launch 2: brand-new process, brand-new repository ----
+        // ---- launch 2: brand-new process, brand-new repository
         simulateRestart()
         val second = JournalRepository()
         assertFalse(second.substances.value.any { it.name == marker },
             "fixture: launch 2 starts from disk, not from a shared repo")
-        DataInitializer.ensureInitialized(second)
+        ensureInitialized(second)
 
         assertTrue(DataInitializer.initializedFlow.value, "the gate must open on launch 2")
         assertEquals(fingerprint, second.seedFingerprint.value,
             "launch 2 must report the same seed fingerprint")
         assertEquals(seedCount, second.substances.value.size,
             "the library must keep its shape across launches")
-        // THE re-ingest detector: applySnapshot() MERGES (bulkPutLocked skips
-        // empty lists), so a re-ingest is visible precisely as seed rows being
-        // put back over user rows by id. A reverted rename is that symptom.
         assertTrue(
             second.substances.value.any { it.name == marker },
             "second launch must SKIP re-ingest: applySnapshot(seed) puts the " +
                 "seed row back over the user's rename"
         )
-        // Session survival is a separate, weaker property (sessions are not in
-        // the seed, so a merge leaves them alone) — it still pins that a
-        // restart restores user content, but it does NOT detect re-ingest.
         assertEquals(
             "Written on launch 1",
             second.sessions.value.singleOrNull { it.id == "s:user-session" }?.title,
@@ -208,15 +199,13 @@ class FirstLaunchE2ETest {
         // And the skip must not be a stale-cache illusion: launch 3 agrees.
         simulateRestart()
         val third = JournalRepository()
-        DataInitializer.ensureInitialized(third)
+        ensureInitialized(third)
         assertTrue(third.substances.value.any { it.name == marker },
             "a third launch must still not clobber the user's edit")
         assertEquals(seedCount, third.substances.value.size, "three launches, one library")
     }
 
-    // ------------------------------------------------------------------
-    // 3. Sync-applied content survives a restart
-    // ------------------------------------------------------------------
+    // ---- 3: Sync-applied content survives a restart
 
     @Test
     fun contentAppliedFromAPeerIsOnDiskAndSurvivesAFullRestart() = withTempHome { _ -> runBlocking {
@@ -226,14 +215,12 @@ class FirstLaunchE2ETest {
         hostDir = hDir
         clientDir = cDir
 
-        // ---- launch 1: a normal, seeded host ----
+        // ---- launch 1: a normal, seeded host
         val hostRepo = JournalRepository()
-        DataInitializer.ensureInitialized(hostRepo)
+        ensureInitialized(hostRepo)
         assertTrue(hostRepo.substances.value.isNotEmpty(), "fixture: host is seeded")
         val seededSessionCount = hostRepo.sessions.value.size
 
-        // Production persistence shape (SyncEngineFactoryDesktop): every
-        // accepted sync write is flushed to the journal BEFORE it is acked.
         val store = JournalStore(hostRepo)
         val hostTransport = SyncTransport(hostRepo, hDir.absolutePath) {
             store.save(fullBackup = false)
@@ -246,7 +233,6 @@ class FirstLaunchE2ETest {
         val token = hostTransport.observeStatus().first().pairingToken
         assertNotNull(token, "host must publish a pairing token")
 
-        // ---- a peer joins and pushes content the host has never seen ----
         val clientRepo = JournalRepository()
         val peerStamp = System.currentTimeMillis()
         clientRepo.upsertSession(
@@ -277,10 +263,9 @@ class FirstLaunchE2ETest {
         withTimeout(10_000) { hostTransport.stopHosting() }
         transport = null
 
-        // ---- restart: throw away every in-memory object ----
         simulateRestart()
         val relaunched = JournalRepository()
-        DataInitializer.ensureInitialized(relaunched)
+        ensureInitialized(relaunched)
 
         assertTrue(DataInitializer.initializedFlow.value, "the gate must open on relaunch")
         assertTrue(relaunched.substances.value.isNotEmpty(), "the seed library must still load")
@@ -295,15 +280,13 @@ class FirstLaunchE2ETest {
         )
     } }
 
-    // ------------------------------------------------------------------
-    // 4. Crash leftovers
-    // ------------------------------------------------------------------
+    // ---- 4: Crash leftovers
 
     @Test
     fun aLiveTimerLeftByACrashedLaunchIsAbortedOnTheNextStart() = withTempHome { _ ->
-        // ---- launch 1 leaves a stale, empty live session behind ----
+        // ---- launch 1 leaves a stale, empty live session behind
         val first = JournalRepository()
-        DataInitializer.ensureInitialized(first)
+        ensureInitialized(first)
         val staleStart = System.currentTimeMillis() - 2 * 3_600_000L
         first.upsertSession(
             Session(
@@ -313,17 +296,15 @@ class FirstLaunchE2ETest {
             )
         )
         JournalStore(first).save()
-        // Fixture precondition: without it, "must be gone" on the next launch
-        // would pass vacuously if the session had never been persisted at all.
         assertTrue(
             first.sessions.value.any { it.id == "session:live:crashed" },
             "fixture: the stale live session must exist before the restart"
         )
 
-        // ---- launch 2 ----
+        // ---- launch 2
         simulateRestart()
         val second = JournalRepository()
-        DataInitializer.ensureInitialized(second)
+        ensureInitialized(second)
 
         assertTrue(DataInitializer.initializedFlow.value, "the gate must open")
         assertTrue(
@@ -332,8 +313,6 @@ class FirstLaunchE2ETest {
                 "launch, not carried forever"
         )
         assertTrue(second.substances.value.isNotEmpty(), "the library is otherwise intact")
-        // A non-stale live session must NOT be swept: an active timer has to
-        // survive a normal restart.
         val fresh = System.currentTimeMillis() - 60_000L
         second.upsertSession(
             Session(
@@ -345,7 +324,7 @@ class FirstLaunchE2ETest {
         JournalStore(second).save()
         simulateRestart()
         val third = JournalRepository()
-        DataInitializer.ensureInitialized(third)
+        ensureInitialized(third)
         assertTrue(
             third.sessions.value.any { it.id == "session:live:active" },
             "a recent live session must survive a restart"

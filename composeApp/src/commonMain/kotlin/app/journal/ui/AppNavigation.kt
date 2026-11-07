@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
 import app.journal.model.Session
@@ -56,6 +57,7 @@ import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
 import app.journal.util.TimeDisplayMode
+import app.journal.ui.components.SubstanceLibraryGate
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
 import app.journal.ui.search.SearchOverlay
@@ -103,19 +105,19 @@ internal fun AppNavigation(
     var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember(repo) {
-        // Single persistence owner: the engine persists through THIS store
-        // instead of constructing its own (audit C5).
+        // Single persistence owner: the engine persists through this store instead of constructing its own (audit C5).
         createSyncEngine(repo, persist = { journalStore.save(fullBackup = false) })
     }
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
+    // Substance ids and interaction warnings come from the bundled library; every dosing surface waits for it.
+    val libraryReady by DataInitializer.libraryReadyFlow.collectAsState()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = colorScheme.background
     ) {
-        // Desktop keyboard shortcuts
         val desktopHandler = if (isDesktopPlatform()) {
             Modifier.onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyUp && event.isCtrlPressed) {
@@ -128,13 +130,11 @@ internal fun AppNavigation(
             }
         } else Modifier
         Box(Modifier.fillMaxSize().then(desktopHandler)) {
-            // Background image layer
             BackgroundImage(
                 imagePath = themeConfig.backgroundImagePath,
                 opacity = themeConfig.backgroundOpacity
             )
 
-            // Foreground content
             val editingSession = remember(editingSessionId) {
                 editingSessionId?.let { id ->
                     if (id == "__new__") null
@@ -225,14 +225,16 @@ internal fun AppNavigation(
                                 else repo.getSession(id)
                             }
                         }
-                        var liveCreateError by remember { mutableStateOf<String?>(null) }
-                        if (session != null) {
+                        if (!libraryReady) {
+                            SubstanceLibraryGate(onBack = { liveSessionId = null })
+                        } else if (session != null) {
                             LiveSessionScreen(
                                 repo = repo,
                                 session = session,
                                 onBack = { liveSessionId = null }
                             )
                         } else {
+                            var liveCreateError by remember { mutableStateOf<String?>(null) }
                             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("Starting session...")
@@ -245,8 +247,6 @@ internal fun AppNavigation(
                             val liveCreateKey = stableLiveId
                             LaunchedEffect(liveCreateKey) {
                                 if (liveCreateKey != "__new__") return@LaunchedEffect
-                                // Live sessions are capped at one: resume the open
-                                // live session instead of stacking a second timer.
                                 val openLive = repo.sessions.value.firstOrNull {
                                     it.id.startsWith("session:live:") && it.endTime == null
                                 }
@@ -272,11 +272,15 @@ internal fun AppNavigation(
                         }
                     }
                     NavigationState.EditorSession -> {
-                        SessionEditorScreen(
-                            repo = repo,
-                            sessionToEdit = editingSession,
-                            onBack = { editingSessionId = null }
-                        )
+                        if (!libraryReady) {
+                            SubstanceLibraryGate(onBack = { editingSessionId = null })
+                        } else {
+                            SessionEditorScreen(
+                                repo = repo,
+                                sessionToEdit = editingSession,
+                                onBack = { editingSessionId = null }
+                            )
+                        }
                     }
                     NavigationState.Timeline -> {
                         val id = stableTimelineId
@@ -397,9 +401,6 @@ internal fun AppNavigation(
                                         onNewSession = { editingSessionId = "__new__" },
                                         onEditSession = { id -> editingSessionId = id },
                                         onSessionClick = { id ->
-                                            // Ongoing sessions open the live card with its
-                                            // ingestion options; ended sessions open the
-                                            // read-only timeline.
                                             if (repo.getSession(id)?.endTime == null) liveSessionId = id
                                             else selectedTimelineSessionId = id
                                         },
@@ -411,10 +412,14 @@ internal fun AppNavigation(
                                             ]
                                         }
                                     )
-                                    Screen.SUBSTANCES -> SubstanceScreen(
-                                        onSubstanceClick = { id -> selectedSubstanceId = id },
-                                        onNewSubstance = { editingSubstanceId = "__new__" }
-                                    )
+                                    Screen.SUBSTANCES -> if (!libraryReady) {
+                                        SubstanceLibraryGate()
+                                    } else {
+                                        SubstanceScreen(
+                                            onSubstanceClick = { id -> selectedSubstanceId = id },
+                                            onNewSubstance = { editingSubstanceId = "__new__" }
+                                        )
+                                    }
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(selectedScreen)

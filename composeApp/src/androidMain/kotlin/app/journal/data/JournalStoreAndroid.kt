@@ -10,8 +10,7 @@ import java.io.IOException
 
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
-    /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
-    private val saveLock = PlatformLock()
+    private val saveLock = JournalSaveLock.instance
 
     private val baseDir: File
         get() = File(NepentheApp.appContext.filesDir, ".nepenthe")
@@ -23,12 +22,10 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
     private fun tempPath(): String = dataPath() + ".tmp"
     private fun backupPath(): String = dataPath() + ".bak"
 
-    /** Set to true when [load] had to use [recoverSnapshot] (partial recovery). */
     @Volatile
     actual var lastLoadHadIssues: Boolean = false
         private set
 
-    /** Human-readable summary of what was recovered during the last [load]. */
     @Volatile
     actual var lastLoadIssueSummary: String = ""
         private set
@@ -41,15 +38,11 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         val tmp = File(tempPath())
 
         if (!target.exists()) {
-            // Audit C3 mirror (the iOS JournalStoreIos.load recovery): a crash
-            // inside save()'s backup rotation can leave the main file missing
-            // while .bak / .tmp still hold complete copies. Recover
-            // automatically instead of starting the session blank.
+            // Audit C3 mirror (the iOS JournalStoreIos.load recovery)
             recoverMissingMainFile(tmp)
             return@withLock
         }
 
-        // Clean the orphaned temp file only now that the main file is known to exist.
         if (tmp.exists()) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             tmp.delete()
@@ -61,8 +54,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
         try {
             val text = target.readText()
-            // Same recovery path + issue flags as JournalStoreDesktop so the
-            // App.kt recovery banner works on Android too (audit HIGH).
+            // Same recovery path + issue flags as JournalStoreDesktop so the App.kt recovery banner works on Android too (audit high).
             val decoded = decodeSnapshotWithRecovery(text)
             if (decoded.parseError != null) {
                 lastLoadHadIssues = true
@@ -131,7 +123,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         try {
             baseDir.mkdirs()
 
-            // Locked snapshot - see JournalStoreDesktop.save() (audit S1).
+            // Locked snapshot: see JournalStoreDesktop.save() (audit S1).
             val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
@@ -191,10 +183,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
             backup.copyTo(target, overwrite = true)
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
-            // The backup is authoritative: clear live state first so entities created
-            // after the backup was taken are not merged back on top of the restore.
             repo.clearAll()
-            // Reload the restored data
             load()
             return@withLock true
         } catch (e: Exception) {
@@ -222,8 +211,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             target.copyTo(backupFile, overwrite = false)
             Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
 
-            // Rotate auto-backups: keep only the 10 most recent (desktop/iOS parity;
-            // triggerAutoBackup runs on every close so the directory was unbounded).
+            // Rotate auto-backups: keep only the 10 most recent (desktop/iOS parity; triggerAutoBackup runs on every close so the directory was unbounded).
             val allAutoBackups = autoDir.listFiles()
                 ?.filter { it.name.endsWith(".json") }
                 ?.sortedByDescending { it.name }

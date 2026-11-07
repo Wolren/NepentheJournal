@@ -10,8 +10,7 @@ import platform.Foundation.*
 @OptIn(ExperimentalForeignApi::class)
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
-    /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
-    private val saveLock = PlatformLock()
+    private val saveLock = JournalSaveLock.instance
 
     private val fileManager = NSFileManager.defaultManager
     private val baseDir: String
@@ -27,12 +26,10 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
     private fun backupPath(): String = dataPath() + ".bak"
     private fun versionedBackupPath(index: Int): String = backupPath() + ".$index"
 
-    /** Set to true when [load] had to use [recoverSnapshot] (partial recovery). */
     @kotlin.concurrent.Volatile
     actual var lastLoadHadIssues: Boolean = false
         private set
 
-    /** Human-readable summary of what was recovered during the last [load]. */
     @kotlin.concurrent.Volatile
     actual var lastLoadIssueSummary: String = ""
         private set
@@ -49,14 +46,11 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         lastLoadIssueSummary = ""
 
         if (!fileManager.fileExistsAtPath(dataPath())) {
-            // Audit C3: a crash inside save()'s backup rotation can leave the main
-            // file missing while .bak / .tmp still hold complete copies. Recover
-            // automatically instead of starting the session blank.
+            // Audit C3: a crash inside save()'s backup rotation can leave the main file missing
             recoverMissingMainFile()
             return@withLock
         }
 
-        // Clean the orphaned temp file only now that the main file is known to exist.
         if (fileManager.fileExistsAtPath(tempPath())) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             fileManager.removeItemAtPath(tempPath(), null)
@@ -138,7 +132,6 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 fileManager.moveItemAtPath(from, toPath = to, error = null)
             }
         }
-        // Newest versioned backup slot: copy of the file we are about to replace.
         if (fileManager.fileExistsAtPath(versionedBackupPath(1))) {
             fileManager.removeItemAtPath(versionedBackupPath(1), null)
         }
@@ -196,15 +189,12 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
                 return@withLock false
             }
-            // Remove current file if exists
             if (fileManager.fileExistsAtPath(dataPath())) {
                 fileManager.removeItemAtPath(dataPath(), null)
             }
             val success = fileManager.copyItemAtPath(backup, toPath = dataPath(), error = null)
             if (success) {
                 Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
-                // The backup is authoritative: clear live state first so entities
-                // created after the backup was taken are not merged back on top.
                 repo.clearAll()
                 load()
                 true
@@ -222,7 +212,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         try {
             fileManager.createDirectoryAtPath(baseDir, withIntermediateDirectories = true, attributes = null, error = null)
 
-            // Locked snapshot - see JournalStoreDesktop.save() (audit S1).
+            // Locked snapshot: see JournalStoreDesktop.save() (audit S1).
             val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
@@ -231,8 +221,6 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            // Write temp first: nothing below starts until the new payload is a
-            // complete file on disk.
             val tmpWritten = (text as NSString).writeToFile(tempPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
             if (!tmpWritten) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tempPath()}" }
@@ -242,11 +230,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             if (fullBackup && fileManager.fileExistsAtPath(dataPath())) {
                 // Versioned chain .bak.1..5 (desktop parity; audit "iOS backup rotation").
                 rotateVersionedBackups()
-                // Promote the current file to .bak by MOVING it so dataPath's name is
-                // free for the tmp promote. Never delete dataPath outright: through
-                // every step of this rotation at least two of {dataPath, .bak, .tmp}
-                // hold a complete copy, so no crash can leave zero journal files
-                // (audit C3).
+                // Never delete dataPath outright: through every step of this rotation at least two of {dataPath, .bak
                 if (fileManager.fileExistsAtPath(backupPath())) {
                     fileManager.removeItemAtPath(backupPath(), null)
                 }
@@ -257,9 +241,6 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
 
             if (!fileManager.moveItemAtPath(tempPath(), toPath = dataPath(), error = null)) {
-                // Destination still exists (light save, or the .bak promote fell back
-                // to a copy): NSString's atomic write replaces it in place with no
-                // missing-file window.
                 Log.withTag("JournalStore").w { "Atomic rename failed, falling back to direct write" }
                 val direct = (text as NSString).writeToFile(dataPath(), atomically = true, encoding = NSUTF8StringEncoding, error = null)
                 if (direct) {

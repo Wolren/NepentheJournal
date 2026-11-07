@@ -3,6 +3,8 @@ package app.journal.data
 import app.journal.ingest.DoseWikiIngestor
 import java.io.File
 import java.lang.reflect.Proxy
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -39,6 +41,12 @@ class DataInitializerTest {
         }
     }
 
+    /** Runs startup and waits for the bundled library build, which is asynchronous by design. */
+    private fun ensureInitialized(repo: IJournalRepository) {
+        DataInitializer.ensureInitialized(repo)
+        runBlocking { withTimeout(120_000) { DataInitializer.awaitLibraryBuild() } }
+    }
+
     @BeforeTest
     fun resetBefore() {
         DataInitializer.reset()
@@ -55,19 +63,17 @@ class DataInitializerTest {
     fun seedLoadsOnceAndSecondEnsureIsNoop() = withTempHome { _ ->
         val repo = JournalRepository()
 
-        DataInitializer.ensureInitialized(repo)
+        ensureInitialized(repo)
         assertTrue(repo.substances.value.isNotEmpty(), "first call must load the bundled seed")
         assertNotNull(repo.seedFingerprint.value,
             "a successful seed load stamps the fingerprint")
         assertTrue(DataInitializer.initializedFlow.value,
             "initializedFlow must be true after a completed init")
 
-        // Probe: clear the library. If the second call re-ran initialization
-        // it would repopulate the seed (empty library can never be "fresh").
         repo.clearAll()
         assertTrue(repo.substances.value.isEmpty(), "fixture check")
 
-        DataInitializer.ensureInitialized(repo)
+        ensureInitialized(repo)
         assertTrue(repo.substances.value.isEmpty(),
             "second ensureInitialized must be a no-op (a re-run repopulates the seed)")
         assertTrue(DataInitializer.initializedFlow.value, "gate stays open")
@@ -79,21 +85,17 @@ class DataInitializerTest {
         dataFile.parentFile.mkdirs()
         dataFile.writeText("{ definitely not json")
 
-        // Prove the fixture is what we think: the store reports a load issue.
         val probe = JournalStore(JournalRepository())
         probe.load()
         assertTrue(probe.lastLoadHadIssues,
             "corrupt journal file must trip the store's load-recovery path")
 
-        // DataInitializer runs against the same corrupt file and must finish
-        // with the gate open (its finally block), seed intact.
         val repo = JournalRepository()
-        DataInitializer.ensureInitialized(repo)
+        ensureInitialized(repo)
         assertTrue(DataInitializer.initializedFlow.value,
             "initializedFlow must open even when store.load() fails")
         assertTrue(repo.substances.value.isNotEmpty(), "seed still loads")
 
-        // Store must be usable again after init (init rewrites the file).
         JournalStore(repo).save()
         assertTrue(dataFile.readText().contains("substances"),
             "init + save must leave a valid journal file")
@@ -103,9 +105,6 @@ class DataInitializerTest {
     fun gateOpensEvenWhenInitializationThrows() = withTempHome { _ ->
         assertFalse(DataInitializer.initializedFlow.value, "reset must close the gate first")
 
-        // Any non-JournalRepository IJournalRepository blows up the
-        // `repo as JournalRepository` cast inside runInitialization before a
-        // single repository method is invoked; the proxy guarantees that.
         val neverCalled = Proxy.newProxyInstance(
             IJournalRepository::class.java.classLoader,
             arrayOf(IJournalRepository::class.java)
@@ -122,19 +121,19 @@ class DataInitializerTest {
     @Test
     fun resetClosesTheGateAgain() = withTempHome { _ ->
         val repo = JournalRepository()
-        DataInitializer.ensureInitialized(repo)
+        ensureInitialized(repo)
         assertTrue(DataInitializer.initializedFlow.value)
 
         DataInitializer.reset()
         assertFalse(DataInitializer.initializedFlow.value,
             "reset must re-arm the initialization flag and close the gate")
+        assertFalse(DataInitializer.libraryReadyFlow.value,
+            "reset must close the library gate too")
 
-        // And a fresh ensure runs the full pipeline again: new repo, seed loads.
         val second = JournalRepository()
-        DataInitializer.ensureInitialized(second)
+        ensureInitialized(second)
         assertTrue(second.substances.value.isNotEmpty(), "post-reset init must load the seed again")
         assertTrue(DataInitializer.initializedFlow.value)
-        // Sanity: equality with the first run's seed count (seed is deterministic).
         assertEquals(repo.substances.value.size, second.substances.value.size,
             "both inits must load the identical bundled seed")
     }

@@ -15,17 +15,32 @@ class DoseWikiLookupTest {
         DoseWikiLookup.reset()
         val base = DoseWikiLookup.loadCount
 
-        // First lookup after reset must load and cache the bundled resource.
         DoseWikiLookup.getSubstance("anything")
         assertEquals(base + 1, DoseWikiLookup.loadCount, "first lookup must load the bundled resource once")
 
-        // Subsequent lookups are served from cache: no second load.
         DoseWikiLookup.getSubstance("something else")
         assertEquals(base + 1, DoseWikiLookup.loadCount, "cached lookup must not reload")
 
-        // reset() clears the cache so the next lookup reloads from disk.
         DoseWikiLookup.reset()
         DoseWikiLookup.getSubstance("anything")
         assertEquals(base + 2, DoseWikiLookup.loadCount, "reset must force a reload")
+    }
+
+    @Test
+    fun adoptedListSkipsTheResourceReadAndParse() {
+        DoseWikiLookup.reset()
+        val base = DoseWikiLookup.loadCount
+        val seeded = listOf(
+            app.journal.model.DoseWikiSubstance(title = "Adopted Sample"),
+            app.journal.model.DoseWikiSubstance(title = "Adopted Other", slug = "adopted-other")
+        )
+
+        DoseWikiLookup.adopt(seeded)
+
+        assertEquals("Adopted Other", DoseWikiLookup.getSubstance("adopted other")?.title)
+        assertEquals(
+            base, DoseWikiLookup.loadCount,
+            "an adopted list must serve lookups without reading the bundled asset again"
+        )
     }
 }

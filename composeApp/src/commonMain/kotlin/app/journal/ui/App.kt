@@ -29,26 +29,22 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val themeManager = remember { ThemeManager.instance }
     val themeConfig by themeManager.config.collectAsState()
 
-    // Startup gate: heavy init (seed plus DoseWiki JSON) runs on a background
-    // scope from the platform launcher. Show a loading screen until
-    // DataInitializer.initializedFlow opens, never a blank window.
+    // Show a loading screen until DataInitializer.initializedFlow opens, never a blank window.
     val ready by DataInitializer.initializedFlow.collectAsState()
+    val phase by DataInitializer.phase.collectAsState()
 
     val journalStore = remember(repo) { JournalStore(repo) }
 
-    // ── Data integrity: save + auto-backup on close ──
     DisposableEffect(Unit) {
         onDispose {
-            // Save in-memory changes FIRST, then back up the fresh file.
-            // Backing up without saving would copy a file up to 2s stale
-            // (autosave debounce) and silently drop the last edits (audit S2).
+            // Backing up without saving would copy a file up to 2s stale and silently drop the last edits (audit S2).
             journalStore.save()
             journalStore.triggerAutoBackup()
         }
     }
 
     if (!ready) {
-        AppSplash(themeManager)
+        AppSplash(themeManager, phase)
         return
     }
 

@@ -12,15 +12,12 @@ import java.time.format.DateTimeFormatter
 
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
-    /** Serializes save/load so concurrent saves cannot interleave writes to the shared tmp file. */
-    private val saveLock = PlatformLock()
+    private val saveLock = JournalSaveLock.instance
 
-    /** Set to true when [load] had to use [recoverSnapshot] (partial recovery). */
     @Volatile
     actual var lastLoadHadIssues: Boolean = false
         private set
 
-    /** Human-readable summary of what was recovered during the last [load]. */
     @Volatile
     actual var lastLoadIssueSummary: String = ""
         private set
@@ -43,18 +40,11 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         lastLoadIssueSummary = ""
 
         if (!target.exists()) {
-            // Missing-target recovery (desktop parity with JournalStoreIos
-            // and JournalStoreAndroid.recoverMissingMainFile, audit C3): a
-            // crash inside save()'s backup rotation can leave the main file
-            // missing while .bak / .tmp still hold complete copies. Recover
-            // instead of starting the session blank. Runs BEFORE the orphan
-            // cleanup because .tmp is a recovery candidate here, not an orphan.
+            // Missing-target recovery (desktop parity with JournalStoreIos and JournalStoreAndroid.recoverMissingMainFile, audit C3)
             recoverMissingMainFile(tmp)
             return@withLock
         }
 
-        // Clean the orphaned temp file only now that the main file is known
-        // to exist.
         if (tmp.exists()) {
             Log.withTag("JournalStore").w { "Cleaning orphaned temp file from prior save" }
             tmp.delete()
@@ -141,10 +131,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         try {
             target.parentFile.mkdirs()
 
-            // repo.fullSnapshot() holds the repository lock so the multi-store
-            // snapshot cannot tear (a mutation between store reads would persist
-            // e.g. a session without its doses). AppJson.snapshot(repo) directly
-            // is NOT safe here (audit S1).
+            // AppJson.snapshot(repo) directly isn't safe here (audit S1).
             val snapshot = repo.fullSnapshot()
             val text = AppJson.json.encodeToString(snapshot)
 
@@ -169,11 +156,11 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 }
                 // Copy current file to .bak.1 (newest versioned backup)
                 target.copyTo(File(versionedBackupPath(1)), overwrite = true)
-                // Keep .bak as immediate-previous snapshot
                 target.copyTo(backup, overwrite = true)
             }
 
-            if (!tmp.renameTo(target)) {
+            // File.renameTo cannot replace an existing target on Windows, so every save fell back to a non-atomic write.
+            if (!replaceWithMove(tmp, target)) {
                 Log.withTag("JournalStore").w { "Atomic rename failed (target may be locked), falling back to direct write with retry" }
                 // Retry up to 3 times total (initial + 2) with 100ms delay between attempts
                 var success = false
@@ -253,15 +240,34 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
             backup.copyTo(target, overwrite = true)
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
-            // The backup is authoritative: clear live state first so entities created
-            // after the backup was taken are not merged back on top of the restore.
             repo.clearAll()
-            // Reload the restored data
             load()
             return@withLock true
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to restore from backup: ${e.message}" }
             return@withLock false
+        }
+    }
+
+    /** Moves [from] over [to], replacing an existing target; ATOMIC_MOVE where the filesystem allows it. */
+    private fun replaceWithMove(from: File, to: File): Boolean {
+        return try {
+            java.nio.file.Files.move(
+                from.toPath(), to.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE
+            )
+            true
+        } catch (_: Exception) {
+            try {
+                java.nio.file.Files.move(
+                    from.toPath(), to.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 }

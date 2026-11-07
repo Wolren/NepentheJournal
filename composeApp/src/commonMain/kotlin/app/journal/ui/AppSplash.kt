@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.ThemeManager
 
 @Composable
-internal fun AppSplash(themeManager: ThemeManager) {
+internal fun AppSplash(themeManager: ThemeManager, phase: String = "Loading journal") {
     val splashColors = themeManager.colorScheme(themeManager.isDarkTheme())
     MaterialTheme(colorScheme = splashColors) {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -38,6 +38,13 @@ internal fun AppSplash(themeManager: ThemeManager) {
                     CircularProgressIndicator()
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Loading journal...")
+                    Spacer(modifier = Modifier.height(6.dp))
+                    // First launch parses the bundled library for tens of seconds on a phone; name the step.
+                    Text(
+                        phase,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
