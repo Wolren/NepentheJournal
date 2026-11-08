@@ -61,7 +61,7 @@ class IosDeviceTrustStore(private val dataDir: String) {
     private val backupPath: String get() = "$dataDir/ios-trusted-devices.json.bak"
     private val tmpPath: String get() = "$dataDir/ios-trusted-devices.json.tmp"
     private val fileJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val atRestKey = IosAtRestKey("journal.trust-store")
+    private val atRestKey = IosAtRestKey("journal.trust-store", fallbackFile = "$dataDir/ios-trust-store.bin")
 
     @kotlin.concurrent.Volatile
     private var cachedStore: IosTrustFile? = null

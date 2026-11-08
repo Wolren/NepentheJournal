@@ -47,7 +47,7 @@ class IosDeviceIdentityStore(private val dataDir: String) {
     private val filePath: String get() = "$dataDir/ios-device-identity.json"
     private val backupPath: String get() = "$dataDir/ios-device-identity.json.bak"
     private val fileJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val atRestKey = IosAtRestKey("journal.device-identity")
+    private val atRestKey = IosAtRestKey("journal.device-identity", fallbackFile = "$dataDir/ios-device-identity.bin")
 
     @kotlin.concurrent.Volatile
     private var cachedHex: String? = null
