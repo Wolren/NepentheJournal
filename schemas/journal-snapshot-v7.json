@@ -308,6 +308,16 @@
           },
           "default": {}
         },
+        "halfLifeMinutes": {
+          "type": ["number", "null"],
+          "description": "Elimination half-life in minutes, parsed from the source duration route. Null when the source has none, so the curve estimates one from the effect window. Animal-study values are rejected at ingest.",
+          "default": null
+        },
+        "tmaxMinutes": {
+          "type": ["number", "null"],
+          "description": "Time to peak in minutes, from the peak stage of the duration profile. Drives the absorption rate of the derived PK curve.",
+          "default": null
+        },
         "addictionPotential": {
           "type": "string",
           "description": "Addiction/addiction potential classification from SMW. Free text or structured label.",

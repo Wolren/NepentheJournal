@@ -200,6 +200,10 @@ data class Substance(
     val routesOfAdministration: List<String> = emptyList(),
     val dosageBands: Map<String, String> = emptyMap(),
     val durationProfile: Map<String, String> = emptyMap(),
+    /** Elimination half-life in minutes, parsed from the source; null when the source has none. */
+    val halfLifeMinutes: Double? = null,
+    /** Time to peak in minutes, from the peak stage of the duration profile. */
+    val tmaxMinutes: Double? = null,
     val addictionPotential: String? = null,
     val toxicity: List<String> = emptyList(),
     val crossTolerances: List<String> = emptyList(),

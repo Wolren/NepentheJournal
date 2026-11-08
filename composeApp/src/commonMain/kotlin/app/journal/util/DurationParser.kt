@@ -29,7 +29,8 @@ fun parseDurationValue(value: String): Pair<Double, Double>? {
     val clean = value.trim()
     val parts = clean.split("\u2013", "-", "\u2013")
     val numPattern = Regex("""([\d.]+)""")
-    val unitPattern = Regex("""(minute|minutes|min|hour|hours|hr|day|days)\b""", RegexOption.IGNORE_CASE)
+    // Bare "h" and "d" appear in the seed ("4-6 h"); without them 4-6 h parsed as 4-6 minutes.
+    val unitPattern = Regex("""(minutes?|mins?|hours?|hrs?|h|days?|d)\b""", RegexOption.IGNORE_CASE)
 
     val nums = numPattern.findAll(clean).map { it.value.toDoubleOrNull() }.filterNotNull().toList()
     val unitMatch = unitPattern.find(clean)
@@ -40,8 +41,8 @@ fun parseDurationValue(value: String): Pair<Double, Double>? {
     val min = nums.getOrElse(0) { 0.0 }
     val max = nums.getOrElse(1) { min }
     val multiplier = when {
-        unit.startsWith("day") -> 1440.0
-        unit.startsWith("hour") || unit.startsWith("hr") -> 60.0
+        unit == "d" || unit.startsWith("day") -> 1440.0
+        unit == "h" || unit.startsWith("hour") || unit.startsWith("hr") -> 60.0
         else -> 1.0
     }
 

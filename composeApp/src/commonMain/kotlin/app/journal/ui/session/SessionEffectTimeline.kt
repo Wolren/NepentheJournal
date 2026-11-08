@@ -71,15 +71,38 @@ internal fun SessionEffectTimeline(
         if (logged.isNotEmpty()) {
             listOf(EffectCurveLayer(substanceId = null, samples = logged))
         } else {
+            val windowStart = minOf(session.startTime, doses.minOfOrNull { it.timestamp } ?: session.startTime)
+            val windowEnd = maxOf(session.endTime ?: now, doses.maxOfOrNull { it.timestamp } ?: windowStart)
+            val span = (windowEnd - windowStart).coerceAtLeast(60_000L)
             doses.groupBy { it.substanceId }
                 .mapNotNull { (substanceId, group) ->
-                    val profile = substancesById[substanceId]?.durationProfile
-                        ?.let { parseDurationProfile(it) }
-                    if (profile.isNullOrEmpty()) return@mapNotNull null
+                    val substance = substancesById[substanceId] ?: return@mapNotNull null
+                    val pk = pkEffectSamples(
+                        doses = group,
+                        substance = substance,
+                        startMs = windowStart,
+                        endMs = windowEnd + span / 2,
+                    )
+                    if (pk != null && pk.samples.size >= 2) {
+                        return@mapNotNull EffectCurveLayer(substanceId, pk.samples)
+                    }
+                    val profile = parseDurationProfile(substance.durationProfile)
+                    if (profile.isEmpty()) return@mapNotNull null
                     val samples = synthesizedEffectSamples(profile, group.minOf { it.timestamp })
                     if (samples.isEmpty()) null else EffectCurveLayer(substanceId, samples)
                 }
                 .sortedBy { it.samples.first().timestampMs }
+        }
+    }
+    val halfLifeNote = remember(doses, substancesById) {
+        if (loggedEffectSamples(events, session.checkins).isNotEmpty()) return@remember null
+        doses.groupBy { it.substanceId }.entries.firstNotNullOfOrNull { (id, group) ->
+            val substance = substancesById[id] ?: return@firstNotNullOfOrNull null
+            val window = group.minOf { it.timestamp }..group.maxOf { it.timestamp }.coerceAtLeast(group.minOf { it.timestamp } + 1)
+            pkEffectSamples(group, substance, window.first, window.last)?.let { pk ->
+                val source = if (pk.halfLifeFromSource) "from data" else "estimated from duration"
+                "${substance.name}: half-life ${formatHalfLife(pk.halfLifeMinutes)} ($source)"
+            }
         }
     }
 
@@ -239,6 +262,14 @@ internal fun SessionEffectTimeline(
             if (labels.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
                 TickLabelRow(labels)
+            }
+            halfLifeNote?.let { note ->
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
             }
         }
     }

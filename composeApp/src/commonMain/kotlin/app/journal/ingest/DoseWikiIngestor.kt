@@ -192,6 +192,8 @@ object DoseWikiIngestor {
         routesOfAdministration = routesOf(dw),
         dosageBands = dosageBands(dw),
         durationProfile = durationProfile(dw),
+        halfLifeMinutes = halfLifeMinutes(dw),
+        tmaxMinutes = tmaxMinutes(dw),
         addictionPotential = addictionOf(dw),
         toxicity = toxicityOf(dw),
         crossTolerances = crossTolerancesOf(dw),
@@ -230,6 +232,8 @@ object DoseWikiIngestor {
             routesOfAdministration = if (dwRoutes.isNotEmpty()) dwRoutes else existing.routesOfAdministration,
             dosageBands = if (dwBands.isNotEmpty()) dwBands else existing.dosageBands,
             durationProfile = if (dwDuration.isNotEmpty()) dwDuration else existing.durationProfile,
+            halfLifeMinutes = halfLifeMinutes(dw) ?: existing.halfLifeMinutes,
+            tmaxMinutes = tmaxMinutes(dw) ?: existing.tmaxMinutes,
             addictionPotential = addictionOf(dw) ?: existing.addictionPotential,
             toxicity = if (dwToxicity.isNotEmpty()) dwToxicity else existing.toxicity,
             crossTolerances = if (dwCross.isNotEmpty()) dwCross else existing.crossTolerances,
@@ -313,6 +317,12 @@ object DoseWikiIngestor {
             "${fmtNum(s.min!!)}$suffix"
         }
     }
+
+    private fun halfLifeMinutes(dw: DoseWikiSubstance): Double? =
+        Pharmacokinetics.halfLifeMinutes(primaryDurationRoute(dw)?.half_life)
+
+    private fun tmaxMinutes(dw: DoseWikiSubstance): Double? =
+        Pharmacokinetics.tmaxMinutes(primaryDurationRoute(dw)?.stages)
 
     private fun durationProfile(dw: DoseWikiSubstance): Map<String, String> {
         val stages = primaryDurationRoute(dw)?.stages ?: return emptyMap()
