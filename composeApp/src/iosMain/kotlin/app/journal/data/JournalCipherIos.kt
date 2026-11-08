@@ -16,7 +16,11 @@ import platform.CoreCrypto.kCCAlgorithmAES
  */
 @OptIn(ExperimentalForeignApi::class)
 private fun journalKey(): ByteArray =
-    IosAtRestKey(service = "app.journal.nepenthe", account = "journal-at-rest-key").loadOrCreate()
+    IosAtRestKey(
+        service = "app.journal.nepenthe",
+        account = "journal-at-rest-key",
+        fallbackFile = "${app.journal.util.PlatformFile.dataDir()}/journal-at-rest.key",
+    ).loadOrCreate()
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun journalSeal(plain: ByteArray): ByteArray {

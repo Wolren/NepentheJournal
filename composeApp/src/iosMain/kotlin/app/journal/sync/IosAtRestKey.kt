@@ -24,6 +24,8 @@ import platform.CoreFoundation.CFStringCreateWithCString
 import platform.CoreFoundation.CFTypeRefVar
 import platform.CoreFoundation.kCFBooleanTrue
 import platform.CoreFoundation.kCFStringEncodingUTF8
+import platform.Foundation.NSData
+import platform.Foundation.NSFileManager
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemUpdate
@@ -51,14 +53,19 @@ import platform.posix.memcpy
  * the trust and identity stores with AES-256-GCM. The Keychain entry is
  * app namespaced by the OS, so no access group is needed.
  *
- * Fail closed: when the Keychain cannot be read or written, callers throw
- * instead of falling back to a derivable key.
+ * When the Keychain is unavailable (error -25291, and in unit-test bundles no
+ * keychain exists) the key falls back to a 32-byte file inside the app
+ * container, which has the same protection class as the desktop key file.
  */
 @OptIn(ExperimentalForeignApi::class)
 internal class IosAtRestKey(
     private val service: String,
-    private val account: String = "at-rest-key"
+    private val account: String = "at-rest-key",
+    private val fallbackFile: String? = null
 ) {
+
+    /** Raised when no Keychain exists at all, which is the only case that may fall back. */
+    private class KeychainUnavailable(message: String) : IllegalStateException(message)
 
     @kotlin.concurrent.Volatile
     private var cached: ByteArray? = null
@@ -66,24 +73,57 @@ internal class IosAtRestKey(
     @Throws(IllegalStateException::class)
     fun loadOrCreate(): ByteArray {
         cached?.let { return it }
-        loadFromKeychain()?.let {
-            cached = it
-            return it
+        try {
+            loadFromKeychain()?.let {
+                cached = it
+                return it
+            }
+            val fresh = secureRandomBytes(KEY_BYTES)
+            saveToKeychain(fresh)
+            cached = fresh
+            return fresh
+        } catch (e: KeychainUnavailable) {
+            Log.withTag("IosAtRestKey").w { "${e.message}; using $fallbackFile" }
+            return loadOrCreateFallback()
         }
-        val fresh = secureRandomBytes(KEY_BYTES)
-        saveToKeychain(fresh)
-        cached = fresh
-        return fresh
     }
 
     fun loadOrNull(): ByteArray? {
         cached?.let { return it }
         return try {
             loadFromKeychain()?.also { cached = it }
+        } catch (e: KeychainUnavailable) {
+            loadOrCreateFallback().also { cached = it }
         } catch (e: Exception) {
             Log.withTag("IosAtRestKey").w { "Keychain read failed: ${e.message}" }
             null
         }
+    }
+
+    /** Container-file key for hosts with no Keychain at all (test bundles). */
+    private fun loadOrCreateFallback(): ByteArray {
+        val path = fallbackFile ?: throw IllegalStateException("No keychain and no fallback file for $service")
+        val manager = NSFileManager.defaultManager
+        if (manager.fileExistsAtPath(path)) {
+            val data = NSData.dataWithContentsOfFile(path)
+            if (data != null && data.length.toInt() == KEY_BYTES) {
+                val bytes = ByteArray(KEY_BYTES)
+                bytes.usePinned { pinned -> memcpy(pinned.addressOf(0), data.bytes, KEY_BYTES.toULong()) }
+                return bytes
+            }
+        }
+        val fresh = secureRandomBytes(KEY_BYTES)
+        val parent = path.substringBeforeLast('/', "")
+        if (parent.isNotEmpty() && !manager.fileExistsAtPath(parent)) {
+            manager.createDirectoryAtPath(parent, withIntermediateDirectories = true, attributes = null, error = null)
+        }
+        val data = fresh.usePinned { pinned ->
+            NSData.create(bytes = pinned.addressOf(0), length = KEY_BYTES.toULong())
+        }
+        if (!data.writeToFile(path, atomically = true)) {
+            throw IllegalStateException("Cannot write fallback key file: $path")
+        }
+        return fresh
     }
 
     private fun loadFromKeychain(): ByteArray? = memScoped {
@@ -116,6 +156,8 @@ internal class IosAtRestKey(
                     }
                 }
                 errSecItemNotFound -> null
+                ERR_SEC_NOT_AVAILABLE, ERR_SEC_MISSING_ENTITLEMENT ->
+                    throw KeychainUnavailable("Keychain read failed with status $status")
                 else -> throw IllegalStateException("Keychain read failed with status $status")
             }
         } finally {
@@ -146,6 +188,8 @@ internal class IosAtRestKey(
                 when (val status = SecItemAdd(addDict, null)) {
                     errSecSuccess -> Unit
                     errSecDuplicateItem -> updateKeychain(key)
+                    ERR_SEC_NOT_AVAILABLE, ERR_SEC_MISSING_ENTITLEMENT ->
+                        throw KeychainUnavailable("Keychain write failed with status $status")
                     else -> throw IllegalStateException("Keychain write failed with status $status")
                 }
             } finally {
@@ -199,5 +243,9 @@ internal class IosAtRestKey(
 
     companion object {
         const val KEY_BYTES = 32
+        /** errSecNotAvailable: no keychain in this host. */
+        private const val ERR_SEC_NOT_AVAILABLE = -25291
+        /** errSecMissingEntitlement: the bundle carries no keychain entitlement. */
+        private const val ERR_SEC_MISSING_ENTITLEMENT = -34018
     }
 }

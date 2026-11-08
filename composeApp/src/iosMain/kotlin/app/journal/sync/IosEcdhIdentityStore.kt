@@ -43,7 +43,7 @@ class IosEcdhIdentityStore(private val dataDir: String) {
     private val filePath: String get() = "$dataDir/ios-ecdh-key.json"
     private val backupPath: String get() = "$dataDir/ios-ecdh-key.json.bak"
     private val fileJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private val atRestKey = IosAtRestKey("journal.ecdh-identity")
+    private val atRestKey = IosAtRestKey("journal.ecdh-identity", fallbackFile = "$dataDir/ios-ecdh-key.bin")
 
     @kotlin.concurrent.Volatile
     private var cachedPrivateKeyB64: String? = null
