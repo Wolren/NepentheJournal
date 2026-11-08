@@ -3,6 +3,7 @@ package app.journal.sync
 import app.journal.data.JournalRepository
 import app.journal.model.Session
 import app.journal.model.SyncConfig
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -18,6 +19,7 @@ import kotlin.test.assertTrue
  * IosSyncServerRouter, the real ECDH flight and the real pull. iOS sync had no
  * runtime evidence at all before this test.
  */
+@OptIn(ExperimentalForeignApi::class)
 class IosSyncLoopbackTest {
 
     private val root = NSTemporaryDirectory() + "nep-ios-loopback-" + NSUUID().UUIDString()
