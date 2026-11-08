@@ -71,17 +71,15 @@ internal fun SessionEffectTimeline(
         if (logged.isNotEmpty()) {
             listOf(EffectCurveLayer(substanceId = null, samples = logged))
         } else {
-            val windowStart = minOf(session.startTime, doses.minOfOrNull { it.timestamp } ?: session.startTime)
-            val windowEnd = maxOf(session.endTime ?: now, doses.maxOfOrNull { it.timestamp } ?: windowStart)
-            val span = (windowEnd - windowStart).coerceAtLeast(60_000L)
+            val firstDose = doses.minOfOrNull { it.timestamp } ?: session.startTime
             doses.groupBy { it.substanceId }
                 .mapNotNull { (substanceId, group) ->
                     val substance = substancesById[substanceId] ?: return@mapNotNull null
+                    // No window: the curve runs to its own tail, so the chart sees the whole effect.
                     val pk = pkEffectSamples(
                         doses = group,
                         substance = substance,
-                        startMs = windowStart,
-                        endMs = windowEnd + span / 2,
+                        startMs = minOf(firstDose, group.minOf { it.timestamp }),
                     )
                     if (pk != null && pk.samples.size >= 2) {
                         return@mapNotNull EffectCurveLayer(substanceId, pk.samples)
@@ -106,17 +104,21 @@ internal fun SessionEffectTimeline(
         }
     }
 
+    // The window follows the curves and the doses. Anchoring it at session.startTime drew dead
+    // space from "session started" to the first dose and cut curves that ran past the session.
     val startMs = minOf(
-        session.startTime,
         doses.minOfOrNull { it.timestamp } ?: Long.MAX_VALUE,
         layers.minOfOrNull { it.samples.first().timestampMs } ?: Long.MAX_VALUE,
-    )
+    ).takeIf { it != Long.MAX_VALUE } ?: session.startTime
     val endMs = maxOf(
-        session.endTime ?: now,
         doses.maxOfOrNull { it.timestamp } ?: Long.MIN_VALUE,
         layers.maxOfOrNull { it.samples.last().timestampMs } ?: Long.MIN_VALUE,
-    )
-    val spanMs = (endMs - startMs).coerceAtLeast(60_000L)
+        // A live session still ends at now, so the axis does not stop at the last dose.
+        if (session.endTime == null) now else Long.MIN_VALUE,
+    ).takeIf { it != Long.MIN_VALUE } ?: (startMs + 60_000L)
+    val dataSpanMs = (endMs - startMs).coerceAtLeast(60_000L)
+    // Breathing room on the right so the curve ends inside the frame instead of at its edge.
+    val spanMs = dataSpanMs + dataSpanMs / 40
 
     val tickStep = remember(spanMs) { axisStepMs(spanMs) }
     val labels = remember(spanMs, tickStep) {
@@ -191,27 +193,50 @@ internal fun SessionEffectTimeline(
 
                 fun buildPaths(samples: List<EffectSample>): Pair<Path, Path> {
                     val linePath = Path()
-                    val first = samples.first()
-                    linePath.moveTo(xAt(first.timestampMs), yAt(first.intensity))
-                    for (i in 1 until samples.size) {
-                        val prev = samples[i - 1]
-                        val cur = samples[i]
-                        val x0 = xAt(prev.timestampMs)
-                        val y0 = yAt(prev.intensity)
-                        val x1 = xAt(cur.timestampMs)
-                        val y1 = yAt(cur.intensity)
-                        val midX = (x0 + x1) / 2f
-                        linePath.cubicTo(midX, y0, midX, y1, x1, y1)
+                    // Catmull-Rom through the samples: the tangent at each point comes from its
+                    // neighbours, so passing through a peak keeps the slope instead of kinking it.
+                    val xs = samples.map { xAt(it.timestampMs) }
+                    val ys = samples.map { yAt(it.intensity) }
+                    linePath.moveTo(xs[0], ys[0])
+                    if (samples.size == 1) {
+                        linePath.lineTo(xs[0] + 1f, ys[0])
+                    } else {
+                        for (i in 0 until samples.size - 1) {
+                            val x0 = xs.getOrElse(i - 1) { xs[i] }
+                            val y0 = ys.getOrElse(i - 1) { ys[i] }
+                            val x1 = xs[i]
+                            val y1 = ys[i]
+                            val x2 = xs[i + 1]
+                            val y2 = ys[i + 1]
+                            val x3 = xs.getOrElse(i + 2) { xs[i + 1] }
+                            val y3 = ys.getOrElse(i + 2) { ys[i + 1] }
+                            // Uneven sample spacing lets the raw tangents cross, which draws a loop;
+                            // clamping each control point into its own segment keeps x monotone.
+                            val lo = minOf(x1, x2)
+                            val hi = maxOf(x1, x2)
+                            val c1x = (x1 + (x2 - x0) / 6f).coerceIn(lo, hi)
+                            val c1y = (y1 + (y2 - y0) / 6f).coerceIn(0f, h)
+                            val c2x = (x2 - (x3 - x1) / 6f).coerceIn(lo, hi)
+                            val c2y = (y2 - (y3 - y1) / 6f).coerceIn(0f, h)
+                            linePath.cubicTo(c1x, c1y, c2x, c2y, x2, y2)
+                        }
                     }
                     val areaPath = Path()
                     areaPath.addPath(linePath)
-                    areaPath.lineTo(xAt(samples.last().timestampMs), h)
-                    areaPath.lineTo(xAt(first.timestampMs), h)
+                    areaPath.lineTo(xs.last(), h)
+                    areaPath.lineTo(xs.first(), h)
                     areaPath.close()
                     return linePath to areaPath
                 }
 
                 val built = layers.map { buildPaths(it.samples) }
+                // The baseline goes down first: drawn last it hid the near-zero start of every curve.
+                drawLine(
+                    color = accent.copy(alpha = 0.35f),
+                    start = Offset(0f, h),
+                    end = Offset(w, h),
+                    strokeWidth = 1.dp.toPx(),
+                )
                 layers.forEachIndexed { index, _ ->
                     val (_, areaPath) = built[index]
                     val color = layerColors[index]

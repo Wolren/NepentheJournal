@@ -108,6 +108,21 @@ class PkEffectCurveTest {
     }
 
     @Test
+    fun aDoseAboveTheBandPeaksAtTenWithoutAPlateau() {
+        val s = substance(halfLife = 52.0, tmax = 40.0, bands = mapOf("common" to "50-150 mg"))
+        val curve = pkEffectSamples(listOf(dose(5000.0, "mg", 0)), s, 0L, 12 * 3_600_000L)!!
+        assertEquals(10f, curve.samples.maxOf { it.intensity }, 0.05f)
+        val peak = curve.samples.maxBy { it.intensity }
+        val oneHalfLifeLater = curve.samples.minBy {
+            abs(it.timestampMs - (peak.timestampMs + 52 * 60_000L))
+        }
+        assertTrue(
+            oneHalfLifeLater.intensity < 8.5f,
+            "a 5 g dose must keep decaying instead of holding 10, got ${oneHalfLifeLater.intensity}"
+        )
+    }
+
+    @Test
     fun aSubstanceWithNoTimingAtAllYieldsNoCurve() {
         val curve = pkEffectSamples(
             listOf(dose(100.0, "mg", 0)),

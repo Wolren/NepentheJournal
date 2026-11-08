@@ -14,6 +14,8 @@ data class PkEffectCurve(
     val samples: List<EffectSample>,
     val halfLifeMinutes: Double,
     val halfLifeFromSource: Boolean,
+    /** Last point of the curve, so the chart can size its window to the full effect. */
+    val endMs: Long,
 )
 
 /**
@@ -27,7 +29,7 @@ fun pkEffectSamples(
     doses: List<Dose>,
     substance: Substance,
     startMs: Long,
-    endMs: Long,
+    endMs: Long? = null,
 ): PkEffectCurve? {
     if (doses.isEmpty()) return null
     val timed = doses
@@ -51,20 +53,27 @@ fun pkEffectSamples(
 
     val ke = PkCurve.eliminationRate(halfLife)
     val ka = PkCurve.absorptionRate(ke, tmax)
-    val step = ((endMs - startMs) / 240L).coerceIn(60_000L, 900_000L)
+    // Without a caller window the curve runs to its own tail: six half-lives is 1.5 percent.
+    val horizonMinutes = maxOf(totalMinutes ?: 0.0, 6.0 * halfLife)
+    val curveEnd = endMs ?: (timed.last().second + (horizonMinutes * 60_000.0).toLong()).coerceAtLeast(startMs + 60_000L)
+    val step = ((curveEnd - startMs) / 240L).coerceIn(60_000L, 900_000L)
     val series = PkCurve.series(
         doses = timed.map { (mg, timestamp) -> timestamp to mg / referenceMg },
         ke = ke,
         ka = ka,
         startMs = startMs,
-        endMs = endMs,
+        endMs = curveEnd,
         stepMs = step,
     )
     if (series.isEmpty()) return null
+    // A dose far above the band would clamp at 10 and flatten the peak into a plateau, so the
+    // shape is scaled to its own maximum and that maximum is what the dose decides.
+    val rawPeak = series.maxOf { it.second }.takeIf { it > 0.0 } ?: return null
+    val targetPeak = 10.0 * minOf(1.0, rawPeak)
     val samples = series.map { (timestamp, level) ->
-        EffectSample(timestampMs = timestamp, intensity = (level * 10.0).toFloat().coerceIn(0f, 10f))
+        EffectSample(timestampMs = timestamp, intensity = (level / rawPeak * targetPeak).toFloat().coerceIn(0f, 10f))
     }
-    return PkEffectCurve(samples, halfLife, halfLifeFromSource)
+    return PkEffectCurve(samples, halfLife, halfLifeFromSource, curveEnd)
 }
 
 /** Doses arrive in µg, mg or g; the reference is always mg. */

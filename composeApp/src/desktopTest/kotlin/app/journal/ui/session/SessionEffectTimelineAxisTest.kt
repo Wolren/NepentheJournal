@@ -58,26 +58,25 @@ class SessionEffectTimelineAxisTest {
             fun count(text: String) = onAllNodesWithText(text)
                 .fetchSemanticsNodes(atLeastOneRootRequired = false).size
 
-            // A duplicated label row would show as a count of 2
-            for (expected in listOf("0h", "1h", "2h", "3h", "4h")) {
+            // The window follows the check-ins (1h to 4h), so the axis is stepped in minutes.
+            // A duplicated label row would show as a count of 2.
+            for (expected in listOf("0m", "30m", "1h", "1h30m", "2h", "2h30m", "3h")) {
                 assertEquals(
                     1,
                     count(expected),
                     "axis label \"$expected\" must appear exactly once (below the plot)",
                 )
             }
-            // axisLabel(0) is "0m"; on an hour-stepped axis it must never leak.
-            assertEquals(0, count("0m"), "an hour axis must not show a \"0m\" label")
 
             // The 60dp threshold sits between the two.
             val header = onAllNodesWithText("Effect timeline")
                 .fetchSemanticsNodes(atLeastOneRootRequired = false).first()
-            val firstLabel = onAllNodesWithText("0h")
+            val firstLabel = onAllNodesWithText("0m")
                 .fetchSemanticsNodes(atLeastOneRootRequired = false).first()
             val gapPx = firstLabel.boundsInRoot.top - header.boundsInRoot.bottom
             assertTrue(
                 gapPx > 60f * density,
-                "the 0h label must sit below the 100dp plot, gap was ${gapPx}px",
+                "the first label must sit below the 100dp plot, gap was ${gapPx}px",
             )
         }
     }
