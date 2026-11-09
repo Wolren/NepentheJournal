@@ -10,79 +10,115 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.model.rules.InteractionCheckResult
 import app.journal.model.InteractionRisk
+import app.journal.model.rules.ActiveInteractionResult
+import app.journal.model.rules.InteractionWarningLevel
+
+/** One warning line. [message] is set for class-rule warnings, null for catalog pairs. */
+private data class WarningRow(val a: String, val b: String, val message: String?)
+
+private data class WarningGroup(
+    val title: String,
+    val riskLevel: InteractionRisk,
+    val rows: List<WarningRow>,
+)
 
 /**
- * Displays interaction warnings for a set of substance pairs.
- * Shows dangerous (red), unsafe (amber), and uncertain (gray) groups.
+ * Renders every warning the active set produces: catalog pair risks plus class-rule
+ * risks, including standing medications and doses that are still active.
  */
 @Composable
 fun InteractionWarnings(
-    result: InteractionCheckResult,
+    result: ActiveInteractionResult,
     substanceNameLookup: (String) -> String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    if (!result.hasIssues && result.uncertain.isEmpty()) return
-
-    val shown = remember(result, substanceNameLookup) {
-        val seen = mutableSetOf<Pair<String, String>>()
-        fun dedupe(pairs: List<Pair<String, String>>): List<Pair<String, String>> =
-            pairs.filter { (a, b) ->
-                val key = listOf(
-                    substanceNameLookup(a).lowercase(),
-                    substanceNameLookup(b).lowercase()
-                ).sorted().let { it[0] to it[1] }
-                seen.add(key)
-            }
-        Triple(
-            dedupe(result.dangerous),
-            dedupe(result.unsafe),
-            dedupe(result.uncertain)
-        )
+    if (result.isEmpty) return
+    val groups = remember(result) { buildGroups(result, substanceNameLookup) }
+    val medicationNames = remember(result.medicationNames) {
+        result.medicationNames.map { it.trim().lowercase() }.toSet()
     }
-    val (dangerous, unsafe, uncertain) = shown
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (dangerous.isNotEmpty()) {
-            InteractionGroup(
-                title = "Dangerous Combinations",
-                pairs = dangerous,
-                riskLevel = InteractionRisk.DANGEROUS,
-                substanceNameLookup = substanceNameLookup
+        sourceCaption(result)?.let { caption ->
+            Text(
+                caption,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (unsafe.isNotEmpty()) {
-            InteractionGroup(
-                title = "Unsafe Combinations",
-                pairs = unsafe,
-                riskLevel = InteractionRisk.UNSAFE,
-                substanceNameLookup = substanceNameLookup
-            )
-        }
-        if (uncertain.isNotEmpty()) {
-            InteractionGroup(
-                title = "Uncertain Combinations",
-                pairs = uncertain,
-                riskLevel = InteractionRisk.UNCERTAIN,
-                substanceNameLookup = substanceNameLookup
-            )
+        groups.forEach { group ->
+            if (group.rows.isNotEmpty()) {
+                InteractionGroup(group, substanceNameLookup, medicationNames)
+            }
         }
     }
 }
 
+/** Explains which non-session sources were checked, so a warning is never unexplained. */
+private fun sourceCaption(result: ActiveInteractionResult): String? {
+    val parts = buildList {
+        val meds = result.medicationNames.size
+        if (meds > 0) add(if (meds == 1) "1 standing medication" else "$meds standing medications")
+        val recent = result.recentSubstanceNames.size
+        if (recent > 0) add(if (recent == 1) "1 recent dose" else "$recent recent doses")
+    }
+    if (parts.isEmpty()) return null
+    return "Includes ${parts.joinToString(" and ")}."
+}
+
+private fun buildGroups(
+    result: ActiveInteractionResult,
+    substanceNameLookup: (String) -> String,
+): List<WarningGroup> {
+    val dangerous = linkedMapOf<String, WarningRow>()
+    val unsafe = linkedMapOf<String, WarningRow>()
+    val uncertain = linkedMapOf<String, WarningRow>()
+    val notes = linkedMapOf<String, WarningRow>()
+
+    fun keyOf(row: WarningRow): String {
+        val a = substanceNameLookup(row.a).trim().lowercase()
+        val b = substanceNameLookup(row.b).trim().lowercase()
+        return if (a <= b) "$a|$b" else "$b|$a"
+    }
+
+    fun put(into: MutableMap<String, WarningRow>, row: WarningRow) {
+        val key = keyOf(row)
+        val existing = into[key]
+        if (existing == null || existing.message == null) into[key] = row
+    }
+
+    result.pairs.dangerous.forEach { (a, b) -> put(dangerous, WarningRow(a, b, null)) }
+    result.pairs.unsafe.forEach { (a, b) -> put(unsafe, WarningRow(a, b, null)) }
+    result.pairs.uncertain.forEach { (a, b) -> put(uncertain, WarningRow(a, b, null)) }
+    result.classWarnings.forEach { warning ->
+        val row = WarningRow(warning.substanceA, warning.substanceB, warning.message)
+        when (warning.level) {
+            InteractionWarningLevel.DANGER -> put(dangerous, row)
+            InteractionWarningLevel.CAUTION -> put(unsafe, row)
+            InteractionWarningLevel.NOTE -> put(notes, row)
+        }
+    }
+
+    return listOf(
+        WarningGroup("Dangerous Combinations", InteractionRisk.DANGEROUS, dangerous.values.toList()),
+        WarningGroup("Unsafe Combinations", InteractionRisk.UNSAFE, unsafe.values.toList()),
+        WarningGroup("Uncertain Combinations", InteractionRisk.UNCERTAIN, uncertain.values.toList()),
+        WarningGroup("Notes", InteractionRisk.UNCERTAIN, notes.values.toList()),
+    )
+}
+
 @Composable
 private fun InteractionGroup(
-    title: String,
-    pairs: List<Pair<String, String>>,
-    riskLevel: InteractionRisk,
-    substanceNameLookup: (String) -> String
+    group: WarningGroup,
+    substanceNameLookup: (String) -> String,
+    medicationNames: Set<String>,
 ) {
-    val color = InteractionColors.color(riskLevel)
-    val bgColor = InteractionColors.backgroundColor(riskLevel)
+    val color = InteractionColors.color(group.riskLevel)
+    val bgColor = InteractionColors.backgroundColor(group.riskLevel)
 
     Card(
         shape = RoundedCornerShape(8.dp),
@@ -95,71 +131,49 @@ private fun InteractionGroup(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Icon(
-                    imageVector = when (riskLevel) {
-                        InteractionRisk.DANGEROUS -> Icons.Default.Warning
-                        InteractionRisk.UNSAFE -> Icons.Default.Warning
-                        else -> Icons.Default.Info
+                    imageVector = if (group.riskLevel == InteractionRisk.UNCERTAIN) {
+                        Icons.Default.Info
+                    } else {
+                        Icons.Default.Warning
                     },
                     contentDescription = null,
                     tint = color,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
-                    text = "$title (${pairs.size})",
+                    text = "${group.title} (${group.rows.size})",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = color
                 )
             }
             Spacer(Modifier.height(4.dp))
-            pairs.forEach { (a, b) ->
-                Row(
-                    modifier = Modifier.padding(start = 22.dp, top = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            group.rows.forEach { row ->
+                Column(modifier = Modifier.padding(start = 22.dp, top = 2.dp)) {
                     Text(
-                        text = "${substanceNameLookup(a)} + ${substanceNameLookup(b)}",
+                        text = "${displayName(row.a, substanceNameLookup, medicationNames)} + " +
+                            displayName(row.b, substanceNameLookup, medicationNames),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    row.message?.let { message ->
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-/**
- * Compact inline warning that summarizes dangerous interactions
- * for placement next to a dose entry.
- */
-@Composable
-fun InlineInteractionWarning(
-    level: InteractionRisk,
-    otherSubstanceName: String,
-    modifier: Modifier = Modifier
-) {
-    val color = InteractionColors.color(level)
-
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Icon(
-            Icons.Default.Warning,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(12.dp)
-        )
-        Text(
-            text = when (level) {
-                InteractionRisk.DANGEROUS -> "Dangerous with $otherSubstanceName"
-                InteractionRisk.UNSAFE -> "Unsafe with $otherSubstanceName"
-                else -> "Interaction with $otherSubstanceName"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            maxLines = 1
-        )
-    }
+private fun displayName(
+    raw: String,
+    substanceNameLookup: (String) -> String,
+    medicationNames: Set<String>,
+): String {
+    val resolved = substanceNameLookup(raw)
+    return if (resolved.trim().lowercase() in medicationNames) "$resolved (medication)" else resolved
 }

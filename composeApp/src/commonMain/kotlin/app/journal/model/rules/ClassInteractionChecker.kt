@@ -18,6 +18,12 @@ data class ClassBasedWarning(
     val message: String,
 )
 
+/** A display name plus the classes it contributes, for entries with no catalog row. */
+data class NamedInteractionClasses(
+    val name: String,
+    val classes: List<String>,
+)
+
 /**
  * Deterministic interaction checker that operates on pharmacological classes
  * assigned to each substance. Ported from Field Notes' interactions.rs.
@@ -42,16 +48,18 @@ object ClassInteractionChecker {
             "Lithium + psychedelic: reports of seizures and serious reactions. Contraindicated."),
         Rule("lithium", "stimulant", InteractionWarningLevel.DANGER,
             "Lithium + stimulant: increased seizure and neurotoxicity risk."),
-        Rule("opioid", "depressant", InteractionWarningLevel.DANGER,
-            "Opioid + depressant (alcohol/GHB/etc.): additive respiratory depression. A leading cause of overdose."),
         Rule("opioid", "benzodiazepine", InteractionWarningLevel.DANGER,
             "Opioid + benzodiazepine: additive respiratory depression. Frequently fatal in overdose."),
+        Rule("opioid", "depressant", InteractionWarningLevel.DANGER,
+            "Opioid + depressant (alcohol/GHB/etc.): additive respiratory depression. A leading cause of overdose."),
         Rule("depressant", "benzodiazepine", InteractionWarningLevel.CAUTION,
             "Depressant + benzodiazepine: additive sedation and blackout/respiratory risk."),
         Rule("benzodiazepine", "benzodiazepine", InteractionWarningLevel.CAUTION,
             "Multiple benzodiazepines stack unpredictably, with heightened sedation and memory loss."),
         Rule("ssri", "serotonin_releaser", InteractionWarningLevel.CAUTION,
             "SSRI + serotonin releaser (e.g. MDMA): serotonin syndrome risk, and SSRIs blunt the effect."),
+        Rule("serotonergic", "serotonin_releaser", InteractionWarningLevel.CAUTION,
+            "Serotonergic drug + serotonin releaser: serotonin syndrome risk. The serotonergic drug can also blunt the effect."),
         Rule("serotonin_releaser", "serotonin_releaser", InteractionWarningLevel.CAUTION,
             "Two serotonin releasers: additive serotonin syndrome and neurotoxicity risk."),
         Rule("stimulant", "stimulant", InteractionWarningLevel.CAUTION,
@@ -76,14 +84,21 @@ object ClassInteractionChecker {
      * Each substance should have its `interactionClasses` populated.
      * Precomputes lowercase class sets for O(1) containment checks.
      */
-    fun check(substances: List<Substance>): List<ClassBasedWarning> {
-        if (substances.size < 2) return emptyList()
-        val classSets = substances.map { sub ->
-            sub.interactionClasses.mapTo(mutableSetOf()) { it.lowercase() }
+    fun check(substances: List<Substance>): List<ClassBasedWarning> =
+        checkNamed(substances.map { NamedInteractionClasses(it.name, it.interactionClasses) })
+
+    /**
+     * Check named class entries against each other. Medications enter the check as
+     * name plus preset classes, so they never need a catalog [Substance] row.
+     */
+    fun checkNamed(entries: List<NamedInteractionClasses>): List<ClassBasedWarning> {
+        if (entries.size < 2) return emptyList()
+        val classSets = entries.map { entry ->
+            entry.classes.mapTo(mutableSetOf()) { it.lowercase() }
         }
-        return scanPairs(substances.zip(classSets)) { _, (subA, setA), _, (subB, setB) ->
+        return scanPairs(entries.zip(classSets)) { _, (entry, setA), _, (other, setB) ->
             matchRuleWithSet(setA, setB)?.let { rule ->
-                ClassBasedWarning(rule.level, subA.name, subB.name, rule.message)
+                ClassBasedWarning(rule.level, entry.name, other.name, rule.message)
             }
         }.sortedByDescending { it.level.ordinal }
     }

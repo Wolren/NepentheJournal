@@ -141,4 +141,17 @@ class ClassInteractionCheckerTest {
         ))
         assertEquals(1, result.size)
     }
+
+    @Test
+    fun opioidWithBenzodiazepineUsesTheSpecificRule() {
+        val result = ClassInteractionChecker.check(listOf(
+            substance("cid:1", "Morphine", listOf("opioid")),
+            substance("cid:2", "Alprazolam", listOf("depressant", "benzodiazepine"))
+        ))
+        assertEquals(1, result.size)
+        assertTrue(
+            result.first().message.startsWith("Opioid + benzodiazepine"),
+            "the specific rule must come before opioid + depressant, got: ${result.first().message}"
+        )
+    }
 }

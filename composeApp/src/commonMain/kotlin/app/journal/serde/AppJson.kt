@@ -43,6 +43,7 @@ object AppJson {
             effects = repo.effects.value,
             customUnits = repo.customUnits.value,
             persons = repo.persons.value,
+            medications = repo.medications.value,
             tombstones = repo.exportTombstones(),
             ratingScaleMode = repo.ratingScaleMode.value,
             useShulginRating = false,
@@ -84,7 +85,8 @@ object AppJson {
             interactions = snapshot.interactions,
             effects = snapshot.effects,
             customUnits = snapshot.customUnits,
-            persons = snapshot.persons
+            persons = snapshot.persons,
+            medications = snapshot.medications
         )
         repo.importTombstones(snapshot.tombstones)
         repo.setRatingScaleMode(

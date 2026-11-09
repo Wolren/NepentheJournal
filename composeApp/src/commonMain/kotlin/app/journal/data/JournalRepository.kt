@@ -50,6 +50,8 @@ class JournalRepository internal constructor() : IJournalRepository {
         get() = customUnitsStore.flow
     override val persons: StateFlow<List<Person>>
         get() = personsStore.flow
+    override val medications: StateFlow<List<Medication>>
+        get() = medicationsStore.flow
 
     private val sessionsStore = EntityStore(Session::id)
     private val dosesStore = EntityStore(Dose::id)
@@ -60,6 +62,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val effectsStore = EntityStore(Effect::id)
     private val customUnitsStore = EntityStore(CustomUnit::id)
     private val personsStore = EntityStore(Person::id)
+    private val medicationsStore = EntityStore(Medication::id)
 
     private val _toleranceVersion = MutableStateFlow(0)
     override val toleranceVersion: StateFlow<Int> = _toleranceVersion.asStateFlow()
@@ -96,14 +99,14 @@ class JournalRepository internal constructor() : IJournalRepository {
     )
     private val mutations = JournalMutations(
         lock, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
-        effectsStore, customUnitsStore, personsStore, indices,
+        effectsStore, customUnitsStore, personsStore, medicationsStore, indices,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
     )
     private val frames = JournalExportFrames(lock, sessionsStore, dosesStore, substancesStore, indices)
     private val syncBridge = JournalSyncBridge(
         lock, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
-        effectsStore, customUnitsStore, personsStore, indices, tombstones,
+        effectsStore, customUnitsStore, personsStore, medicationsStore, indices, tombstones,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
     )
@@ -136,6 +139,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         timelineEvents: List<TimelineEvent>,
         customUnits: List<CustomUnit>,
         persons: List<Person>,
+        medications: List<Medication>,
         lastWriterWins: Boolean,
         deletedSessionIds: List<String>,
         deletedDoseIds: List<String>,
@@ -148,7 +152,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         tombstoneCutoff: Long
     ) = syncBridge.applyBatch(
         sessions, doses, substances, effects, interactions, notes, timelineEvents,
-        customUnits, persons, lastWriterWins, deletedSessionIds, deletedDoseIds,
+        customUnits, persons, medications, lastWriterWins, deletedSessionIds, deletedDoseIds,
         deletedNoteIds, deletedSubstanceIds, deletedEffectIds, deletedInteractionIds,
         deletedTimelineEventIds, deletedCustomUnitIds, tombstoneCutoff
     )
@@ -165,6 +169,13 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun getPerson(id: String): Person? = lock.withLock { personsStore.get(id) }
 
     override fun deletePerson(id: String) = mutations.deletePerson(id)
+
+
+    override fun upsertMedication(medication: Medication) = mutations.upsertMedication(medication)
+
+    override fun getMedication(id: String): Medication? = lock.withLock { medicationsStore.get(id) }
+
+    override fun deleteMedication(id: String) = mutations.deleteMedication(id)
 
 
     override fun upsertSession(session: Session) = mutations.upsertSession(session)
@@ -308,6 +319,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         effectsStore.clear()
         customUnitsStore.clear()
         personsStore.clear()
+        medicationsStore.clear()
         indices.clearAllLocked()
         tombstones.clear()
         searchEngine.rebuildSearchIndexLocked()

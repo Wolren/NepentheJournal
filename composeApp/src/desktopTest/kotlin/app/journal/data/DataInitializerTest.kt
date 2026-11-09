@@ -137,4 +137,20 @@ class DataInitializerTest {
         assertEquals(repo.substances.value.size, second.substances.value.size,
             "both inits must load the identical bundled seed")
     }
+
+    @Test
+    fun bundledSeedGetsTheMissingInteractionClasses() = withTempHome { _ ->
+        val repo = JournalRepository()
+        ensureInitialized(repo)
+        val byName = repo.substances.value.associateBy { it.name.lowercase() }
+
+        // desktopTest ships a 1.2 KB DoseWiki fixture, so only seed rows are guaranteed here.
+        val mdma = assertNotNull(byName["mdma"], "the seed ships MDMA")
+        assertTrue("serotonin_releaser" in mdma.interactionClasses,
+            "MDMA must carry the serotonin releaser class, got ${mdma.interactionClasses}")
+
+        val alprazolam = assertNotNull(byName["alprazolam"], "the seed ships Alprazolam")
+        assertTrue("benzodiazepine" in alprazolam.interactionClasses,
+            "Alprazolam must carry the benzodiazepine class, got ${alprazolam.interactionClasses}")
+    }
 }

@@ -84,11 +84,12 @@ internal fun recoverSnapshot(text: String): JournalSnapshot {
     val effects = decodeList(root, "effects", Effect.serializer())
     val customUnits = decodeList(root, "customUnits", CustomUnit.serializer())
     val persons = decodeList(root, "persons", Person.serializer())
+    val medications = decodeList(root, "medications", Medication.serializer())
     Log.withTag("JournalStore").i {
         "Recovered journal: ${sessions.size} sessions, ${substances.size} substances, " +
         "${doses.size} doses, ${notes.size} notes, ${timelineEvents.size} events, " +
         "${interactions.size} interactions, ${effects.size} effects, ${customUnits.size} units, " +
-        "${persons.size} persons, ${tombstones.size} tombstones"
+        "${persons.size} persons, ${medications.size} medications, ${tombstones.size} tombstones"
     }
     return JournalSnapshot(
         savedAt = currentTimeMillis(),
@@ -101,6 +102,7 @@ internal fun recoverSnapshot(text: String): JournalSnapshot {
         effects = effects,
         customUnits = customUnits,
         persons = persons,
+        medications = medications,
         tombstones = tombstones,
         ratingScaleMode = ratingScaleMode,
         useShulginRating = decodeBoolean(root, "useShulginRating", false),

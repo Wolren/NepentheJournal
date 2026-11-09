@@ -34,6 +34,7 @@ internal class JournalMutations(
     private val effectsStore: EntityStore<Effect>,
     private val customUnitsStore: EntityStore<CustomUnit>,
     private val personsStore: EntityStore<Person>,
+    private val medicationsStore: EntityStore<Medication>,
     private val indices: JournalIndices,
     private val markSearchIndexDirtyLocked: () -> Unit,
     private val bumpToleranceVersion: () -> Unit,
@@ -45,6 +46,16 @@ internal class JournalMutations(
     }
 
     fun deletePerson(id: String) = lock.withLock { personsStore.remove(id); bumpMutationCount() }
+
+    fun upsertMedication(medication: Medication) = lock.withLock {
+        medicationsStore.put(medication)
+        bumpMutationCount()
+    }
+
+    fun deleteMedication(id: String) = lock.withLock {
+        medicationsStore.remove(id)
+        bumpMutationCount()
+    }
 
     fun upsertSession(session: Session) = lock.withLock {
         val oldSession = sessionsStore.put(session)

@@ -12,7 +12,7 @@ import kotlin.test.*
 
 /**
  * Golden-file and contract tests for the shared snapshot layer:
- * schemas/journal-snapshot-v7.json (schema version + field coverage),
+ * schemas/journal-snapshot-v8.json (schema version + field coverage),
  * recoverSnapshot field preservation, and the AppJson.apply version dispatch.
  */
 class SnapshotSchemaTest {
@@ -20,11 +20,11 @@ class SnapshotSchemaTest {
     private fun findSchema(): File {
         var dir: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile
         while (dir != null) {
-            val candidate = File(dir, "schemas/journal-snapshot-v7.json")
+            val candidate = File(dir, "schemas/journal-snapshot-v8.json")
             if (candidate.exists()) return candidate
             dir = dir.parentFile
         }
-        fail("schemas/journal-snapshot-v7.json not found above ${System.getProperty("user.dir")}")
+        fail("schemas/journal-snapshot-v8.json not found above ${System.getProperty("user.dir")}")
     }
 
     private fun schemaJson(): kotlinx.serialization.json.JsonElement =
@@ -48,7 +48,7 @@ class SnapshotSchemaTest {
         val declared = properties["version"]!!.jsonObject["const"]!!.jsonPrimitive.content.toInt()
         assertEquals(
             JournalSnapshot.CURRENT_VERSION, declared,
-            "schemas/journal-snapshot-v7.json must declare the same version the code writes"
+            "schemas/journal-snapshot-v8.json must declare the same version the code writes"
         )
     }
 
@@ -73,6 +73,7 @@ class SnapshotSchemaTest {
             "Effect" to Effect.serializer(),
             "CustomUnit" to CustomUnit.serializer(),
             "Person" to Person.serializer(),
+            "Medication" to Medication.serializer(),
             "Substance" to Substance.serializer(),
             "CuratedSection" to CuratedSection.serializer(),
             "ChemicalProperties" to ChemicalProperties.serializer(),

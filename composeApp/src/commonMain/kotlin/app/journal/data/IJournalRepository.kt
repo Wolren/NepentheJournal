@@ -93,6 +93,12 @@ interface IJournalRepository {
     fun getPerson(id: String): Person?
     fun deletePerson(id: String)
 
+    /** Standing medications fed into the interaction check; device-local, like persons. */
+    val medications: StateFlow<List<Medication>>
+    fun upsertMedication(medication: Medication)
+    fun getMedication(id: String): Medication?
+    fun deleteMedication(id: String)
+
     fun upsertDose(dose: Dose)
     fun dosesForSession(sessionId: String): List<Dose>
     fun deleteDose(id: String)
@@ -186,8 +192,8 @@ interface IJournalRepository {
     )
 
     /**
-     * Bulk-apply entities. Snapshot loads pass [persons]; sync deltas leave the
-     * default empty so device-local persons are never overwritten by peers.
+     * Bulk-apply entities. Snapshot loads pass [persons] and [medications]; sync
+     * deltas leave the defaults empty so device-local rows are never overwritten by peers.
      *
      * Notes on a last-writer-wins (sync) apply do NOT blind-overwrite: they
      * route through the same conflict merge as [upsertNoteWithConflict], so a
@@ -205,6 +211,7 @@ interface IJournalRepository {
         timelineEvents: List<TimelineEvent> = emptyList(),
         customUnits: List<CustomUnit> = emptyList(),
         persons: List<Person> = emptyList(),
+        medications: List<Medication> = emptyList(),
         lastWriterWins: Boolean = false,
         deletedSessionIds: List<String> = emptyList(),
         deletedDoseIds: List<String> = emptyList(),

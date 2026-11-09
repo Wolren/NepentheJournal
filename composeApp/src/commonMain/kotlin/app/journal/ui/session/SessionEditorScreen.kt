@@ -12,7 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.journal.model.rules.InteractionCheckResult
+import app.journal.model.rules.ActiveInteractionResult
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.model.*
@@ -69,8 +69,8 @@ fun SessionEditorScreen(
     var showDiscardDialog by remember { mutableStateOf(false) }
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState(initial = false)
 
-    val interactionCheckResult by viewModel.interactionCheckResult.collectAsState(
-        initial = InteractionCheckResult()
+    val activeInteractionResult by viewModel.activeInteractionResult.collectAsState(
+        initial = ActiveInteractionResult()
     )
 
     fun exitEditor() {
@@ -240,7 +240,7 @@ fun SessionEditorScreen(
         item {
             SessionDoseSection(
                 sessionDoses = sessionDoses,
-                interactionCheckResult = interactionCheckResult,
+                activeInteractionResult = activeInteractionResult,
                 substanceNameLookup = { id -> substanceNameById[id] ?: stripPrefix(id) },
                 onAddDose = {
                     editingDose = null

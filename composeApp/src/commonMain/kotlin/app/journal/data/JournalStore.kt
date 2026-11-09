@@ -20,6 +20,11 @@ data class JournalSnapshot(
     val effects: List<Effect> = emptyList(),
     val customUnits: List<CustomUnit> = emptyList(),
     val persons: List<Person> = emptyList(),
+    /**
+     * Standing medications fed into the interaction check. Device-local for the
+     * same reason people are: personal medical data stays on this device.
+     */
+    val medications: List<Medication> = emptyList(),
     val tombstones: Map<String, Long> = emptyMap(),
     /**
      * Rating scale mode. Null means an old file predating the mode:
@@ -42,7 +47,7 @@ data class JournalSnapshot(
     val showSessionsTrendChart: Boolean = false
 ) {
     companion object {
-        const val CURRENT_VERSION = 7
+        const val CURRENT_VERSION = 8
     }
 }
 

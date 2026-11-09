@@ -203,6 +203,8 @@ fun SettingsScreen(
 
         item { PeopleSettingsContent(repo = repo) }
 
+        item { MedicationsSettingsContent(repo = repo) }
+
         item { ObsidianSettingsCard() }
 
         item {

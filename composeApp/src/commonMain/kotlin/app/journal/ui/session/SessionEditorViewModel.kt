@@ -9,8 +9,8 @@ import app.journal.model.Session
 import app.journal.model.SessionProfile
 import app.journal.model.ShulginRating
 import app.journal.model.TimelineEvent
-import app.journal.model.rules.InteractionCheckResult
-import app.journal.model.rules.InteractionChecker
+import app.journal.model.rules.ActiveInteractionCheck
+import app.journal.model.rules.ActiveInteractionResult
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 import kotlinx.coroutines.flow.Flow
@@ -105,18 +105,20 @@ class SessionEditorViewModel(
     }
 
     /**
-     * Interaction warnings for the current dose list; re-emits when either
-     * the doses or the stored interactions change.
+     * Interaction warnings over the current doses, the standing medications and
+     * the earlier doses that are still inside their elimination window.
      */
-    val interactionCheckResult: Flow<InteractionCheckResult> =
-        combine(sessionDoses, repo.interactions) { doses, allInteractions ->
-            if (doses.size >= 2) {
-                InteractionChecker.checkPairwise(
-                    doses.map { it.substanceId }.distinct(), allInteractions
-                )
-            } else {
-                InteractionCheckResult()
-            }
+    val activeInteractionResult: Flow<ActiveInteractionResult> =
+        combine(sessionDoses, repo.medications, repo.doses, repo.substances, repo.interactions) {
+                doses, medications, allDoses, substances, interactions ->
+            ActiveInteractionCheck.run(
+                sessionDoses = doses,
+                medications = medications,
+                allDoses = allDoses,
+                ownDoseIds = doses.map { it.id }.toSet(),
+                substancesById = substances.associateBy { it.id },
+                interactions = interactions,
+            )
         }
 
     private fun buildProfile(): SessionProfile? {

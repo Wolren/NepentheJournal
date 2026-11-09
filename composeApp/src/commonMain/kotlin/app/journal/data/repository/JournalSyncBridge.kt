@@ -34,6 +34,7 @@ internal class JournalSyncBridge(
     private val effectsStore: EntityStore<Effect>,
     private val customUnitsStore: EntityStore<CustomUnit>,
     private val personsStore: EntityStore<Person>,
+    private val medicationsStore: EntityStore<Medication>,
     private val indices: JournalIndices,
     private val tombstones: JournalTombstones,
     private val markSearchIndexDirtyLocked: () -> Unit,
@@ -57,6 +58,7 @@ internal class JournalSyncBridge(
      * divergent edit keeps both bodies (contract c).
      * @param persons device-local snapshot-only entities (never synced, no tombstones).
      * Sync deltas leave this empty; snapshot loads pass the stored list.
+     * @param medications same device-local policy as persons: medical data stays on its device.
      */
     fun applyBatch(
         sessions: List<Session>,
@@ -68,6 +70,7 @@ internal class JournalSyncBridge(
         timelineEvents: List<TimelineEvent>,
         customUnits: List<CustomUnit>,
         persons: List<Person>,
+        medications: List<Medication>,
         lastWriterWins: Boolean,
         deletedSessionIds: List<String>,
         deletedDoseIds: List<String>,
@@ -101,6 +104,7 @@ internal class JournalSyncBridge(
                 if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
             }
         val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt })
+        val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt })
         val anyIndexedPut = bulkPutLocked(
             sessions = sessionsToPut,
             substances = substancesToPut,
@@ -111,6 +115,7 @@ internal class JournalSyncBridge(
             effects = effectsToPut,
             customUnits = customUnitsToPut,
             persons = personsToPut,
+            medications = medicationsToPut,
         )
         val tombstonesChanged = tombstones.applyTombstonesLocked(
             DeletedIds(
@@ -156,6 +161,7 @@ internal class JournalSyncBridge(
             effects = snapshot.effects,
             customUnits = snapshot.customUnits,
             persons = snapshot.persons,
+            medications = snapshot.medications,
         )
         if (changed) {
             indices.rebuildAllIndices()
@@ -182,6 +188,7 @@ internal class JournalSyncBridge(
         effects: List<Effect>,
         customUnits: List<CustomUnit>,
         persons: List<Person>,
+        medications: List<Medication>,
     ): Boolean {
         var indexedChanged = false
         fun <T> put(store: EntityStore<T>, items: List<T>) {
@@ -198,6 +205,7 @@ internal class JournalSyncBridge(
         put(effectsStore, effects)
         put(customUnitsStore, customUnits)
         if (persons.isNotEmpty()) personsStore.putAll(persons)
+        if (medications.isNotEmpty()) medicationsStore.putAll(medications)
         return indexedChanged
     }
 

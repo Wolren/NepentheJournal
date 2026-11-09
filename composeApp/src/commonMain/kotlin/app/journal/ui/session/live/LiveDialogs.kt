@@ -4,47 +4,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Emergency
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.model.rules.ClassBasedWarning
-import app.journal.model.rules.InteractionWarningLevel
 import app.journal.ui.components.*
-
-@Composable
-internal fun InteractionWarningsBanner(warnings: List<ClassBasedWarning>) {
-    val dangerWarnings = warnings.filter { it.level == InteractionWarningLevel.DANGER }
-    val cautionWarnings = warnings.filter { it.level == InteractionWarningLevel.CAUTION }
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (dangerWarnings.isNotEmpty()) {
-            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = InteractionColors.dangerous.copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = InteractionColors.dangerous, modifier = Modifier.size(18.dp))
-                        Text("Dangerous Combinations", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = InteractionColors.dangerous)
-                    }
-                    dangerWarnings.forEach { w -> Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 24.dp, top = 4.dp)) }
-                }
-            }
-        }
-        if (cautionWarnings.isNotEmpty()) {
-            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = InteractionColors.unsafe.copy(alpha = 0.12f)), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Default.Warning, null, tint = InteractionColors.unsafe, modifier = Modifier.size(18.dp))
-                        Text("Caution", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = InteractionColors.unsafe)
-                    }
-                    cautionWarnings.forEach { w -> Text(w.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 24.dp, top = 4.dp)) }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 internal fun LiveSessionEditDialog(

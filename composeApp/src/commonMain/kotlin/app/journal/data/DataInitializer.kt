@@ -5,6 +5,7 @@ import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.model.rules.InteractionClassEnricher
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformTestDataEnabled
@@ -154,6 +155,8 @@ object DataInitializer {
                 libraryDirty = true
                 Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
             }
+            _phase.value = "Applying interaction classes"
+            if (enrichInteractionClasses(repo) > 0) libraryDirty = true
             if (isTestDataEnabled() && repo.substances.value.size >= 2) {
                 FuzzSeed.generate(repo)
                 libraryDirty = true
@@ -205,6 +208,9 @@ object DataInitializer {
             if (taggedCount > 0) {
                 Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
             }
+
+            _phase.value = "Applying interaction classes"
+            enrichInteractionClasses(repo)
 
             // Re-arm auto-save so the build's own mutations do not queue a second full save.
             if (callerScope != null) {
@@ -275,6 +281,22 @@ object DataInitializer {
             store.save()
             Log.withTag("DataInit").i { "Aborted ${staleLive.size} stale empty live sessions" }
         }
+    }
+
+    /**
+     * Adds the interaction classes the DoseWiki ingest drops, because the upstream
+     * psychoactive labels name drug families the rule table does not speak.
+     * Additive and idempotent: a launch after the first writes nothing.
+     */
+    internal fun enrichInteractionClasses(repo: IJournalRepository): Int {
+        val updated = repo.substances.value.mapNotNull { substance ->
+            val enriched = InteractionClassEnricher.enrich(substance)
+            enriched.takeIf { it !== substance }
+        }
+        if (updated.isEmpty()) return 0
+        repo.applyBatch(substances = updated)
+        Log.withTag("DataInit").i { "Enriched interaction classes on ${updated.size} substances" }
+        return updated.size
     }
 
     /**
@@ -399,6 +421,7 @@ object DataInitializer {
 
             DoseWikiIngestor.reset()
             DoseWikiIngestor.ensureIngested(repo)
+            enrichInteractionClasses(repo)
 
             JournalStore(repo as JournalRepository).save()
             Log.withTag("DataInit").i { "Reloaded ${normalized.substances.size} substances from bundled seed" }

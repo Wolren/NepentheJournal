@@ -13,7 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.model.rules.ClassInteractionChecker
+import app.journal.model.rules.ActiveInteractionCheck
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.model.*
@@ -40,11 +40,21 @@ fun LiveSessionScreen(
     val allTimelineEvents by repo.timelineEvents.collectAsState()
     val sessionEvents = remember(allTimelineEvents, live.id) { allTimelineEvents.filter { it.sessionId == live.id }.sortedBy { it.timestamp } }
     val allSubstances by repo.substances.collectAsState()
+    val allInteractions by repo.interactions.collectAsState()
+    val allMedications by repo.medications.collectAsState()
 
-    val usedSubstances = remember(sessionDoses, allSubstances) {
-        val ids = sessionDoses.map { it.substanceId }.distinct(); allSubstances.filter { it.id in ids }
+    val activeInteractionResult = remember(
+        sessionDoses, allMedications, allDoses, allSubstances, allInteractions
+    ) {
+        ActiveInteractionCheck.run(
+            sessionDoses = sessionDoses,
+            medications = allMedications,
+            allDoses = allDoses,
+            ownDoseIds = sessionDoses.map { it.id }.toSet(),
+            substancesById = allSubstances.associateBy { it.id },
+            interactions = allInteractions,
+        )
     }
-    val warnings = remember(usedSubstances) { ClassInteractionChecker.check(usedSubstances) }
 
     var showDoseDialog by remember { mutableStateOf(false) }
     var showMoodDialog by remember { mutableStateOf(false) }
@@ -118,7 +128,14 @@ fun LiveSessionScreen(
             TimerCard(session = live)
         }
 
-        if (warnings.isNotEmpty()) { item { InteractionWarningsBanner(warnings) } }
+        if (!activeInteractionResult.isEmpty) {
+            item {
+                InteractionWarnings(
+                    result = activeInteractionResult,
+                    substanceNameLookup = { id -> substancesById[id]?.name ?: id },
+                )
+            }
+        }
 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

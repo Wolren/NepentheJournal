@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.model.rules.InteractionCheckResult
+import app.journal.model.rules.ActiveInteractionResult
 import app.journal.log.Log
 import app.journal.model.Dose
 import app.journal.ui.components.InteractionWarnings
@@ -26,7 +26,7 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun SessionDoseSection(
     sessionDoses: List<Dose>,
-    interactionCheckResult: InteractionCheckResult,
+    activeInteractionResult: ActiveInteractionResult,
     substanceNameLookup: (String) -> String,
     onAddDose: () -> Unit,
     onEditDose: (Dose) -> Unit,
@@ -141,9 +141,9 @@ fun SessionDoseSection(
         }
     }
 
-    if (interactionCheckResult.hasIssues || interactionCheckResult.uncertain.isNotEmpty()) {
+    if (!activeInteractionResult.isEmpty) {
         InteractionWarnings(
-            result = interactionCheckResult,
+            result = activeInteractionResult,
             substanceNameLookup = substanceNameLookup,
             modifier = Modifier.padding(top = 4.dp)
         )
