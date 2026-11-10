@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 fun EditorInlineEventCard(
     event: TimelineEvent,
     repo: IJournalRepository,
+    onUpdated: (TimelineEvent) -> Unit,
     onDelete: () -> Unit
 ) {
     var editing by remember { mutableStateOf(false) }
@@ -60,7 +62,8 @@ fun EditorInlineEventCard(
                     }
                 }
                 OutlinedTextField(value = editLabel, onValueChange = { editLabel = it },
-                    label = { Text("Label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    label = { Text("Label") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("event-label"))
                 OutlinedTextField(value = editBody, onValueChange = { editBody = it },
                     label = { Text("Notes") }, minLines = 2, maxLines = 4,
                     modifier = Modifier.fillMaxWidth())
@@ -78,15 +81,17 @@ fun EditorInlineEventCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppTextButton(onClick = { editing = false }) { Text("Cancel") }
                     AppTextButton(onClick = {
-                        repo.upsertTimelineEvent(event.copy(
+                        val updated = event.copy(
                             eventType = editType,
                             label = editLabel.ifBlank { event.label },
                             body = editBody.ifBlank { null },
                             intensity = if (useIntensity) editIntensity else null,
                             updatedAt = currentTimeMillis()
-                        ))
+                        )
+                        repo.upsertTimelineEvent(updated)
+                        onUpdated(updated)
                         editing = false
-                    }) { Text("Save") }
+                    }, modifier = Modifier.testTag("event-save")) { Text("Save") }
                 }
             }
         }

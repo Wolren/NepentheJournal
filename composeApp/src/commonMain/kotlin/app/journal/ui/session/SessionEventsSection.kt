@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
@@ -23,6 +24,7 @@ fun SessionEventsSection(
     sessionId: String,
     repo: IJournalRepository,
     onEventAdded: (TimelineEvent) -> Unit,
+    onEventUpdated: (TimelineEvent) -> Unit,
     onEventDeleted: (String) -> Unit
 ) {
     HorizontalDivider()
@@ -47,7 +49,7 @@ fun SessionEventsSection(
             )
             repo.upsertTimelineEvent(newEvent)
             onEventAdded(newEvent)
-        }) {
+        }, modifier = Modifier.testTag("session-add-event")) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text("Add Event")
@@ -60,6 +62,7 @@ fun SessionEventsSection(
                 EditorInlineEventCard(
                     event = event,
                     repo = repo,
+                    onUpdated = onEventUpdated,
                     onDelete = { onEventDeleted(event.id) }
                 )
             }

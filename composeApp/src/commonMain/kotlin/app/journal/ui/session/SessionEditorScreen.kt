@@ -266,6 +266,9 @@ fun SessionEditorScreen(
                 onEventAdded = { event ->
                     viewModel.addEvent(event)
                 },
+                onEventUpdated = { event ->
+                    viewModel.updateEvent(event)
+                },
                 onEventDeleted = { eventId ->
                     viewModel.deleteEvent(eventId)
                 }

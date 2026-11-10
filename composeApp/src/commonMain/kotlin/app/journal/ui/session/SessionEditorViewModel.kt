@@ -238,6 +238,10 @@ class SessionEditorViewModel(
         sessionEvents.value = sessionEvents.value + event
     }
 
+    fun updateEvent(event: TimelineEvent) {
+        sessionEvents.value = sessionEvents.value.map { if (it.id == event.id) event else it }
+    }
+
     fun deleteEvent(eventId: String) {
         repo.deleteTimelineEvent(eventId)
         sessionEvents.value = sessionEvents.value.filter { it.id != eventId }

@@ -131,7 +131,7 @@ fun SessionDoseSection(
                                 )
                             }
                         }
-                        IconButton(onClick = { onDeleteDose(dose.id) }) {
+                        IconButton(onClick = { onDeleteDose(dose.id) }, modifier = Modifier.testTag("dose-delete-${dose.id}")) {
                             Icon(Icons.Default.Delete, contentDescription = "Remove",
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp))
