@@ -94,7 +94,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     private val indices = JournalIndices(
         lock, sessionsStore, dosesStore, notesStore, timelineEventsStore, effectsStore, customUnitsStore,
         doses = dosesStore.flow, substances = substancesStore.flow,
-        rebuildSearchIndexLocked = { searchEngine.rebuildSearchIndexLocked() },
+        markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
     )
     private val tombstones = JournalTombstones(
         lock, sessionsStore, dosesStore, notesStore, substancesStore, effectsStore, interactionsStore,
@@ -286,7 +286,6 @@ class JournalRepository internal constructor() : IJournalRepository {
                         return@collect
                     }
                     try {
-                        searchEngine.rebuildSearchIndexIfDirty()
                         save()
                         Log.withTag("Repo").v { "Auto-saved (mutation #$it)" }
                     } catch (e: Exception) {

@@ -15,13 +15,9 @@ import kotlin.test.assertTrue
  * Both tests start from an EMPTY repository and warm the index first (an
  * empty search still runs rebuild-if-dirty and clears the flag), so the
  * property under test is exactly "cold index + bulk apply + first query
- * finds the applied entity". HONEST NOTE (measured, not assumed): a
- * red-proof run with the JournalSyncBridge dirty flip commented out still
- * passed for applyBatch, because JournalIndices.rebuildAllIndices() ends
- * with rebuildSearchIndexLocked() and therefore rebuilds search eagerly on
- * every apply that changed anything. The tests pin the END-TO-END
- * freshness behavior; the explicit dirty flip in the bridge is the
- * belt-and-braces wiring the task mandates, not the only thing holding it.
+ * finds the applied entity". The tests pin the END-TO-END freshness
+ * behavior: every bulk apply marks the index dirty, and the FIRST search
+ * after the apply rebuilds it lazily.
  */
 class SyncApplySearchFreshnessTest {
 

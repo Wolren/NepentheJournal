@@ -37,7 +37,7 @@ internal class JournalIndices(
     private val customUnitsStore: EntityStore<CustomUnit>,
     private val doses: Flow<List<Dose>>,
     private val substances: Flow<List<Substance>>,
-    private val rebuildSearchIndexLocked: () -> Unit,
+    private val markSearchIndexDirtyLocked: () -> Unit,
 ) {
     /**
      * Doses of one substance as a flow, deduplicated: edits to other
@@ -122,7 +122,7 @@ internal class JournalIndices(
         customUnitsStore.forEachValue { unit ->
             _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         }
-        rebuildSearchIndexLocked()
+        markSearchIndexDirtyLocked()
     }
 
     internal fun updateDoseStatsForSubstance(substanceId: String, sessionId: String, timestamp: Long) {

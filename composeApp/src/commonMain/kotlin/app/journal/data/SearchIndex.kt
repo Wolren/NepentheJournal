@@ -34,8 +34,8 @@ private val TOKEN_SEPARATOR =
  * The dataset is small enough that a full rebuild from scratch is fast
  * (< 10ms for a typical journal), so the index is never maintained
  * incrementally. JournalRepository marks it dirty on every mutation and
- * rebuilds lazily inside search() (results are never stale) plus once per
- * auto-save quiet period; bulk applies rebuild eagerly.
+ * rebuilds lazily inside search(), so results are never stale; bulk applies
+ * also mark it dirty.
  *
  * Locking and scoring (wave4): [search] only holds [lock] long enough to
  * copy the inverted index out ([snapshotIndex]); the scoring pass runs on

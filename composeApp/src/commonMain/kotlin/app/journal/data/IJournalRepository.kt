@@ -239,8 +239,8 @@ interface IJournalRepository {
     /**
      * Debounced auto-save loop: after a quiet period following each mutation,
      * invoke [save] (the caller owns persistence, so this interface never
-     * references the JournalStore class). The same quiet-period tail also
-     * refreshes the full-text search index when mutations dirtied it.
+     * references the JournalStore class). Saving never touches the search index;
+     * the index rebuilds lazily inside the next search.
      */
     fun autoSave(scope: CoroutineScope, save: () -> Unit): Job
 

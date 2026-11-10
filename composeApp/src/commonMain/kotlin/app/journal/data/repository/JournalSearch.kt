@@ -36,8 +36,7 @@ internal class JournalSearch(
      * Set by every single-entity mutation, cleared by
      * [rebuildSearchIndexLocked]. Mutations only flip this bit (O(1) under
      * the repo lock) instead of tokenizing every entity; [search] rebuilds
-     * lazily before querying so results are never stale, and the auto-save
-     * quiet-period tail rebuilds once per burst of edits. Guarded by [lock].
+     * lazily before querying so results are never stale. Guarded by [lock].
      */
     private var searchIndexDirty = true
 
@@ -56,10 +55,6 @@ internal class JournalSearch(
             searchIndex.snapshotIndex()
         }
         return scoreSearchSnapshot(query, snapshot)
-    }
-
-    internal fun rebuildSearchIndexIfDirty() = lock.withLock {
-        if (searchIndexDirty) rebuildSearchIndexLocked()
     }
 
     internal fun markSearchIndexDirtyLocked() {
