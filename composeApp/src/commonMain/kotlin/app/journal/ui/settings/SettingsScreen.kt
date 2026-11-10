@@ -108,6 +108,7 @@ fun SettingsScreen(
 
     val scrollState = rememberLazyListState()
 
+    CenteredContent {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -264,5 +265,6 @@ fun SettingsScreen(
         item { Spacer(Modifier.height(16.dp)) }
         }
         DesktopScrollbar(scrollState)
+    }
     }
 }

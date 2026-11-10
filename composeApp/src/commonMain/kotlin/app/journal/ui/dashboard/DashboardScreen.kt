@@ -83,6 +83,7 @@ fun DashboardScreen(
     val scrollState = rememberLazyListState()
 
     SelectableContent {
+        CenteredContent(maxWidth = 1100.dp) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -165,12 +166,32 @@ fun DashboardScreen(
                 }
             }
 
-            if (sessions.isNotEmpty() && showTrendChart) {
-                item { SessionsTrendChart(sessions = sessions, modifier = Modifier.fillMaxWidth()) }
-            }
-
-            if (substanceSessionPairs.isNotEmpty()) {
-                item { TopSubstancesChart(substanceSessionPairs = substanceSessionPairs) }
+            val hasTrend = sessions.isNotEmpty() && showTrendChart
+            val hasTop = substanceSessionPairs.isNotEmpty()
+            if (hasTrend || hasTop) {
+                item {
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        if (maxWidth >= 900.dp) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (hasTrend) {
+                                    Box(Modifier.weight(1f)) {
+                                        SessionsTrendChart(sessions = sessions, modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                                if (hasTop) {
+                                    Box(Modifier.weight(1f)) {
+                                        TopSubstancesChart(substanceSessionPairs = substanceSessionPairs)
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                if (hasTrend) SessionsTrendChart(sessions = sessions, modifier = Modifier.fillMaxWidth())
+                                if (hasTop) TopSubstancesChart(substanceSessionPairs = substanceSessionPairs)
+                            }
+                        }
+                    }
+                }
             }
 
             if (toleranceList.isNotEmpty()) {
@@ -216,6 +237,7 @@ fun DashboardScreen(
         }
 
         DesktopScrollbar(scrollState)
+        }
         }
     }
 

@@ -83,20 +83,22 @@ fun ScreenScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            SelectableContent(enabled = selectable) {
-                LazyColumn(
-                    state = scrollState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                        .testTag("screen-list"),
-                    verticalArrangement = verticalArrangement,
-                    contentPadding = contentPadding
-                ) {
-                    content()
+            CenteredContent {
+                SelectableContent(enabled = selectable) {
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp)
+                            .testTag("screen-list"),
+                        verticalArrangement = verticalArrangement,
+                        contentPadding = contentPadding
+                    ) {
+                        content()
+                    }
                 }
+                DesktopScrollbar(scrollState)
             }
-            DesktopScrollbar(scrollState)
         }
     }
 }

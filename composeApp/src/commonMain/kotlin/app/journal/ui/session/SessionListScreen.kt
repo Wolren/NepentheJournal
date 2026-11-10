@@ -64,6 +64,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
     val scrollState = rememberLazyListState()
 
+    CenteredContent(maxWidth = 1100.dp) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Box {
@@ -235,6 +236,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
         }
 
         DesktopScrollbar(scrollState)
+    }
     }
 
     if (showLiveDialog) {

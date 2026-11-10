@@ -23,6 +23,7 @@ import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.data.SearchResult
 import app.journal.model.Note
+import app.journal.ui.components.CenteredContent
 import app.journal.ui.components.DesktopScrollbar
 import app.journal.ui.components.SelectableContent
 import app.journal.ui.components.InteractionColors
@@ -76,6 +77,7 @@ fun SearchOverlay(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        CenteredContent {
         SelectableContent {
         LazyColumn(
             modifier = Modifier
@@ -190,6 +192,7 @@ fun SearchOverlay(
         }
         }
         DesktopScrollbar(scrollState)
+        }
         }
     }
 }
