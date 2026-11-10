@@ -157,6 +157,7 @@ object ThemePresets {
             textColor = 0xFF12221F
         ),
         cornerRadius = CornerRadius.LARGE,
+        fontFamily = AppFontFamily.MONO,
         fontScale = 1.0f,
         surfaceTint = 0.16f,
         outlineStrength = 0.32f
