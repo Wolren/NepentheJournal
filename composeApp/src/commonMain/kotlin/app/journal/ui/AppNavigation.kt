@@ -16,6 +16,7 @@ package app.journal.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -50,6 +52,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import app.journal.data.DataInitializer
@@ -139,6 +142,7 @@ internal fun AppNavigation(
         }
     }
     var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
+    var sessionPaneFraction by remember { mutableStateOf(0.42f) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember(repo) {
         // Single persistence owner: the engine persists through this store instead of constructing its own (audit C5).
@@ -482,24 +486,49 @@ internal fun AppNavigation(
                                             )
                                         }
                                         if (wide) {
-                                            Row(Modifier.fillMaxSize()) {
-                                                Box(Modifier.weight(0.42f).fillMaxHeight()) { listContent() }
-                                                VerticalDivider()
-                                                Box(Modifier.weight(0.58f).fillMaxHeight()) {
-                                                    val paneSessionId = selectedTimelineSessionId
-                                                    if (paneSessionId != null) {
-                                                        SessionTimelineScreen(
-                                                            repo = repo,
-                                                            sessionId = paneSessionId,
-                                                            onBack = { selectedTimelineSessionId = null }
+                                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                                val totalPx = with(LocalDensity.current) { maxWidth.toPx() }
+                                                val listFraction = sessionPaneFraction.coerceIn(0.25f, 0.65f)
+                                                Row(Modifier.fillMaxSize()) {
+                                                    Box(Modifier.weight(listFraction).fillMaxHeight()) { listContent() }
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(8.dp)
+                                                            .fillMaxHeight()
+                                                            .pointerInput(totalPx) {
+                                                                detectHorizontalDragGestures { change, dragAmount ->
+                                                                    change.consume()
+                                                                    if (totalPx > 0f) {
+                                                                        sessionPaneFraction = (sessionPaneFraction + dragAmount / totalPx)
+                                                                            .coerceIn(0.25f, 0.65f)
+                                                                    }
+                                                                }
+                                                            },
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Box(
+                                                            Modifier
+                                                                .width(1.dp)
+                                                                .fillMaxHeight()
+                                                                .background(MaterialTheme.colorScheme.outlineVariant)
                                                         )
-                                                    } else {
-                                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                            Text(
-                                                                "Select a session",
-                                                                style = MaterialTheme.typography.bodyLarge,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    }
+                                                    Box(Modifier.weight(1f - listFraction).fillMaxHeight()) {
+                                                        val paneSessionId = selectedTimelineSessionId
+                                                        if (paneSessionId != null) {
+                                                            SessionTimelineScreen(
+                                                                repo = repo,
+                                                                sessionId = paneSessionId,
+                                                                onBack = { selectedTimelineSessionId = null }
                                                             )
+                                                        } else {
+                                                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                                Text(
+                                                                    "Select a session",
+                                                                    style = MaterialTheme.typography.bodyLarge,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
