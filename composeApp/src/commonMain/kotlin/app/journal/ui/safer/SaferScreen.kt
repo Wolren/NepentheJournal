@@ -21,6 +21,7 @@ fun SaferScreen() {
     val uriHandler = LocalUriHandler.current
     val scrollState = rememberLazyListState()
 
+    SelectableContent {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -218,6 +219,7 @@ fun SaferScreen() {
         item { Spacer(Modifier.height(16.dp)) }
         }
         DesktopScrollbar(scrollState)
+    }
     }
 }
 
