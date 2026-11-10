@@ -73,6 +73,7 @@ fun SettingsScreen(
     var editAnimationScale by remember(themeConfig) { mutableStateOf(themeConfig.animationScale) }
     var editSurfaceTint by remember(themeConfig) { mutableStateOf(themeConfig.surfaceTint) }
     var editOutlineStrength by remember(themeConfig) { mutableStateOf(themeConfig.outlineStrength) }
+    var editSubstanceAccentMode by remember(themeConfig) { mutableStateOf(themeConfig.substanceAccentMode) }
     var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
 
     fun currentEditConfig(): ThemeConfig = ThemeConfig(
@@ -82,7 +83,8 @@ fun SettingsScreen(
         cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
         fontFamily = editFontFamily, textColor = editTextColor,
         animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
-        outlineStrength = editOutlineStrength, githubGreenActivity = editGithubGreen
+        outlineStrength = editOutlineStrength, substanceAccentMode = editSubstanceAccentMode,
+        githubGreenActivity = editGithubGreen
     )
 
     fun setEditConfig(config: ThemeConfig) {
@@ -102,6 +104,7 @@ fun SettingsScreen(
         editAnimationScale = config.animationScale
         editSurfaceTint = config.surfaceTint
         editOutlineStrength = config.outlineStrength
+        editSubstanceAccentMode = config.substanceAccentMode
         editGithubGreen = config.githubGreenActivity
     }
 
@@ -151,6 +154,7 @@ fun SettingsScreen(
             editCornerRadius = editCornerRadius, editFontScale = editFontScale, editAnimationScale = editAnimationScale,
             editFontFamily = editFontFamily, editTextColor = editTextColor,
             editSurfaceTint = editSurfaceTint, editOutlineStrength = editOutlineStrength,
+            editSubstanceAccentMode = editSubstanceAccentMode,
             editGithubGreen = editGithubGreen,
             onBaseThemeChange = { editBaseTheme = it },
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
@@ -160,12 +164,14 @@ fun SettingsScreen(
             onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
             onFontFamilyChange = { editFontFamily = it }, onTextColorChange = { editTextColor = it },
             onSurfaceTintChange = { editSurfaceTint = it }, onOutlineStrengthChange = { editOutlineStrength = it },
+            onSubstanceAccentModeChange = { editSubstanceAccentMode = it },
             onAnimationScaleChange = { editAnimationScale = it },
             onGithubGreenChange = { editGithubGreen = it },
             onPresetSelect = { preset ->
                 setEditConfig(preset.applyTo(currentEditConfig(), isDarkNow))
                 applyTheme()
             },
+            onConfigImport = { config -> setEditConfig(config); applyTheme() },
             applyTheme = { applyTheme() }
         ) }
 

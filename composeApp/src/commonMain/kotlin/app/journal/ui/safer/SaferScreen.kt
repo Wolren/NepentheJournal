@@ -233,9 +233,9 @@ private fun SaferSection(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
+        colors = appCardColors(),
+        elevation = appCardElevation(),
+        border = appCardBorder(),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),

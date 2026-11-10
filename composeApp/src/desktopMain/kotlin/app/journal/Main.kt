@@ -1,6 +1,8 @@
 package app.journal
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -14,10 +16,13 @@ import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
 import app.journal.log.initLogging
 import app.journal.ui.App
+import app.journal.util.WindowGeometryStore
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
 
@@ -78,10 +83,17 @@ fun main() {
 
     application {
         val icon = remember { loadAppIcon() }
+        val savedGeometry = remember { WindowGeometryStore.load() }
         val windowState = rememberWindowState(
-            size = DpSize(1200.dp, 820.dp),
-            position = WindowPosition(100.dp, 60.dp)
+            size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
+            position = savedGeometry?.first ?: WindowPosition(100.dp, 60.dp)
         )
+        LaunchedEffect(windowState) {
+            snapshotFlow { windowState.position to windowState.size }.collectLatest { (position, size) ->
+                delay(400)
+                WindowGeometryStore.save(position, size)
+            }
+        }
 
         Window(
             onCloseRequest = ::exitApplication,

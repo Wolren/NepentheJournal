@@ -86,13 +86,9 @@ fun HoverCard(
         enabled = enabled,
         interactionSource = interactionSource,
         shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        border = resolvedBorder,
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = elevation
-        )
+        colors = appCardColors(),
+        border = resolvedBorder ?: appCardBorder(),
+        elevation = appCardElevation(elevation)
     ) {
         content()
     }

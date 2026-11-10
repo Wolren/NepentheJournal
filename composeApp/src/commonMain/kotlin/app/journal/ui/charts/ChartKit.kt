@@ -15,6 +15,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.journal.ui.components.CardContentPadding
+import app.journal.ui.components.appCardBorder
+import app.journal.ui.components.appCardColors
+import app.journal.ui.components.appCardElevation
 import app.journal.ui.theme.ThemeManager
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -49,9 +52,9 @@ fun ChartCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = chartCardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = appCardColors(),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+        elevation = appCardElevation(),
     ) {
         Column(Modifier.padding(CardContentPadding).fillMaxWidth()) {
             Row(

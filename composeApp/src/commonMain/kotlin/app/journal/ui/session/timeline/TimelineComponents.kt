@@ -102,7 +102,7 @@ internal fun PhaseMarker(type: TimelineEventType, color: Color, modifier: Modifi
 
 @Composable
 internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    Card(colors = appCardColors(), elevation = appCardElevation(), border = appCardBorder(),
         shape = cardShape(), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp)) {
             Surface(modifier = Modifier.width(4.dp).height(48.dp), shape = RoundedCornerShape(2.dp),
@@ -130,10 +130,10 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
         grouped.keys.associateWith { id -> repo.getSubstance(id)?.name ?: id }
     }
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = appCardColors(),
         shape = cardShape(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        elevation = appCardElevation(1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(14.dp)) {
@@ -251,7 +251,7 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
     }
     if (intensityEvents.size < 2) return
 
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    Card(colors = appCardColors(), elevation = appCardElevation(), border = appCardBorder(),
         shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -314,10 +314,10 @@ internal fun PhaseCard(
     val durationStr = formatDuration(durationMs)
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = appCardColors(),
         shape = cardShape(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        elevation = appCardElevation(1.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(12.dp)) {

@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -32,6 +34,7 @@ internal fun ThemeContent(
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
     editFontFamily: AppFontFamily, editTextColor: Long?,
     editSurfaceTint: Float?, editOutlineStrength: Float?,
+    editSubstanceAccentMode: SubstanceAccentMode,
     onBaseThemeChange: (BaseTheme) -> Unit, onPrimaryChange: (Long) -> Unit,
     onSecondaryChange: (Long) -> Unit, onTertiaryChange: (Long) -> Unit,
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
@@ -40,13 +43,21 @@ internal fun ThemeContent(
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
     onFontFamilyChange: (AppFontFamily) -> Unit, onTextColorChange: (Long?) -> Unit,
     onSurfaceTintChange: (Float?) -> Unit, onOutlineStrengthChange: (Float?) -> Unit,
+    onSubstanceAccentModeChange: (SubstanceAccentMode) -> Unit,
     onGithubGreenChange: (Boolean) -> Unit,
     onPresetSelect: (ThemePreset) -> Unit,
+    onConfigImport: (ThemeConfig) -> Unit,
     applyTheme: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var userPresets by remember { mutableStateOf(ThemeStore.loadPresets()) }
+    var presetName by remember { mutableStateOf("") }
+    var importFailed by remember { mutableStateOf(false) }
+    val clipboard = LocalClipboardManager.current
     Card(modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = appCardColors(),
+        elevation = appCardElevation(),
+        border = appCardBorder()
     ) {
         Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
             Row(
@@ -102,6 +113,80 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(8.dp))
                 }
 
+                Spacer(Modifier.height(8.dp))
+                if (userPresets.isNotEmpty()) {
+                    HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                    Text("Your presets", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(6.dp))
+                    userPresets.chunked(2).forEach { rowPresets ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowPresets.forEach { preset ->
+                                PresetCard(
+                                    preset = preset,
+                                    selected = preset.matches(
+                                        editPrimary, editSecondary, editTertiary,
+                                        editBgColor, editSurfaceColor, isDark
+                                    ),
+                                    onClick = { onPresetSelect(preset) },
+                                    onDelete = {
+                                        userPresets = userPresets.filterNot { it.name == preset.name }
+                                        ThemeStore.savePresets(userPresets)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowPresets.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = presetName,
+                        onValueChange = { presetName = it },
+                        placeholder = { Text("Preset name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AppButton(onClick = {
+                        val name = presetName.trim()
+                        if (name.isNotEmpty()) {
+                            val preset = ThemePreset(
+                                name = name,
+                                dark = themeConfig.copy(baseTheme = BaseTheme.DARK),
+                                light = themeConfig.copy(baseTheme = BaseTheme.LIGHT),
+                                cardStyle = themeConfig.cardStyle,
+                                cornerRadius = themeConfig.cornerRadius,
+                                fontFamily = themeConfig.fontFamily,
+                                fontScale = themeConfig.fontScale,
+                                animationScale = themeConfig.animationScale,
+                                surfaceTint = themeConfig.surfaceTint,
+                                outlineStrength = themeConfig.outlineStrength
+                            )
+                            userPresets = userPresets.filterNot { it.name == name } + preset
+                            ThemeStore.savePresets(userPresets)
+                            presetName = ""
+                        }
+                    }, enabled = presetName.isNotBlank()) { Text("Save") }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTonalButton(onClick = {
+                        clipboard.setText(AnnotatedString(ThemeStore.encode(themeConfig)))
+                    }, modifier = Modifier.weight(1f)) { Text("Copy theme") }
+                    AppTonalButton(onClick = {
+                        val parsed = clipboard.getText()?.text?.let { ThemeStore.decode(it) }
+                        importFailed = parsed == null
+                        parsed?.let { onConfigImport(it) }
+                    }, modifier = Modifier.weight(1f)) { Text("Paste theme") }
+                }
+                if (importFailed) {
+                    Text(
+                        "Clipboard does not contain a theme",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
@@ -109,8 +194,7 @@ internal fun ThemeContent(
                     Switch(checked = editGithubGreen,
                         onCheckedChange = { onGithubGreenChange(it); applyTheme() })
                 }
-                if (editBaseTheme == BaseTheme.CUSTOM) {
-                    Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(12.dp))
                     Text("Colors", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
                     ColorPickerField("Primary", editPrimary, onPick = { onPrimaryChange(it); applyTheme() })
@@ -186,6 +270,18 @@ internal fun ThemeContent(
                         Text("${(editFontScale * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
                     }
                     Spacer(Modifier.height(12.dp))
+                    Text("Substance accents", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SubstanceAccentMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = editSubstanceAccentMode == mode,
+                                onClick = { onSubstanceAccentModeChange(mode); applyTheme() },
+                                label = { Text(mode.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Text("Animations", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Speed", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
@@ -194,15 +290,12 @@ internal fun ThemeContent(
                         val label = when { editAnimationScale == 0f -> "Off"; editAnimationScale <= 0.25f -> "0.25x"; editAnimationScale <= 0.5f -> "0.5x"; editAnimationScale <= 0.75f -> "0.75x"; else -> "1x" }
                         Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
                     }
-                }
-                if (editBaseTheme == BaseTheme.CUSTOM) {
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
-                }
             }
         }
     }
@@ -218,7 +311,8 @@ private fun PresetCard(
     preset: ThemePreset,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDelete: (() -> Unit)? = null
 ) {
     val v = preset.variant(ThemeManager.instance.isDarkTheme())
     Surface(
@@ -243,6 +337,12 @@ private fun PresetCard(
                         )
                     }
                 Spacer(Modifier.weight(1f))
+                if (onDelete != null) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(20.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Delete preset",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                    }
+                }
                 if (selected) Icon(Icons.Default.Check, null,
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             }

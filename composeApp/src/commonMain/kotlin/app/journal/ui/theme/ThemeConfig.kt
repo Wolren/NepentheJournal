@@ -29,6 +29,7 @@ data class ThemeConfig(
     val animationScale: Float = 1.0f,
     val surfaceTint: Float? = null,
     val outlineStrength: Float? = null,
+    val substanceAccentMode: SubstanceAccentMode = SubstanceAccentMode.ADAPTIVE,
     val githubGreenActivity: Boolean = false
 ) {
     val primary: Color get() = Color(primaryColor)
@@ -61,6 +62,7 @@ enum class BaseTheme { DARK, LIGHT, SYSTEM, CUSTOM }
 enum class CardStyle { ELEVATED, FILLED, OUTLINED }
 enum class CornerRadius { SMALL, MEDIUM, LARGE }
 enum class AppFontFamily { SANS, SERIF, MONO }
+enum class SubstanceAccentMode { ADAPTIVE, THEME, MONO }
 
 object ThemeDefaults {
     /** Logo palette: cream lily on deep teal. */
@@ -90,6 +92,8 @@ object ThemeDefaults {
  * A curated theme pair: one palette for dark rendering, one for light.
  * Applying a preset keeps the current base theme and picks the matching variant.
  */
+@Immutable
+@Serializable
 data class ThemePreset(
     val name: String,
     val dark: ThemeConfig,
@@ -157,6 +161,7 @@ object ThemePresets {
             textColor = 0xFF12221F
         ),
         cornerRadius = CornerRadius.LARGE,
+        cardStyle = CardStyle.OUTLINED,
         fontFamily = AppFontFamily.MONO,
         fontScale = 1.0f,
         surfaceTint = 0.16f,
@@ -177,6 +182,7 @@ object ThemePresets {
             textColor = 0xFF2B241C
         ),
         cornerRadius = CornerRadius.SMALL,
+        cardStyle = CardStyle.FILLED,
         fontFamily = AppFontFamily.SERIF,
         fontScale = 1.04f,
         animationScale = 0.75f,
@@ -198,6 +204,7 @@ object ThemePresets {
             textColor = 0xFF101418
         ),
         cornerRadius = CornerRadius.MEDIUM,
+        cardStyle = CardStyle.OUTLINED,
         fontScale = 0.96f,
         surfaceTint = 0.22f,
         outlineStrength = 0.5f
@@ -217,6 +224,7 @@ object ThemePresets {
             textColor = 0xFF102412
         ),
         cornerRadius = CornerRadius.SMALL,
+        cardStyle = CardStyle.OUTLINED,
         fontFamily = AppFontFamily.MONO,
         fontScale = 0.95f,
         animationScale = 0f,

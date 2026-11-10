@@ -38,9 +38,9 @@ fun CollapsibleSettingsCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        colors = appCardColors(),
+        elevation = appCardElevation(),
+        border = appCardBorder()
     ) {
         Column(
             modifier = Modifier

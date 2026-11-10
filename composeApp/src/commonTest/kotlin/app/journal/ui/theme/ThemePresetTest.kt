@@ -2,6 +2,7 @@ package app.journal.ui.theme
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class ThemePresetTest {
 
@@ -41,5 +42,17 @@ class ThemePresetTest {
         assertEquals("wallpaper.png", next.backgroundImagePath)
         assertEquals(0.6f, next.backgroundOpacity)
         assertEquals(ThemePresets.Neon.light.primaryColor, next.primaryColor)
+    }
+
+    @Test
+    fun themeJsonRoundTrips() {
+        val config = ThemePresets.Neon.applyTo(ThemeConfig(), isDark = true)
+
+        assertEquals(config, ThemeStore.decode(ThemeStore.encode(config)))
+    }
+
+    @Test
+    fun invalidThemeJsonReturnsNull() {
+        assertNull(ThemeStore.decode("not a theme"))
     }
 }

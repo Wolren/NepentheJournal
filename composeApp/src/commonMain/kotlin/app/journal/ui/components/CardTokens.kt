@@ -1,10 +1,16 @@
 package app.journal.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.CardColors
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardElevation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.journal.ui.theme.CardStyle
+import app.journal.ui.theme.LocalThemeConfig
 
 /** Cards follow the theme's medium radius, so the corner setting applies everywhere. */
 @Composable
@@ -13,6 +19,31 @@ fun cardShape(): Shape = MaterialTheme.shapes.medium
 /** Chips and small pills follow the theme's small radius. */
 @Composable
 fun chipShape(): Shape = MaterialTheme.shapes.small
+
+/** Card fill for the selected card style: filled uses the variant, outlined uses the surface. */
+@Composable
+fun appCardColors(): CardColors {
+    val scheme = MaterialTheme.colorScheme
+    val container = when (LocalThemeConfig.current.cardStyle) {
+        CardStyle.OUTLINED -> scheme.surface
+        else -> scheme.surfaceVariant
+    }
+    return CardDefaults.cardColors(containerColor = container)
+}
+
+/** Elevated cards lift by 2 dp; filled and outlined cards stay flat. */
+@Composable
+fun appCardElevation(default: Dp = 0.dp): CardElevation =
+    CardDefaults.cardElevation(
+        defaultElevation = if (LocalThemeConfig.current.cardStyle == CardStyle.ELEVATED) maxOf(default, 2.dp) else 0.dp
+    )
+
+/** Outlined cards draw an outline-colour border; filled and elevated cards draw none. */
+@Composable
+fun appCardBorder(): BorderStroke? =
+    if (LocalThemeConfig.current.cardStyle == CardStyle.OUTLINED) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    } else null
 
 /**
  * Shared inner padding for content cards.

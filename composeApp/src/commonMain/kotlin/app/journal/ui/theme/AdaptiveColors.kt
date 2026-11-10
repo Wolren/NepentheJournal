@@ -26,20 +26,41 @@ object AdaptiveColors {
     private val colorCache = mutableMapOf<String, SubstanceColor>()
 
     fun colorFor(name: String): SubstanceColor {
-        return colorCache.getOrPut(name.lowercase()) {
-            val hash = abs(name.hashCode())
-            val hue = (hash % 360).toFloat()
-            // Vary saturation between 55-85% based on hash
-            val sat = 55f + (hash / 360) % 31
-            // Light: medium lightness (40-60%) for dark text on light bg
-            val lightL = 40f + (hash / 7) % 21
-            // Dark: lower lightness (25-45%) for light text on dark bg
-            val darkL = 25f + (hash / 11) % 21
-            SubstanceColor(
-                light = hslToColor(hue, sat / 100f, lightL / 100f),
-                dark = hslToColor(hue, sat / 100f, darkL / 100f)
-            )
+        val config = ThemeManager.instance.config.value
+        val mode = config.substanceAccentMode
+        val key = when (mode) {
+            SubstanceAccentMode.ADAPTIVE -> name.lowercase()
+            SubstanceAccentMode.THEME ->
+                "theme:${config.primaryColor}:${config.secondaryColor}:${config.tertiaryColor}:${name.lowercase()}"
+            SubstanceAccentMode.MONO -> "mono:${name.lowercase()}"
         }
+        return colorCache.getOrPut(key) {
+            when (mode) {
+                SubstanceAccentMode.ADAPTIVE -> adaptiveColor(name)
+                SubstanceAccentMode.THEME -> {
+                    val palette = listOf(config.primary, config.secondary, config.tertiary, config.error)
+                    val index = (name.hashCode() % palette.size + palette.size) % palette.size
+                    val color = palette[index]
+                    SubstanceColor(color, color)
+                }
+                SubstanceAccentMode.MONO -> SubstanceColor(Color(0xFF5F6B66), Color(0xFFA8B3AE))
+            }
+        }
+    }
+
+    private fun adaptiveColor(name: String): SubstanceColor {
+        val hash = abs(name.hashCode())
+        val hue = (hash % 360).toFloat()
+        // Vary saturation between 55-85% based on hash
+        val sat = 55f + (hash / 360) % 31
+        // Light: medium lightness (40-60%) for dark text on light bg
+        val lightL = 40f + (hash / 7) % 21
+        // Dark: lower lightness (25-45%) for light text on dark bg
+        val darkL = 25f + (hash / 11) % 21
+        return SubstanceColor(
+            light = hslToColor(hue, sat / 100f, lightL / 100f),
+            dark = hslToColor(hue, sat / 100f, darkL / 100f)
+        )
     }
 
     private fun hslToColor(hue: Float, sat: Float, light: Float): Color {

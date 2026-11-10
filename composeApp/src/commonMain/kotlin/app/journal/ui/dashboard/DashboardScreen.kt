@@ -141,9 +141,9 @@ fun DashboardScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        colors = appCardColors(),
+                        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+                        elevation = appCardElevation()
                     ) {
                         Column(Modifier.padding(14.dp).fillMaxWidth()) {
                             val sessionDates = remember(sessions) {
@@ -266,9 +266,9 @@ private data class DaySubstanceInfo(val date: LocalDate, val count: Int, val sub
 private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
     val accent = MaterialTheme.colorScheme.primary
     Card(modifier = modifier, shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        colors = appCardColors(),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+        elevation = appCardElevation()) {
         Column(Modifier.padding(14.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(Modifier.width(24.dp).height(1.5.dp).background(accent.copy(alpha = 0.55f), RoundedCornerShape(1.dp)))
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
@@ -296,9 +296,9 @@ private fun ToleranceCard(info: ToleranceInfo) {
         ToleranceLevel.NONE -> Color.Transparent
     }
     Card(modifier = Modifier.fillMaxWidth(), shape = cardShape(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {
+        colors = appCardColors(),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+        elevation = appCardElevation()) {
         Row(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
