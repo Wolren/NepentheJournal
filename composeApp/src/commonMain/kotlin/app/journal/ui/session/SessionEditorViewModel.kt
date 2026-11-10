@@ -13,9 +13,13 @@ import app.journal.model.rules.ActiveInteractionCheck
 import app.journal.model.rules.ActiveInteractionResult
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /**
@@ -34,6 +38,7 @@ import kotlin.random.Random
 class SessionEditorViewModel(
     private val repo: IJournalRepository,
     private val sessionToEdit: Session?,
+    private val exportScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     val title = MutableStateFlow(sessionToEdit?.title ?: "")
     val startTime = MutableStateFlow(sessionToEdit?.startTime ?: currentTimeMillis())
@@ -175,20 +180,6 @@ class SessionEditorViewModel(
         )
         repo.upsertSession(session)
 
-        if (repo.obsidianAutoExport.value && repo.obsidianVaultPath.value.isNotBlank()) {
-            try {
-                val config = app.journal.export.obsidian.ObsidianExportConfig(
-                    vaultPath = repo.obsidianVaultPath.value,
-                    subfolder = repo.obsidianSubfolder.value
-                )
-                app.journal.export.obsidian.ObsidianExportManager.exportSession(
-                    repo, sessionId, config
-                )
-            } catch (e: Exception) {
-                Log.withTag("SessionEdit").w(e) { "Auto-export to Obsidian failed" }
-            }
-        }
-
         val doses = sessionDoses.value
         val events = sessionEvents.value
         val existingIds = if (sessionToEdit != null)
@@ -197,6 +188,21 @@ class SessionEditorViewModel(
         // One putAll per store + one index rebuild instead of a full reindex per dose/event
         repo.upsertSessionChildren(sessionId, doses, events)
         (existingIds - keptIds).forEach { repo.deleteDose(it) }
+
+        // Export after the children land, and off the save path: the write must not block navigation.
+        if (repo.obsidianAutoExport.value && repo.obsidianVaultPath.value.isNotBlank()) {
+            val config = app.journal.export.obsidian.ObsidianExportConfig(
+                vaultPath = repo.obsidianVaultPath.value,
+                subfolder = repo.obsidianSubfolder.value
+            )
+            exportScope.launch {
+                try {
+                    app.journal.export.obsidian.ObsidianExportManager.exportSession(repo, sessionId, config)
+                } catch (e: Exception) {
+                    Log.withTag("SessionEdit").w(e) { "Auto-export to Obsidian failed" }
+                }
+            }
+        }
     }
 
     /**

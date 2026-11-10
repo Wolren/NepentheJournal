@@ -39,19 +39,23 @@ fun SearchOverlay(
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     var hasSearched by remember { mutableStateOf(false) }
+    var isSearching by remember { mutableStateOf(false) }
     val notes by repo.notes.collectAsState()
     val scrollState = rememberLazyListState()
 
     LaunchedEffect(query) {
         if (query.length >= 2) {
+            isSearching = true
             delay(200)
             // First keystroke can rebuild the index; keep that off the frame thread.
             val found = withContext(Dispatchers.Default) { repo.search(query) }
             results = found
             hasSearched = true
+            isSearching = false
         } else {
             results = emptyList()
             hasSearched = false
+            isSearching = false
         }
     }
 
@@ -99,6 +103,14 @@ fun SearchOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+            }
+
+            if (isSearching) {
+                item {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp)
+                    )
+                }
             }
 
             if (query.length < 2 && hasSearched) {
