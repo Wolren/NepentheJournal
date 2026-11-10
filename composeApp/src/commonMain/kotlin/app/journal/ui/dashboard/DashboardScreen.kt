@@ -265,7 +265,7 @@ private fun ToleranceCard(info: ToleranceInfo) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.error
         ToleranceLevel.MEDIUM -> if (isDark) toleranceMediumColor else Color(0xFF9A6700)
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiary
-        ToleranceLevel.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        ToleranceLevel.NONE -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
     val levelBg = when (info.level) {
         ToleranceLevel.HIGH -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
@@ -273,7 +273,7 @@ private fun ToleranceCard(info: ToleranceInfo) {
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.18f)
         ToleranceLevel.NONE -> Color.Transparent
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp),
+    Card(modifier = Modifier.fillMaxWidth(), shape = cardShape(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)) {

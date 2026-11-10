@@ -17,7 +17,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -365,6 +367,8 @@ internal fun AppNavigation(
                         )
                     }
                     NavigationState.Main -> {
+                        BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val wide = maxWidth >= 840.dp
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
@@ -401,6 +405,7 @@ internal fun AppNavigation(
                                 }
                             },
                             bottomBar = {
+                                if (!wide) {
                                 NavigationBar(
                                     containerColor = MaterialTheme.colorScheme.surface,
                                     contentColor = MaterialTheme.colorScheme.onSurface
@@ -419,9 +424,28 @@ internal fun AppNavigation(
                                         )
                                     }
                                 }
+                                }
                             }
                         ) { innerPadding ->
-                            Box(Modifier.padding(innerPadding).fillMaxSize()) {
+                            Row(Modifier.padding(innerPadding).fillMaxSize()) {
+                                if (wide) {
+                                    NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
+                                        Screen.entries.forEach { screen ->
+                                            NavigationRailItem(
+                                                selected = selectedScreen == screen,
+                                                onClick = { selectedScreen = screen },
+                                                icon = {
+                                                    Icon(
+                                                        imageVector = if (selectedScreen == screen) screen.filledIcon else screen.outlinedIcon,
+                                                        contentDescription = screen.label
+                                                    )
+                                                },
+                                                label = { Text(screen.label) }
+                                            )
+                                        }
+                                    }
+                                }
+                                Box(Modifier.weight(1f).fillMaxSize()) {
                                 when (selectedScreen) {
                                     Screen.DASHBOARD -> DashboardScreen(
                                         repo = repo,
@@ -454,8 +478,10 @@ internal fun AppNavigation(
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(selectedScreen)
-                            }  // closes inner Box(padding)
+                                }  // closes inner Box(weight)
+                            }  // closes Row
                         }  // closes Scaffold innerPadding
+                        }  // closes BoxWithConstraints
                     }  // closes "main" block
                     }  // closes when(state)
                 }  // closes Box wrapper (background flash fix)

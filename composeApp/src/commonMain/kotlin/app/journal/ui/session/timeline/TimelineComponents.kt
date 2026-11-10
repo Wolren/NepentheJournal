@@ -38,7 +38,7 @@ internal fun RatingBadge(rating: Int?, shulginRating: String?) {
         val displayText = shulginRating ?: "${rating}/10"
         val accent = MaterialTheme.colorScheme.primary
         Surface(
-            shape = RoundedCornerShape(6.dp),
+            shape = chipShape(),
             color = accent.copy(alpha = 0.12f),
             border = androidx.compose.foundation.BorderStroke(
                 1.dp, accent.copy(alpha = 0.35f)
@@ -103,7 +103,7 @@ internal fun PhaseMarker(type: TimelineEventType, color: Color, modifier: Modifi
 @Composable
 internal fun DoseTimelineCard(dose: Dose, substance: Substance?) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+        shape = cardShape(), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp)) {
             Surface(modifier = Modifier.width(4.dp).height(48.dp), shape = RoundedCornerShape(2.dp),
                 color = MaterialTheme.colorScheme.primary) {}
@@ -131,7 +131,7 @@ internal fun DosageSummaryTable(doses: List<Dose>, repo: app.journal.data.IJourn
     }
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(12.dp),
+        shape = cardShape(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier.fillMaxWidth()
@@ -205,7 +205,7 @@ internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journa
                 val label = effect.replace("_", " ").replaceFirstChar { it.uppercase() }
                 val fraction = (avgScore / 10f).coerceIn(0f, 1f)
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = chipShape(),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
@@ -291,7 +291,7 @@ internal fun IntensityCurveOverlay(events: List<TimelineEvent>, startTime: Long)
             Spacer(Modifier.height(2.dp))
             Row(modifier = Modifier.fillMaxWidth().padding(start = 24.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 val durHours = rangeMs / 3600000f
-                for (i in 0..4) { Text("${(durHours * i / 4).toInt()}h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) }
+                for (i in 0..4) { Text("${(durHours * i / 4).toInt()}h", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)) }
             }
         }
     }
@@ -315,7 +315,7 @@ internal fun PhaseCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(10.dp),
+        shape = cardShape(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier.fillMaxWidth()
@@ -340,7 +340,7 @@ internal fun PhaseCard(
                     Text(
                         phase.description,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
                 }
             }

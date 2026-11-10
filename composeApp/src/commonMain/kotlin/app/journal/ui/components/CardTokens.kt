@@ -1,7 +1,18 @@
 package app.journal.ui.components
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/** Cards follow the theme's medium radius, so the corner setting applies everywhere. */
+@Composable
+fun cardShape(): Shape = MaterialTheme.shapes.medium
+
+/** Chips and small pills follow the theme's small radius. */
+@Composable
+fun chipShape(): Shape = MaterialTheme.shapes.small
 
 /**
  * Shared inner padding for content cards.

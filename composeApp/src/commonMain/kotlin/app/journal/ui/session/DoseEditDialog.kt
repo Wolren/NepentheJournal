@@ -211,7 +211,7 @@ fun DoseEditDialog(
                                     containerColor = MaterialTheme.colorScheme.surface
                                 ),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = cardShape(),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 val scrollState = rememberScrollState()

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.ui.components.HoverCard
+import app.journal.ui.components.cardShape
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.foregroundFor
 import app.journal.ui.theme.isDarkTheme
@@ -55,7 +56,7 @@ fun SessionCard(
     HoverCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = cardShape(),
         useAnimations = isDesktopPlatform(),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
     ) {
@@ -91,7 +92,7 @@ fun SessionCard(
                             Text(
                                 text = session.consumerName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
                             )
                         }
 
