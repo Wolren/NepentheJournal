@@ -23,10 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 fun EditorInlineEventCard(
     event: TimelineEvent,
     repo: IJournalRepository,
+    autoEdit: Boolean = false,
+    onEditingFinished: () -> Unit = {},
     onUpdated: (TimelineEvent) -> Unit,
     onDelete: () -> Unit
 ) {
-    var editing by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(autoEdit) }
     var editLabel by remember { mutableStateOf(event.label) }
     var editBody by remember { mutableStateOf(event.body ?: "") }
     var editIntensity by remember { mutableFloatStateOf(event.intensity ?: 5f) }
@@ -79,7 +81,7 @@ fun EditorInlineEventCard(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppTextButton(onClick = { editing = false }) { Text("Cancel") }
+                    AppTextButton(onClick = { editing = false; onEditingFinished() }) { Text("Cancel") }
                     AppTextButton(onClick = {
                         val updated = event.copy(
                             eventType = editType,
@@ -90,6 +92,7 @@ fun EditorInlineEventCard(
                         )
                         repo.upsertTimelineEvent(updated)
                         onUpdated(updated)
+                        onEditingFinished()
                         editing = false
                     }, modifier = Modifier.testTag("event-save")) { Text("Save") }
                 }

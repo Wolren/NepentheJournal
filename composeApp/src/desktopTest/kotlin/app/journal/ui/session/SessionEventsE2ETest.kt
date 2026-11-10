@@ -68,8 +68,6 @@ class SessionEventsE2ETest {
             onNodeWithTag("screen-list").performScrollToNode(hasTestTag("session-add-event"))
             onNodeWithTag("session-add-event").performClick()
             waitForIdle()
-            onNodeWithContentDescription("Edit").performClick()
-            waitForIdle()
             onNodeWithTag("screen-list").performScrollToNode(hasTestTag("event-label"))
             onNodeWithTag("event-label").performTextClearance()
             onNodeWithTag("event-label").performTextInput("Edited label")

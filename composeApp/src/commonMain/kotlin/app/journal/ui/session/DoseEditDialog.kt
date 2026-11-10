@@ -26,7 +26,6 @@ import app.journal.model.Dose
 import app.journal.model.StomachFullness
 import app.journal.model.Substance
 import app.journal.util.currentTimeMillis
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 val ROA_OPTIONS = listOf(
@@ -115,20 +114,11 @@ fun DoseEditDialog(
         mutableStateOf(initialDose?.timestamp ?: sessionStartTime)
     }
 
-    var substanceQuery by remember { mutableStateOf("") }
-    LaunchedEffect(substanceSearch) {
-        if (substanceSearch.isBlank()) {
-            substanceQuery = ""
-        } else {
-            delay(200)
-            substanceQuery = substanceSearch
-        }
-    }
-    val filtered = remember(substanceQuery, substances) {
-        if (substanceQuery.isBlank()) emptyList()
+    val filtered = remember(substanceSearch, substances) {
+        if (substanceSearch.isBlank()) emptyList()
         else substances.filter {
-            it.name.contains(substanceQuery, ignoreCase = true) ||
-                it.aliases.any { a -> a.contains(substanceQuery, ignoreCase = true) }
+            it.name.contains(substanceSearch, ignoreCase = true) ||
+                it.aliases.any { a -> a.contains(substanceSearch, ignoreCase = true) }
         }
     }
 
@@ -206,7 +196,7 @@ fun DoseEditDialog(
                         singleLine = true
                     )
                 }
-                if (selectedSubstanceId.isEmpty() && substanceQuery.isNotBlank()) {
+                if (selectedSubstanceId.isEmpty() && substanceSearch.isNotBlank()) {
                     if (filtered.isEmpty()) {
                         item {
                             Text("No substances match",

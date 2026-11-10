@@ -117,10 +117,21 @@ fun SessionEditorScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
+        val sessionId = sessionToEdit?.id
+        val doseCount = remember(sessionId) { sessionId?.let { repo.dosesForSession(it).size } ?: 0 }
+        val eventCount = remember(sessionId) { sessionId?.let { repo.eventsForSession(it).size } ?: 0 }
+        val noteCount = remember(sessionId) { sessionId?.let { repo.notesForSession(it).size } ?: 0 }
+        val contents = listOfNotNull(
+            doseCount.takeIf { it > 0 }?.let { "$it doses" },
+            eventCount.takeIf { it > 0 }?.let { "$it events" },
+            noteCount.takeIf { it > 0 }?.let { "$it notes" },
+        )
+        val confirmText = if (contents.isEmpty()) "This deletes the session. This cannot be undone."
+            else "This deletes the session with ${contents.joinToString(", ")}. This cannot be undone."
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Delete session?") },
-            text = { Text("This cannot be undone.") },
+            text = { Text(confirmText) },
             confirmButton = {
                 AppTextButton(onClick = {
                     viewModel.deleteSession()
@@ -167,6 +178,9 @@ fun SessionEditorScreen(
                 onValueChange = { viewModel.title.value = it },
                 label = { Text("Title") },
                 placeholder = { Text("Session title...") },
+                supportingText = if (title.isBlank()) {
+                    { Text("Saves as Untitled Session") }
+                } else null,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("session-title")
             )
@@ -216,30 +230,6 @@ fun SessionEditorScreen(
         }
 
         item {
-            SessionTextFieldsSection(
-                set = set, onSetChange = { viewModel.set.value = it },
-                setting = setting, onSettingChange = { viewModel.setting.value = it },
-                intention = intention, onIntentionChange = { viewModel.intention.value = it },
-                outcome = outcome, onOutcomeChange = { viewModel.outcome.value = it },
-                notes = notes, onNotesChange = { viewModel.notes.value = it },
-                tags = tags, onTagsChange = { viewModel.tags.value = it }
-            )
-        }
-
-        if (personId == null) {
-        item {
-            SessionDemographicsSection(
-                expanded = profileExpanded,
-                onToggle = { profileExpanded = !profileExpanded },
-                age = profileAge, onAgeChange = { viewModel.profileAge.value = it },
-                gender = profileGender, onGenderChange = { viewModel.profileGender.value = it },
-                heightCm = profileHeightCm, onHeightCmChange = { viewModel.profileHeightCm.value = it },
-                weightKg = profileWeightKg, onWeightKgChange = { viewModel.profileWeightKg.value = it }
-            )
-        }
-        }
-
-        item {
             SessionDoseSection(
                 sessionDoses = sessionDoses,
                 activeInteractionResult = activeInteractionResult,
@@ -273,6 +263,30 @@ fun SessionEditorScreen(
                     viewModel.deleteEvent(eventId)
                 }
             )
+        }
+
+        item {
+            SessionTextFieldsSection(
+                set = set, onSetChange = { viewModel.set.value = it },
+                setting = setting, onSettingChange = { viewModel.setting.value = it },
+                intention = intention, onIntentionChange = { viewModel.intention.value = it },
+                outcome = outcome, onOutcomeChange = { viewModel.outcome.value = it },
+                notes = notes, onNotesChange = { viewModel.notes.value = it },
+                tags = tags, onTagsChange = { viewModel.tags.value = it }
+            )
+        }
+
+        if (personId == null) {
+        item {
+            SessionDemographicsSection(
+                expanded = profileExpanded,
+                onToggle = { profileExpanded = !profileExpanded },
+                age = profileAge, onAgeChange = { viewModel.profileAge.value = it },
+                gender = profileGender, onGenderChange = { viewModel.profileGender.value = it },
+                heightCm = profileHeightCm, onHeightCmChange = { viewModel.profileHeightCm.value = it },
+                weightKg = profileWeightKg, onWeightKgChange = { viewModel.profileWeightKg.value = it }
+            )
+        }
         }
     }
 }

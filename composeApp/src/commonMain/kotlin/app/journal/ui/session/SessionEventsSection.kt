@@ -27,6 +27,7 @@ fun SessionEventsSection(
     onEventUpdated: (TimelineEvent) -> Unit,
     onEventDeleted: (String) -> Unit
 ) {
+    var autoEditEventId by remember { mutableStateOf<String?>(null) }
     HorizontalDivider()
     Spacer(Modifier.height(4.dp))
     Row(
@@ -43,12 +44,13 @@ fun SessionEventsSection(
                 eventType = TimelineEventType.OBSERVATION,
                 label = "Check-in",
                 timestamp = now,
-                body = "Quick event",
+                body = null,
                 createdAt = now, updatedAt = now,
                 deviceOrigin = "desktop"
             )
             repo.upsertTimelineEvent(newEvent)
             onEventAdded(newEvent)
+            autoEditEventId = newEvent.id
         }, modifier = Modifier.testTag("session-add-event")) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
@@ -62,6 +64,8 @@ fun SessionEventsSection(
                 EditorInlineEventCard(
                     event = event,
                     repo = repo,
+                    autoEdit = event.id == autoEditEventId,
+                    onEditingFinished = { if (autoEditEventId == event.id) autoEditEventId = null },
                     onUpdated = onEventUpdated,
                     onDelete = { onEventDeleted(event.id) }
                 )
