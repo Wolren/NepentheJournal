@@ -41,6 +41,8 @@ import kotlinx.datetime.toLocalDateTime
 fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     viewModel: SessionListViewModel,
     showInlineActions: Boolean = false,
+    compactActions: Boolean = false,
+    selectedSessionId: String? = null,
     onCalendarClick: () -> Unit = {},
     onNewSession: () -> Unit = {},
     onEditSession: (String) -> Unit = {},
@@ -109,8 +111,20 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                     )
                     if (showCount) {
                         Spacer(Modifier.height(6.dp))
-                        Text(countText, style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(countText, style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f))
+                            if (compactActions) {
+                                SessionListScreen.TopActions(
+                                    showFavoritesOnly = showFavs,
+                                    onToggleFavorites = { viewModel.showFavoritesOnly.value = !showFavs },
+                                    onCalendarClick = onCalendarClick,
+                                    timeDisplayMode = timeDisplayMode,
+                                    onCycleTimeDisplay = onCycleTimeDisplay,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -164,7 +178,8 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                                 timeDisplayMode = timeDisplayMode,
                                 onClick = { onSessionClick(session.id) },
                                 onEdit = { onEditSession(session.id) },
-                                onToggleFavorite = { repo.toggleFavorite(session.id) }
+                                onToggleFavorite = { repo.toggleFavorite(session.id) },
+                                selected = session.id == selectedSessionId
                             )
                         }
                     }

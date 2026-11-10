@@ -44,7 +44,8 @@ fun SessionCard(
     timeDisplayMode: TimeDisplayMode,
     onClick: () -> Unit,
     onEdit: () -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    selected: Boolean = false
 ) {
     val isDark = isDarkTheme()
     val accentSource = remember(substanceNameMap, doses, session.title) {
@@ -58,7 +59,8 @@ fun SessionCard(
         modifier = Modifier.fillMaxWidth(),
         shape = cardShape(),
         useAnimations = isDesktopPlatform(),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                 else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)

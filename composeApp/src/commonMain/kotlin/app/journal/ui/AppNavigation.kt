@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -49,6 +50,8 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalStore
@@ -199,6 +202,8 @@ internal fun AppNavigation(
             }
 
             val isSoftwareRender = remember { isSoftwareRender() }
+            val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+            val wideShell = windowWidth >= 840.dp
             val animationScale = themeConfig.animationScale.coerceIn(0f, 1f)
             val animationSpeed = 0.4f + 0.6f * animationScale
             val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember(isSoftwareRender, animationSpeed) {
@@ -214,7 +219,7 @@ internal fun AppNavigation(
                     companionSubstanceId != null -> NavigationState.CompanionSubstance
                     liveSessionId != null -> NavigationState.LiveSession
                     editingSessionId != null -> NavigationState.EditorSession
-                    selectedTimelineSessionId != null -> NavigationState.Timeline
+                    !wideShell && selectedTimelineSessionId != null -> NavigationState.Timeline
                     editingSubstanceId != null -> NavigationState.EditorSubstance
                     selectedSubstanceId != null -> NavigationState.DetailSubstance
                     showCalendar -> NavigationState.Calendar
@@ -453,24 +458,56 @@ internal fun AppNavigation(
                                         repo = repo,
                                         onSearchClick = { showSearch = true }
                                     )
-                                    Screen.SESSIONS -> SessionListScreen(
-                                        viewModel = sessionListViewModel,
-                                        showInlineActions = wide,
-                                        onCalendarClick = { showCalendar = true },
-                                        onNewSession = { editingSessionId = "__new__" },
-                                        onEditSession = { id -> editingSessionId = id },
-                                        onSessionClick = { id ->
-                                            if (repo.getSession(id)?.endTime == null) liveSessionId = id
-                                            else selectedTimelineSessionId = id
-                                        },
-                                        onLiveSession = { liveSessionId = "__new__" },
-                                        timeDisplayMode = timeDisplayMode,
-                                        onCycleTimeDisplay = {
-                                            timeDisplayMode = TimeDisplayMode.entries[
-                                                (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
-                                            ]
+                                    Screen.SESSIONS -> {
+                                        val listContent: @Composable () -> Unit = {
+                                            SessionListScreen(
+                                                viewModel = sessionListViewModel,
+                                                showInlineActions = false,
+                                                compactActions = wide,
+                                                selectedSessionId = selectedTimelineSessionId,
+                                                onCalendarClick = { showCalendar = true },
+                                                onNewSession = { editingSessionId = "__new__" },
+                                                onEditSession = { id -> editingSessionId = id },
+                                                onSessionClick = { id ->
+                                                    if (repo.getSession(id)?.endTime == null) liveSessionId = id
+                                                    else selectedTimelineSessionId = id
+                                                },
+                                                onLiveSession = { liveSessionId = "__new__" },
+                                                timeDisplayMode = timeDisplayMode,
+                                                onCycleTimeDisplay = {
+                                                    timeDisplayMode = TimeDisplayMode.entries[
+                                                        (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                    ]
+                                                }
+                                            )
                                         }
-                                    )
+                                        if (wide) {
+                                            Row(Modifier.fillMaxSize()) {
+                                                Box(Modifier.weight(0.42f).fillMaxHeight()) { listContent() }
+                                                VerticalDivider()
+                                                Box(Modifier.weight(0.58f).fillMaxHeight()) {
+                                                    val paneSessionId = selectedTimelineSessionId
+                                                    if (paneSessionId != null) {
+                                                        SessionTimelineScreen(
+                                                            repo = repo,
+                                                            sessionId = paneSessionId,
+                                                            onBack = { selectedTimelineSessionId = null }
+                                                        )
+                                                    } else {
+                                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                            Text(
+                                                                "Select a session",
+                                                                style = MaterialTheme.typography.bodyLarge,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            listContent()
+                                        }
+                                    }
                                     Screen.SUBSTANCES -> if (!libraryReady) {
                                         SubstanceLibraryGate()
                                     } else {
