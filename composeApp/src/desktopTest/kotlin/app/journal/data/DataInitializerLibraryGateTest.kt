@@ -85,7 +85,7 @@ class DataInitializerLibraryGateTest {
 
         assertTrue(DataInitializer.libraryReadyFlow.value)
         val path = JournalStore(repo).dataPath()
-        val snapshot = decodeSnapshot(File(path).readJournal()).getOrThrow()
+        val snapshot = File(path).readMergedJournal()
         assertEquals(repo.substances.value.size, snapshot.substances.size,
             "the persisted library must match memory when the gate opens")
         assertNotNull(snapshot.seedFingerprint,

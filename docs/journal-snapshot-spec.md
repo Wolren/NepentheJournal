@@ -11,6 +11,8 @@
 
 JournalSnapshot is the interchange format for Nepenthe Journal's data. It is a single JSON file that contains the full state of a journal: substances, sessions, doses, notes, interactions, effects, timeline events, and custom units, plus app settings.
 
+The app stores that snapshot split at rest: `journal-data.json` holds user data, `journal-library.json` holds substances, interactions and effects. Both files use this schema, and the library file is rewritten only when the library changes. Export, import and backups still write the single-file form.
+
 The format is designed to be:
 
 - **Self-contained** - one file holds every entity. No external references.

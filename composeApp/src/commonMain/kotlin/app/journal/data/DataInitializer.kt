@@ -135,7 +135,8 @@ object DataInitializer {
 
         // Auto-save must be live before the gate opens: the welcome dialog mutates during the build.
         if (scope != null) {
-            autoSaveJob = repo.autoSave(scope) { store.save() }
+            // Quiet-period saves skip the backup rotation; close and explicit saves rotate.
+            autoSaveJob = repo.autoSave(scope) { store.save(fullBackup = false) }
             Log.withTag("DataInit").i { "Auto-save enabled (debounce 2000ms)" }
         }
 
@@ -216,7 +217,7 @@ object DataInitializer {
             if (callerScope != null) {
                 guardLock.withLock {
                     autoSaveJob?.cancel()
-                    autoSaveJob = repo.autoSave(callerScope) { store.save() }
+                    autoSaveJob = repo.autoSave(callerScope) { store.save(fullBackup = false) }
                 }
             }
 

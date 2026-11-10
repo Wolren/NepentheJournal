@@ -503,8 +503,8 @@ class JournalStoreTest {
         store.save()
         val path = store.dataPath()
 
-        assertTrue(File(path).readJournal().contains("LSD"),
-            "Main file should contain saved substance before corruption")
+        assertTrue(File(path).readMergedJournal().substances.any { it.name == "LSD" },
+            "Main files should contain the saved substance before corruption")
 
         File(path).writeText("NOT VALID JSON {{corrupted data")
 

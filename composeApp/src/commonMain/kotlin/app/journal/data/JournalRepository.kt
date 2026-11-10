@@ -74,6 +74,10 @@ class JournalRepository internal constructor() : IJournalRepository {
     private var autosaveSuppressed = false
     private fun bumpMutationCount() { _mutationCount.update { it + 1 } }
 
+    private val _libraryVersion = MutableStateFlow(0L)
+    override val libraryVersion: StateFlow<Long> = _libraryVersion.asStateFlow()
+    private fun bumpLibraryVersion() { _libraryVersion.update { it + 1 } }
+
     override val recentSessions: Flow<List<Session>> =
         sessions.map { it.sortedByDescending { s -> s.startTime }.take(5) }
 
@@ -96,12 +100,14 @@ class JournalRepository internal constructor() : IJournalRepository {
         lock, sessionsStore, dosesStore, notesStore, substancesStore, effectsStore, interactionsStore,
         timelineEventsStore, customUnitsStore, indices,
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
+        bumpLibraryVersion = { bumpLibraryVersion() },
     )
     private val mutations = JournalMutations(
         lock, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
         effectsStore, customUnitsStore, personsStore, medicationsStore, indices,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
+        bumpLibraryVersion = { bumpLibraryVersion() },
     )
     private val frames = JournalExportFrames(lock, sessionsStore, dosesStore, substancesStore, indices)
     private val syncBridge = JournalSyncBridge(
@@ -109,6 +115,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         effectsStore, customUnitsStore, personsStore, medicationsStore, indices, tombstones,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
+        bumpLibraryVersion = { bumpLibraryVersion() },
     )
 
     override val ratingScaleMode: StateFlow<RatingScaleMode> = prefs.ratingScaleMode
@@ -326,6 +333,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         prefs.resetForClearAll()
         bumpToleranceVersion()
         bumpMutationCount()
+        bumpLibraryVersion()
     }
 
 

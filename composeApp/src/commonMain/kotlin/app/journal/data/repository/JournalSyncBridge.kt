@@ -40,6 +40,7 @@ internal class JournalSyncBridge(
     private val markSearchIndexDirtyLocked: () -> Unit,
     private val bumpToleranceVersion: () -> Unit,
     private val bumpMutationCount: () -> Unit,
+    private val bumpLibraryVersion: () -> Unit,
 ) {
     val pendingConflictCount: Flow<Int> = notesStore.flow.map { list ->
         list.count { it.conflictSiblings.isNotEmpty() }
@@ -132,6 +133,11 @@ internal class JournalSyncBridge(
         if (dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty()) {
             bumpToleranceVersion()
         }
+        if (substancesToPut.isNotEmpty() || effectsToPut.isNotEmpty() || interactionsToPut.isNotEmpty() ||
+            deletedSubstanceIds.isNotEmpty() || deletedEffectIds.isNotEmpty() || deletedInteractionIds.isNotEmpty()
+        ) {
+            bumpLibraryVersion()
+        }
         bumpMutationCount()
     }
 
@@ -166,6 +172,9 @@ internal class JournalSyncBridge(
         if (changed) {
             indices.rebuildAllIndices()
             markSearchIndexDirtyLocked()
+        }
+        if (snapshot.substances.isNotEmpty() || snapshot.interactions.isNotEmpty() || snapshot.effects.isNotEmpty()) {
+            bumpLibraryVersion()
         }
     }
 

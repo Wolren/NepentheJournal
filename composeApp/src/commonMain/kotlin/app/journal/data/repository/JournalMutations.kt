@@ -39,6 +39,7 @@ internal class JournalMutations(
     private val markSearchIndexDirtyLocked: () -> Unit,
     private val bumpToleranceVersion: () -> Unit,
     private val bumpMutationCount: () -> Unit,
+    private val bumpLibraryVersion: () -> Unit,
 ) {
     fun upsertPerson(person: Person) = lock.withLock {
         personsStore.put(person)
@@ -100,12 +101,14 @@ internal class JournalMutations(
         substancesStore.put(substance)
         bumpToleranceVersion()
         bumpMutationCount()
+        bumpLibraryVersion()
         markSearchIndexDirtyLocked()
     }
 
     fun upsertInteraction(interaction: Interaction) = lock.withLock {
         interactionsStore.put(interaction)
         bumpMutationCount()
+        bumpLibraryVersion()
         markSearchIndexDirtyLocked()
     }
 
@@ -122,6 +125,7 @@ internal class JournalMutations(
             indices._effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
         }
         bumpMutationCount()
+        bumpLibraryVersion()
         markSearchIndexDirtyLocked()
     }
 

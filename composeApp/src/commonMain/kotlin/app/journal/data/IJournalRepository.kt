@@ -42,6 +42,12 @@ interface IJournalRepository {
     val toleranceVersion: StateFlow<Int>
     val mutationCount: StateFlow<Long>
 
+    /**
+     * Bumped whenever substances, interactions or effects change. The split store
+     * rewrites the library file only when this value moves past its last save.
+     */
+    val libraryVersion: StateFlow<Long>
+
     val obsidianVaultPath: StateFlow<String>
     val obsidianAutoExport: StateFlow<Boolean>
     val obsidianSubfolder: StateFlow<String>

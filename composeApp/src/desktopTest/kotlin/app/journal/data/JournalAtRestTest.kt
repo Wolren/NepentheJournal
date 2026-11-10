@@ -11,7 +11,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * At-rest contract: a saved journal carries the NEPE1 envelope, a plaintext
+ * At-rest contract: a saved journal carries the NEPE2 envelope, a plaintext
  * journal from an older build still loads and is re-sealed on the next save,
  * and the .bak copy is sealed as well.
  */
@@ -46,9 +46,32 @@ class JournalAtRestTest {
     @Test
     fun sealRoundTripsAndCarriesTheMagic() {
         val sealed = JournalAtRest.seal("""{"version":2}""")
-        assertTrue(JournalAtRest.looksEncrypted(sealed), "sealed journal must carry the NEPE1 magic")
+        assertTrue(JournalAtRest.looksEncrypted(sealed), "sealed journal must carry the NEPE2 magic")
         assertFalse(JournalAtRest.looksEncrypted("""{"version":2}""".encodeToByteArray()), "plain JSON must not look sealed")
         assertEquals("""{"version":2}""", JournalAtRest.open(sealed))
+    }
+
+    @Test
+    fun compressedEnvelopeShrinksThePayload() {
+        val text = """{"notes":"""" + "x".repeat(10_000) + """"}"""
+        val sealed = JournalAtRest.seal(text)
+        assertTrue(sealed.size < text.length / 2, "zstd must shrink the repetitive payload")
+        assertEquals(text, JournalAtRest.open(sealed))
+    }
+
+    @Test
+    fun legacyV1EnvelopeStillOpens() {
+        val plain = """{"version":7}"""
+        val legacy = "NEPE1".encodeToByteArray() + journalSeal(plain.encodeToByteArray())
+        assertTrue(JournalAtRest.looksEncrypted(legacy), "a NEPE1 file must still look sealed")
+        assertEquals(plain, JournalAtRest.open(legacy))
+    }
+
+    @Test
+    fun uncompressedV2EnvelopeOpens() {
+        val plain = """{"version":8}"""
+        val legacy = "NEPE2".encodeToByteArray() + byteArrayOf(0) + journalSeal(plain.encodeToByteArray())
+        assertEquals(plain, JournalAtRest.open(legacy))
     }
 
     @Test

@@ -40,6 +40,7 @@ internal class JournalTombstones(
     private val indices: JournalIndices,
     private val bumpToleranceVersion: () -> Unit,
     private val bumpMutationCount: () -> Unit,
+    private val bumpLibraryVersion: () -> Unit,
 ) {
 
     /**
@@ -275,6 +276,7 @@ internal class JournalTombstones(
         indices._doseStatsSessionIds.remove(id)
         bumpToleranceVersion()
         bumpMutationCount()
+        bumpLibraryVersion()
     }
 
     internal fun deleteCustomUnitLocked(id: String) {
@@ -295,12 +297,14 @@ internal class JournalTombstones(
         }
         recordTombstone("effect", id)
         bumpMutationCount()
+        bumpLibraryVersion()
     }
 
     internal fun deleteInteractionLocked(id: String) {
         interactionsStore.remove(id) ?: return
         recordTombstone("interaction", id)
         bumpMutationCount()
+        bumpLibraryVersion()
     }
 }
 

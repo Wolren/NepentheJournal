@@ -134,9 +134,9 @@ class FirstLaunchE2ETest {
         val snapshot = decoded.getOrThrow()
         assertEquals(JournalSnapshot.CURRENT_VERSION, snapshot.version,
             "the store must be written at the current snapshot version")
-        assertEquals(repo.substances.value.size, snapshot.substances.size,
-            "everything the seed loaded must be on disk")
         assertTrue(snapshot.sessions.isEmpty(), "fixture: no sessions on a cold start")
+        assertEquals(repo.substances.value.size, file.readMergedJournal().substances.size,
+            "everything the seed loaded must be on disk")
 
         val reread = JournalRepository()
         JournalStore(reread).load()
@@ -169,7 +169,7 @@ class FirstLaunchE2ETest {
         )
         JournalStore(first).save()
         assertTrue(
-            File(JournalStore(first).dataPath()).readJournal().contains(marker),
+            File(JournalStore(first).dataPath()).readMergedJournal().substances.any { it.name == marker },
             "fixture: the marker must be on disk before the restart"
         )
 

@@ -52,7 +52,9 @@ data class JournalSnapshot(
 }
 
 /**
- * Handles loading/saving repository state to a JSON file.
+ * Handles loading/saving repository state to two JSON files: the user journal
+ * (`journal-data.json`) and the library (`journal-library.json`). Each file is
+ * sealed at rest; the library file is only rewritten when the library changes.
  * Platform-specific path resolution via expect/actual.
  *
  * Depends on the [IJournalRepository] abstraction so the composition root can
@@ -60,12 +62,12 @@ data class JournalSnapshot(
  */
 expect class JournalStore(repo: IJournalRepository) {
     /**
-     * Persist the repository to disk (atomic tmp + rename).
+     * Persist the repository to disk (atomic tmp + rename), plus the library file
+     * when its version moved.
      *
-     * @param fullBackup when true (default), rotate the versioned .bak.N chain
-     * and refresh the immediate .bak. For high-frequency sync persists this is
-     * expensive (6 file copies of the journal); pass false to only update the
-     * main file; the debounced autosave performs the full backup shortly after.
+     * @param fullBackup when true (default), also rotate the versioned .bak.N
+     * chain. Every save refreshes the immediate .bak; pass false for the
+     * high-frequency autosave path.
      */
     fun save(fullBackup: Boolean = true)
     fun load()

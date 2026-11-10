@@ -22,6 +22,13 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
     private fun tempPath(): String = dataPath() + ".tmp"
     private fun backupPath(): String = dataPath() + ".bak"
 
+    private fun libraryPath(): String = File(baseDir, "journal-library.json").absolutePath
+
+    private fun libraryBackupPath(): String = libraryPath() + ".bak"
+
+    /** Library version this store last persisted; -1 forces a write on the next save. */
+    private var savedLibraryVersion: Long = -1L
+
     @Volatile
     actual var lastLoadHadIssues: Boolean = false
         private set
@@ -39,7 +46,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
 
         if (!target.exists()) {
             // Audit C3 mirror (the iOS JournalStoreIos.load recovery)
-            recoverMissingMainFile(tmp)
+            recoverMissingMainFile(tmp, readLibraryText())
             return@withLock
         }
 
@@ -56,14 +63,37 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             val raw = target.readBytes()
             val text = if (JournalAtRest.looksEncrypted(raw)) JournalAtRest.open(raw) else raw.decodeToString()
             // Same recovery path + issue flags as JournalStoreDesktop so the App.kt recovery banner works on Android too (audit high).
-            val decoded = decodeSnapshotWithRecovery(text)
-            if (decoded.parseError != null) {
+            val loaded = JournalSplit.merge(text, readLibraryText())
+            if (loaded.userParseError != null) {
                 lastLoadHadIssues = true
-                lastLoadIssueSummary = "Recovered from parse failure: ${decoded.parseError}"
+                lastLoadIssueSummary = "Recovered from parse failure: ${loaded.userParseError}"
             }
-            AppJson.apply(repo, decoded.snapshot)
+            if (loaded.libraryParseError != null) {
+                lastLoadHadIssues = true
+                val note = "Library file recovered from parse failure: ${loaded.libraryParseError}"
+                lastLoadIssueSummary =
+                    if (lastLoadIssueSummary.isEmpty()) note else "$lastLoadIssueSummary; $note"
+            }
+            AppJson.apply(repo, loaded.snapshot)
+            savedLibraryVersion = if (loaded.needsLibraryWrite) -1L else repo.libraryVersion.value
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
+        }
+    }
+
+    private fun readLibraryText(): String? {
+        val file = File(libraryPath())
+        if (!file.exists()) return null
+        if (file.length() > 50_000_000) {
+            Log.withTag("JournalStore").e { "Journal library too large (${file.length()} bytes), ignoring" }
+            return null
+        }
+        return try {
+            val raw = file.readBytes()
+            if (JournalAtRest.looksEncrypted(raw)) JournalAtRest.open(raw) else raw.decodeToString()
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").w { "Unreadable journal library: ${e.message}" }
+            null
         }
     }
 
@@ -77,7 +107,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
      * rules cannot drift from desktop/iOS. [tmp] is passed in because the
      * caller's orphan cleanup must not run before recovery gets its chance.
      */
-    private fun recoverMissingMainFile(tmp: File) {
+    private fun recoverMissingMainFile(tmp: File, libraryText: String?) {
         val candidates = listOf(File(backupPath()) to ".bak", tmp to ".tmp")
         var partialText: String? = null
         var partialLabel: String? = null
@@ -92,12 +122,13 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 Log.withTag("JournalStore").w { "Unreadable $label candidate: ${e.message}" }
                 continue
             }
-            val clean = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }.getOrNull()
-            if (clean != null) {
+            val loaded = JournalSplit.merge(text, libraryText)
+            if (loaded.userParseError == null) {
                 Log.withTag("JournalStore").w { "Journal file missing; recovered from $label backup" }
                 lastLoadHadIssues = true
                 lastLoadIssueSummary = "Main journal file was missing; restored from $label"
-                AppJson.apply(repo, clean)
+                AppJson.apply(repo, loaded.snapshot)
+                savedLibraryVersion = if (loaded.needsLibraryWrite) -1L else repo.libraryVersion.value
                 return
             }
             if (partialText == null) {
@@ -107,14 +138,23 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
         if (partialText != null) {
             Log.withTag("JournalStore").w { "Journal file missing; partially recovering from $partialLabel" }
-            val decoded = decodeSnapshotWithRecovery(partialText)
+            val loaded = JournalSplit.merge(partialText, libraryText)
             lastLoadHadIssues = true
             lastLoadIssueSummary =
-                "Main journal file was missing; partially recovered from $partialLabel: ${decoded.parseError ?: "ok"}"
-            AppJson.apply(repo, decoded.snapshot)
+                "Main journal file was missing; partially recovered from $partialLabel: ${loaded.userParseError ?: "ok"}"
+            AppJson.apply(repo, loaded.snapshot)
+            savedLibraryVersion = if (loaded.needsLibraryWrite) -1L else repo.libraryVersion.value
+            return
+        }
+        if (libraryText != null) {
+            Log.withTag("JournalStore").w { "No usable backup; starting with the library file only" }
+            val loaded = JournalSplit.merge("{}", libraryText)
+            AppJson.apply(repo, loaded.snapshot)
+            savedLibraryVersion = repo.libraryVersion.value
             return
         }
         Log.withTag("JournalStore").w { "Journal file missing and no usable .bak/.tmp backup found; starting empty" }
+        savedLibraryVersion = -1L
     }
 
     actual fun save(fullBackup: Boolean) = saveLock.withLock {
@@ -125,9 +165,16 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         try {
             baseDir.mkdirs()
 
+            // Stamp before the snapshot: a concurrent library edit forces a rewrite next save.
+            val libraryVersion = repo.libraryVersion.value
             // Locked snapshot: see JournalStoreDesktop.save() (audit S1).
             val snapshot = repo.fullSnapshot()
-            val text = AppJson.json.encodeToString(snapshot)
+            val libraryDirty = savedLibraryVersion != libraryVersion
+            if (libraryDirty && !writeLibrary(snapshot, fullBackup)) {
+                Log.withTag("JournalStore").w { "Library write failed; skipping this save so both files stay consistent" }
+                return@withLock
+            }
+            val text = JournalSplit.userText(snapshot)
 
             if (text.length > 50_000_000) {
                 Log.withTag("JournalStore").e { "Serialized journal too large (${text.length} chars), refusing to save" }
@@ -140,7 +187,8 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            if (fullBackup && target.exists()) {
+            if (target.exists()) {
+                // Always refresh .bak: it is the recovery copy, and 53 KB is cheap.
                 target.copyTo(backup, overwrite = true)
             }
 
@@ -166,8 +214,36 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                     Log.withTag("JournalStore").e { "Failed to write journal data after 3 attempts" }
                 }
             }
+
+            if (libraryDirty) savedLibraryVersion = libraryVersion
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to save journal data: ${e.message}" }
+        }
+    }
+
+    /** Writes the library file when the library changed; returns true on success. */
+    private fun writeLibrary(snapshot: JournalSnapshot, fullBackup: Boolean): Boolean {
+        val text = JournalSplit.libraryText(snapshot)
+        if (text.length > 50_000_000) {
+            Log.withTag("JournalStore").e { "Serialized library too large (${text.length} chars), refusing to save" }
+            return false
+        }
+        val library = File(libraryPath())
+        val tmp = File(libraryPath() + ".tmp")
+        return try {
+            tmp.writeBytes(JournalAtRest.seal(text))
+            if (fullBackup && library.exists()) {
+                library.copyTo(File(libraryBackupPath()), overwrite = true)
+            }
+            if (!tmp.renameTo(library)) {
+                library.writeBytes(JournalAtRest.seal(text))
+                tmp.delete()
+            }
+            true
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").e(e) { "Failed to write journal library: ${e.message}" }
+            tmp.delete()
+            false
         }
     }
 
@@ -184,6 +260,10 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock false
             }
             backup.copyTo(target, overwrite = true)
+            val libraryBackup = File(libraryBackupPath())
+            if (libraryBackup.exists()) {
+                libraryBackup.copyTo(File(libraryPath()), overwrite = true)
+            }
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
             repo.clearAll()
             load()
@@ -210,7 +290,8 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             autoDir.mkdirs()
             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
             val backupFile = File(autoDir, "$timestamp.json")
-            target.copyTo(backupFile, overwrite = false)
+            val text = AppJson.json.encodeToString(repo.fullSnapshot())
+            backupFile.writeBytes(JournalAtRest.seal(text))
             Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
 
             // Rotate auto-backups: keep only the 10 most recent (desktop/iOS parity; triggerAutoBackup runs on every close so the directory was unbounded).
