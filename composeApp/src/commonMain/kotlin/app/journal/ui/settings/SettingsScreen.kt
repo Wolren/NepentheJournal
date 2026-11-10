@@ -71,17 +71,42 @@ fun SettingsScreen(
     var editFontFamily by remember(themeConfig) { mutableStateOf(themeConfig.fontFamily) }
     var editTextColor by remember(themeConfig) { mutableStateOf(themeConfig.textColor) }
     var editAnimationScale by remember(themeConfig) { mutableStateOf(themeConfig.animationScale) }
+    var editSurfaceTint by remember(themeConfig) { mutableStateOf(themeConfig.surfaceTint) }
+    var editOutlineStrength by remember(themeConfig) { mutableStateOf(themeConfig.outlineStrength) }
     var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
 
+    fun currentEditConfig(): ThemeConfig = ThemeConfig(
+        baseTheme = editBaseTheme, primaryColor = editPrimary, secondaryColor = editSecondary,
+        tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
+        backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
+        cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
+        fontFamily = editFontFamily, textColor = editTextColor,
+        animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
+        outlineStrength = editOutlineStrength, githubGreenActivity = editGithubGreen
+    )
+
+    fun setEditConfig(config: ThemeConfig) {
+        editBaseTheme = config.baseTheme
+        editPrimary = config.primaryColor
+        editSecondary = config.secondaryColor
+        editTertiary = config.tertiaryColor
+        editBgColor = config.backgroundColor ?: editBgColor
+        editSurfaceColor = config.surfaceColor ?: editSurfaceColor
+        editBgImage = config.backgroundImagePath
+        editBgOpacity = config.backgroundOpacity
+        editCardStyle = config.cardStyle
+        editCornerRadius = config.cornerRadius
+        editFontScale = config.fontScale
+        editFontFamily = config.fontFamily
+        editTextColor = config.textColor
+        editAnimationScale = config.animationScale
+        editSurfaceTint = config.surfaceTint
+        editOutlineStrength = config.outlineStrength
+        editGithubGreen = config.githubGreenActivity
+    }
+
     fun applyTheme() {
-        themeManager.update(ThemeConfig(
-            baseTheme = editBaseTheme, primaryColor = editPrimary, secondaryColor = editSecondary,
-            tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
-            backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
-            cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
-            fontFamily = editFontFamily, textColor = editTextColor,
-            animationScale = editAnimationScale, githubGreenActivity = editGithubGreen
-        ))
+        themeManager.update(currentEditConfig())
     }
 
     val status by syncEngine.observeStatus().collectAsState(initial = SyncStatusSnapshot(
@@ -125,6 +150,7 @@ fun SettingsScreen(
             editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
             editCornerRadius = editCornerRadius, editFontScale = editFontScale, editAnimationScale = editAnimationScale,
             editFontFamily = editFontFamily, editTextColor = editTextColor,
+            editSurfaceTint = editSurfaceTint, editOutlineStrength = editOutlineStrength,
             editGithubGreen = editGithubGreen,
             onBaseThemeChange = { editBaseTheme = it },
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
@@ -133,18 +159,11 @@ fun SettingsScreen(
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
             onFontFamilyChange = { editFontFamily = it }, onTextColorChange = { editTextColor = it },
+            onSurfaceTintChange = { editSurfaceTint = it }, onOutlineStrengthChange = { editOutlineStrength = it },
             onAnimationScaleChange = { editAnimationScale = it },
             onGithubGreenChange = { editGithubGreen = it },
             onPresetSelect = { preset ->
-                val v = preset.variant(isDarkNow)
-                editPrimary = v.primaryColor
-                editSecondary = v.secondaryColor
-                editTertiary = v.tertiaryColor
-                editBgColor = v.backgroundColor ?: editBgColor
-                editSurfaceColor = v.surfaceColor ?: editSurfaceColor
-                editTextColor = v.textColor
-                preset.cardStyle?.let { editCardStyle = it }
-                preset.cornerRadius?.let { editCornerRadius = it }
+                setEditConfig(preset.applyTo(currentEditConfig(), isDarkNow))
                 applyTheme()
             },
             applyTheme = { applyTheme() }

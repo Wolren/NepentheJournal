@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ internal fun ThemeContent(
     editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
     editFontFamily: AppFontFamily, editTextColor: Long?,
+    editSurfaceTint: Float?, editOutlineStrength: Float?,
     onBaseThemeChange: (BaseTheme) -> Unit, onPrimaryChange: (Long) -> Unit,
     onSecondaryChange: (Long) -> Unit, onTertiaryChange: (Long) -> Unit,
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
@@ -37,6 +39,7 @@ internal fun ThemeContent(
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
     onFontFamilyChange: (AppFontFamily) -> Unit, onTextColorChange: (Long?) -> Unit,
+    onSurfaceTintChange: (Float?) -> Unit, onOutlineStrengthChange: (Float?) -> Unit,
     onGithubGreenChange: (Boolean) -> Unit,
     onPresetSelect: (ThemePreset) -> Unit,
     applyTheme: () -> Unit,
@@ -62,10 +65,10 @@ internal fun ThemeContent(
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = editBaseTheme == BaseTheme.DARK,
-                        onClick = { onBaseThemeChange(BaseTheme.DARK); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); applyTheme() },
+                        onClick = { onBaseThemeChange(BaseTheme.DARK); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); applyTheme() },
                         label = { Text("Dark", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.LIGHT,
-                        onClick = { onBaseThemeChange(BaseTheme.LIGHT); onPrimaryChange(ThemeDefaults.Light.primaryColor); onSecondaryChange(ThemeDefaults.Light.secondaryColor); onTertiaryChange(ThemeDefaults.Light.tertiaryColor); onBgColorChange(ThemeDefaults.Light.backgroundColor ?: 0xFFF4EFE3L); onSurfaceColorChange(ThemeDefaults.Light.surfaceColor ?: 0xFFFFFFFFL); onTextColorChange(ThemeDefaults.Light.textColor); applyTheme() },
+                        onClick = { onBaseThemeChange(BaseTheme.LIGHT); onPrimaryChange(ThemeDefaults.Light.primaryColor); onSecondaryChange(ThemeDefaults.Light.secondaryColor); onTertiaryChange(ThemeDefaults.Light.tertiaryColor); onBgColorChange(ThemeDefaults.Light.backgroundColor ?: 0xFFF4EFE3L); onSurfaceColorChange(ThemeDefaults.Light.surfaceColor ?: 0xFFFFFFFFL); onTextColorChange(ThemeDefaults.Light.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); applyTheme() },
                         label = { Text("Light", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.SYSTEM,
                         onClick = { onBaseThemeChange(BaseTheme.SYSTEM); applyTheme() },
@@ -150,6 +153,21 @@ internal fun ThemeContent(
                         Text("Corners: ", style = MaterialTheme.typography.bodySmall)
                         CornerRadius.entries.forEach { radius -> FilterChip(selected = editCornerRadius == radius, onClick = { onCornerRadiusChange(radius); applyTheme() }, label = { Text(radius.name.lowercase(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.padding(end = 4.dp)) }
                     }
+                    Spacer(Modifier.height(4.dp))
+                    val tintValue = editSurfaceTint ?: (if (isDark) 0.12f else 0.06f)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Surface tint", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
+                        Slider(value = tintValue, onValueChange = { onSurfaceTintChange(it); applyTheme() },
+                            modifier = Modifier.weight(1f), valueRange = 0f..0.3f)
+                        Text("${(tintValue * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                    }
+                    val outlineValue = editOutlineStrength ?: (if (isDark) 0.28f else 0.18f)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Outline", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
+                        Slider(value = outlineValue, onValueChange = { onOutlineStrengthChange(it); applyTheme() },
+                            modifier = Modifier.weight(1f), valueRange = 0f..0.5f)
+                        Text("${(outlineValue * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Typography", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -181,7 +199,7 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
                 }
@@ -229,9 +247,21 @@ private fun PresetCard(
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             }
             Spacer(Modifier.height(6.dp))
-            Text(preset.name, style = MaterialTheme.typography.labelMedium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Aa",
+                    fontFamily = when (preset.fontFamily ?: AppFontFamily.SANS) {
+                        AppFontFamily.SANS -> FontFamily.SansSerif
+                        AppFontFamily.SERIF -> FontFamily.Serif
+                        AppFontFamily.MONO -> FontFamily.Monospace
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) MaterialTheme.colorScheme.primary else v.primary
+                )
+                Text(preset.name, style = MaterialTheme.typography.labelMedium,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+            }
         }
     }
 }

@@ -27,6 +27,8 @@ data class ThemeConfig(
     val fontFamily: AppFontFamily = AppFontFamily.SANS,
     val textColor: Long? = null,
     val animationScale: Float = 1.0f,
+    val surfaceTint: Float? = null,
+    val outlineStrength: Float? = null,
     val githubGreenActivity: Boolean = false
 ) {
     val primary: Color get() = Color(primaryColor)
@@ -93,9 +95,39 @@ data class ThemePreset(
     val dark: ThemeConfig,
     val light: ThemeConfig,
     val cardStyle: CardStyle? = null,
-    val cornerRadius: CornerRadius? = null
+    val cornerRadius: CornerRadius? = null,
+    val fontFamily: AppFontFamily? = null,
+    val fontScale: Float? = null,
+    val animationScale: Float? = null,
+    val surfaceTint: Float? = null,
+    val outlineStrength: Float? = null
 ) {
     fun variant(isDark: Boolean): ThemeConfig = if (isDark) dark else light
+
+    /**
+     * Applies this preset on top of [current]. Colors come from the variant
+     * matching the current appearance; the non-color fields only override
+     * when the preset declares them.
+     */
+    fun applyTo(current: ThemeConfig, isDark: Boolean): ThemeConfig {
+        val v = variant(isDark)
+        return current.copy(
+            primaryColor = v.primaryColor,
+            secondaryColor = v.secondaryColor,
+            tertiaryColor = v.tertiaryColor,
+            errorColor = v.errorColor,
+            backgroundColor = v.backgroundColor,
+            surfaceColor = v.surfaceColor,
+            textColor = v.textColor,
+            cardStyle = cardStyle ?: current.cardStyle,
+            cornerRadius = cornerRadius ?: current.cornerRadius,
+            fontFamily = fontFamily ?: current.fontFamily,
+            fontScale = fontScale ?: current.fontScale,
+            animationScale = animationScale ?: current.animationScale,
+            surfaceTint = surfaceTint ?: current.surfaceTint,
+            outlineStrength = outlineStrength ?: current.outlineStrength,
+        )
+    }
 
     fun matches(primary: Long, secondary: Long, tertiary: Long, bg: Long, surface: Long, isDark: Boolean): Boolean {
         val v = variant(isDark)
@@ -109,6 +141,86 @@ object ThemePresets {
         name = "Nepenthe",
         dark = ThemeDefaults.Dark,
         light = ThemeDefaults.Light
+    )
+    val Glass = ThemePreset(
+        name = "Glass",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFBFEDE6, secondaryColor = 0xFF8FD1E8, tertiaryColor = 0xFFE8C98F,
+            errorColor = 0xFFF1A7A7, backgroundColor = 0xFF0B1B1F, surfaceColor = 0xFF12292E,
+            textColor = 0xFFEAF7F4
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF0E6B63, secondaryColor = 0xFF1E6F8C, tertiaryColor = 0xFF9A6A1E,
+            errorColor = 0xFFC62828, backgroundColor = 0xFFEFF7F7, surfaceColor = 0xFFFFFFFF,
+            textColor = 0xFF12221F
+        ),
+        cornerRadius = CornerRadius.LARGE,
+        fontScale = 1.0f,
+        surfaceTint = 0.16f,
+        outlineStrength = 0.32f
+    )
+    val Paper = ThemePreset(
+        name = "Paper",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFFD9C7A7, secondaryColor = 0xFFB8A27E, tertiaryColor = 0xFFC9A24B,
+            errorColor = 0xFFE0A0A0, backgroundColor = 0xFF1A1611, surfaceColor = 0xFF241E17,
+            textColor = 0xFFF0E7D8
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF5B4636, secondaryColor = 0xFF7A6248, tertiaryColor = 0xFF9A6A1E,
+            errorColor = 0xFFB3261E, backgroundColor = 0xFFF6F1E6, surfaceColor = 0xFFFFFDF7,
+            textColor = 0xFF2B241C
+        ),
+        cornerRadius = CornerRadius.SMALL,
+        fontFamily = AppFontFamily.SERIF,
+        fontScale = 1.04f,
+        animationScale = 0.75f,
+        surfaceTint = 0.08f,
+        outlineStrength = 0.22f
+    )
+    val Neon = ThemePreset(
+        name = "Neon",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFF66F2D6, secondaryColor = 0xFFC56CFF, tertiaryColor = 0xFFFF6FAE,
+            errorColor = 0xFFFF7A7A, backgroundColor = 0xFF05060A, surfaceColor = 0xFF0C0F1A,
+            textColor = 0xFFEAFBFF
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF00796B, secondaryColor = 0xFF8E24AA, tertiaryColor = 0xFFD81B60,
+            errorColor = 0xFFC62828, backgroundColor = 0xFFF5F7FF, surfaceColor = 0xFFFFFFFF,
+            textColor = 0xFF101418
+        ),
+        cornerRadius = CornerRadius.MEDIUM,
+        fontScale = 0.96f,
+        surfaceTint = 0.22f,
+        outlineStrength = 0.5f
+    )
+    val Terminal = ThemePreset(
+        name = "Terminal",
+        dark = ThemeConfig(
+            baseTheme = BaseTheme.DARK,
+            primaryColor = 0xFF7FE08A, secondaryColor = 0xFF4CC96B, tertiaryColor = 0xFFD8E36A,
+            errorColor = 0xFFFF8A80, backgroundColor = 0xFF030A04, surfaceColor = 0xFF07130A,
+            textColor = 0xFFCFF7D3
+        ),
+        light = ThemeConfig(
+            baseTheme = BaseTheme.LIGHT,
+            primaryColor = 0xFF1B5E20, secondaryColor = 0xFF2E7D32, tertiaryColor = 0xFF827717,
+            errorColor = 0xFFC62828, backgroundColor = 0xFFF2FBF2, surfaceColor = 0xFFFFFFFF,
+            textColor = 0xFF102412
+        ),
+        cornerRadius = CornerRadius.SMALL,
+        fontFamily = AppFontFamily.MONO,
+        fontScale = 0.95f,
+        animationScale = 0f,
+        surfaceTint = 0.06f,
+        outlineStrength = 0.35f
     )
     val Forest = ThemePreset(
         name = "Forest",
@@ -279,8 +391,8 @@ object ThemePresets {
     )
 
     val all: List<ThemePreset> = listOf(
-        Nepenthe, Slate, Forest, Ocean, Sunset, Ember, Midnight, Mono,
-        Meadow, Copper, Amethyst, Rose, DoseWiki
+        Nepenthe, Glass, Paper, Neon, Terminal, Slate, Forest, Ocean, Sunset, Ember,
+        Midnight, Mono, Meadow, Copper, Amethyst, Rose, DoseWiki
     )
 }
 
