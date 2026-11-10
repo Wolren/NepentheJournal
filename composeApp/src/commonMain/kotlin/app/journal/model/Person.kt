@@ -1,4 +1,5 @@
 package app.journal.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 enum class PersonRole { PARTICIPANT, SITTER, OBSERVER }
@@ -15,6 +16,7 @@ enum class PersonRole { PARTICIPANT, SITTER, OBSERVER }
  * Conflict: FIELD_LEVEL_MERGE. Individuals are device-local profile data and are
  * deliberately excluded from sync replication and tombstones.
  */
+@Immutable
 @Serializable
 data class Person(
     override val id: String,

@@ -1,8 +1,10 @@
 package app.journal.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 enum class InteractionRisk { DANGEROUS, UNSAFE, UNCERTAIN, LOW, UNKNOWN }
 
+@Immutable
 @Serializable
 data class Interaction(
     override val id: String,

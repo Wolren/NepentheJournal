@@ -26,7 +26,9 @@ import app.journal.ui.components.userMessage
 import app.journal.util.FilePicker
 import app.journal.util.PlatformFile
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * dose.wiki export dialog. The app is offline, so this only writes the
@@ -109,7 +111,7 @@ fun DoseWikiExportDialog(
                 onClick = {
                     scope.launch {
                         try {
-                            val report = preview()
+                            val report = withContext(Dispatchers.Default) { preview() }
                             val slug = session.title.trim().lowercase()
                                 .replace(Regex("[^a-z0-9]+"), "-").trim('-')
                                 .ifEmpty { "untitled-report" }
@@ -117,7 +119,8 @@ fun DoseWikiExportDialog(
                                 "trip-report-$slug.json", "JSON files", listOf("json")
                             )
                             if (path != null) {
-                                PlatformFile.writeText(path, report.toJsonString())
+                                val json = withContext(Dispatchers.Default) { report.toJsonString() }
+                                withContext(Dispatchers.Default) { PlatformFile.writeText(path, json) }
                                 onStatus("Trip report exported")
                             }
                         } catch (e: Exception) {

@@ -24,7 +24,9 @@ import app.journal.data.SearchResult
 import app.journal.model.Note
 import app.journal.ui.components.DesktopScrollbar
 import app.journal.ui.components.InteractionColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +45,9 @@ fun SearchOverlay(
     LaunchedEffect(query) {
         if (query.length >= 2) {
             delay(200)
-            results = repo.search(query)
+            // First keystroke can rebuild the index; keep that off the frame thread.
+            val found = withContext(Dispatchers.Default) { repo.search(query) }
+            results = found
             hasSearched = true
         } else {
             results = emptyList()

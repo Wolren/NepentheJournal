@@ -1,6 +1,8 @@
 package app.journal.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class ConflictSibling(
     val body: String,
@@ -12,6 +14,7 @@ data class ConflictSibling(
  * Conflict: SIBLING_AND_FLAG
  * UI must render a conflict banner when conflictSiblings is non-empty.
  */
+@Immutable
 @Serializable
 data class Note(
     override val id: String,

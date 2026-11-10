@@ -27,6 +27,9 @@ import app.journal.util.formatDateShort
 import app.journal.ui.session.timeline.*
 import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.isDarkTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -111,9 +114,13 @@ fun SessionTimelineScreen(
             if (vaultPath.isNotBlank()) {
                 var exportStatus by remember { mutableStateOf<String?>(null) }
                 IconButton(onClick = {
-                    val config = app.journal.export.obsidian.ObsidianExportConfig(vaultPath = vaultPath, subfolder = subfolder)
-                    val path = app.journal.export.obsidian.ObsidianExportManager.exportSession(repo, sessionId, config)
-                    exportStatus = if (path != null) "Exported" else "Export failed"
+                    exportScope.launch {
+                        val config = app.journal.export.obsidian.ObsidianExportConfig(vaultPath = vaultPath, subfolder = subfolder)
+                        val path = withContext(Dispatchers.Default) {
+                            app.journal.export.obsidian.ObsidianExportManager.exportSession(repo, sessionId, config)
+                        }
+                        exportStatus = if (path != null) "Exported" else "Export failed"
+                    }
                 }) {
                     Icon(Icons.Default.MenuBook, contentDescription = "Export to Obsidian",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant)

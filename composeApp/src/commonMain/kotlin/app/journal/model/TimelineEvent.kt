@@ -1,4 +1,5 @@
 package app.journal.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 enum class TimelineEventType {
@@ -6,6 +7,7 @@ enum class TimelineEventType {
     OBSERVATION, SAFETY_CHECK, SIDE_EFFECT, EMERGENCY, NOTE
 }
 
+@Immutable
 @Serializable
 data class TimelineEvent(
     override val id: String,

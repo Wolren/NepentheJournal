@@ -18,7 +18,9 @@ import app.journal.ui.components.AppOutlinedButton
 import app.journal.ui.components.AppTonalButton
 import app.journal.util.FilePicker
 import app.journal.util.defaultVaultPath
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ObsidianSettingsCard(
@@ -238,7 +240,9 @@ fun ObsidianSettingsCard(
                                     autoExport = autoExport,
                                     fileOrganization = fileOrg
                                 )
-                                val result = ObsidianExportManager.exportAllSessions(repo, config)
+                                val result = withContext(Dispatchers.Default) {
+                                    ObsidianExportManager.exportAllSessions(repo, config)
+                                }
                                 isExporting = false
                                 statusIsError = result.errors.isNotEmpty()
                                 statusText = if (result.errors.isEmpty())

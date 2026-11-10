@@ -1,6 +1,8 @@
 package app.journal.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class Effect(
     override val id: String,

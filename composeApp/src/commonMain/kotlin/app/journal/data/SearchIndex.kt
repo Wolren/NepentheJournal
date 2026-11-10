@@ -1,5 +1,6 @@
 package app.journal.data
 
+import androidx.compose.runtime.Immutable
 import app.journal.model.*
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
@@ -10,6 +11,7 @@ import kotlinx.datetime.toLocalDateTime
 /**
  * A search result pointing to an entity in the journal.
  */
+@Immutable
 data class SearchResult(
     val entityType: String,
     val entityId: String,

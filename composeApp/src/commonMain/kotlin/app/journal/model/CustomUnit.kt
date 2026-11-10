@@ -1,11 +1,13 @@
 package app.journal.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /**
  * Custom dosing unit defined by the user.
  * Enables flexible units beyond mg/µg: drops, puffs, tabs, sprays, etc.
  */
+@Immutable
 @Serializable
 data class CustomUnit(
     override val id: String,
