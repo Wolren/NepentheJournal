@@ -54,7 +54,6 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     val substanceNameMap = remember(allSubstances) { allSubstances.associate { it.id to it.name } }
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
-    var substanceDropdownExpanded by remember { mutableStateOf(false) }
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val filterSubstanceIds by viewModel.filterSubstanceIds.collectAsState()
@@ -67,92 +66,46 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     CenteredContent(maxWidth = 1100.dp) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Box {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.searchQuery.value = it },
-                    placeholder = { Text("Search sessions...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.searchQuery.value = "" }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Clear")
-                                }
-                            }
-                            IconButton(onClick = { substanceDropdownExpanded = true }) {
-                                Icon(
-                                    Icons.Default.Label,
-                                    contentDescription = "Filter by substance",
-                                    tint = if (filterSubstanceIds.isNotEmpty()) MaterialTheme.colorScheme.primary
-                                           else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                DropdownMenu(
-                    expanded = substanceDropdownExpanded,
-                    onDismissRequest = { substanceDropdownExpanded = false },
-                    offset = DpOffset(0.dp, 0.dp)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Clear filters", fontWeight = if (filterSubstanceIds.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
-                        onClick = { viewModel.filterSubstanceIds.value = emptySet(); substanceDropdownExpanded = false },
-                        leadingIcon = {
-                            if (filterSubstanceIds.isEmpty()) {
-                                Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
-                                }
-                            } else Box(Modifier.size(18.dp))
-                        }
-                    )
-                    if (allSessionSubstances.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No substances used yet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = { substanceDropdownExpanded = false },
-                            enabled = false
-                        )
-                    } else {
-                        allSessionSubstances.forEach { item ->
-                            val isSelected = item.id in filterSubstanceIds
-                            DropdownMenuItem(
-                                text = { Text(item.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                                onClick = {
-                                    viewModel.toggleSubstance(item.id)
-                                },
-                                leadingIcon = {
-                                    if (isSelected) {
-                                        Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
-                                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
-                                        }
-                                    } else Box(Modifier.size(18.dp))
-                                }
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Done", fontWeight = FontWeight.Bold) },
-                            onClick = { substanceDropdownExpanded = false },
-                            leadingIcon = { Box(Modifier.size(18.dp)) }
+            val showEmptyState = rememberEmptyStateVisible(isEmpty = sessions.isEmpty())
+            val countText = "${sessions.size} session${if (sessions.size != 1) "s" else ""}"
+            val showCount = sessions.isNotEmpty() || showEmptyState
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 720.dp) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (showCount) {
+                            Text(countText, style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f))
+                        } else Spacer(Modifier.weight(1f))
+                        SessionSearchBox(
+                            searchQuery = searchQuery,
+                            onSearchChange = { viewModel.searchQuery.value = it },
+                            allSessionSubstances = allSessionSubstances,
+                            filterSubstanceIds = filterSubstanceIds,
+                            onToggleSubstance = { viewModel.toggleSubstance(it) },
+                            onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
+                            modifier = Modifier.width(380.dp),
                         )
                     }
+                } else {
+                    Column {
+                        SessionSearchBox(
+                            searchQuery = searchQuery,
+                            onSearchChange = { viewModel.searchQuery.value = it },
+                            allSessionSubstances = allSessionSubstances,
+                            filterSubstanceIds = filterSubstanceIds,
+                            onToggleSubstance = { viewModel.toggleSubstance(it) },
+                            onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (showCount) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(countText, style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            val showEmptyState = rememberEmptyStateVisible(isEmpty = sessions.isEmpty())
-
-            if (sessions.isNotEmpty() || showEmptyState) {
-                Text(
-                    text = "${sessions.size} session${if (sessions.size != 1) "s" else ""}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
             Spacer(Modifier.height(4.dp))
@@ -333,6 +286,92 @@ object SessionListScreen {
                         modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionSearchBox(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    allSessionSubstances: List<SubstanceFilterItem>,
+    filterSubstanceIds: Set<String>,
+    onToggleSubstance: (String) -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchChange,
+            placeholder = { Text("Search sessions...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearchChange("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            Icons.Default.Label,
+                            contentDescription = "Filter by substance",
+                            tint = if (filterSubstanceIds.isNotEmpty()) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            offset = DpOffset(0.dp, 0.dp)
+        ) {
+            DropdownMenuItem(
+                text = { Text("Clear filters", fontWeight = if (filterSubstanceIds.isEmpty()) FontWeight.Bold else FontWeight.Normal) },
+                onClick = { onClearFilters(); expanded = false },
+                leadingIcon = {
+                    if (filterSubstanceIds.isEmpty()) {
+                        Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    } else Box(Modifier.size(18.dp))
+                }
+            )
+            if (allSessionSubstances.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No substances used yet", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = { expanded = false },
+                    enabled = false
+                )
+            } else {
+                allSessionSubstances.forEach { item ->
+                    val isSelected = item.id in filterSubstanceIds
+                    DropdownMenuItem(
+                        text = { Text(item.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = { onToggleSubstance(item.id) },
+                        leadingIcon = {
+                            if (isSelected) {
+                                Box(Modifier.size(18.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))) {
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp).align(Alignment.Center), tint = MaterialTheme.colorScheme.onPrimary)
+                                }
+                            } else Box(Modifier.size(18.dp))
+                        }
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Done", fontWeight = FontWeight.Bold) },
+                    onClick = { expanded = false },
+                    leadingIcon = { Box(Modifier.size(18.dp)) }
+                )
             }
         }
     }
