@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.ui.components.*
@@ -133,6 +134,7 @@ fun DoseEditDialog(
 
     fun buildDose(): Dose? {
         val amt = amount.toDoubleOrNull() ?: return null
+        if (!amt.isFinite() || amt < 0.0) return null
         if (selectedSubstanceId.isBlank()) return null
         val now = currentTimeMillis()
         val customUnit = customUnits.find { it.substanceId == selectedSubstanceId && it.name == unit }
@@ -146,7 +148,9 @@ fun DoseEditDialog(
             timestamp = doseTimestamp,
             redosing = isRedose,
             isDoseEstimate = isEstimate,
-            estimatedDoseStandardDeviation = if (isEstimate) estimateStddev.toDoubleOrNull() else null,
+            estimatedDoseStandardDeviation = if (isEstimate) {
+                estimateStddev.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 }
+            } else null,
             createdAt = initialDose?.createdAt ?: now,
             updatedAt = now,
             deviceOrigin = "desktop",
@@ -154,6 +158,11 @@ fun DoseEditDialog(
             customUnitId = customUnit?.id
         )
     }
+
+    val parsedAmount = amount.toDoubleOrNull()
+    val amountValid = parsedAmount != null && parsedAmount.isFinite() && parsedAmount >= 0.0
+    val stddevValid = !isEstimate || estimateStddev.isBlank() ||
+        estimateStddev.toDoubleOrNull()?.let { it.isFinite() && it >= 0.0 } == true
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -193,7 +202,7 @@ fun DoseEditDialog(
                                     modifier = Modifier.size(20.dp))
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("dose-substance"),
                         singleLine = true
                     )
                 }
@@ -267,7 +276,7 @@ fun DoseEditDialog(
                             onValueChange = { amount = it },
                             label = { Text("Amount") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("dose-amount")
                         )
                         ExposedDropdownMenuBox(
                             expanded = expandedUnit,
@@ -414,7 +423,8 @@ fun DoseEditDialog(
                     val dose = buildDose()
                     if (dose != null) onSave(dose)
                 },
-                enabled = selectedSubstanceId.isNotBlank() && amount.toDoubleOrNull() != null
+                enabled = selectedSubstanceId.isNotBlank() && amountValid && stddevValid,
+                modifier = Modifier.testTag("dose-save")
             ) { Text("Save") }
         },
         dismissButton = {

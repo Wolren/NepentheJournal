@@ -147,6 +147,9 @@ class SessionEditorViewModel(
      * The caller navigates back after this returns.
      */
     fun save() {
+        val endTimeValue = endTime.value
+        // A session cannot end before it starts; the editor disables Save, this is the safety net.
+        if (endTimeValue != null && endTimeValue <= startTime.value) return
         val now = currentTimeMillis()
         val sessionId = sessionToEdit?.id
             ?: "session:${now}_${Random.nextInt(0, 0x10000).toString(16)}"

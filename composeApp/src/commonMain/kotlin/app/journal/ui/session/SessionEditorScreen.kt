@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.journal.model.rules.ActiveInteractionResult
 import app.journal.data.IJournalRepository
@@ -156,7 +157,8 @@ fun SessionEditorScreen(
             AppButton(onClick = {
                 viewModel.save()
                 onBack()
-            }) { Text("Save") }
+            }, enabled = endTime?.let { it <= startTime } != true,
+                modifier = Modifier.testTag("session-save")) { Text("Save") }
         }
     ) {
         item {
@@ -166,7 +168,7 @@ fun SessionEditorScreen(
                 label = { Text("Title") },
                 placeholder = { Text("Session title...") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag("session-title")
             )
         }
 

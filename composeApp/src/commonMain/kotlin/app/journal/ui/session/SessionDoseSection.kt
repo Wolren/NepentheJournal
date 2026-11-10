@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.rules.ActiveInteractionResult
@@ -40,7 +41,7 @@ fun SessionDoseSection(
         verticalAlignment = Alignment.CenterVertically
     ) {
         SectionHeader("Substances & Doses")
-        AppTonalButton(onClick = onAddDose) {
+        AppTonalButton(onClick = onAddDose, modifier = Modifier.testTag("session-add-dose")) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text("Add Dose")
