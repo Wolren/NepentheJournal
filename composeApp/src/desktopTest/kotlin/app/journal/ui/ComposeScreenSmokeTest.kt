@@ -1,12 +1,16 @@
 package app.journal.ui
 
 import app.journal.data.JournalRepository
+import app.journal.model.Medication
+import app.journal.model.MedicationPreset
 import app.journal.model.Session
 import app.journal.sync.SyncTransport
 import app.journal.ui.components.EMPTY_STATE_DELAY_MS
 import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
+import app.journal.ui.settings.detail.MedicationsSettingsContent
+import androidx.compose.material3.MaterialTheme
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
@@ -128,6 +132,40 @@ class ComposeScreenSmokeTest {
             assertTrue(
                 onAllNodesWithText("Manage").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SettingsScreen must render the theme manage action"
+            )
+        }
+    }
+
+    @Test
+    fun medicationCardRendersFromTheRepository() = runBlocking {
+        runComposeUiTest {
+            val stamp = 1_700_000_000_000L
+            val repo = JournalRepository()
+            repo.upsertMedication(
+                Medication(
+                    id = "medication:1",
+                    createdAt = stamp,
+                    updatedAt = stamp,
+                    deviceOrigin = "test",
+                    name = "Sertraline",
+                    presetId = MedicationPreset.SSRI.id,
+                    startedAt = stamp,
+                )
+            )
+            setContent {
+                MaterialTheme {
+                    MedicationsSettingsContent(repo)
+                }
+            }
+            waitForIdle()
+
+            assertTrue(
+                onAllNodesWithText("Medications").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the medication card must render"
+            )
+            assertTrue(
+                onAllNodesWithText("1 active").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the card count must follow the repository"
             )
         }
     }

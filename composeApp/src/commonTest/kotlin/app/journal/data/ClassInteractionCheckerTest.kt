@@ -154,4 +154,18 @@ class ClassInteractionCheckerTest {
             "the specific rule must come before opioid + depressant, got: ${result.first().message}"
         )
     }
+
+    @Test
+    fun twoSerotonergicDrugsAreCaution() {
+        val result = ClassInteractionChecker.check(listOf(
+            substance("cid:1", "Sertraline", listOf("ssri", "serotonergic")),
+            substance("cid:2", "Tramadol", listOf("opioid", "serotonergic"))
+        ))
+        assertEquals(1, result.size)
+        assertEquals(InteractionWarningLevel.CAUTION, result.first().level)
+        assertTrue(
+            result.first().message.startsWith("Two serotonergic drugs"),
+            "SSRI + tramadol must report the serotonergic pair, got: ${result.first().message}"
+        )
+    }
 }

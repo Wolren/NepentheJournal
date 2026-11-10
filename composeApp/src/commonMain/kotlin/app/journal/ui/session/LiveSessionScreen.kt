@@ -43,14 +43,23 @@ fun LiveSessionScreen(
     val allInteractions by repo.interactions.collectAsState()
     val allMedications by repo.medications.collectAsState()
 
+    var minuteTick by remember { mutableStateOf(currentTimeMillis() / 60_000) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            minuteTick = currentTimeMillis() / 60_000
+        }
+    }
+
     val activeInteractionResult = remember(
-        sessionDoses, allMedications, allDoses, allSubstances, allInteractions
+        sessionDoses, allMedications, allDoses, allSubstances, allInteractions, minuteTick
     ) {
         ActiveInteractionCheck.run(
             sessionDoses = sessionDoses,
             medications = allMedications,
             allDoses = allDoses,
             ownDoseIds = sessionDoses.map { it.id }.toSet(),
+            excludeSessionId = live.id,
             substancesById = allSubstances.associateBy { it.id },
             interactions = allInteractions,
         )

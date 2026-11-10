@@ -5,6 +5,7 @@ import app.journal.data.JournalRepository
 import app.journal.data.JournalSnapshot
 import app.journal.log.Log
 import app.journal.model.Dose
+import app.journal.model.Medication
 import app.journal.model.Session
 import app.journal.serde.AppJson
 import app.journal.sync.EntityTimePolicy
@@ -26,6 +27,9 @@ object ExportImport {
     const val MAX_IMPORT_SESSIONS = 5000
 
     const val MAX_IMPORT_DOSES_PER_SESSION = 500
+
+    /** A real medication list is short; the cap bounds import-driven UI and pair cost. */
+    const val MAX_IMPORT_MEDICATIONS = 200
 
     const val MAX_IMPORT_FIELD_LEN = 65536
     const val MAX_IMPORT_TITLE_LEN = 500
@@ -57,6 +61,7 @@ object ExportImport {
         val doses: Int = 0,
         val notes: Int = 0,
         val timelineEvents: Int = 0,
+        val medications: Int = 0,
         val error: String? = null
     )
 
@@ -95,7 +100,7 @@ object ExportImport {
     /**
      * Exports the full journal as a pretty-printed JSON string.
      * Includes all entities: sessions, substances, doses, notes, timeline events,
-     * interactions, effects, custom units, and settings.
+     * interactions, effects, custom units, individuals, medications, and settings.
      *
      * Format: a JournalSnapshot (backup format). Restore it with
      * [importFullJournal]; the session-only [importSessions] path expects a
@@ -181,10 +186,11 @@ object ExportImport {
      * per-session/per-dose sanity checks (invalid records are dropped, not
      * applied). The snapshot's version is checked before anything is applied:
      * files newer than [JournalSnapshot.CURRENT_VERSION] are rejected with a
-     * clear error. Sessions, doses, notes, events, the substance library,
-     * tombstones, and preferences then apply through [AppJson.apply], the same
-     * path a disk load uses (blind upsert by ID; entities absent from the
-     * backup stay untouched).
+     * clear error. Sessions, doses, notes, events, individuals, medications, the
+     * substance library, tombstones, and preferences then apply through
+     * [AppJson.apply], the same path a disk load uses (blind upsert by ID;
+     * entities absent from the backup stay untouched). Invalid medication
+     * records are dropped, and the list is capped by [MAX_IMPORT_MEDICATIONS].
      */
     fun importFullJournal(repo: IJournalRepository, content: String): FullJournalImportResult {
         if (content.length > MAX_IMPORT_BYTES) {
@@ -207,6 +213,11 @@ object ExportImport {
         if (snapshot.sessions.size > MAX_IMPORT_SESSIONS) {
             return FullJournalImportResult(error = "Too many sessions in backup (max $MAX_IMPORT_SESSIONS)")
         }
+        if (snapshot.medications.size > MAX_IMPORT_MEDICATIONS) {
+            return FullJournalImportResult(
+                error = "Too many medications in backup (max $MAX_IMPORT_MEDICATIONS)"
+            )
+        }
 
         val maxTimestamp = currentTimeMillis() + TIMESTAMP_FUTURE_MARGIN_MS
         val dosesBySession = snapshot.doses.groupBy { it.sessionId }
@@ -220,6 +231,7 @@ object ExportImport {
         }
         val keptNotes = snapshot.notes
         val keptEvents = snapshot.timelineEvents
+        val keptMedications = snapshot.medications.filter { validateMedication(it, maxTimestamp).isEmpty() }
 
         AppJson.apply(
             repo,
@@ -227,7 +239,8 @@ object ExportImport {
                 sessions = keptSessions,
                 doses = keptDoses,
                 notes = keptNotes,
-                timelineEvents = keptEvents
+                timelineEvents = keptEvents,
+                medications = keptMedications
             )
         )
         return FullJournalImportResult(
@@ -235,7 +248,8 @@ object ExportImport {
             substances = snapshot.substances.size,
             doses = keptDoses.size,
             notes = keptNotes.size,
-            timelineEvents = keptEvents.size
+            timelineEvents = keptEvents.size,
+            medications = keptMedications.size
         )
     }
 
@@ -311,6 +325,35 @@ object ExportImport {
             errors.add("amount is not finite: ${dose.amount}")
         } else if (dose.amount < 0.0 || dose.amount > 1_000_000.0) {
             errors.add("amount out of range: ${dose.amount}")
+        }
+        return errors
+    }
+
+    private fun validateMedication(medication: Medication, maxTimestamp: Long): List<String> {
+        val errors = mutableListOf<String>()
+        if (!isValidId(medication.id) || medication.id.length > MAX_IMPORT_ID_LEN) {
+            errors.add("has invalid ID '${medication.id}'")
+        }
+        if (medication.name.length > Medication.MAX_NAME_LENGTH) {
+            errors.add("name too long")
+        }
+        if ((medication.doseLabel?.length ?: 0) > MAX_IMPORT_FIELD_LEN) {
+            errors.add("dose label too long")
+        }
+        if ((medication.notes?.length ?: 0) > MAX_IMPORT_FIELD_LEN) {
+            errors.add("notes too long")
+        }
+        if (medication.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("createdAt ${medication.createdAt} out of valid range")
+        }
+        if (medication.updatedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("updatedAt ${medication.updatedAt} out of valid range")
+        }
+        if (medication.startedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("startedAt ${medication.startedAt} out of valid range")
+        }
+        if (medication.endedAt != null && medication.endedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("endedAt ${medication.endedAt} out of valid range")
         }
         return errors
     }

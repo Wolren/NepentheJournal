@@ -1,9 +1,11 @@
 package app.journal.data
 
+import app.journal.export.ExportImport
 import app.journal.model.Medication
 import app.journal.model.MedicationPreset
 import app.journal.serde.AppJson
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.io.File
 import kotlin.test.*
 
@@ -133,5 +135,43 @@ class MedicationPersistenceTest {
 
         assertTrue(repo.medications.value.isEmpty())
         assertNull(repo.getMedication("medication:1"))
+    }
+
+    @Test
+    fun fullJournalImportRejectsAnOversizedMedicationList() {
+        val repo = JournalRepository()
+        val medications = (1..ExportImport.MAX_IMPORT_MEDICATIONS + 1).map { index ->
+            medication(id = "medication:$index", name = "Med $index")
+        }
+        val text = AppJson.json.encodeToString(
+            JournalSnapshot(savedAt = 1_700_000_000_000L, medications = medications)
+        )
+
+        val result = ExportImport.importFullJournal(repo, text)
+
+        assertEquals(
+            "Too many medications in backup (max ${ExportImport.MAX_IMPORT_MEDICATIONS})",
+            result.error
+        )
+        assertTrue(repo.medications.value.isEmpty())
+    }
+
+    @Test
+    fun fullJournalImportDropsInvalidMedicationRecords() {
+        val stamp = 1_700_000_000_000L
+        val valid = medication().copy(createdAt = stamp, updatedAt = stamp, startedAt = stamp)
+        val badTime = valid.copy(id = "medication:bad-time", startedAt = 0L)
+        val badName = valid.copy(
+            id = "medication:bad-name",
+            name = "x".repeat(Medication.MAX_NAME_LENGTH + 1)
+        )
+        val text = AppJson.json.encodeToString(
+            JournalSnapshot(savedAt = stamp, medications = listOf(valid, badTime, badName))
+        )
+
+        val result = ExportImport.importFullJournal(JournalRepository(), text)
+
+        assertNull(result.error)
+        assertEquals(1, result.medications)
     }
 }

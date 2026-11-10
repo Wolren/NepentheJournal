@@ -152,5 +152,13 @@ class DataInitializerTest {
         val alprazolam = assertNotNull(byName["alprazolam"], "the seed ships Alprazolam")
         assertTrue("benzodiazepine" in alprazolam.interactionClasses,
             "Alprazolam must carry the benzodiazepine class, got ${alprazolam.interactionClasses}")
+
+        val ayahuasca = assertNotNull(byName["ayahuasca"], "the seed ships Ayahuasca")
+        assertTrue("maoi" in ayahuasca.interactionClasses,
+            "Ayahuasca must carry the maoi class, got ${ayahuasca.interactionClasses}")
+
+        val harmala = assertNotNull(byName["peganum harmala"], "the seed ships Peganum harmala")
+        assertTrue("maoi" in harmala.interactionClasses,
+            "Peganum harmala must carry the maoi class, got ${harmala.interactionClasses}")
     }
 }

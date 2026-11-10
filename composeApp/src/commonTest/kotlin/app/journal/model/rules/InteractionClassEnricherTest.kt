@@ -1,5 +1,6 @@
 package app.journal.model.rules
 
+import app.journal.model.MedicationPreset
 import app.journal.model.Substance
 import kotlin.test.*
 
@@ -52,6 +53,54 @@ class InteractionClassEnricherTest {
     @Test
     fun moclobemideGetsMaoiClass() {
         assertTrue("maoi" in InteractionClassEnricher.enrich(substance("Moclobemide")).interactionClasses)
+    }
+
+    @Test
+    fun maoiPlantsGetMaoiClass() {
+        listOf("Ayahuasca", "Banisteriopsis caapi", "Peganum harmala").forEach { plant ->
+            assertTrue(
+                "maoi" in InteractionClassEnricher.enrich(substance(plant)).interactionClasses,
+                "$plant must carry the maoi class"
+            )
+        }
+    }
+
+    @Test
+    fun nonBenzodiazepineLabelGetsNoBenzodiazepineClass() {
+        val enriched = InteractionClassEnricher.enrich(
+            substance("Zolpidem", listOf("sedative", "non-benzodiazepine hypnotic"))
+        )
+        assertFalse("benzodiazepine" in enriched.interactionClasses)
+    }
+
+    @Test
+    fun suggestPresetMapsKnownNames() {
+        assertEquals(
+            MedicationPreset.SSRI,
+            InteractionClassEnricher.suggestPreset("Sertraline")
+        )
+        assertEquals(
+            MedicationPreset.LITHIUM,
+            InteractionClassEnricher.suggestPreset("lithium carbonate")
+        )
+        assertEquals(
+            MedicationPreset.MAOI,
+            InteractionClassEnricher.suggestPreset("Phenelzine")
+        )
+        assertEquals(
+            MedicationPreset.BENZODIAZEPINE,
+            InteractionClassEnricher.suggestPreset("Xanax")
+        )
+        assertEquals(
+            MedicationPreset.SEROTONERGIC,
+            InteractionClassEnricher.suggestPreset("Tramadol")
+        )
+    }
+
+    @Test
+    fun suggestPresetReturnsNullForUnknownNames() {
+        assertNull(InteractionClassEnricher.suggestPreset("Vitamin D"))
+        assertNull(InteractionClassEnricher.suggestPreset(""))
     }
 
     @Test

@@ -181,6 +181,7 @@ What this does not cover: tapping through screens. `simctl` has no tap verb, and
 
 - **Android runtime coverage runs in CI.** A dedicated job boots an emulator and runs the instrumented smoke suite: Activity start, the first frame, the tabs. Android still requires manual side-loading.
 - **LAN-only sync.** P2P sync works between devices on the same local network. No remote relay or cloud tunnel.
+- **The medications list is device-local.** It does not sync between devices, like each individual's profile.
 - **Single-user.** The app has no multi-account or profile system. All data belongs to one user per install.
 - **At-rest encryption uses a device-held key.** The journal, its backups and its temp file are AES-256-GCM sealed under a key held by the Android Keystore, the iOS Keychain, or a 0600 key file beside the journal on desktop. It protects a copied file, a pulled backup, or a synced folder; it does not protect against a compromised device, and the key has no passphrase. Exports stay plaintext so other tools can read them.
 - **Reference data is bundled.** DoseWiki and the seed are pre-processed at build time, not live-fetched. Updates ship with releases.

@@ -116,6 +116,7 @@ class SessionEditorViewModel(
                 medications = medications,
                 allDoses = allDoses,
                 ownDoseIds = doses.map { it.id }.toSet(),
+                excludeSessionId = sessionToEdit?.id,
                 substancesById = substances.associateBy { it.id },
                 interactions = interactions,
             )

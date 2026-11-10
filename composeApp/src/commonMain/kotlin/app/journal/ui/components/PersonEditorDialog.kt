@@ -115,8 +115,11 @@ internal fun PersonEditorDialog(
                 OutlinedTextField(
                     value = medications,
                     onValueChange = { medications = it },
-                    label = { Text("Medications") },
+                    label = { Text("Medications (trip report)") },
                     placeholder = { Text("None") },
+                    supportingText = {
+                        Text("Used only in the trip-report export. Interaction checks read the Medications card in Settings.")
+                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(

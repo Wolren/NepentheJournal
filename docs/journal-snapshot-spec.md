@@ -1,7 +1,7 @@
 # JournalSnapshot format specification
 
-**Schema version:** 5  
-**File:** `schemas/journal-snapshot-v5.json` (JSON Schema draft 2020-12)  
+**Documented shape:** 5 (the field tables below describe v5)
+**Current schema:** 8, `schemas/journal-snapshot-v8.json` (JSON Schema draft 2020-12)  
 **Seed data:** `scripts/seed.json` (version 3, being migrated to 5)  
 **License:** GPLv3 (the schema spec itself is CC0)
 
@@ -29,11 +29,13 @@ The format is designed to be:
 | 3       | CID-based substance IDs, `oldId` migration field, multi-source pharmacology blocks (ChEMBL, IUPHAR, PDSP, BindingDB). |
 | 4       | Obsidian export settings (`obsidianVaultPath`, `obsidianAutoExport`, `obsidianSubfolder`, `obsidianFileOrganization`). |
 | 5       | Added `showSessionsTrendChart`, `useShulginRating`, `useSubstanceColors` to snapshot settings. Schema published as standalone JSON Schema. |
+| 7       | Added persons, tombstones, `ratingScaleMode`, `welcomeCompleted` and `seedFingerprint`. Version 6 was skipped; no schema file ships for it. |
+| 8       | Added `medications`: device-local standing medications for the interaction check. |
 
 **Migration policy:**
 - The app loads any version >= 1 with `ignoreUnknownKeys = true`.
-- On write, the app always writes `CURRENT_VERSION` (currently 5).
-- Unknown fields are preserved during load-write cycles when using JournalJson.
+- On write, the app always writes `CURRENT_VERSION` (currently 8).
+- Fields unknown to the running build are ignored on load and are not written back. Do not run an older build against a newer journal.
 - There is no automated data migration between versions - each version adds fields that are optional (`null` or `default` values are acceptable).
 
 ---

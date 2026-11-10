@@ -60,6 +60,8 @@ object ClassInteractionChecker {
             "SSRI + serotonin releaser (e.g. MDMA): serotonin syndrome risk, and SSRIs blunt the effect."),
         Rule("serotonergic", "serotonin_releaser", InteractionWarningLevel.CAUTION,
             "Serotonergic drug + serotonin releaser: serotonin syndrome risk. The serotonergic drug can also blunt the effect."),
+        Rule("serotonergic", "serotonergic", InteractionWarningLevel.CAUTION,
+            "Two serotonergic drugs: serotonin syndrome risk, especially with SSRIs, SNRIs, tramadol and dextromethorphan."),
         Rule("serotonin_releaser", "serotonin_releaser", InteractionWarningLevel.CAUTION,
             "Two serotonin releasers: additive serotonin syndrome and neurotoxicity risk."),
         Rule("stimulant", "stimulant", InteractionWarningLevel.CAUTION,

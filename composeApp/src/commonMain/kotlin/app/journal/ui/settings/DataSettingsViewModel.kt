@@ -157,7 +157,8 @@ class DataSettingsViewModel(
                     dataStatus.value =
                         if (result.error != null) "Import failed: ${result.error}"
                         else "Imported full journal backup: ${result.sessions} sessions, " +
-                            "${result.substances} substances, ${result.doses} doses"
+                            "${result.substances} substances, ${result.doses} doses, " +
+                            "${result.medications} medications"
                 } catch (e: Exception) {
                     dataStatus.value = userMessage("Data", "Import failed", e)
                 }

@@ -2,6 +2,8 @@ package app.journal.ui.settings.detail
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -12,10 +14,13 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.model.Medication
 import app.journal.model.MedicationPreset
+import app.journal.model.rules.InteractionClassEnricher
 import app.journal.ui.components.AppTextButton
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import app.journal.util.platformDeviceOrigin
+
+private const val MAX_RENDERED_MEDICATIONS = 200
 
 /**
  * Standing medications: entries that stay in the interaction check while active,
@@ -76,7 +81,8 @@ fun MedicationsSettingsContent(repo: IJournalRepository) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
-                ordered.forEachIndexed { index, medication ->
+                val shown = ordered.take(MAX_RENDERED_MEDICATIONS)
+                shown.forEachIndexed { index, medication ->
                     MedicationRow(
                         medication = medication,
                         now = now,
@@ -93,7 +99,15 @@ fun MedicationsSettingsContent(repo: IJournalRepository) {
                         },
                         onDelete = { repo.deleteMedication(medication.id) },
                     )
-                    if (index < ordered.size - 1) HorizontalDivider()
+                    if (index < shown.size - 1) HorizontalDivider()
+                }
+                if (ordered.size > shown.size) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Only the first ${shown.size} medications are shown.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(
@@ -180,15 +194,28 @@ private fun MedicationEditorDialog(
     var name by remember(initial?.id) { mutableStateOf(initial?.name ?: "") }
     var presetId by remember(initial?.id) { mutableStateOf(initial?.presetId) }
     var doseLabel by remember(initial?.id) { mutableStateOf(initial?.doseLabel ?: "") }
+    var notes by remember(initial?.id) { mutableStateOf(initial?.notes ?: "") }
     var presetExpanded by remember { mutableStateOf(false) }
-    val preset = presetId?.let { MedicationPreset.fromId(it) }
-    val canSave = name.isNotBlank() && preset != null
+    val selected = presetId?.let { MedicationPreset.fromId(it) }
+    val suggested = remember(name) { InteractionClassEnricher.suggestPreset(name) }
+    val effective = when {
+        selected == null -> null
+        selected == MedicationPreset.OTHER && suggested != null -> suggested
+        else -> selected
+    }
+    val nameTooLong = name.trim().length > Medication.MAX_NAME_LENGTH
+    val canSave = name.isNotBlank() && !nameTooLong && effective != null
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Add medication" else "Edit medication") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -197,6 +224,13 @@ private fun MedicationEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (nameTooLong) {
+                    Text(
+                        "Name is too long (max ${Medication.MAX_NAME_LENGTH} characters).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Text(
                     "Type",
                     style = MaterialTheme.typography.labelLarge,
@@ -207,7 +241,7 @@ private fun MedicationEditorDialog(
                     onExpandedChange = { presetExpanded = it }
                 ) {
                     OutlinedTextField(
-                        value = preset?.label ?: "",
+                        value = selected?.label ?: "",
                         onValueChange = {},
                         readOnly = true,
                         placeholder = { Text("Choose type") },
@@ -238,13 +272,19 @@ private fun MedicationEditorDialog(
                         }
                     }
                 }
-                preset?.let {
-                    Text(
-                        if (it.interactionClasses.isEmpty()) {
-                            "This type adds no interaction checks."
-                        } else {
-                            "Examples: ${it.examples}"
-                        },
+                when {
+                    selected == MedicationPreset.OTHER && suggested != null -> Text(
+                        "Detected ${suggested.label} from the name. The check will use it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    selected == MedicationPreset.OTHER -> Text(
+                        "No interaction checks for this type. Pick a classed type when the drug belongs to one.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    effective != null -> Text(
+                        "Examples: ${effective.examples}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -257,13 +297,21 @@ private fun MedicationEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    minLines = 2,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
             AppTextButton(
                 onClick = {
                     val stamp = currentTimeMillis()
-                    val chosen = preset ?: return@AppTextButton
+                    val chosen = effective ?: return@AppTextButton
                     onSave(
                         Medication(
                             id = initial?.id ?: "medication:$stamp",
@@ -275,7 +323,7 @@ private fun MedicationEditorDialog(
                             doseLabel = doseLabel.trim().ifBlank { null },
                             startedAt = initial?.startedAt ?: stamp,
                             endedAt = initial?.endedAt,
-                            notes = initial?.notes,
+                            notes = notes.trim().ifBlank { null },
                         )
                     )
                 },

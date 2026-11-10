@@ -294,7 +294,8 @@ object DataInitializer {
             enriched.takeIf { it !== substance }
         }
         if (updated.isEmpty()) return 0
-        repo.applyBatch(substances = updated)
+        // A newer peer copy wins, so startup enrichment never rewrites synced rows.
+        repo.applyBatch(substances = updated, lastWriterWins = true)
         Log.withTag("DataInit").i { "Enriched interaction classes on ${updated.size} substances" }
         return updated.size
     }

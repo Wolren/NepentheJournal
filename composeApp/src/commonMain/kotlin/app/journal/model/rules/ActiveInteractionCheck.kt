@@ -53,6 +53,7 @@ object ActiveInteractionCheck {
     /**
      * @param ownDoseIds doses already shown as the session's own; excluded from the
      * recent sweep so the same dose is never counted twice.
+     * @param excludeSessionId all persisted doses of this session stay out of the sweep.
      * @param now injectable clock, tests pin it.
      */
     fun run(
@@ -60,6 +61,7 @@ object ActiveInteractionCheck {
         medications: List<Medication>,
         allDoses: List<Dose>,
         ownDoseIds: Set<String>,
+        excludeSessionId: String? = null,
         substancesById: Map<String, Substance>,
         interactions: List<Interaction>,
         now: Long = currentTimeMillis(),
@@ -67,7 +69,9 @@ object ActiveInteractionCheck {
         val activeMedications = medications.filter { it.isActiveAt(now) }
         val sessionSubstances = sessionDoses.mapNotNull { substancesById[it.substanceId] }
         val recentDoses = allDoses.filter { dose ->
-            dose.id !in ownDoseIds && substancesById[dose.substanceId]?.let { isStillActive(dose, it, now) } == true
+            dose.id !in ownDoseIds &&
+                (excludeSessionId == null || dose.sessionId != excludeSessionId) &&
+                substancesById[dose.substanceId]?.let { isStillActive(dose, it, now) } == true
         }
         val recentSubstances = recentDoses.mapNotNull { substancesById[it.substanceId] }
 

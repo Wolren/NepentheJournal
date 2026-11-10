@@ -64,6 +64,7 @@ class ActiveInteractionCheckTest {
         medications: List<Medication> = emptyList(),
         allDoses: List<Dose> = sessionDoses,
         ownDoseIds: Set<String> = sessionDoses.map { it.id }.toSet(),
+        excludeSessionId: String? = null,
         substances: List<Substance>,
         interactions: List<Interaction> = emptyList(),
     ) = ActiveInteractionCheck.run(
@@ -71,6 +72,7 @@ class ActiveInteractionCheckTest {
         medications = medications,
         allDoses = allDoses,
         ownDoseIds = ownDoseIds,
+        excludeSessionId = excludeSessionId,
         substancesById = substances.associateBy { it.id },
         interactions = interactions,
         now = now,
@@ -216,6 +218,23 @@ class ActiveInteractionCheckTest {
 
         assertTrue(result.recentSubstanceNames.isEmpty())
         assertEquals(1, result.classWarnings.size)
+    }
+
+    @Test
+    fun dosesOfTheExcludedSessionAreNotRecent() {
+        val mdma = substance("cid:mdma", "MDMA", listOf("serotonin_releaser"), halfLifeMinutes = 120.0)
+        val removed = dose("d:removed", mdma.id, now - 60_000, sessionId = "s:edited")
+
+        val result = run(
+            medications = listOf(medication("Sertraline", MedicationPreset.SSRI)),
+            allDoses = listOf(removed),
+            ownDoseIds = emptySet(),
+            excludeSessionId = "s:edited",
+            substances = listOf(mdma),
+        )
+
+        assertTrue(result.isEmpty)
+        assertTrue(result.recentSubstanceNames.isEmpty())
     }
 
     @Test

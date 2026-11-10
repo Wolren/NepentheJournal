@@ -1,5 +1,6 @@
 package app.journal.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /**
@@ -60,6 +61,7 @@ enum class MedicationPreset(
  * [presetId] supplies the interaction classes; [startedAt] and [endedAt] decide when it counts.
  * Device-local: excluded from sync replication, like [Person].
  */
+@Immutable
 @Serializable
 data class Medication(
     override val id: String,
@@ -84,4 +86,9 @@ data class Medication(
 
     fun isActiveAt(now: Long): Boolean =
         startedAt <= now && (endedAt == null || endedAt > now)
+
+    companion object {
+        /** Longest accepted display name; the editor and the import share this bound. */
+        const val MAX_NAME_LENGTH = 500
+    }
 }

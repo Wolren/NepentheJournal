@@ -84,6 +84,12 @@ internal fun DataSettingsContent(
                     }
                 }
                 Spacer(Modifier.height(4.dp))
+                Text(
+                    "Backup (full) is readable JSON and includes your medications. Use Seal backup for an encrypted file.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppOutlinedButton(
                         onClick = { passphraseAction = PassphraseAction.SEAL },
