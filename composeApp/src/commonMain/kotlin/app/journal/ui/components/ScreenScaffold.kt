@@ -35,6 +35,7 @@ fun ScreenScaffold(
     onBack: (() -> Unit)? = null,
     navigationIcon: @Composable (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
+    selectable: Boolean = false,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(12.dp),
     contentPadding: PaddingValues = PaddingValues(bottom = 16.dp),
     content: LazyListScope.() -> Unit
@@ -82,16 +83,18 @@ fun ScreenScaffold(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            LazyColumn(
-                state = scrollState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-                    .testTag("screen-list"),
-                verticalArrangement = verticalArrangement,
-                contentPadding = contentPadding
-            ) {
-                content()
+            SelectableContent(enabled = selectable) {
+                LazyColumn(
+                    state = scrollState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
+                        .testTag("screen-list"),
+                    verticalArrangement = verticalArrangement,
+                    contentPadding = contentPadding
+                ) {
+                    content()
+                }
             }
             DesktopScrollbar(scrollState)
         }

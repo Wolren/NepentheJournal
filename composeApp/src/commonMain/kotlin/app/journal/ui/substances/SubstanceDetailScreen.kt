@@ -115,6 +115,7 @@ fun SubstanceDetailScreen(
     ScreenScaffold(
         title = substance.name,
         onBack = onBack,
+        selectable = true,
         actions = {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {

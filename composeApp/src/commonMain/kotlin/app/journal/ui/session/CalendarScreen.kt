@@ -111,6 +111,7 @@ fun CalendarScreen(
         }
     ) { innerPadding ->
         val scrollState = rememberLazyListState()
+        SelectableContent {
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             LazyColumn(
                 state = scrollState,
@@ -335,6 +336,7 @@ fun CalendarScreen(
                 }
             }
             DesktopScrollbar(scrollState)
+        }
         }
     }
 }

@@ -88,6 +88,7 @@ fun SessionTimelineScreen(
     ScreenScaffold(
         title = session.title,
         onBack = onBack,
+        selectable = true,
         actions = {
             val vaultPath by repo.obsidianVaultPath.collectAsState()
             val subfolder by repo.obsidianSubfolder.collectAsState()

@@ -9,7 +9,22 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import app.journal.util.isDesktopPlatform
 
-/** Text that can be copied on desktop. Selection has no use on touch, where it adds a container per text. */
+@Composable
+fun SelectableContent(
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (!enabled || !isDesktopPlatform()) {
+        content()
+        return
+    }
+    SelectionContainer(modifier = modifier) {
+        content()
+    }
+}
+
+/** Copyable text on desktop. Touch gains nothing and pays for a container. */
 @Composable
 fun SelectableText(
     text: String,

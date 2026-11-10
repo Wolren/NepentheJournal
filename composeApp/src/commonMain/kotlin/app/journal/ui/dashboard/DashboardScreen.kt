@@ -82,8 +82,9 @@ fun DashboardScreen(
     var clickedDayInfo by remember { mutableStateOf<DaySubstanceInfo?>(null) }
     val scrollState = rememberLazyListState()
 
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(
+    SelectableContent {
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             state = scrollState
@@ -215,6 +216,7 @@ fun DashboardScreen(
         }
 
         DesktopScrollbar(scrollState)
+        }
     }
 
     clickedDayInfo?.let { info ->

@@ -188,6 +188,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                     }
                 }
             } else {
+                SelectableContent {
                 LazyColumn(
                     state = scrollState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -206,6 +207,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                             )
                         }
                     }
+                }
                 }
             }
         }

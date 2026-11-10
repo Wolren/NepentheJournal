@@ -24,6 +24,7 @@ import app.journal.ui.LocalJournalRepository
 import app.journal.data.SearchResult
 import app.journal.model.Note
 import app.journal.ui.components.DesktopScrollbar
+import app.journal.ui.components.SelectableContent
 import app.journal.ui.components.InteractionColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -75,6 +76,7 @@ fun SearchOverlay(
         }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        SelectableContent {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -185,6 +187,7 @@ fun SearchOverlay(
 
                 item { Spacer(Modifier.height(16.dp)) }
             }
+        }
         }
         DesktopScrollbar(scrollState)
         }

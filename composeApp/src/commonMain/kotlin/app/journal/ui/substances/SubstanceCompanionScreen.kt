@@ -83,6 +83,7 @@ fun SubstanceCompanionScreen(
     ScreenScaffold(
         title = substance.name,
         onBack = onBack,
+        selectable = true,
     ) {
         item {
             Card(

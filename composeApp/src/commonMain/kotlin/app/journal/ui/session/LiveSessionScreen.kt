@@ -117,6 +117,7 @@ fun LiveSessionScreen(
 
     ScreenScaffold(
         title = live.title.ifBlank { "Live Session" }, onBack = onBack,
+        selectable = true,
         actions = {
             Box { IconButton(onClick = { showCrisisDialog = true }) { Icon(Icons.Default.Emergency, contentDescription = "Get help", tint = MaterialTheme.colorScheme.error) } }
             Box { IconButton(onClick = { showEditDialog = true }) { Icon(Icons.Default.Edit, contentDescription = "Edit session info") } }
