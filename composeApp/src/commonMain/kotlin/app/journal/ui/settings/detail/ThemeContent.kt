@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,12 +29,14 @@ internal fun ThemeContent(
     editBgColor: Long, editSurfaceColor: Long, editBgImage: String?,
     editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
+    editFontFamily: AppFontFamily, editTextColor: Long?,
     onBaseThemeChange: (BaseTheme) -> Unit, onPrimaryChange: (Long) -> Unit,
     onSecondaryChange: (Long) -> Unit, onTertiaryChange: (Long) -> Unit,
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
+    onFontFamilyChange: (AppFontFamily) -> Unit, onTextColorChange: (Long?) -> Unit,
     onGithubGreenChange: (Boolean) -> Unit,
     onPresetSelect: (ThemePreset) -> Unit,
     applyTheme: () -> Unit,
@@ -59,10 +62,10 @@ internal fun ThemeContent(
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = editBaseTheme == BaseTheme.DARK,
-                        onClick = { onBaseThemeChange(BaseTheme.DARK); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(0xFF0E1318L); onSurfaceColorChange(0xFF1A222BL); applyTheme() },
+                        onClick = { onBaseThemeChange(BaseTheme.DARK); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); applyTheme() },
                         label = { Text("Dark", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.LIGHT,
-                        onClick = { onBaseThemeChange(BaseTheme.LIGHT); onPrimaryChange(ThemeDefaults.Light.primaryColor); onSecondaryChange(ThemeDefaults.Light.secondaryColor); onTertiaryChange(ThemeDefaults.Light.tertiaryColor); onBgColorChange(0xFFECEFF1L); onSurfaceColorChange(0xFFFFFFFFL); applyTheme() },
+                        onClick = { onBaseThemeChange(BaseTheme.LIGHT); onPrimaryChange(ThemeDefaults.Light.primaryColor); onSecondaryChange(ThemeDefaults.Light.secondaryColor); onTertiaryChange(ThemeDefaults.Light.tertiaryColor); onBgColorChange(ThemeDefaults.Light.backgroundColor ?: 0xFFF4EFE3L); onSurfaceColorChange(ThemeDefaults.Light.surfaceColor ?: 0xFFFFFFFFL); onTextColorChange(ThemeDefaults.Light.textColor); applyTheme() },
                         label = { Text("Light", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }, modifier = Modifier.weight(1f))
                     FilterChip(selected = editBaseTheme == BaseTheme.SYSTEM,
                         onClick = { onBaseThemeChange(BaseTheme.SYSTEM); applyTheme() },
@@ -117,6 +120,12 @@ internal fun ThemeContent(
                     ColorPickerField("Background", editBgColor, onPick = { onBgColorChange(it); applyTheme() })
                     Spacer(Modifier.height(4.dp))
                     ColorPickerField("Surface", editSurfaceColor, onPick = { onSurfaceColorChange(it); applyTheme() })
+                    Spacer(Modifier.height(8.dp))
+                    val effectiveText = editTextColor ?: (MaterialTheme.colorScheme.onSurface.toArgb().toLong() and 0xFFFFFFFFL)
+                    ColorPickerField("Text", effectiveText, onPick = { onTextColorChange(it); applyTheme() })
+                    if (editTextColor != null) {
+                        AppTextButton(onClick = { onTextColorChange(null); applyTheme() }) { Text("Use default text") }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Background image", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
@@ -144,6 +153,15 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp))
                     Text("Typography", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Font: ", style = MaterialTheme.typography.bodySmall)
+                        AppFontFamily.entries.forEach { family ->
+                            FilterChip(selected = editFontFamily == family,
+                                onClick = { onFontFamilyChange(family); applyTheme() },
+                                label = { Text(family.name.lowercase(), style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.padding(end = 4.dp))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Font scale", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
                         Slider(value = editFontScale, onValueChange = { onFontScaleChange(it); applyTheme() },
                             modifier = Modifier.weight(1f).height(16.dp), valueRange = 0.8f..1.3f, steps = 9)
@@ -163,7 +181,7 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(0xFF0E1318L); onSurfaceColorChange(0xFF1A222BL); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
                 }

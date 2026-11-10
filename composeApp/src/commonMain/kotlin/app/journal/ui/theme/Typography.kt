@@ -115,3 +115,35 @@ val monospaceStyle = TextStyle(
     fontFamily = FontFamily.Monospace,
     letterSpacing = 0.sp
 )
+
+/** Applies the chosen font family and font scale to the theme typography. */
+fun nepentheTypography(family: AppFontFamily = AppFontFamily.SANS, scale: Float = 1f): Typography {
+    val font = when (family) {
+        AppFontFamily.SANS -> FontFamily.SansSerif
+        AppFontFamily.SERIF -> FontFamily.Serif
+        AppFontFamily.MONO -> FontFamily.Monospace
+    }
+    fun TextStyle.fit(): TextStyle = copy(
+        fontFamily = font,
+        fontSize = fontSize * scale,
+        lineHeight = lineHeight * scale,
+        letterSpacing = letterSpacing * scale,
+    )
+    return NepentheTypography.copy(
+        displayLarge = NepentheTypography.displayLarge.fit(),
+        displayMedium = NepentheTypography.displayMedium.fit(),
+        displaySmall = NepentheTypography.displaySmall.fit(),
+        headlineLarge = NepentheTypography.headlineLarge.fit(),
+        headlineMedium = NepentheTypography.headlineMedium.fit(),
+        headlineSmall = NepentheTypography.headlineSmall.fit(),
+        titleLarge = NepentheTypography.titleLarge.fit(),
+        titleMedium = NepentheTypography.titleMedium.fit(),
+        titleSmall = NepentheTypography.titleSmall.fit(),
+        bodyLarge = NepentheTypography.bodyLarge.fit(),
+        bodyMedium = NepentheTypography.bodyMedium.fit(),
+        bodySmall = NepentheTypography.bodySmall.fit(),
+        labelLarge = NepentheTypography.labelLarge.fit(),
+        labelMedium = NepentheTypography.labelMedium.fit(),
+        labelSmall = NepentheTypography.labelSmall.fit(),
+    )
+}

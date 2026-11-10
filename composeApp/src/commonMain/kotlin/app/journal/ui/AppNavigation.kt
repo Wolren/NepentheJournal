@@ -199,13 +199,13 @@ internal fun AppNavigation(
             }
 
             val isSoftwareRender = remember { isSoftwareRender() }
-            val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember {
-                if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
-                else spring(dampingRatio = 1f, stiffness = 4000f)
+            val animationScale = themeConfig.animationScale.coerceIn(0f, 1f)
+            val animationSpeed = 0.4f + 0.6f * animationScale
+            val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember(isSoftwareRender, animationSpeed) {
+                spring(dampingRatio = 1f, stiffness = (if (isSoftwareRender) 6000f else 4000f) * animationSpeed)
             }
-            val fadeSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = remember {
-                if (isSoftwareRender) spring(dampingRatio = 1f, stiffness = 6000f)
-                else spring(dampingRatio = 1f, stiffness = 4000f)
+            val fadeSpec: androidx.compose.animation.core.FiniteAnimationSpec<Float> = remember(isSoftwareRender, animationSpeed) {
+                spring(dampingRatio = 1f, stiffness = (if (isSoftwareRender) 6000f else 4000f) * animationSpeed)
             }
 
             AnimatedContent(
@@ -221,7 +221,9 @@ internal fun AppNavigation(
                     else -> NavigationState.Main
                 },
                 transitionSpec = {
-                    if (targetState is NavigationState.Main) {
+                    if (animationScale <= 0.01f) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else if (targetState is NavigationState.Main) {
                         slideInVertically(animationSpec = slideSpec) { it / 8 } togetherWith
                         slideOutVertically(animationSpec = slideSpec) { it / 8 }
                     } else {

@@ -24,6 +24,8 @@ data class ThemeConfig(
     val cardStyle: CardStyle = CardStyle.ELEVATED,
     val cornerRadius: CornerRadius = CornerRadius.MEDIUM,
     val fontScale: Float = 1.0f,
+    val fontFamily: AppFontFamily = AppFontFamily.SANS,
+    val textColor: Long? = null,
     val animationScale: Float = 1.0f,
     val githubGreenActivity: Boolean = false
 ) {
@@ -56,25 +58,29 @@ data class ThemeConfig(
 enum class BaseTheme { DARK, LIGHT, SYSTEM, CUSTOM }
 enum class CardStyle { ELEVATED, FILLED, OUTLINED }
 enum class CornerRadius { SMALL, MEDIUM, LARGE }
+enum class AppFontFamily { SANS, SERIF, MONO }
 
 object ThemeDefaults {
+    /** Logo palette: cream lily on deep teal. */
     val Dark = ThemeConfig(
         baseTheme = BaseTheme.DARK,
-        primaryColor = 0xFF90A4AE,
-        secondaryColor = 0xFF78909C,
-        tertiaryColor = 0xFFB0BEC5,
-        errorColor = 0xFFEF9A9A,
-        backgroundColor = 0xFF0E1318,
-        surfaceColor = 0xFF1A222B
+        primaryColor = 0xFFEBD9B0,
+        secondaryColor = 0xFF8FD8BE,
+        tertiaryColor = 0xFFE4B363,
+        errorColor = 0xFFF1A7A7,
+        backgroundColor = 0xFF0A2621,
+        surfaceColor = 0xFF10332B,
+        textColor = 0xFFF2E7CF
     )
     val Light = ThemeConfig(
         baseTheme = BaseTheme.LIGHT,
-        primaryColor = 0xFF37474F,
-        secondaryColor = 0xFF455A64,
-        tertiaryColor = 0xFF546E7A,
-        errorColor = 0xFFD32F2F,
-        backgroundColor = 0xFFECEFF1,
-        surfaceColor = 0xFFFFFFFF
+        primaryColor = 0xFF1E5C4B,
+        secondaryColor = 0xFF2F7D66,
+        tertiaryColor = 0xFFA5741F,
+        errorColor = 0xFFC62828,
+        backgroundColor = 0xFFF4EFE3,
+        surfaceColor = 0xFFFFFFFF,
+        textColor = 0xFF1D2B27
     )
 }
 
@@ -99,6 +105,11 @@ data class ThemePreset(
 }
 
 object ThemePresets {
+    val Nepenthe = ThemePreset(
+        name = "Nepenthe",
+        dark = ThemeDefaults.Dark,
+        light = ThemeDefaults.Light
+    )
     val Forest = ThemePreset(
         name = "Forest",
         dark = ThemeConfig(
@@ -268,7 +279,7 @@ object ThemePresets {
     )
 
     val all: List<ThemePreset> = listOf(
-        Slate, Forest, Ocean, Sunset, Ember, Midnight, Mono,
+        Nepenthe, Slate, Forest, Ocean, Sunset, Ember, Midnight, Mono,
         Meadow, Copper, Amethyst, Rose, DoseWiki
     )
 }

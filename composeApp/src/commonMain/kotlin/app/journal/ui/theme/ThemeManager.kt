@@ -23,6 +23,12 @@ class ThemeManager private constructor() {
     fun update(newConfig: ThemeConfig) {
         _config.value = newConfig
         cachedConfigHash = 0
+        ThemeStore.save(newConfig)
+    }
+
+    /** Loads the saved theme once at startup; tests keep the in-memory default. */
+    fun restore() {
+        ThemeStore.load()?.let { _config.value = it; cachedConfigHash = 0 }
     }
 
     fun presetDark() { update(ThemeDefaults.Dark) }
@@ -80,9 +86,9 @@ class ThemeManager private constructor() {
             errorContainer = blend(bg, cfg.error, 0.30f),
             onErrorContainer = contrastColor(blend(bg, cfg.error, 0.30f)),
             background = bg,
-            onBackground = contrastColor(bg),
+            onBackground = cfg.textColor?.let { Color(it) } ?: contrastColor(bg),
             surface = surf,
-            onSurface = contrastColor(surf),
+            onSurface = cfg.textColor?.let { Color(it) } ?: contrastColor(surf),
             surfaceVariant = surfaceVariant(cfg.primary),
             onSurfaceVariant = contrastColor(surfaceVariant(cfg.primary)),
             outline = surfaceVariant(cfg.primary, if (isDark) 0.28f else 0.18f),

@@ -20,13 +20,13 @@ import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
 import app.journal.ui.theme.LocalThemeConfig
-import app.journal.ui.theme.NepentheTypography
 import app.journal.ui.theme.ThemeManager
+import app.journal.ui.theme.nepentheTypography
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(repo: IJournalRepository = JournalRepository.instance) {
-    val themeManager = remember { ThemeManager.instance }
+    val themeManager = remember { ThemeManager.instance.also { it.restore() } }
     val themeConfig by themeManager.config.collectAsState()
 
     // Show a loading screen until DataInitializer.initializedFlow opens, never a blank window.
@@ -57,7 +57,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
 
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = NepentheTypography,
+            typography = nepentheTypography(themeConfig.fontFamily, themeConfig.fontScale),
             shapes = themeConfig.shapes
         ) {
             AppDialogs(repo = repo, journalStore = journalStore, ready = ready)

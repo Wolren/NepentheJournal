@@ -68,6 +68,8 @@ fun SettingsScreen(
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
     var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
+    var editFontFamily by remember(themeConfig) { mutableStateOf(themeConfig.fontFamily) }
+    var editTextColor by remember(themeConfig) { mutableStateOf(themeConfig.textColor) }
     var editAnimationScale by remember(themeConfig) { mutableStateOf(themeConfig.animationScale) }
     var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
 
@@ -77,6 +79,7 @@ fun SettingsScreen(
             tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
             backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
             cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
+            fontFamily = editFontFamily, textColor = editTextColor,
             animationScale = editAnimationScale, githubGreenActivity = editGithubGreen
         ))
     }
@@ -121,6 +124,7 @@ fun SettingsScreen(
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
             editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
             editCornerRadius = editCornerRadius, editFontScale = editFontScale, editAnimationScale = editAnimationScale,
+            editFontFamily = editFontFamily, editTextColor = editTextColor,
             editGithubGreen = editGithubGreen,
             onBaseThemeChange = { editBaseTheme = it },
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
@@ -128,6 +132,7 @@ fun SettingsScreen(
             onSurfaceColorChange = { editSurfaceColor = it }, onBgImageChange = { editBgImage = it },
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
+            onFontFamilyChange = { editFontFamily = it }, onTextColorChange = { editTextColor = it },
             onAnimationScaleChange = { editAnimationScale = it },
             onGithubGreenChange = { editGithubGreen = it },
             onPresetSelect = { preset ->
@@ -137,6 +142,7 @@ fun SettingsScreen(
                 editTertiary = v.tertiaryColor
                 editBgColor = v.backgroundColor ?: editBgColor
                 editSurfaceColor = v.surfaceColor ?: editSurfaceColor
+                editTextColor = v.textColor
                 preset.cardStyle?.let { editCardStyle = it }
                 preset.cornerRadius?.let { editCornerRadius = it }
                 applyTheme()
