@@ -196,34 +196,44 @@ internal fun EffectTagCloud(session: app.journal.model.Session, repo: app.journa
     }
     if (allScores.isEmpty()) return
 
-    val isDark = ThemeManager.instance.isDarkTheme()
     Column {
         Spacer(Modifier.height(10.dp))
         SectionHeader("Effects Experienced")
         Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             allScores.forEach { (effect, avgScore) ->
                 val label = effect.replace("_", " ").replaceFirstChar { it.uppercase() }
-                val chipColor = when { avgScore >= 7f -> MaterialTheme.colorScheme.tertiary; avgScore >= 4f -> MaterialTheme.colorScheme.primary; else -> MaterialTheme.colorScheme.secondary }
+                val fraction = (avgScore / 10f).coerceIn(0f, 1f)
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = chipColor.copy(alpha = 0.10f),
-                    border = BorderStroke(1.dp, chipColor.copy(alpha = 0.30f))
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(label, style = MaterialTheme.typography.labelSmall, color = chipColor, fontWeight = FontWeight.Medium)
-                            Text("${avgScore.toInt()}/10", style = MaterialTheme.typography.labelSmall, color = chipColor.copy(alpha = 0.7f))
+                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "${avgScore.toInt()}/10",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        // 10-segment score bar
-                        Row(horizontalArrangement = Arrangement.spacedBy(1.5.dp), modifier = Modifier.padding(top = 3.dp)) {
-                            repeat(10) { idx ->
-                                val filled = idx < avgScore.toInt()
-                                Box(
-                                    Modifier.width(5.dp).height(3.dp).clip(RoundedCornerShape(1.dp))
-                                        .background(if (filled) chipColor.copy(alpha = 0.85f) else chipColor.copy(alpha = 0.12f))
-                                )
-                            }
+                        Spacer(Modifier.height(6.dp))
+                        Box(
+                            Modifier.width(68.dp).height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f))
+                        ) {
+                            Box(
+                                Modifier.fillMaxWidth(fraction).fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
                         }
                     }
                 }
