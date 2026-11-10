@@ -40,6 +40,8 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     viewModel: SessionListViewModel,
+    showInlineActions: Boolean = false,
+    onCalendarClick: () -> Unit = {},
     onNewSession: () -> Unit = {},
     onEditSession: (String) -> Unit = {},
     onSessionClick: (String) -> Unit = {},
@@ -69,41 +71,46 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
             val showEmptyState = rememberEmptyStateVisible(isEmpty = sessions.isEmpty())
             val countText = "${sessions.size} session${if (sessions.size != 1) "s" else ""}"
             val showCount = sessions.isNotEmpty() || showEmptyState
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                if (maxWidth >= 720.dp) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        if (showCount) {
-                            Text(countText, style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f))
-                        } else Spacer(Modifier.weight(1f))
-                        SessionSearchBox(
-                            searchQuery = searchQuery,
-                            onSearchChange = { viewModel.searchQuery.value = it },
-                            allSessionSubstances = allSessionSubstances,
-                            filterSubstanceIds = filterSubstanceIds,
-                            onToggleSubstance = { viewModel.toggleSubstance(it) },
-                            onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
-                            modifier = Modifier.width(380.dp),
-                        )
-                    }
-                } else {
-                    Column {
-                        SessionSearchBox(
-                            searchQuery = searchQuery,
-                            onSearchChange = { viewModel.searchQuery.value = it },
-                            allSessionSubstances = allSessionSubstances,
-                            filterSubstanceIds = filterSubstanceIds,
-                            onToggleSubstance = { viewModel.toggleSubstance(it) },
-                            onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        if (showCount) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(countText, style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+            if (showInlineActions) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (showCount) {
+                        Text(countText, style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f))
+                    } else Spacer(Modifier.weight(1f))
+                    SessionListScreen.TopActions(
+                        showFavoritesOnly = showFavs,
+                        onToggleFavorites = { viewModel.showFavoritesOnly.value = !showFavs },
+                        onCalendarClick = onCalendarClick,
+                        timeDisplayMode = timeDisplayMode,
+                        onCycleTimeDisplay = onCycleTimeDisplay,
+                    )
+                    SessionSearchBox(
+                        searchQuery = searchQuery,
+                        onSearchChange = { viewModel.searchQuery.value = it },
+                        allSessionSubstances = allSessionSubstances,
+                        filterSubstanceIds = filterSubstanceIds,
+                        onToggleSubstance = { viewModel.toggleSubstance(it) },
+                        onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
+                        modifier = Modifier.width(380.dp),
+                    )
+                }
+            } else {
+                Column {
+                    SessionSearchBox(
+                        searchQuery = searchQuery,
+                        onSearchChange = { viewModel.searchQuery.value = it },
+                        allSessionSubstances = allSessionSubstances,
+                        filterSubstanceIds = filterSubstanceIds,
+                        onToggleSubstance = { viewModel.toggleSubstance(it) },
+                        onClearFilters = { viewModel.filterSubstanceIds.value = emptySet() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (showCount) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(countText, style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

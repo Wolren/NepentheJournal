@@ -372,7 +372,7 @@ internal fun AppNavigation(
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
-                                if (selectedScreen == Screen.SESSIONS) {
+                                if (!wide && selectedScreen == Screen.SESSIONS) {
                                     TopAppBar(
                                         title = {
                                             Text(
@@ -453,6 +453,8 @@ internal fun AppNavigation(
                                     )
                                     Screen.SESSIONS -> SessionListScreen(
                                         viewModel = sessionListViewModel,
+                                        showInlineActions = wide,
+                                        onCalendarClick = { showCalendar = true },
                                         onNewSession = { editingSessionId = "__new__" },
                                         onEditSession = { id -> editingSessionId = id },
                                         onSessionClick = { id ->
