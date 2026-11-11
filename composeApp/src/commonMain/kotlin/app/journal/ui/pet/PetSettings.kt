@@ -17,9 +17,9 @@ enum class PetState { IDLE, RUNNING, WAVING }
 
 @Serializable
 data class PetSettings(
-    val enabled: Boolean = false,
-    val slug: String = "",
-    val scale: Float = 0.6f,
+    val enabled: Boolean = true,
+    val slug: String = "nightly-fox",
+    val scale: Float = 0.5f,
     val corner: PetCorner = PetCorner.BOTTOM_END,
 )
 

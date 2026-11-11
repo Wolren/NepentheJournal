@@ -46,6 +46,7 @@ import app.journal.ui.settings.detail.SyncSettingsCallbacks
 import app.journal.ui.settings.detail.SyncSettingsUiState
 import app.journal.ui.settings.detail.*
 import app.journal.ui.pet.CompanionCard
+import app.journal.ui.keybind.KeybindCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,6 +211,7 @@ fun SettingsScreen(
         ) }
 
         if (visible(SettingsCategory.APPEARANCE)) item { CompanionCard() }
+        if (visible(SettingsCategory.PREFERENCES)) item { KeybindCard() }
 
         if (visible(SettingsCategory.PREFERENCES)) item {
             val prefExpanded = remember { mutableStateOf(false) }

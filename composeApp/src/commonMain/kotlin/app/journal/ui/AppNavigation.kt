@@ -71,6 +71,7 @@ import app.journal.ui.pet.PetCompanion
 import app.journal.ui.pet.PetCorner
 import app.journal.ui.pet.PetManager
 import app.journal.ui.pet.PetState
+import app.journal.ui.keybind.KeybindManager
 import app.journal.util.TimeDisplayMode
 import app.journal.ui.components.SubstanceLibraryGate
 import app.journal.ui.dashboard.DashboardScreen
@@ -161,6 +162,7 @@ internal fun AppNavigation(
     val paletteSubstances by repo.substances.collectAsState()
     val paletteSessions by repo.sessions.collectAsState()
     val petSettings by PetManager.instance.settings.collectAsState()
+    val keybinds by KeybindManager.instance.settings.collectAsState()
     val paletteCommands = remember(paletteSubstances, paletteSessions) {
         buildList {
             Screen.entries.forEach { screen ->
@@ -187,14 +189,13 @@ internal fun AppNavigation(
     ) {
         val desktopHandler = if (isDesktopPlatform()) {
             Modifier.onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && event.isCtrlPressed) {
-                    when (event.key) {
-                        Key.F -> { showSearch = true; true }
-                        Key.N -> { liveSessionId = "__new__"; true }
-                        Key.K -> { showPalette = true; true }
-                        else -> false
-                    }
-                } else false
+                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                when {
+                    keybinds.palette.matches(event) -> { showPalette = true; true }
+                    keybinds.search.matches(event) -> { showSearch = true; true }
+                    keybinds.liveSession.matches(event) -> { liveSessionId = "__new__"; true }
+                    else -> false
+                }
             }
         } else Modifier
         Box(Modifier.fillMaxSize().then(desktopHandler)) {

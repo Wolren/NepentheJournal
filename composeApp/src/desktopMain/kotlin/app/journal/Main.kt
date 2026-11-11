@@ -26,9 +26,11 @@ import app.journal.data.JournalRepository
 import app.journal.log.Log
 import app.journal.log.initLogging
 import app.journal.ui.App
+import app.journal.ui.keybind.KeybindManager
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.NativeFullscreen
 import app.journal.util.WindowGeometryStore
+import app.journal.util.WindowOpacity
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,12 +98,13 @@ fun main() {
     application {
         val icon = remember { loadAppIcon() }
         val themeConfig by ThemeManager.instance.config.collectAsState()
+        val keybinds by KeybindManager.instance.settings.collectAsState()
         val savedGeometry = remember { WindowGeometryStore.load() }
         val windowState = rememberWindowState(
             size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
             position = savedGeometry?.first ?: WindowPosition(100.dp, 60.dp)
         )
-        // F11 strips the frame through user32; the rest of the time the window keeps its system title bar.
+        // The full screen shortcut comes from the keybind store; the frame strip happens through user32.
         var fullscreen by remember { mutableStateOf(false) }
         LaunchedEffect(windowState) {
             snapshotFlow { Triple(fullscreen, windowState.placement, windowState.position to windowState.size) }
@@ -121,7 +124,7 @@ fun main() {
             icon = icon,
             onPreviewKeyEvent = { event ->
                 // KeyUp fires once per press; KeyDown repeats while the key is held and would flip the state.
-                if (event.type == KeyEventType.KeyUp && event.key == Key.F11) {
+                if (event.type == KeyEventType.KeyUp && keybinds.fullscreen.matches(event)) {
                     fullscreen = !fullscreen
                     true
                 } else false
@@ -131,12 +134,9 @@ fun main() {
             LaunchedEffect(Unit) {
                 Log.withTag("Window").i { "native handle 0x${window.windowHandle.toString(16)}" }
             }
-            LaunchedEffect(themeConfig.windowOpacity) {
-                try {
-                    window.opacity = themeConfig.windowOpacity.coerceIn(0.5f, 1f)
-                } catch (e: Exception) {
-                    Log.withTag("Window").w(e) { "window opacity unsupported" }
-                }
+            LaunchedEffect(themeConfig.windowOpacity, fullscreen) {
+                // Re-apply after full screen: leaving it restores the saved window styles.
+                WindowOpacity.apply(window.windowHandle, themeConfig.windowOpacity)
             }
             LaunchedEffect(fullscreen) {
                 if (fullscreen) {
