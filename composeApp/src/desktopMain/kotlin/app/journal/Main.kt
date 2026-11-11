@@ -22,6 +22,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
+import app.journal.log.Log
 import app.journal.log.initLogging
 import app.journal.ui.App
 import app.journal.util.WindowGeometryStore
@@ -33,6 +34,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
+import java.awt.Frame
 
 private fun loadAppIcon(): Painter {
     val bytes = Thread.currentThread().contextClassLoader
@@ -96,21 +98,15 @@ fun main() {
             size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
             position = savedGeometry?.first ?: WindowPosition(100.dp, 60.dp)
         )
-        // F11 returns to the placement that was live before full screen, so a maximized window comes back maximized.
-        var restorePlacement by remember { mutableStateOf<WindowPlacement>(WindowPlacement.Floating) }
-        fun toggleFullscreen() {
-            if (windowState.placement == WindowPlacement.Fullscreen) {
-                windowState.placement = restorePlacement
-            } else {
-                restorePlacement = windowState.placement
-                windowState.placement = WindowPlacement.Fullscreen
-            }
-        }
+        // F11 drives AWT full-screen exclusive mode: the frame and the taskbar go away.
+        var fullscreen by remember { mutableStateOf(false) }
+        var restoreSize by remember { mutableStateOf(windowState.size) }
+        var restorePosition by remember { mutableStateOf(windowState.position) }
         LaunchedEffect(windowState) {
-            snapshotFlow { Triple(windowState.placement, windowState.position, windowState.size) }
-                .collectLatest { (placement, position, size) ->
-                    // Full-screen geometry is the screen size, so saving it would reopen the window edge to edge.
-                    if (placement != WindowPlacement.Floating) return@collectLatest
+            snapshotFlow { Triple(fullscreen, windowState.position, windowState.size) }
+                .collectLatest { (isFullscreen, position, size) ->
+                    // Full-screen bounds are the screen, so saving them would reopen the window edge to edge.
+                    if (isFullscreen) return@collectLatest
                     delay(400)
                     WindowGeometryStore.save(position, size)
                 }
@@ -124,10 +120,35 @@ fun main() {
             // KeyUp fires once per press; KeyDown repeats while the key is held and would flip the state.
             onPreviewKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyUp && event.key == Key.F11) {
-                    toggleFullscreen()
+                    fullscreen = !fullscreen
                     true
                 } else false
             }
-        ) { App() }
+        ) {
+            LaunchedEffect(fullscreen) {
+                val device = window.graphicsConfiguration.device
+                if (fullscreen) {
+                    restoreSize = windowState.size
+                    restorePosition = windowState.position
+                    window.extendedState = Frame.NORMAL
+                    try {
+                        if (device.isFullScreenSupported) device.fullScreenWindow = window
+                        else windowState.placement = WindowPlacement.Fullscreen
+                    } catch (e: Exception) {
+                        Log.withTag("Window").w(e) { "full screen exclusive mode failed" }
+                        windowState.placement = WindowPlacement.Fullscreen
+                    }
+                } else {
+                    if (device.fullScreenWindow === window) device.fullScreenWindow = null
+                    windowState.placement = WindowPlacement.Floating
+                    windowState.size = restoreSize
+                    windowState.position = restorePosition
+                }
+                Log.withTag("Window").i {
+                    "full screen $fullscreen, undecorated ${window.isUndecorated}, bounds ${window.bounds}"
+                }
+            }
+            App()
+        }
     }
 }
