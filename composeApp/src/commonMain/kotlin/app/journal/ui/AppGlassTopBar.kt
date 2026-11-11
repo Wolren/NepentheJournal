@@ -16,21 +16,21 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 
-/** Space the shell reserves for the bar, so screens start below it. */
+/** Space the bar itself takes: the row height. */
 val AppTopBarHeight = 48.dp
 
-/** Top inset a scrolling screen adds so its first item lands below the glass bar. */
-val LocalTopBarInset = compositionLocalOf { 0.dp }
+/** Space the shell reserves: the row, the hairline and the fade below it. */
+val AppTopBarTotal = 59.dp
 
-private val BarAlpha = 0.72f
+private val BarAlpha = 0.6f
+private const val BarTint = 0.10f
 
 /**
  * Translucent shell bar: the surface tint lets the window backdrop through,
@@ -40,12 +40,14 @@ private val BarAlpha = 0.72f
 fun AppGlassTopBar(title: String, onSearch: () -> Unit, modifier: Modifier = Modifier) {
     val surface = MaterialTheme.colorScheme.surface
     val onSurface = MaterialTheme.colorScheme.onSurface
+    // A little primary in the glass separates the bar from a page that shares the surface tone.
+    val glass = lerp(surface, MaterialTheme.colorScheme.primary, BarTint).copy(alpha = BarAlpha)
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(AppTopBarHeight)
-                .background(surface.copy(alpha = BarAlpha))
+                .background(glass)
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -55,12 +57,12 @@ fun AppGlassTopBar(title: String, onSearch: () -> Unit, modifier: Modifier = Mod
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = onSurface)
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(10.dp)
-                .background(Brush.verticalGradient(listOf(surface.copy(alpha = BarAlpha), Color.Transparent)))
+                .background(Brush.verticalGradient(listOf(glass, Color.Transparent)))
         )
     }
 }

@@ -1,7 +1,5 @@
 package app.journal.ui.session
 
-import app.journal.ui.LocalTopBarInset
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -169,7 +167,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                 LazyColumn(
                     state = scrollState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(top = LocalTopBarInset.current, bottom = 88.dp)
+                    contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
                     itemsIndexed(sessions, key = { _, s -> s.id }) { _, session ->
                         AnimatedListItem {

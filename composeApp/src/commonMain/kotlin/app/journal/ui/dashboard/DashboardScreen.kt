@@ -1,7 +1,5 @@
 package app.journal.ui.dashboard
 
-import app.journal.ui.LocalTopBarInset
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -90,8 +88,7 @@ fun DashboardScreen(
             LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            state = scrollState,
-            contentPadding = PaddingValues(top = LocalTopBarInset.current)
+            state = scrollState
         ) {
             item {
                 val tz = TimeZone.currentSystemDefault()

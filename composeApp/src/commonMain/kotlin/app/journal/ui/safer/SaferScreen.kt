@@ -1,7 +1,5 @@
 package app.journal.ui.safer
 
-import app.journal.ui.LocalTopBarInset
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,8 +27,7 @@ fun SaferScreen() {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            state = scrollState,
-            contentPadding = PaddingValues(top = LocalTopBarInset.current)
+            state = scrollState
         ) {
         item {
             Spacer(Modifier.height(4.dp))

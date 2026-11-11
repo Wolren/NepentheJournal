@@ -27,8 +27,10 @@ import app.journal.log.Log
 import app.journal.log.initLogging
 import app.journal.ui.App
 import app.journal.ui.keybind.KeybindManager
+import app.journal.ui.theme.BaseTheme
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.NativeFullscreen
+import app.journal.util.WindowChrome
 import app.journal.util.WindowGeometryStore
 import app.journal.util.WindowOpacity
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -138,6 +140,9 @@ fun main() {
                 ThemeManager.instance.config.collectLatest { config ->
                     val applied = WindowOpacity.apply(window.windowHandle, config.windowOpacity)
                     if (!applied) Log.withTag("Window").w { "window opacity failed at ${config.windowOpacity}" }
+                    val caption = config.backgroundColor
+                        ?: if (config.baseTheme == BaseTheme.DARK) 0xFF0A0A14 else 0xFFF7F7F7
+                    WindowChrome.applyDark(window.windowHandle, caption)
                 }
             }
             LaunchedEffect(fullscreen) {

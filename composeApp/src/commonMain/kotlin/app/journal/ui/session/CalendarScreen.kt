@@ -1,7 +1,5 @@
 package app.journal.ui.session
 
-import app.journal.ui.LocalTopBarInset
-
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.Canvas
@@ -118,8 +116,7 @@ fun CalendarScreen(
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             LazyColumn(
                 state = scrollState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = LocalTopBarInset.current)
+                modifier = Modifier.fillMaxSize()
             ) {
                 item {
                     Column(

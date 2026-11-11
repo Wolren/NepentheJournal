@@ -1,7 +1,5 @@
 package app.journal.ui.substances
 
-import app.journal.ui.LocalTopBarInset
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -239,8 +237,7 @@ fun SubstanceScreen(
             } else {
                 LazyColumn(
                     state = scrollState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(top = LocalTopBarInset.current)) {
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     itemsIndexed(results, key = { _, s -> s.id }) { _, substance ->
                         AnimatedListItem {
                         val stats = substanceDoseStats[substance.id]

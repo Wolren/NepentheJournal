@@ -428,7 +428,6 @@ internal fun AppNavigation(
                                 }
                             }
                         ) { innerPadding ->
-                            CompositionLocalProvider(LocalTopBarInset provides if (wide) AppTopBarHeight else 0.dp) {
                             Row(Modifier.padding(innerPadding).fillMaxSize()) {
                                 if (wide) {
                                     NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
@@ -448,6 +447,7 @@ internal fun AppNavigation(
                                     }
                                 }
                                 Box(Modifier.weight(1f).fillMaxSize()) {
+                                Box(Modifier.fillMaxSize().padding(top = if (wide) AppTopBarTotal else 0.dp)) {
                                 when (selectedScreen) {
                                     Screen.DASHBOARD -> DashboardScreen(
                                         repo = repo,
@@ -477,9 +477,7 @@ internal fun AppNavigation(
                                             )
                                         }
                                         if (wide) {
-                                            // The shell bar spans both panes, so the split starts below it.
-                                            CompositionLocalProvider(LocalTopBarInset provides 0.dp) {
-                                            BoxWithConstraints(Modifier.fillMaxSize().padding(top = AppTopBarHeight)) {
+                                            BoxWithConstraints(Modifier.fillMaxSize()) {
                                                 val totalPx = with(LocalDensity.current) { maxWidth.toPx() }
                                                 val listFraction = sessionPaneFraction.coerceIn(0.25f, 0.65f)
                                                 Row(Modifier.fillMaxSize()) {
@@ -533,7 +531,6 @@ internal fun AppNavigation(
                                                     }
                                                 }
                                             }
-                                            }  // closes the pane inset provider
                                         } else {
                                             listContent()
                                         }
@@ -549,6 +546,7 @@ internal fun AppNavigation(
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(selectedScreen)
+                                }  // closes the bar strip
                                 if (wide) {
                                     AppGlassTopBar(
                                         title = selectedScreen.label,
@@ -557,7 +555,6 @@ internal fun AppNavigation(
                                 }
                                 }  // closes inner Box(weight)
                             }  // closes Row
-                            }  // closes the bar inset provider
                         }  // closes Scaffold innerPadding
                         }  // closes BoxWithConstraints
                     }  // closes "main" block
