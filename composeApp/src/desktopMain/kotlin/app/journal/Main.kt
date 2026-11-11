@@ -1,6 +1,7 @@
 package app.journal
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import app.journal.data.JournalRepository
 import app.journal.log.Log
 import app.journal.log.initLogging
 import app.journal.ui.App
+import app.journal.ui.theme.ThemeManager
 import app.journal.util.NativeFullscreen
 import app.journal.util.WindowGeometryStore
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -93,6 +95,7 @@ fun main() {
 
     application {
         val icon = remember { loadAppIcon() }
+        val themeConfig by ThemeManager.instance.config.collectAsState()
         val savedGeometry = remember { WindowGeometryStore.load() }
         val windowState = rememberWindowState(
             size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
@@ -127,6 +130,13 @@ fun main() {
             val borderless = remember { NativeFullscreen { window.windowHandle } }
             LaunchedEffect(Unit) {
                 Log.withTag("Window").i { "native handle 0x${window.windowHandle.toString(16)}" }
+            }
+            LaunchedEffect(themeConfig.windowOpacity) {
+                try {
+                    window.opacity = themeConfig.windowOpacity.coerceIn(0.5f, 1f)
+                } catch (e: Exception) {
+                    Log.withTag("Window").w(e) { "window opacity unsupported" }
+                }
             }
             LaunchedEffect(fullscreen) {
                 if (fullscreen) {

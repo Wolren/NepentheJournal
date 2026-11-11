@@ -45,6 +45,7 @@ import app.journal.util.PlatformFile
 import app.journal.ui.settings.detail.SyncSettingsCallbacks
 import app.journal.ui.settings.detail.SyncSettingsUiState
 import app.journal.ui.settings.detail.*
+import app.journal.ui.pet.CompanionCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +72,8 @@ fun SettingsScreen(
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
     var editDensity by remember(themeConfig) { mutableStateOf(themeConfig.density) }
+    var editWindowOpacity by remember(themeConfig) { mutableStateOf(themeConfig.windowOpacity) }
+    var editCardOpacity by remember(themeConfig) { mutableStateOf(themeConfig.cardOpacity) }
     var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
     var editFontFamily by remember(themeConfig) { mutableStateOf(themeConfig.fontFamily) }
     var editTextColor by remember(themeConfig) { mutableStateOf(themeConfig.textColor) }
@@ -88,7 +91,7 @@ fun SettingsScreen(
         fontFamily = editFontFamily, textColor = editTextColor,
         animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
         outlineStrength = editOutlineStrength, substanceAccentMode = editSubstanceAccentMode,
-        githubGreenActivity = editGithubGreen
+        githubGreenActivity = editGithubGreen, windowOpacity = editWindowOpacity, cardOpacity = editCardOpacity
     )
 
     fun setEditConfig(config: ThemeConfig) {
@@ -103,6 +106,8 @@ fun SettingsScreen(
         editCardStyle = config.cardStyle
         editCornerRadius = config.cornerRadius
         editDensity = config.density
+        editWindowOpacity = config.windowOpacity
+        editCardOpacity = config.cardOpacity
         editFontScale = config.fontScale
         editFontFamily = config.fontFamily
         editTextColor = config.textColor
@@ -177,6 +182,7 @@ fun SettingsScreen(
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
             editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
             editCornerRadius = editCornerRadius, editDensity = editDensity,
+            editWindowOpacity = editWindowOpacity, editCardOpacity = editCardOpacity,
             editFontScale = editFontScale, editAnimationScale = editAnimationScale,
             editFontFamily = editFontFamily, editTextColor = editTextColor,
             editSurfaceTint = editSurfaceTint, editOutlineStrength = editOutlineStrength,
@@ -188,6 +194,7 @@ fun SettingsScreen(
             onSurfaceColorChange = { editSurfaceColor = it }, onBgImageChange = { editBgImage = it },
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onDensityChange = { editDensity = it },
+            onWindowOpacityChange = { editWindowOpacity = it }, onCardOpacityChange = { editCardOpacity = it },
             onFontScaleChange = { editFontScale = it },
             onFontFamilyChange = { editFontFamily = it }, onTextColorChange = { editTextColor = it },
             onSurfaceTintChange = { editSurfaceTint = it }, onOutlineStrengthChange = { editOutlineStrength = it },
@@ -201,6 +208,8 @@ fun SettingsScreen(
             onConfigImport = { config -> setEditConfig(config); applyTheme() },
             applyTheme = { applyTheme() }
         ) }
+
+        if (visible(SettingsCategory.APPEARANCE)) item { CompanionCard() }
 
         if (visible(SettingsCategory.PREFERENCES)) item {
             val prefExpanded = remember { mutableStateOf(false) }

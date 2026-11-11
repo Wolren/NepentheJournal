@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
+import app.journal.util.isDesktopPlatform
 
 @Composable
 internal fun ThemeContent(
@@ -32,6 +33,7 @@ internal fun ThemeContent(
     editBgColor: Long, editSurfaceColor: Long, editBgImage: String?,
     editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
     editDensity: Density,
+    editWindowOpacity: Float, editCardOpacity: Float,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
     editFontFamily: AppFontFamily, editTextColor: Long?,
     editSurfaceTint: Float?, editOutlineStrength: Float?,
@@ -42,6 +44,7 @@ internal fun ThemeContent(
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onDensityChange: (Density) -> Unit,
+    onWindowOpacityChange: (Float) -> Unit, onCardOpacityChange: (Float) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
     onFontFamilyChange: (AppFontFamily) -> Unit, onTextColorChange: (Long?) -> Unit,
     onSurfaceTintChange: (Float?) -> Unit, onOutlineStrengthChange: (Float?) -> Unit,
@@ -241,6 +244,20 @@ internal fun ThemeContent(
                         Density.entries.forEach { density -> FilterChip(selected = editDensity == density, onClick = { onDensityChange(density); applyTheme() }, label = { Text(density.name.lowercase(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.padding(end = 4.dp)) }
                     }
                     Spacer(Modifier.height(4.dp))
+                    if (isDesktopPlatform()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Window opacity", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
+                            Slider(value = editWindowOpacity, onValueChange = { onWindowOpacityChange(it); applyTheme() },
+                                modifier = Modifier.weight(1f), valueRange = 0.6f..1f)
+                            Text("${(editWindowOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Card opacity", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
+                        Slider(value = editCardOpacity, onValueChange = { onCardOpacityChange(it); applyTheme() },
+                            modifier = Modifier.weight(1f), valueRange = 0.3f..1f)
+                        Text("${(editCardOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                    }
                     val tintValue = editSurfaceTint ?: (if (isDark) 0.12f else 0.06f)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Surface tint", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
@@ -296,7 +313,7 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onDensityChange(ThemeDefaults.Dark.density); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onDensityChange(ThemeDefaults.Dark.density); onWindowOpacityChange(1f); onCardOpacityChange(1f); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
             }

@@ -41,7 +41,11 @@ fun appCardContainer(): Color = when (LocalThemeConfig.current.cardStyle) {
 fun appCardColors(
     container: Color = appCardContainer(),
     alpha: Float = 1f,
-): CardColors = CardDefaults.cardColors(containerColor = container.copy(alpha = alpha))
+): CardColors {
+    // Card opacity comes from the theme, so translucent panels show the backdrop through every card.
+    val painted = container.copy(alpha = (alpha * LocalThemeConfig.current.cardOpacity).coerceIn(0f, 1f))
+    return CardDefaults.cardColors(containerColor = painted)
+}
 
 /**
  * Fill for a block nested inside a card: one tone step away from the card, so

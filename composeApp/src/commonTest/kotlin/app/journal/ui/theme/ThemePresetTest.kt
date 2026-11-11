@@ -55,4 +55,24 @@ class ThemePresetTest {
     fun invalidThemeJsonReturnsNull() {
         assertNull(ThemeStore.decode("not a theme"))
     }
+
+    @Test
+    fun opacitySurvivesTheStore() {
+        val config = ThemeConfig(windowOpacity = 0.8f, cardOpacity = 0.55f)
+
+        val decoded = ThemeStore.decode(ThemeStore.encode(config))
+
+        assertEquals(0.8f, decoded?.windowOpacity)
+        assertEquals(0.55f, decoded?.cardOpacity)
+    }
+
+    @Test
+    fun presetKeepsTheCurrentOpacity() {
+        val base = ThemeConfig(windowOpacity = 0.7f, cardOpacity = 0.5f)
+
+        val next = ThemePresets.Paper.applyTo(base, isDark = true)
+
+        assertEquals(0.7f, next.windowOpacity)
+        assertEquals(0.5f, next.cardOpacity)
+    }
 }

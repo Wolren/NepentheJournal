@@ -67,6 +67,10 @@ import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
 import app.journal.util.isSoftwareRender
 import app.journal.util.platformDeviceOrigin
+import app.journal.ui.pet.PetCompanion
+import app.journal.ui.pet.PetCorner
+import app.journal.ui.pet.PetManager
+import app.journal.ui.pet.PetState
 import app.journal.util.TimeDisplayMode
 import app.journal.ui.components.SubstanceLibraryGate
 import app.journal.ui.dashboard.DashboardScreen
@@ -115,6 +119,7 @@ internal fun AppNavigation(
     var selectedTimelineSessionId by remember { mutableStateOf<String?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
+    var showPalette by remember { mutableStateOf(false) }
     var selectedSubstanceId by remember { mutableStateOf<String?>(null) }
     var editingSubstanceId by remember { mutableStateOf<String?>(null) }
     // A nepenthe://quicklog link logs its dose on arrival, then opens that session.
@@ -153,6 +158,28 @@ internal fun AppNavigation(
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
     // Substance ids and interaction warnings come from the bundled library; every dosing surface waits for it.
     val libraryReady by DataInitializer.libraryReadyFlow.collectAsState()
+    val paletteSubstances by repo.substances.collectAsState()
+    val paletteSessions by repo.sessions.collectAsState()
+    val petSettings by PetManager.instance.settings.collectAsState()
+    val paletteCommands = remember(paletteSubstances, paletteSessions) {
+        buildList {
+            Screen.entries.forEach { screen ->
+                add(CommandItem(screen.label, "Open screen", "Screen") { selectedScreen = screen })
+            }
+            add(CommandItem("New session", "Open the session editor", "Action") { editingSessionId = "__new__" })
+            add(CommandItem("Start live session", "Start a timer now", "Action") { liveSessionId = "__new__" })
+            add(CommandItem("Calendar", "Sessions by day", "Action") { showCalendar = true })
+            add(CommandItem("Search", "Full text search", "Action") { showSearch = true })
+            paletteSubstances.sortedBy { it.name.lowercase() }.forEach { substance ->
+                add(CommandItem(substance.name, substance.substanceClass.joinToString(", "), "Substance") {
+                    selectedSubstanceId = substance.id
+                })
+            }
+            paletteSessions.sortedByDescending { it.startTime }.forEach { session ->
+                add(CommandItem(session.title, "Session", "Session") { selectedTimelineSessionId = session.id })
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -164,6 +191,7 @@ internal fun AppNavigation(
                     when (event.key) {
                         Key.F -> { showSearch = true; true }
                         Key.N -> { liveSessionId = "__new__"; true }
+                        Key.K -> { showPalette = true; true }
                         else -> false
                     }
                 } else false
@@ -556,6 +584,23 @@ internal fun AppNavigation(
                     }  // closes when(state)
                 }  // closes Box wrapper (background flash fix)
             }  // closes AnimatedContent transitionSpec
+
+            if (petSettings.enabled) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(20.dp),
+                    contentAlignment = when (petSettings.corner) {
+                        PetCorner.TOP_START -> Alignment.TopStart
+                        PetCorner.TOP_END -> Alignment.TopEnd
+                        PetCorner.BOTTOM_START -> Alignment.BottomStart
+                        PetCorner.BOTTOM_END -> Alignment.BottomEnd
+                    }
+                ) {
+                    PetCompanion(state = if (liveSessionId != null) PetState.RUNNING else PetState.IDLE)
+                }
+            }
+            if (showPalette) {
+                CommandPalette(commands = paletteCommands, onDismiss = { showPalette = false })
+            }
         }  // closes outer Box(fillMaxSize)
     }  // closes Surface
 }

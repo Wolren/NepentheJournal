@@ -31,7 +31,9 @@ data class ThemeConfig(
     val surfaceTint: Float? = null,
     val outlineStrength: Float? = null,
     val substanceAccentMode: SubstanceAccentMode = SubstanceAccentMode.ADAPTIVE,
-    val githubGreenActivity: Boolean = false
+    val githubGreenActivity: Boolean = false,
+    val windowOpacity: Float = 1f,
+    val cardOpacity: Float = 1f
 ) {
     val primary: Color get() = Color(primaryColor)
     val secondary: Color get() = Color(secondaryColor)
