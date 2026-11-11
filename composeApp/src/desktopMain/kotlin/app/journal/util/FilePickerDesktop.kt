@@ -1,5 +1,6 @@
 package app.journal.util
 
+import java.awt.FileDialog
 import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.SwingUtilities
@@ -40,15 +41,31 @@ actual object FilePicker {
         extensions: List<String>,
         title: String
     ): String? = suspendCancellableCoroutine { cont ->
+        // A FileDialog is the native Windows dialog; JFileChooser draws its own Swing chrome.
         SwingUtilities.invokeLater {
             try {
-                val chooser = JFileChooser().apply {
-                    dialogTitle = title
-                    fileFilter = FileNameExtensionFilter(description, *extensions.toTypedArray())
+                while (true) {
+                    val dialog = FileDialog(null as java.awt.Frame?, title, FileDialog.LOAD)
+                    dialog.isMultipleMode = false
+                    dialog.file = extensions.joinToString(";") { "*.$it" }
+                    dialog.isVisible = true
+                    val name = dialog.file
+                    val directory = dialog.directory
+                    if (name == null) {
+                        cont.resume(null)
+                        return@invokeLater
+                    }
+                    val file = if (directory != null) File(directory, name) else File(name)
+                    if (file.isFile && file.extension.lowercase() in extensions) {
+                        cont.resume(file.absolutePath)
+                        return@invokeLater
+                    }
+                    if (!file.isFile) {
+                        cont.resume(null)
+                        return@invokeLater
+                    }
+                    // A file of another type cannot be a backdrop, so the dialog opens again.
                 }
-                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    cont.resume(chooser.selectedFile.absolutePath)
-                } else cont.resume(null)
             } catch (_: Exception) {
                 cont.resume(null)
             }
