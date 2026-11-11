@@ -1,28 +1,19 @@
 package app.journal
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
-import app.journal.log.Log
 import app.journal.log.initLogging
 import app.journal.ui.App
 import app.journal.util.WindowGeometryStore
@@ -34,7 +25,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image
-import java.awt.Frame
 
 private fun loadAppIcon(): Painter {
     val bytes = Thread.currentThread().contextClassLoader
@@ -98,57 +88,18 @@ fun main() {
             size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
             position = savedGeometry?.first ?: WindowPosition(100.dp, 60.dp)
         )
-        // F11 drives AWT full-screen exclusive mode: the frame and the taskbar go away.
-        var fullscreen by remember { mutableStateOf(false) }
-        var restoreSize by remember { mutableStateOf(windowState.size) }
-        var restorePosition by remember { mutableStateOf(windowState.position) }
         LaunchedEffect(windowState) {
-            snapshotFlow { Triple(fullscreen, windowState.position, windowState.size) }
-                .collectLatest { (isFullscreen, position, size) ->
-                    // Full-screen bounds are the screen, so saving them would reopen the window edge to edge.
-                    if (isFullscreen) return@collectLatest
-                    delay(400)
-                    WindowGeometryStore.save(position, size)
-                }
+            snapshotFlow { windowState.position to windowState.size }.collectLatest { (position, size) ->
+                delay(400)
+                WindowGeometryStore.save(position, size)
+            }
         }
 
         Window(
             onCloseRequest = ::exitApplication,
             state = windowState,
             title = "Nepenthe Journal",
-            icon = icon,
-            // KeyUp fires once per press; KeyDown repeats while the key is held and would flip the state.
-            onPreviewKeyEvent = { event ->
-                if (event.type == KeyEventType.KeyUp && event.key == Key.F11) {
-                    fullscreen = !fullscreen
-                    true
-                } else false
-            }
-        ) {
-            LaunchedEffect(fullscreen) {
-                val device = window.graphicsConfiguration.device
-                if (fullscreen) {
-                    restoreSize = windowState.size
-                    restorePosition = windowState.position
-                    window.extendedState = Frame.NORMAL
-                    try {
-                        if (device.isFullScreenSupported) device.fullScreenWindow = window
-                        else windowState.placement = WindowPlacement.Fullscreen
-                    } catch (e: Exception) {
-                        Log.withTag("Window").w(e) { "full screen exclusive mode failed" }
-                        windowState.placement = WindowPlacement.Fullscreen
-                    }
-                } else {
-                    if (device.fullScreenWindow === window) device.fullScreenWindow = null
-                    windowState.placement = WindowPlacement.Floating
-                    windowState.size = restoreSize
-                    windowState.position = restorePosition
-                }
-                Log.withTag("Window").i {
-                    "full screen $fullscreen, undecorated ${window.isUndecorated}, bounds ${window.bounds}"
-                }
-            }
-            App()
-        }
+            icon = icon
+        ) { App() }
     }
 }
