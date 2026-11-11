@@ -13,9 +13,12 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -140,16 +143,35 @@ fun SettingsScreen(
     }
 
     val scrollState = rememberLazyListState()
+    // Categories drive the two-pane split; below the rail width the list shows every category in order.
+    var selectedCategoryIndex by rememberSaveable { mutableStateOf(0) }
+    val selectedCategory = SettingsCategory.entries[selectedCategoryIndex]
 
     CenteredContent {
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val spacing = LocalSpacing.current
-        LazyColumn(
+        val twoPane = maxWidth >= TwoPaneSettingsWidth
+        val visible: (SettingsCategory) -> Boolean = { category -> !twoPane || category == selectedCategory }
+        LaunchedEffect(selectedCategory) { if (twoPane) scrollState.scrollToItem(0) }
+        Row(
             modifier = Modifier.fillMaxSize().padding(spacing.screenPadding),
+            horizontalArrangement = Arrangement.spacedBy(spacing.cardGap)
+        ) {
+            if (twoPane) {
+                SettingsCategoryNav(
+                    selected = selectedCategory,
+                    onSelect = { selectedCategoryIndex = it.ordinal },
+                    modifier = Modifier.width(SettingsNavWidth)
+                )
+                VerticalDivider()
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(spacing.cardGap),
             state = scrollState
         ) {
-        item { ThemeContent(
+        if (visible(SettingsCategory.APPEARANCE)) item { ThemeContent(
             themeConfig = themeConfig, themeManager = themeManager,
             editBaseTheme = editBaseTheme, editPrimary = editPrimary, editSecondary = editSecondary,
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
@@ -180,7 +202,7 @@ fun SettingsScreen(
             applyTheme = { applyTheme() }
         ) }
 
-        item {
+        if (visible(SettingsCategory.PREFERENCES)) item {
             val prefExpanded = remember { mutableStateOf(false) }
             CollapsibleSettingsCard(
                 expanded = prefExpanded.value,
@@ -230,7 +252,7 @@ fun SettingsScreen(
             }
         }
 
-        item {
+        if (visible(SettingsCategory.DATA)) item {
             DataSettingsContent(
                 vm = dataViewModel, sessionCount = sessionCount, substanceCount = substanceCount,
                 dataExpanded = dataExpanded,
@@ -238,13 +260,13 @@ fun SettingsScreen(
             )
         }
 
-        item { PeopleSettingsContent(repo = repo) }
+        if (visible(SettingsCategory.JOURNAL)) item { PeopleSettingsContent(repo = repo) }
 
-        item { MedicationsSettingsContent(repo = repo) }
+        if (visible(SettingsCategory.JOURNAL)) item { MedicationsSettingsContent(repo = repo) }
 
-        item { ObsidianSettingsCard() }
+        if (visible(SettingsCategory.JOURNAL)) item { ObsidianSettingsCard() }
 
-        item {
+        if (visible(SettingsCategory.SYNC)) item {
             SyncSettingsContent(
                 syncEngine = syncEngine, status = status, state = syncState,
                 callbacks = SyncSettingsCallbacks(
@@ -263,7 +285,7 @@ fun SettingsScreen(
             )
         }
 
-        item {
+        if (visible(SettingsCategory.DATA)) item {
             CollapsibleSettingsCard(
                 expanded = libraryExpanded,
                 onToggle = { libraryExpanded = !libraryExpanded },
@@ -288,19 +310,72 @@ fun SettingsScreen(
             }
         }
 
-        item { AboutCardContent(aboutExpanded = aboutExpanded, onToggle = { aboutExpanded = !aboutExpanded }) }
+        if (visible(SettingsCategory.ABOUT)) item { AboutCardContent(aboutExpanded = aboutExpanded, onToggle = { aboutExpanded = !aboutExpanded }) }
 
-        item { LegalCardContent(legalExpanded = legalExpanded, onToggle = { legalExpanded = !legalExpanded }) }
+        if (visible(SettingsCategory.ABOUT)) item { LegalCardContent(legalExpanded = legalExpanded, onToggle = { legalExpanded = !legalExpanded }) }
 
-        item { PrivacyCardContent(privacyExpanded = privacyExpanded, onToggle = { privacyExpanded = !privacyExpanded }) }
+        if (visible(SettingsCategory.ABOUT)) item { PrivacyCardContent(privacyExpanded = privacyExpanded, onToggle = { privacyExpanded = !privacyExpanded }) }
 
-        item {
+        if (visible(SettingsCategory.ABOUT)) item {
             DeveloperCardContent(vm = dataViewModel)
         }
 
         item { Spacer(Modifier.height(16.dp)) }
         }
         DesktopScrollbar(scrollState)
+            }
+        }
     }
+    }
+}
+
+/** Category list for the two-pane settings layout; the single-column layout shows every category in order. */
+private enum class SettingsCategory(val label: String, val icon: ImageVector) {
+    APPEARANCE("Appearance", Icons.Default.Palette),
+    PREFERENCES("Preferences", Icons.Default.Tune),
+    DATA("Data", Icons.Default.Storage),
+    JOURNAL("Journal", Icons.Default.People),
+    SYNC("Sync", Icons.Default.Sync),
+    ABOUT("About", Icons.Default.Info),
+}
+
+private val TwoPaneSettingsWidth = 840.dp
+private val SettingsNavWidth = 200.dp
+
+@Composable
+private fun SettingsCategoryNav(
+    selected: SettingsCategory,
+    onSelect: (SettingsCategory) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SettingsCategory.entries.forEach { category ->
+            val isSelected = category == selected
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(chipShape())
+                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(category) })
+                    .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = category.icon,
+                    contentDescription = null,
+                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                           else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = category.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
     }
 }
