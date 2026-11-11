@@ -92,6 +92,8 @@ kotlin {
                 implementation(libs.logback.classic)
                 // zstd for the sealed backup; this jar carries the desktop natives only.
                 implementation(libs.zstd.jni)
+                // user32 calls for borderless full screen; AWT cannot undecorate a live window.
+                implementation(libs.jna.platform)
             }
         }
         val desktopTest = getByName("desktopTest") {

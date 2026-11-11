@@ -434,7 +434,6 @@ internal fun AppNavigation(
                                             label = { Text(screen.label) }
                                         )
                                     }
-                                    if (WindowControls.available) WindowControlButtons(horizontal = true)
                                 }
                                 }
                             }
@@ -454,14 +453,6 @@ internal fun AppNavigation(
                                                 },
                                                 label = { Text(screen.label) }
                                             )
-                                        }
-                                        Spacer(Modifier.weight(1f))
-                                        if (WindowControls.available) {
-                                            HorizontalDivider(
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                            )
-                                            WindowControlButtons(horizontal = false)
                                         }
                                     }
                                 }

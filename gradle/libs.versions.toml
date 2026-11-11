@@ -15,6 +15,7 @@ coil                   = "3.6.3"
 vico                   = "3.3.1"
 koalaplot              = "0.12.1"
 kermit                 = "2.2.0"
+jna                    = "5.17.0"
 
 bouncycastle = "1.86"
 
@@ -48,6 +49,7 @@ ktor-client-websockets  = { module = "io.ktor:ktor-client-websockets",        ve
 kermit-core             = { module = "co.touchlab:kermit",                   version.ref = "kermit" }
 kermit-io               = { module = "co.touchlab:kermit-io",                version.ref = "kermit" }
 zstd-jni               = { module = "com.github.luben:zstd-jni",             version = "1.5.7-2" }
+jna-platform           = { module = "net.java.dev.jna:jna-platform",         version.ref = "jna" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 
 [plugins]
