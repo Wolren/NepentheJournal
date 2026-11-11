@@ -1,18 +1,17 @@
 package app.journal.util
 
-import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
-import java.awt.Frame
 import java.awt.Rectangle
 
 /**
  * Borderless full screen on a live frame. AWT refuses setUndecorated once the
  * frame has a peer, so the style bits are rewritten on the native handle.
+ * The handle comes from the ComposeWindow, because reflecting into sun.awt is blocked.
  */
-class NativeFullscreen(private val frame: Frame) {
+class NativeFullscreen(private val nativeHandle: () -> Long) {
 
     private val user32 = User32.INSTANCE
     private var savedStyle: Int? = null
@@ -25,9 +24,11 @@ class NativeFullscreen(private val frame: Frame) {
         val hwnd = handle() ?: return false
         val style = user32.GetWindowLong(hwnd, WinUser.GWL_STYLE)
         val exStyle = user32.GetWindowLong(hwnd, WinUser.GWL_EXSTYLE)
+        val rect = WinDef.RECT()
+        if (!user32.GetWindowRect(hwnd, rect)) return false
         savedStyle = style
         savedExStyle = exStyle
-        savedBounds = frame.bounds
+        savedBounds = Rectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
 
         val keep = style and (WinUser.WS_VISIBLE or WinUser.WS_CLIPCHILDREN or WS_CLIPSIBLINGS)
         user32.SetWindowLong(hwnd, WinUser.GWL_STYLE, WinUser.WS_POPUP or keep)
@@ -64,7 +65,10 @@ class NativeFullscreen(private val frame: Frame) {
         )
     }
 
-    private fun handle(): WinDef.HWND? = Native.getWindowPointer(frame)?.let { WinDef.HWND(it) }
+    private fun handle(): WinDef.HWND? {
+        val value = nativeHandle()
+        return if (value == 0L) null else WinDef.HWND(Pointer.createConstant(value))
+    }
 
     private fun topmost(): WinDef.HWND = WinDef.HWND(Pointer.createConstant(-1))
 

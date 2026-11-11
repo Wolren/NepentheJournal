@@ -102,11 +102,12 @@ fun main() {
         var fullscreen by remember { mutableStateOf(false) }
         LaunchedEffect(windowState) {
             snapshotFlow { Triple(fullscreen, windowState.placement, windowState.position to windowState.size) }
-                .collectLatest { (isFullscreen, placement, geometry) ->
+                .collectLatest { (isFullscreen, placement, _) ->
                     // A maximized or full-screen window would persist as an edge-to-edge floating window.
                     if (isFullscreen || placement != WindowPlacement.Floating) return@collectLatest
                     delay(400)
-                    WindowGeometryStore.save(geometry.first, geometry.second)
+                    // Read after the delay: the native restore lands before this point, the emitted value may not.
+                    WindowGeometryStore.save(windowState.position, windowState.size)
                 }
         }
 
@@ -123,11 +124,14 @@ fun main() {
                 } else false
             }
         ) {
-            val borderless = remember { NativeFullscreen(window) }
+            val borderless = remember { NativeFullscreen { window.windowHandle } }
+            LaunchedEffect(Unit) {
+                Log.withTag("Window").i { "native handle 0x${window.windowHandle.toString(16)}" }
+            }
             LaunchedEffect(fullscreen) {
                 if (fullscreen) {
                     if (!borderless.enter()) {
-                        Log.withTag("Window").w { "native full screen unavailable" }
+                        Log.withTag("Window").w { "native full screen unavailable, handle ${window.windowHandle}" }
                         windowState.placement = WindowPlacement.Fullscreen
                     }
                 } else {
