@@ -447,7 +447,6 @@ internal fun AppNavigation(
                                     }
                                 }
                                 Box(Modifier.weight(1f).fillMaxSize()) {
-                                Box(Modifier.fillMaxSize().padding(top = if (wide) AppTopBarTotal else 0.dp)) {
                                 when (selectedScreen) {
                                     Screen.DASHBOARD -> DashboardScreen(
                                         repo = repo,
@@ -546,13 +545,6 @@ internal fun AppNavigation(
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(selectedScreen)
-                                }  // closes the bar strip
-                                if (wide) {
-                                    AppGlassTopBar(
-                                        title = selectedScreen.label,
-                                        onSearch = { showSearch = true }
-                                    )
-                                }
                                 }  // closes inner Box(weight)
                             }  // closes Row
                         }  // closes Scaffold innerPadding
