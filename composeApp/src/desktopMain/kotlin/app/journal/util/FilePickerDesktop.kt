@@ -37,12 +37,13 @@ actual object FilePicker {
 
     actual suspend fun openFile(
         description: String,
-        extensions: List<String>
+        extensions: List<String>,
+        title: String
     ): String? = suspendCancellableCoroutine { cont ->
         SwingUtilities.invokeLater {
             try {
                 val chooser = JFileChooser().apply {
-                    dialogTitle = "Import"
+                    dialogTitle = title
                     fileFilter = FileNameExtensionFilter(description, *extensions.toTypedArray())
                 }
                 if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {

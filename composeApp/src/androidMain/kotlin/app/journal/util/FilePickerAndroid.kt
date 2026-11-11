@@ -29,7 +29,8 @@ actual object FilePicker {
 
     actual suspend fun openFile(
         description: String,
-        extensions: List<String>
+        extensions: List<String>,
+        title: String
     ): String? = suspendCancellableCoroutine { cont ->
         if (AndroidFilePickerBridge.continuation != null) {
             cont.resume(null)

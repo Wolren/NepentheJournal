@@ -21,10 +21,13 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
+import app.journal.util.FilePicker
 import app.journal.util.isDesktopPlatform
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun ThemeContent(
@@ -228,10 +231,35 @@ internal fun ThemeContent(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Background image", style = MaterialTheme.typography.labelLarge)
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedTextField(value = editBgImage ?: "", onValueChange = { onBgImageChange(it); applyTheme() },
-                        placeholder = { Text("Image URL or file path") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = if (editBgImage != null) { { AppIconButton(onClick = { onBgImageChange(null); applyTheme() }, icon = Icons.Default.Close, contentDescription = "Clear") } } else null)
+                    Spacer(Modifier.height(6.dp))
+                    val pickerScope = rememberCoroutineScope()
+                    var showUrlField by remember { mutableStateOf(false) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AppTonalButton(onClick = {
+                            pickerScope.launch {
+                                FilePicker.openFile("Images", ImageExtensions, title = "Choose a background image")
+                                    ?.let { picked -> onBgImageChange(picked); applyTheme() }
+                            }
+                        }) { Text("Choose image") }
+                        Text(
+                            editBgImage?.substringAfterLast('/')?.substringAfterLast('\\') ?: "No image",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (editBgImage != null) {
+                            AppIconButton(onClick = { onBgImageChange(null); applyTheme() }, icon = Icons.Default.Close, contentDescription = "Clear")
+                        }
+                    }
+                    AppTextButton(onClick = { showUrlField = !showUrlField }) {
+                        Text(if (showUrlField) "Hide the URL field" else "Use a URL instead")
+                    }
+                    if (showUrlField) {
+                        OutlinedTextField(value = editBgImage ?: "", onValueChange = { onBgImageChange(it); applyTheme() },
+                            placeholder = { Text("https://example.com/wallpaper.jpg") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Opacity", style = MaterialTheme.typography.bodySmall)
@@ -422,3 +450,5 @@ private fun BackdropGradient.label(): String = when (this) {
     BackdropGradient.BOTTOM -> "Bottom"
     BackdropGradient.VIGNETTE -> "Vignette"
 }
+/** Extensions the image picker offers for a backdrop file. */
+private val ImageExtensions = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif")
