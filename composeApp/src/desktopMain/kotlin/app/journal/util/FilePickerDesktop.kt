@@ -40,8 +40,23 @@ actual object FilePicker {
         description: String,
         extensions: List<String>,
         title: String
-    ): String? = suspendCancellableCoroutine { cont ->
-        // A FileDialog is the native Windows dialog; JFileChooser draws its own Swing chrome.
+    ): String? {
+        if (WinFileDialog.available()) {
+            val outcome = suspendCancellableCoroutine<PickerOutcome> { cont ->
+                SwingUtilities.invokeLater { cont.resume(WinFileDialog.pick(title, extensions)) }
+            }
+            when (outcome) {
+                is PickerOutcome.Picked -> return outcome.path
+                PickerOutcome.Cancelled -> return null
+                PickerOutcome.Unsupported -> Unit
+            }
+        }
+        return openWithSystemDialog(title, extensions)
+    }
+
+    private suspend fun openWithSystemDialog(title: String, extensions: List<String>): String? =
+        suspendCancellableCoroutine { cont ->
+        // AWT FileDialog is the old common dialog, kept only as a fallback.
         SwingUtilities.invokeLater {
             try {
                 while (true) {
