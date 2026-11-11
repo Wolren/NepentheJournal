@@ -70,6 +70,8 @@ fun SettingsScreen(
     var editSurfaceColor by remember(themeConfig) { mutableStateOf(themeConfig.surfaceColor ?: 0xFF16211AL) }
     var editBgImage by remember(themeConfig) { mutableStateOf(themeConfig.backgroundImagePath) }
     var editBgOpacity by remember(themeConfig) { mutableStateOf(themeConfig.backgroundOpacity) }
+    var editBackdropGradient by remember(themeConfig) { mutableStateOf(themeConfig.backdropGradient) }
+    var editBackdropScrim by remember(themeConfig) { mutableStateOf(themeConfig.backdropScrim) }
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
     var editDensity by remember(themeConfig) { mutableStateOf(themeConfig.density) }
@@ -88,6 +90,7 @@ fun SettingsScreen(
         baseTheme = editBaseTheme, primaryColor = editPrimary, secondaryColor = editSecondary,
         tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
         backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
+        backdropGradient = editBackdropGradient, backdropScrim = editBackdropScrim,
         cardStyle = editCardStyle, cornerRadius = editCornerRadius, density = editDensity, fontScale = editFontScale,
         fontFamily = editFontFamily, textColor = editTextColor,
         animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
@@ -104,6 +107,8 @@ fun SettingsScreen(
         editSurfaceColor = config.surfaceColor ?: editSurfaceColor
         editBgImage = config.backgroundImagePath
         editBgOpacity = config.backgroundOpacity
+        editBackdropGradient = config.backdropGradient
+        editBackdropScrim = config.backdropScrim
         editCardStyle = config.cardStyle
         editCornerRadius = config.cornerRadius
         editDensity = config.density
@@ -181,7 +186,8 @@ fun SettingsScreen(
             themeConfig = themeConfig, themeManager = themeManager,
             editBaseTheme = editBaseTheme, editPrimary = editPrimary, editSecondary = editSecondary,
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
-            editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
+            editBgImage = editBgImage, editBgOpacity = editBgOpacity,
+            editBackdropGradient = editBackdropGradient, editBackdropScrim = editBackdropScrim, editCardStyle = editCardStyle,
             editCornerRadius = editCornerRadius, editDensity = editDensity,
             editWindowOpacity = editWindowOpacity, editCardOpacity = editCardOpacity,
             editFontScale = editFontScale, editAnimationScale = editAnimationScale,
@@ -193,7 +199,9 @@ fun SettingsScreen(
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
             onTertiaryChange = { editTertiary = it }, onBgColorChange = { editBgColor = it },
             onSurfaceColorChange = { editSurfaceColor = it }, onBgImageChange = { editBgImage = it },
-            onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
+            onBgOpacityChange = { editBgOpacity = it },
+            onBackdropGradientChange = { editBackdropGradient = it }, onBackdropScrimChange = { editBackdropScrim = it },
+            onCardStyleChange = { editCardStyle = it },
             onCornerRadiusChange = { editCornerRadius = it }, onDensityChange = { editDensity = it },
             onWindowOpacityChange = { editWindowOpacity = it }, onCardOpacityChange = { editCardOpacity = it },
             onFontScaleChange = { editFontScale = it },

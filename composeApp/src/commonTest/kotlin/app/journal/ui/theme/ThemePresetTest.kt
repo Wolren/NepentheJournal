@@ -75,4 +75,14 @@ class ThemePresetTest {
         assertEquals(0.7f, next.windowOpacity)
         assertEquals(0.5f, next.cardOpacity)
     }
+
+    @Test
+    fun backdropSurvivesTheStore() {
+        val config = ThemeConfig(backdropGradient = BackdropGradient.VIGNETTE, backdropScrim = 0.4f)
+
+        val decoded = ThemeStore.decode(ThemeStore.encode(config))
+
+        assertEquals(BackdropGradient.VIGNETTE, decoded?.backdropGradient)
+        assertEquals(0.4f, decoded?.backdropScrim)
+    }
 }

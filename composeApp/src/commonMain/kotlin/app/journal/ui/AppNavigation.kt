@@ -201,8 +201,13 @@ internal fun AppNavigation(
         Box(Modifier.fillMaxSize().then(desktopHandler)) {
             BackgroundImage(
                 imagePath = themeConfig.backgroundImagePath,
-                opacity = themeConfig.backgroundOpacity
+                opacity = themeConfig.backgroundOpacity,
+                gradient = themeConfig.backdropGradient,
+                scrim = themeConfig.backdropScrim
             )
+            // The image sits behind everything, so the shell layers above it must stay clear.
+            val hasBackdrop = !themeConfig.backgroundImagePath.isNullOrBlank()
+            val pageBackground = if (hasBackdrop) Color.Transparent else colorScheme.background
 
             val editingSession = remember(editingSessionId) {
                 editingSessionId?.let { id ->
@@ -279,7 +284,7 @@ internal fun AppNavigation(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
+                        .background(pageBackground)
                 ) {
                     when (state) {
                     NavigationState.Search -> {
@@ -372,6 +377,7 @@ internal fun AppNavigation(
                         val wide = maxWidth >= 840.dp
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
+                            containerColor = pageBackground,
                             topBar = {
                                 if (!wide && selectedScreen == Screen.SESSIONS) {
                                     TopAppBar(

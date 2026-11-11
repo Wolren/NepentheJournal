@@ -33,7 +33,9 @@ data class ThemeConfig(
     val substanceAccentMode: SubstanceAccentMode = SubstanceAccentMode.ADAPTIVE,
     val githubGreenActivity: Boolean = false,
     val windowOpacity: Float = 1f,
-    val cardOpacity: Float = 1f
+    val cardOpacity: Float = 1f,
+    val backdropGradient: BackdropGradient = BackdropGradient.NONE,
+    val backdropScrim: Float = 0f
 ) {
     val primary: Color get() = Color(primaryColor)
     val secondary: Color get() = Color(secondaryColor)
@@ -67,6 +69,9 @@ enum class CornerRadius { SMALL, MEDIUM, LARGE }
 enum class Density { COMPACT, COMFORTABLE, SPACIOUS }
 enum class AppFontFamily { SANS, SERIF, MONO }
 enum class SubstanceAccentMode { ADAPTIVE, THEME, MONO }
+
+/** Shading laid over a background image so cards and text stay readable. */
+enum class BackdropGradient { NONE, TOP, BOTTOM, VIGNETTE }
 
 object ThemeDefaults {
     /** Logo palette: cream lily on deep teal. */

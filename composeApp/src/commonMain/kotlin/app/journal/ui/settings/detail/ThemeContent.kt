@@ -31,7 +31,8 @@ internal fun ThemeContent(
     themeConfig: ThemeConfig, themeManager: ThemeManager,
     editBaseTheme: BaseTheme, editPrimary: Long, editSecondary: Long, editTertiary: Long,
     editBgColor: Long, editSurfaceColor: Long, editBgImage: String?,
-    editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
+    editBgOpacity: Float, editBackdropGradient: BackdropGradient, editBackdropScrim: Float,
+    editCardStyle: CardStyle, editCornerRadius: CornerRadius,
     editDensity: Density,
     editWindowOpacity: Float, editCardOpacity: Float,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
@@ -42,6 +43,7 @@ internal fun ThemeContent(
     onSecondaryChange: (Long) -> Unit, onTertiaryChange: (Long) -> Unit,
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
+    onBackdropGradientChange: (BackdropGradient) -> Unit, onBackdropScrimChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
     onDensityChange: (Density) -> Unit,
     onWindowOpacityChange: (Float) -> Unit, onCardOpacityChange: (Float) -> Unit,
@@ -214,6 +216,16 @@ internal fun ThemeContent(
                     if (editTextColor != null) {
                         AppTextButton(onClick = { onTextColorChange(null); applyTheme() }) { Text("Use default text") }
                     }
+                    val pageColor = Color(editBgColor)
+                    val pageContrast = contrastRatio(Color(effectiveText), pageColor)
+                    if (pageContrast < 4.5f) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                            Text("Text contrast ${(pageContrast * 10).toInt() / 10f} to 1, below 4.5",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            AppTextButton(onClick = { onTextColorChange(readableTextOn(pageColor)); applyTheme() }) { Text("Fix") }
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     Text("Background image", style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(4.dp))
@@ -226,6 +238,24 @@ internal fun ThemeContent(
                         Slider(value = editBgOpacity, onValueChange = { onBgOpacityChange(it); applyTheme() },
                             modifier = Modifier.weight(1f).height(16.dp), valueRange = 0f..1f)
                         Text("${(editBgOpacity * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                    }
+                    if (!editBgImage.isNullOrBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Shading: ", style = MaterialTheme.typography.bodySmall)
+                            BackdropGradient.entries.forEach { shade ->
+                                FilterChip(selected = editBackdropGradient == shade,
+                                    onClick = { onBackdropGradientChange(shade); applyTheme() },
+                                    label = { Text(shade.label(), style = MaterialTheme.typography.labelSmall) },
+                                    modifier = Modifier.padding(end = 4.dp))
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Scrim", style = MaterialTheme.typography.bodySmall)
+                            Slider(value = editBackdropScrim, onValueChange = { onBackdropScrimChange(it); applyTheme() },
+                                modifier = Modifier.weight(1f).height(16.dp), valueRange = 0f..0.85f)
+                            Text("${(editBackdropScrim * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(40.dp))
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Cards & shapes", style = MaterialTheme.typography.labelLarge); Spacer(Modifier.height(4.dp))
@@ -313,7 +343,7 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onDensityChange(ThemeDefaults.Dark.density); onWindowOpacityChange(1f); onCardOpacityChange(1f); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onDensityChange(ThemeDefaults.Dark.density); onWindowOpacityChange(1f); onCardOpacityChange(1f); onBgImageChange(null); onBgOpacityChange(0.3f); onBackdropGradientChange(BackdropGradient.NONE); onBackdropScrimChange(0f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
             }
@@ -384,4 +414,11 @@ private fun PresetCard(
             }
         }
     }
+}
+
+private fun BackdropGradient.label(): String = when (this) {
+    BackdropGradient.NONE -> "None"
+    BackdropGradient.TOP -> "Top"
+    BackdropGradient.BOTTOM -> "Bottom"
+    BackdropGradient.VIGNETTE -> "Vignette"
 }
