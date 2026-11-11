@@ -16,7 +16,10 @@ object WindowOpacity {
 
     /** Returns false when the handle is missing or the call fails. */
     fun apply(handle: Long, opacity: Float): Boolean {
-        if (handle == 0L) return false
+        if (handle == 0L) {
+            Log.withTag("Window").w { "window opacity skipped: no handle" }
+            return false
+        }
         val user32 = User32.INSTANCE
         val hwnd = WinDef.HWND(Pointer.createConstant(handle))
         return try {

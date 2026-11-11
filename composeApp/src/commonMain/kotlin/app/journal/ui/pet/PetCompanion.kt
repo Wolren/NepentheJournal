@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 /** Row index per petdex state, matching the 8 by 9 sheet every set ships. */
 private const val RowIdle = 0
@@ -26,6 +27,13 @@ private const val FrameWidth = 192
 private const val FrameHeight = 208
 
 private const val GreetingMs = 2200L
+
+/** Rest between animation cycles: idle rests longest, a running session keeps a short beat. */
+private fun restMs(row: Int): Long = when (row) {
+    RowRunning -> 1400L
+    RowWaving -> 2000L
+    else -> 3400L
+}
 
 /**
  * Draws the selected pet in the corner of the window. It waves once after
@@ -51,8 +59,13 @@ fun PetCompanion(state: PetState, modifier: Modifier = Modifier) {
     var frame by remember(row, frames) { mutableStateOf(0) }
     LaunchedEffect(row, frames) {
         while (true) {
-            delay(if (row == RowRunning) 90L else 150L)
-            frame = (frame + 1) % frames
+            for (step in 0 until frames) {
+                frame = step
+                delay(if (row == RowRunning) 90L else 150L)
+            }
+            // Hold the last frame so a cycle ends with a rest instead of a permanent loop.
+            frame = frames - 1
+            delay(restMs(row) + Random.nextLong(0L, 900L))
         }
     }
 

@@ -97,7 +97,6 @@ fun main() {
 
     application {
         val icon = remember { loadAppIcon() }
-        val themeConfig by ThemeManager.instance.config.collectAsState()
         val keybinds by KeybindManager.instance.settings.collectAsState()
         val savedGeometry = remember { WindowGeometryStore.load() }
         val windowState = rememberWindowState(
@@ -134,9 +133,12 @@ fun main() {
             LaunchedEffect(Unit) {
                 Log.withTag("Window").i { "native handle 0x${window.windowHandle.toString(16)}" }
             }
-            LaunchedEffect(themeConfig.windowOpacity, fullscreen) {
-                // Re-apply after full screen: leaving it restores the saved window styles.
-                WindowOpacity.apply(window.windowHandle, themeConfig.windowOpacity)
+            LaunchedEffect(fullscreen) {
+                // Collect the store directly: the window must fade even before the app composition settles.
+                ThemeManager.instance.config.collectLatest { config ->
+                    val applied = WindowOpacity.apply(window.windowHandle, config.windowOpacity)
+                    if (!applied) Log.withTag("Window").w { "window opacity failed at ${config.windowOpacity}" }
+                }
             }
             LaunchedEffect(fullscreen) {
                 if (fullscreen) {
