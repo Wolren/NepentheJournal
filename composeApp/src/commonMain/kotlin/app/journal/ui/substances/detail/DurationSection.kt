@@ -27,6 +27,8 @@ import app.journal.util.parseDurationValue
 import app.journal.util.parseDoseWikiDuration
 import app.journal.ui.components.AppCard
 import app.journal.ui.components.PhaseColors
+import app.journal.ui.components.appInnerBorder
+import app.journal.ui.components.appInnerContainer
 import kotlin.math.roundToInt
 
 @Composable
@@ -243,7 +245,8 @@ internal fun DurationTimelineSection(
                     val color = phaseColors[phase.label] ?: Color.Gray
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = color.copy(alpha = 0.10f),
+                        color = appInnerContainer(color, 0.12f),
+                        border = appInnerBorder(color),
                         modifier = Modifier.weight(1f)
                     ) {
                         Column(
@@ -261,8 +264,8 @@ internal fun DurationTimelineSection(
                                 ),
                                 maxLines = 1,
                                 autoSize = TextAutoSize.StepBased(
-                                    minFontSize = 7.sp,
-                                    maxFontSize = 11.sp,
+                                    minFontSize = 8.sp,
+                                    maxFontSize = 12.5.sp,
                                     stepSize = 0.5.sp
                                 )
                             )
@@ -276,7 +279,8 @@ internal fun DurationTimelineSection(
                 Spacer(Modifier.height(4.dp))
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = agColor.copy(alpha = 0.08f),
+                    color = appInnerContainer(agColor, 0.10f),
+                    border = appInnerBorder(agColor),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -297,7 +301,8 @@ internal fun DurationTimelineSection(
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    color = appInnerContainer(),
+                    border = appInnerBorder(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(

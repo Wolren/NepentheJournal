@@ -13,7 +13,8 @@ import kotlin.math.pow
 
 class ThemeManager private constructor() {
 
-    private val _config = MutableStateFlow(ThemeDefaults.Dark)
+    /** Neon is the shipped look; a saved theme replaces it on load. */
+    private val _config = MutableStateFlow(ThemePresets.Neon.applyTo(ThemeDefaults.Dark, isDark = true))
     val config: StateFlow<ThemeConfig> = _config.asStateFlow()
 
     private var cachedConfigHash: Int = 0

@@ -38,6 +38,8 @@ internal fun SectionCard(
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(LocalSpacing.current.innerGap))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        Spacer(Modifier.height(LocalSpacing.current.innerGap))
         content()
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.CardStyle
 import app.journal.ui.theme.LocalSpacing
 import app.journal.ui.theme.LocalThemeConfig
+import app.journal.ui.theme.blend
 
 /** Cards follow the theme's medium radius, so the corner setting applies everywhere. */
 @Composable
@@ -41,6 +42,27 @@ fun appCardColors(
     container: Color = appCardContainer(),
     alpha: Float = 1f,
 ): CardColors = CardDefaults.cardColors(containerColor = container.copy(alpha = alpha))
+
+/**
+ * Fill for a block nested inside a card: one tone step away from the card, so
+ * tiles, rows and bands stay distinct in every theme.
+ */
+@Composable
+fun appInnerContainer(): Color = blend(appCardContainer(), MaterialTheme.colorScheme.onSurface, 0.06f)
+
+/** Inner fill that carries a hue: the hue mixes into the step instead of fading into the card. */
+@Composable
+fun appInnerContainer(tint: Color, alpha: Float = 0.12f): Color =
+    blend(appInnerContainer(), tint, alpha)
+
+/** Hairline for a nested block; a [tint] keeps coloured tiles tied to their accent. */
+@Composable
+fun appInnerBorder(tint: Color? = null): BorderStroke =
+    BorderStroke(
+        width = 1.dp,
+        color = if (tint == null) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                else tint.copy(alpha = 0.45f)
+    )
 
 /** Elevated cards lift by 2 dp; filled and outlined cards stay flat. */
 @Composable

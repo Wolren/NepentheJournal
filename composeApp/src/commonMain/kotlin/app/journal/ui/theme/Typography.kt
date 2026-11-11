@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import app.journal.util.isDesktopPlatform
 
 /**
  * Nepenthe Journal typography scale.
@@ -116,19 +117,36 @@ val monospaceStyle = TextStyle(
     letterSpacing = 0.sp
 )
 
+/** Desktop sits further from the eye, so the small end of the scale gains extra sp. */
+private const val DesktopSmallTextLift = 1.5f
+private const val DesktopBodyTextLift = 1f
+
 /** Applies the chosen font family and font scale to the theme typography. */
-fun nepentheTypography(family: AppFontFamily = AppFontFamily.SANS, scale: Float = 1f): Typography {
+fun nepentheTypography(
+    family: AppFontFamily = AppFontFamily.SANS,
+    scale: Float = 1f,
+    desktop: Boolean = isDesktopPlatform(),
+): Typography {
     val font = when (family) {
         AppFontFamily.SANS -> FontFamily.SansSerif
         AppFontFamily.SERIF -> FontFamily.Serif
         AppFontFamily.MONO -> FontFamily.Monospace
     }
-    fun TextStyle.fit(): TextStyle = copy(
-        fontFamily = font,
-        fontSize = fontSize * scale,
-        lineHeight = lineHeight * scale,
-        letterSpacing = letterSpacing * scale,
-    )
+    // Absolute lift: small text gains proportionally more, and the 16 sp steps stay put.
+    fun lift(size: Float): Float = if (!desktop) 0f else when {
+        size <= 12f -> DesktopSmallTextLift
+        size <= 14f -> DesktopBodyTextLift
+        else -> 0f
+    }
+    fun TextStyle.fit(): TextStyle {
+        val extra = lift(fontSize.value)
+        return copy(
+            fontFamily = font,
+            fontSize = (fontSize.value * scale + extra).sp,
+            lineHeight = (lineHeight.value * scale + extra).sp,
+            letterSpacing = letterSpacing * scale,
+        )
+    }
     return NepentheTypography.copy(
         displayLarge = NepentheTypography.displayLarge.fit(),
         displayMedium = NepentheTypography.displayMedium.fit(),

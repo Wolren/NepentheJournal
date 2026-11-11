@@ -264,8 +264,8 @@ fun SubstanceDetailScreen(
                                         ),
                                         maxLines = 1,
                                         autoSize = TextAutoSize.StepBased(
-                                            minFontSize = 8.sp,
-                                            maxFontSize = 12.sp,
+                                            minFontSize = 9.sp,
+                                            maxFontSize = 13.sp,
                                             stepSize = 0.5.sp
                                         )
                                     )
