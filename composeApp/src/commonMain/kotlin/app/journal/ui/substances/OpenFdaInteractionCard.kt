@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.net.OpenFdaClient
 import app.journal.net.createHttpClient
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.userMessage
 import io.ktor.client.*
 import kotlinx.coroutines.launch
@@ -109,15 +110,8 @@ fun OpenFdaInteractionCard(
 
     val totalCount = interactionEntries.size
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(Modifier.padding(16.dp)) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,

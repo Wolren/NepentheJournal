@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Substance
+import app.journal.ui.components.AppCard
 import app.journal.model.TargetNormalizer
 import app.journal.model.pharmacologySources
 import kotlin.math.roundToInt
@@ -173,11 +174,8 @@ internal fun PharmacologySection(substance: Substance) {
 
     val totalGroups = groups.sumOf { (_, es) -> es.size }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable(enabled = true) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,

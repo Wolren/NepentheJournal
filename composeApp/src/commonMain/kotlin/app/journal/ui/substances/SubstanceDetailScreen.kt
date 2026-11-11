@@ -221,20 +221,15 @@ fun SubstanceDetailScreen(
 
         if (!substance.summary.isNullOrBlank()) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        substance.summary?.split("\n\n")?.forEachIndexed { i, paragraph ->
-                            if (i > 0) Spacer(Modifier.height(8.dp))
-                            SelectableText(
-                                text = paragraph.trim(),
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    substance.summary?.split("\n\n")?.forEachIndexed { i, paragraph ->
+                        if (i > 0) Spacer(Modifier.height(8.dp))
+                        SelectableText(
+                            text = paragraph.trim(),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
+                        )
                     }
                 }
             }
@@ -549,11 +544,11 @@ fun SubstanceDetailScreen(
         if (allDosesForSubstance.isNotEmpty()) {
             items(sortedDosesForSubstance, key = { it.id }) { dose ->
                 val session = sessionById[dose.sessionId]
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
+                AppCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = appCardPadding(dense = true),
                 ) {
-                    Row(Modifier.padding(12.dp).fillMaxWidth(),
+                    Row(Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
                             Text(

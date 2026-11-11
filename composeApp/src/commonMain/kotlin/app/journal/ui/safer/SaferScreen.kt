@@ -39,14 +39,12 @@ fun SaferScreen() {
         }
 
         item {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-                ),
+            AppCard(
+                colors = appCardColors(container = MaterialTheme.colorScheme.errorContainer, alpha = 0.6f),
+                contentPadding = appCardPadding(dense = true),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp))
@@ -155,14 +153,12 @@ fun SaferScreen() {
         }
 
         item {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-                ),
+            AppCard(
+                colors = appCardColors(container = MaterialTheme.colorScheme.tertiaryContainer, alpha = 0.4f),
+                contentPadding = appCardPadding(dense = true),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Link, null, tint = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.size(20.dp))
@@ -189,14 +185,12 @@ fun SaferScreen() {
         }
 
         item {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f)
-                ),
+            AppCard(
+                colors = appCardColors(container = MaterialTheme.colorScheme.tertiaryContainer, alpha = 0.4f),
+                contentPadding = appCardPadding(dense = true),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(14.dp)) {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.size(20.dp))
@@ -231,14 +225,8 @@ private fun SaferSection(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     body: String
 ) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = appCardColors(),
-        elevation = appCardElevation(),
-        border = appCardBorder(),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(modifier = Modifier.padding(14.dp).fillMaxWidth(),
+    AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = appCardPadding(dense = true)) {
+        Row(modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary,

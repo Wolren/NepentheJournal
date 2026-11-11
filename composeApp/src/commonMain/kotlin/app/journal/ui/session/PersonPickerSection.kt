@@ -30,7 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.model.Person
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.PersonEditorDialog
+import app.journal.ui.components.appCardColors
+import app.journal.ui.components.appCardPadding
 
 /**
  * Assigns the individual who took the substances in this trip. The assigned
@@ -56,13 +59,12 @@ fun PersonPickerSection(
         }
         Spacer(Modifier.height(4.dp))
         if (persons.isEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                ),
+            AppCard(
+                colors = appCardColors(container = MaterialTheme.colorScheme.primaryContainer, alpha = 0.5f),
+                contentPadding = appCardPadding(dense = true),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(Modifier.padding(12.dp)) {
+                Column {
                     Text(
                         "No individuals yet. Create your profile so this trip carries " +
                             "the right demographics on export.",

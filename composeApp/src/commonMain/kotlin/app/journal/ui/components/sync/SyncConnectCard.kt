@@ -47,11 +47,8 @@ fun SyncConnectCard(
     val discoveredPeers by syncEngine.observeDiscoveredPeers().collectAsState(initial = emptyList())
     var isScanning by remember { mutableStateOf(false) }
     var scanJob by remember { mutableStateOf<Job?>(null) }
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
+        Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)

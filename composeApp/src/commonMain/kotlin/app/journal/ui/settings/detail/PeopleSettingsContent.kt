@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.model.Person
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.PersonEditorDialog
 
 /**
@@ -28,11 +29,8 @@ fun PeopleSettingsContent(repo: IJournalRepository) {
     var creatingProfile by remember { mutableStateOf(false) }
     val hasSelf = persons.any { it.isSelf }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,

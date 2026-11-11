@@ -120,12 +120,12 @@ private fun InteractionGroup(
     val color = InteractionColors.color(group.riskLevel)
     val bgColor = InteractionColors.backgroundColor(group.riskLevel)
 
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
+    AppCard(
+        colors = appCardColors(container = bgColor),
+        contentPadding = appCardPadding(dense = true),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)

@@ -3,8 +3,6 @@ package app.journal.ui.charts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,10 +12,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.journal.ui.components.CardContentPadding
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.appCardBorder
-import app.journal.ui.components.appCardColors
-import app.journal.ui.components.appCardElevation
 import app.journal.ui.theme.ThemeManager
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -36,11 +32,9 @@ import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
 import com.patrykandpatrick.vico.compose.common.component.TextComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 
-private val chartCardShape = RoundedCornerShape(10.dp)
-
 /**
- * Single card wrapper every chart in the app goes through.
- * 10 dp / surfaceVariant / hairline outline - same as StatCard, ToleranceCard, SectionCard.
+ * Single card wrapper every chart in the app goes through, so one card style
+ * change reaches all charts.
  */
 @Composable
 fun ChartCard(
@@ -49,14 +43,11 @@ fun ChartCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
+    AppCard(
         modifier = modifier.fillMaxWidth(),
-        shape = chartCardShape,
-        colors = appCardColors(),
         border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = appCardElevation(),
     ) {
-        Column(Modifier.padding(CardContentPadding).fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

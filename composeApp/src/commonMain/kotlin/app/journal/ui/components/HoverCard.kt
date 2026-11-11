@@ -107,7 +107,7 @@ private fun StaticCard(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(appCardContainer())
             .then(if (border != null) Modifier.border(border, shape) else Modifier)
             .clickable(enabled = enabled, onClick = onClick),
         propagateMinConstraints = true

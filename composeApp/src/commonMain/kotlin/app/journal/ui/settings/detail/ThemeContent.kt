@@ -31,6 +31,7 @@ internal fun ThemeContent(
     editBaseTheme: BaseTheme, editPrimary: Long, editSecondary: Long, editTertiary: Long,
     editBgColor: Long, editSurfaceColor: Long, editBgImage: String?,
     editBgOpacity: Float, editCardStyle: CardStyle, editCornerRadius: CornerRadius,
+    editDensity: Density,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
     editFontFamily: AppFontFamily, editTextColor: Long?,
     editSurfaceTint: Float?, editOutlineStrength: Float?,
@@ -40,6 +41,7 @@ internal fun ThemeContent(
     onBgColorChange: (Long) -> Unit, onSurfaceColorChange: (Long) -> Unit,
     onBgImageChange: (String?) -> Unit, onBgOpacityChange: (Float) -> Unit,
     onCardStyleChange: (CardStyle) -> Unit, onCornerRadiusChange: (CornerRadius) -> Unit,
+    onDensityChange: (Density) -> Unit,
     onFontScaleChange: (Float) -> Unit, onAnimationScaleChange: (Float) -> Unit,
     onFontFamilyChange: (AppFontFamily) -> Unit, onTextColorChange: (Long?) -> Unit,
     onSurfaceTintChange: (Float?) -> Unit, onOutlineStrengthChange: (Float?) -> Unit,
@@ -54,12 +56,8 @@ internal fun ThemeContent(
     var presetName by remember { mutableStateOf("") }
     var importFailed by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
-    Card(modifier = Modifier.fillMaxWidth(),
-        colors = appCardColors(),
-        elevation = appCardElevation(),
-        border = appCardBorder()
-    ) {
-        Column(modifier = Modifier.padding(16.dp).animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 2000f))) {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically
@@ -238,6 +236,11 @@ internal fun ThemeContent(
                         CornerRadius.entries.forEach { radius -> FilterChip(selected = editCornerRadius == radius, onClick = { onCornerRadiusChange(radius); applyTheme() }, label = { Text(radius.name.lowercase(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.padding(end = 4.dp)) }
                     }
                     Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Density: ", style = MaterialTheme.typography.bodySmall)
+                        Density.entries.forEach { density -> FilterChip(selected = editDensity == density, onClick = { onDensityChange(density); applyTheme() }, label = { Text(density.name.lowercase(), style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.padding(end = 4.dp)) }
+                    }
+                    Spacer(Modifier.height(4.dp))
                     val tintValue = editSurfaceTint ?: (if (isDark) 0.12f else 0.06f)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Surface tint", style = MaterialTheme.typography.bodySmall); Spacer(Modifier.width(8.dp))
@@ -293,7 +296,7 @@ internal fun ThemeContent(
                     Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppButton(onClick = { applyTheme() }, modifier = Modifier.weight(1f)) { Text("Apply") }
-                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
+                        AppTonalButton(onClick = { onBaseThemeChange(ThemeDefaults.Dark.baseTheme); onPrimaryChange(ThemeDefaults.Dark.primaryColor); onSecondaryChange(ThemeDefaults.Dark.secondaryColor); onTertiaryChange(ThemeDefaults.Dark.tertiaryColor); onBgColorChange(ThemeDefaults.Dark.backgroundColor ?: 0xFF0A2621L); onSurfaceColorChange(ThemeDefaults.Dark.surfaceColor ?: 0xFF10332BL); onTextColorChange(ThemeDefaults.Dark.textColor); onSurfaceTintChange(null); onOutlineStrengthChange(null); onFontFamilyChange(ThemeDefaults.Dark.fontFamily); onCardStyleChange(ThemeDefaults.Dark.cardStyle); onCornerRadiusChange(ThemeDefaults.Dark.cornerRadius); onDensityChange(ThemeDefaults.Dark.density); onBgImageChange(null); onBgOpacityChange(0.3f); onFontScaleChange(1.0f); onAnimationScaleChange(1.0f); onSubstanceAccentModeChange(SubstanceAccentMode.ADAPTIVE); applyTheme() },
                             colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.weight(1f)) { Text("Reset") }
                     }
             }

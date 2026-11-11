@@ -292,16 +292,13 @@ fun CalendarScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             } else {
                                 sessionsForDate.forEach { session ->
-                                    Card(
+                                    AppCard(
                                         onClick = { onSessionTap(session.id) },
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
+                                        contentPadding = appCardPadding(dense = true),
                                     ) {
                                         Row(
-                                            Modifier.padding(12.dp).fillMaxWidth(),
+                                            Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {

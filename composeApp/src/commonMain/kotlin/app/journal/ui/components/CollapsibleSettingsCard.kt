@@ -36,15 +36,9 @@ fun CollapsibleSettingsCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = appCardColors(),
-        elevation = appCardElevation(),
-        border = appCardBorder()
-    ) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
-                .padding(CardContentPadding)
                 .then(
                     if (isDesktopPlatform()) Modifier.animateContentSize(
                         animationSpec = spring(dampingRatio = 1f, stiffness = 2000f)

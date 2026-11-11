@@ -86,16 +86,9 @@ fun SubstanceCompanionScreen(
         selectable = true,
     ) {
         item {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            AppCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -124,13 +117,8 @@ fun SubstanceCompanionScreen(
                         .mapValues { (_, ds) -> ds.size }
                         .entries.sortedByDescending { it.value }
                 }
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                AppCard(modifier = Modifier.fillMaxWidth(), contentPadding = appCardPadding(dense = true)) {
+                    Column {
                         Text(
                             "Routes",
                             style = MaterialTheme.typography.titleSmall,
@@ -266,13 +254,8 @@ fun SubstanceCompanionScreen(
 
         if (toleranceInfo != null) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Column {
                         Text(
                             "Tolerance",
                             style = MaterialTheme.typography.titleSmall,
@@ -324,18 +307,15 @@ fun SubstanceCompanionScreen(
                 "${dt.year}-${dt.monthNumber.toString().padStart(2, '0')}-${dt.dayOfMonth.toString().padStart(2, '0')}"
             }
 
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
+            AppCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSessionClick(session.id) }
+                    .clickable { onSessionClick(session.id) },
+                contentPadding = appCardPadding(dense = true),
             ) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
+                        .fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

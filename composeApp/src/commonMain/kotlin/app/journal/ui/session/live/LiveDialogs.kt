@@ -60,8 +60,8 @@ internal fun CrisisResourcesDialog(onDismiss: () -> Unit) {
 
 @Composable
 private fun CrisisResourceCard(label: String, contact: String, detail: String) {
-    Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(10.dp)) {
+    AppCard(contentPadding = appCardPadding(dense = true), modifier = Modifier.fillMaxWidth()) {
+        Column {
             Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
             Text(contact, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -14,6 +14,7 @@ import app.journal.export.obsidian.ObsidianExportConfig
 import app.journal.export.obsidian.ObsidianExportManager
 import app.journal.export.obsidian.ObsidianVaultOps
 import app.journal.ui.LocalJournalRepository
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.AppOutlinedButton
 import app.journal.ui.components.AppTonalButton
 import app.journal.util.FilePicker
@@ -61,13 +62,8 @@ fun ObsidianSettingsCard(
         repo.setObsidianFileOrganization(fileOrg)
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

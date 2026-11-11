@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.Session
+import app.journal.ui.components.AppCard
+import app.journal.ui.components.appCardColors
 import app.journal.util.currentTimeMillis
 import kotlinx.coroutines.delay
 
@@ -35,12 +37,12 @@ internal fun TimerCard(session: Session) {
     val timeStr = if (hours > 0) "${hours}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s"
         else "${mins}m ${secs.toString().padStart(2, '0')}s"
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+    AppCard(
+        colors = appCardColors(container = MaterialTheme.colorScheme.primaryContainer, alpha = 0.6f),
+        contentPadding = PaddingValues(24.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             val cycleMs = 12 * 3600000L
             val progress = (elapsedMs.coerceAtLeast(0L) % cycleMs).toFloat() / cycleMs.toFloat()
             Box(modifier = Modifier.size(120.dp), contentAlignment = Alignment.Center) {

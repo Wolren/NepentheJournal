@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.model.Substance
+import app.journal.ui.components.AppCard
 
 @Composable
 internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
@@ -49,11 +50,8 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
         }
     }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Text("Reported Effects", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))

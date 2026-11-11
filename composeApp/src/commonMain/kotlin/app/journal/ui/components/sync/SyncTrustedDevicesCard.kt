@@ -28,11 +28,8 @@ fun SyncTrustedDevicesCard(
 ) {
     if (devices.isEmpty()) return
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = modifier.fillMaxWidth()) {
+        Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -107,11 +104,8 @@ fun SyncEventLogCard(
 ) {
     var showDebug by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    AppCard(modifier = modifier.fillMaxWidth(), contentPadding = appCardPadding(dense = true)) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

@@ -23,6 +23,7 @@ data class ThemeConfig(
     val backgroundOpacity: Float = 0.3f,
     val cardStyle: CardStyle = CardStyle.ELEVATED,
     val cornerRadius: CornerRadius = CornerRadius.MEDIUM,
+    val density: Density = Density.COMFORTABLE,
     val fontScale: Float = 1.0f,
     val fontFamily: AppFontFamily = AppFontFamily.SANS,
     val textColor: Long? = null,
@@ -61,6 +62,7 @@ data class ThemeConfig(
 enum class BaseTheme { DARK, LIGHT, SYSTEM, CUSTOM }
 enum class CardStyle { ELEVATED, FILLED, OUTLINED }
 enum class CornerRadius { SMALL, MEDIUM, LARGE }
+enum class Density { COMPACT, COMFORTABLE, SPACIOUS }
 enum class AppFontFamily { SANS, SERIF, MONO }
 enum class SubstanceAccentMode { ADAPTIVE, THEME, MONO }
 
@@ -100,6 +102,7 @@ data class ThemePreset(
     val light: ThemeConfig,
     val cardStyle: CardStyle? = null,
     val cornerRadius: CornerRadius? = null,
+    val density: Density? = null,
     val fontFamily: AppFontFamily? = null,
     val fontScale: Float? = null,
     val animationScale: Float? = null,
@@ -125,6 +128,7 @@ data class ThemePreset(
             textColor = v.textColor,
             cardStyle = cardStyle ?: current.cardStyle,
             cornerRadius = cornerRadius ?: current.cornerRadius,
+            density = density ?: current.density,
             fontFamily = fontFamily ?: current.fontFamily,
             fontScale = fontScale ?: current.fontScale,
             animationScale = animationScale ?: current.animationScale,
@@ -183,6 +187,7 @@ object ThemePresets {
         ),
         cornerRadius = CornerRadius.SMALL,
         cardStyle = CardStyle.FILLED,
+        density = Density.SPACIOUS,
         fontFamily = AppFontFamily.SERIF,
         fontScale = 1.04f,
         animationScale = 0.75f,
@@ -225,6 +230,7 @@ object ThemePresets {
         ),
         cornerRadius = CornerRadius.SMALL,
         cardStyle = CardStyle.OUTLINED,
+        density = Density.COMPACT,
         fontFamily = AppFontFamily.MONO,
         fontScale = 0.95f,
         animationScale = 0f,
@@ -396,7 +402,8 @@ object ThemePresets {
             errorColor = 0xFFD32F2F, backgroundColor = 0xFFF6EFFF, surfaceColor = 0xFFFFFFFF
         ),
         cardStyle = CardStyle.OUTLINED,
-        cornerRadius = CornerRadius.LARGE
+        cornerRadius = CornerRadius.LARGE,
+        density = Density.SPACIOUS
     )
 
     val all: List<ThemePreset> = listOf(

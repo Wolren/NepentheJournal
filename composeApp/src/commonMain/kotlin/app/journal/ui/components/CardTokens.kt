@@ -1,15 +1,23 @@
 package app.journal.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.CardStyle
+import app.journal.ui.theme.LocalSpacing
 import app.journal.ui.theme.LocalThemeConfig
 
 /** Cards follow the theme's medium radius, so the corner setting applies everywhere. */
@@ -20,16 +28,19 @@ fun cardShape(): Shape = MaterialTheme.shapes.medium
 @Composable
 fun chipShape(): Shape = MaterialTheme.shapes.small
 
-/** Card fill for the selected card style: filled uses the variant, outlined uses the surface. */
+/** Outlined cards fill with the surface; filled and elevated cards use the accent-tinted variant. */
 @Composable
-fun appCardColors(): CardColors {
-    val scheme = MaterialTheme.colorScheme
-    val container = when (LocalThemeConfig.current.cardStyle) {
-        CardStyle.OUTLINED -> scheme.surface
-        else -> scheme.surfaceVariant
-    }
-    return CardDefaults.cardColors(containerColor = container)
+fun appCardContainer(): Color = when (LocalThemeConfig.current.cardStyle) {
+    CardStyle.OUTLINED -> MaterialTheme.colorScheme.surface
+    else -> MaterialTheme.colorScheme.surfaceVariant
 }
+
+/** Card fill for the selected card style; [alpha] fades the fill for de-emphasised cards. */
+@Composable
+fun appCardColors(
+    container: Color = appCardContainer(),
+    alpha: Float = 1f,
+): CardColors = CardDefaults.cardColors(containerColor = container.copy(alpha = alpha))
 
 /** Elevated cards lift by 2 dp; filled and outlined cards stay flat. */
 @Composable
@@ -46,12 +57,60 @@ fun appCardBorder(): BorderStroke? =
     } else null
 
 /**
- * Shared inner padding for content cards.
- *
- * 16 dp is the value almost every card already used (SectionCard,
- * CollapsibleSettingsCard, the settings and sync cards, the duration and
- * session sections); ChartCard was the lone 14 dp outlier, so the token
- * settles on 16 dp. Charts gain 2 dp of breathing room, which is the only
- * visual shift this consolidation introduces.
+ * Inner padding for a card: the regular step, or the tighter step used by
+ * inline rows, event rows and search hits.
  */
-val CardContentPadding: Dp = 16.dp
+@Composable
+fun appCardPadding(dense: Boolean = false): PaddingValues =
+    PaddingValues(if (dense) LocalSpacing.current.densePadding else LocalSpacing.current.cardPadding)
+
+/**
+ * Card shell shared by every content card: the theme picks fill, border,
+ * elevation and corners, and the density step picks the inner padding.
+ */
+@Composable
+fun AppCard(
+    modifier: Modifier = Modifier,
+    shape: Shape = cardShape(),
+    colors: CardColors = appCardColors(),
+    elevation: CardElevation = appCardElevation(),
+    border: BorderStroke? = appCardBorder(),
+    contentPadding: PaddingValues = appCardPadding(),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        modifier = modifier,
+        shape = shape,
+        colors = colors,
+        elevation = elevation,
+        border = border,
+    ) {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
+}
+
+/** Clickable card shell: same tokens as [AppCard], plus the ripple and semantics of a button. */
+@Composable
+fun AppCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: Shape = cardShape(),
+    colors: CardColors = appCardColors(),
+    elevation: CardElevation = appCardElevation(),
+    border: BorderStroke? = appCardBorder(),
+    contentPadding: PaddingValues = appCardPadding(),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        shape = shape,
+        colors = colors,
+        elevation = elevation,
+        border = border,
+    ) {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
+}

@@ -16,6 +16,7 @@ import app.journal.model.rules.InteractionDedupe
 import app.journal.data.IJournalRepository
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
+import app.journal.ui.components.AppCard
 
 @Composable
 internal fun InteractionsSection(
@@ -36,13 +37,8 @@ internal fun InteractionsSection(
 
     if (dangerous.isEmpty() && unsafe.isEmpty() && uncertain.isEmpty() && low.isEmpty()) return
 
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Text("Interactions", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))

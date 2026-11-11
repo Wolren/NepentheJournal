@@ -45,10 +45,9 @@ internal fun LiveEventCard(
     val timeStr = "+${mins}m${secs}s"
 
     if (editing) {
-        Card(shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
+        AppCard(colors = appCardColors(alpha = 0.8f), contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                     val quickTypes = listOf(TimelineEventType.OBSERVATION to "Obs", TimelineEventType.NOTE to "Note",
                         TimelineEventType.PEAK to "Peak", TimelineEventType.OFFSET to "Off",
@@ -81,9 +80,9 @@ internal fun LiveEventCard(
             }
         }
     } else {
-        Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        AppCard(contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Surface(modifier = Modifier.size(36.dp), shape = CircleShape,
                     color = when (event.eventType) {
                         TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> InteractionColors.dangerous.copy(alpha = 0.15f)
@@ -146,9 +145,9 @@ internal fun LiveDoseCard(dose: Dose, substance: Substance?, sessionStart: Long)
     val mins = elapsed / 60000
     val timeStr = "+${mins}m"
 
-    Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    AppCard(contentPadding = appCardPadding(dense = true),
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Science, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onTertiaryContainer) }
             }

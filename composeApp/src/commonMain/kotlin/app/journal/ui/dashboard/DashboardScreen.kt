@@ -138,14 +138,11 @@ fun DashboardScreen(
 
             if (sessions.isNotEmpty()) {
                 item {
-                    Card(
+                    AppCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = appCardColors(),
                         border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-                        elevation = appCardElevation()
                     ) {
-                        Column(Modifier.padding(14.dp).fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth()) {
                             val sessionDates = remember(sessions) {
                                 sessions.map { it.startTime }
                             }
@@ -265,11 +262,10 @@ private data class DaySubstanceInfo(val date: LocalDate, val count: Int, val sub
 @Composable
 private fun StatCard(modifier: Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
     val accent = MaterialTheme.colorScheme.primary
-    Card(modifier = modifier, shape = RoundedCornerShape(10.dp),
-        colors = appCardColors(),
+    AppCard(modifier = modifier,
         border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = appCardElevation()) {
-        Column(Modifier.padding(14.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        contentPadding = appCardPadding(dense = true)) {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Box(Modifier.width(24.dp).height(1.5.dp).background(accent.copy(alpha = 0.55f), RoundedCornerShape(1.dp)))
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.01).sp)
@@ -295,11 +291,10 @@ private fun ToleranceCard(info: ToleranceInfo) {
         ToleranceLevel.LOW -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.18f)
         ToleranceLevel.NONE -> Color.Transparent
     }
-    Card(modifier = Modifier.fillMaxWidth(), shape = cardShape(),
-        colors = appCardColors(),
+    AppCard(modifier = Modifier.fillMaxWidth(),
         border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.08f)),
-        elevation = appCardElevation()) {
-        Row(modifier = Modifier.padding(14.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        contentPadding = appCardPadding(dense = true)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(info.substanceName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))

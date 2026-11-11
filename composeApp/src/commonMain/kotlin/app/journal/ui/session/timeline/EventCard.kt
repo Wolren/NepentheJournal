@@ -48,8 +48,8 @@ internal fun EventCard(
     }
 
     if (editing) {
-        Card(shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AppCard(colors = appCardColors(alpha = 0.8f), contentPadding = appCardPadding(dense = true), modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                     val quickTypes = listOf(TimelineEventType.OBSERVATION to "Obs", TimelineEventType.NOTE to "Note", TimelineEventType.ONSET to "On", TimelineEventType.COMEUP to "Up", TimelineEventType.PEAK to "Peak", TimelineEventType.OFFSET to "Off", TimelineEventType.AFTERGLOW to "Glow", TimelineEventType.SIDE_EFFECT to "SE", TimelineEventType.EMERGENCY to "!")
                     quickTypes.forEach { (type, lbl) -> FilterChip(selected = editType == type, onClick = { editType = type }, label = { Text(lbl, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.height(26.dp)) }
@@ -67,11 +67,9 @@ internal fun EventCard(
             }
         }
     } else {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        AppCard(
+            border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            contentPadding = PaddingValues(0.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(Modifier.fillMaxWidth()) {

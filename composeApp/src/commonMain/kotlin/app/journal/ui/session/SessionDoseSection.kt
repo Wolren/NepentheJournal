@@ -15,9 +15,11 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.rules.ActiveInteractionResult
 import app.journal.log.Log
 import app.journal.model.Dose
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.AppTonalButton
 import app.journal.ui.components.SectionHeader
+import app.journal.ui.components.appCardPadding
 import app.journal.ui.components.routeColor
 import app.journal.util.formatDateShort
 import kotlinx.datetime.Instant
@@ -74,15 +76,13 @@ fun SessionDoseSection(
                         Instant.fromEpochMilliseconds(dose.timestamp).toLocalDateTime(TimeZone.currentSystemDefault())
                     } catch (e: Exception) { Log.withTag("SessionEdit").w(e) { "Failed to parse dose timestamp" }; null }
                 }
-                Card(
+                AppCard(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { onEditDose(dose) },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    contentPadding = appCardPadding(dense = true),
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(

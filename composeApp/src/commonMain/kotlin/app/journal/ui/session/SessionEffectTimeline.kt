@@ -29,6 +29,7 @@ import app.journal.model.Substance
 import app.journal.model.TimelineEvent
 import app.journal.ui.charts.TickLabel
 import app.journal.ui.charts.TickLabelRow
+import app.journal.ui.components.appCardContainer
 import app.journal.ui.session.timeline.axisLabel
 import app.journal.ui.session.timeline.axisStepMs
 import app.journal.ui.theme.AdaptiveColors
@@ -104,8 +105,7 @@ internal fun SessionEffectTimeline(
         }
     }
 
-    // The window follows the curves and the doses. Anchoring it at session.startTime drew dead
-    // space from "session started" to the first dose and cut curves that ran past the session.
+    // Window spans doses and curves; anchoring at session.startTime left dead space and clipped late curves.
     val startMs = minOf(
         doses.minOfOrNull { it.timestamp } ?: Long.MAX_VALUE,
         layers.minOfOrNull { it.samples.first().timestampMs } ?: Long.MAX_VALUE,
@@ -167,7 +167,7 @@ internal fun SessionEffectTimeline(
                 )
             }
         } else {
-            val container = MaterialTheme.colorScheme.surfaceVariant
+            val container = appCardContainer()
             val colorForSubstance = doses.distinctBy { it.substanceId }.associate { dose ->
                 val name = substancesById[dose.substanceId]?.name ?: dose.substanceId
                 dose.substanceId to AdaptiveColors.colorFor(name).getComposeColor(isDark)
@@ -193,8 +193,7 @@ internal fun SessionEffectTimeline(
 
                 fun buildPaths(samples: List<EffectSample>): Pair<Path, Path> {
                     val linePath = Path()
-                    // Catmull-Rom through the samples: the tangent at each point comes from its
-                    // neighbours, so passing through a peak keeps the slope instead of kinking it.
+                    // Catmull-Rom tangents come from neighbours, so a peak keeps its slope instead of kinking.
                     val xs = samples.map { xAt(it.timestampMs) }
                     val ys = samples.map { yAt(it.intensity) }
                     linePath.moveTo(xs[0], ys[0])
@@ -210,8 +209,7 @@ internal fun SessionEffectTimeline(
                             val y2 = ys[i + 1]
                             val x3 = xs.getOrElse(i + 2) { xs[i + 1] }
                             val y3 = ys.getOrElse(i + 2) { ys[i + 1] }
-                            // Uneven sample spacing lets the raw tangents cross, which draws a loop;
-                            // clamping each control point into its own segment keeps x monotone.
+                            // Clamping each control point into its own segment keeps x monotone on uneven spacing.
                             val lo = minOf(x1, x2)
                             val hi = maxOf(x1, x2)
                             val c1x = (x1 + (x2 - x0) / 6f).coerceIn(lo, hi)

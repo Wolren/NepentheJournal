@@ -30,10 +30,8 @@ internal fun DataSettingsContent(
     val statusText by vm.dataStatus.collectAsState()
     var passphraseAction by remember { mutableStateOf<PassphraseAction?>(null) }
 
-    Card(modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { onDataExpanded() },
                 horizontalArrangement = Arrangement.SpaceBetween,

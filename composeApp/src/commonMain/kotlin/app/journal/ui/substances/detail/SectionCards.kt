@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.journal.ui.components.CardContentPadding
+import app.journal.ui.components.AppCard
+import app.journal.ui.components.appCardColors
 import app.journal.ui.components.routeColor
+import app.journal.ui.theme.LocalSpacing
 
 @Composable
 internal fun SectionCard(
@@ -21,23 +23,22 @@ internal fun SectionCard(
     danger: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (danger) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                             else MaterialTheme.colorScheme.surfaceVariant
-        ),
-        modifier = modifier.fillMaxWidth()
+    AppCard(
+        modifier = modifier.fillMaxWidth(),
+        colors = if (danger) {
+            appCardColors(container = MaterialTheme.colorScheme.errorContainer, alpha = 0.4f)
+        } else {
+            appCardColors()
+        },
     ) {
-        Column(modifier = Modifier.padding(CardContentPadding)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                color = accentColor ?: MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            content()
-        }
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = accentColor ?: MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(Modifier.height(LocalSpacing.current.innerGap))
+        content()
     }
 }
 

@@ -15,6 +15,7 @@ import app.journal.data.IJournalRepository
 import app.journal.model.Medication
 import app.journal.model.MedicationPreset
 import app.journal.model.rules.InteractionClassEnricher
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.AppTextButton
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
@@ -38,11 +39,8 @@ fun MedicationsSettingsContent(repo: IJournalRepository) {
         medications.sortedWith(compareByDescending<Medication> { it.isActiveAt(now) }.thenBy { it.displayName })
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
                 horizontalArrangement = Arrangement.SpaceBetween,

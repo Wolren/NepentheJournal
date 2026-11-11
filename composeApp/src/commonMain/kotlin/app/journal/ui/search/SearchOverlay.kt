@@ -23,6 +23,7 @@ import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.data.SearchResult
 import app.journal.model.Note
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.CenteredContent
 import app.journal.ui.components.DesktopScrollbar
 import app.journal.ui.components.SelectableContent
@@ -204,10 +205,7 @@ private fun SearchResultCard(
     onSessionClick: (String) -> Unit,
     onSubstanceClick: (String) -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
+    AppCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
@@ -219,7 +217,7 @@ private fun SearchResultCard(
             }
     ) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {

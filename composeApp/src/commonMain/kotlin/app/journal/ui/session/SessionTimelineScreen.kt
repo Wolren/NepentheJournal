@@ -224,23 +224,15 @@ fun SessionTimelineScreen(
 
         if (!session.intention.isNullOrBlank() || !session.outcome.isNullOrBlank()) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        if (!session.intention.isNullOrBlank()) {
-                            Text("Intention", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(4.dp)); Text(session.intention, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (!session.outcome.isNullOrBlank()) {
-                            if (!session.intention.isNullOrBlank()) Spacer(Modifier.height(8.dp))
-                            Text("Outcome", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(4.dp)); Text(session.outcome, style = MaterialTheme.typography.bodySmall)
-                        }
+                SessionDetailCard {
+                    if (!session.intention.isNullOrBlank()) {
+                        Text("Intention", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp)); Text(session.intention, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (!session.outcome.isNullOrBlank()) {
+                        if (!session.intention.isNullOrBlank()) Spacer(Modifier.height(8.dp))
+                        Text("Outcome", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp)); Text(session.outcome, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -248,23 +240,15 @@ fun SessionTimelineScreen(
 
         if (!session.set.isNullOrBlank() || !session.setting.isNullOrBlank()) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        if (!session.set.isNullOrBlank()) {
-                            Text("Set (Mindset)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(4.dp)); Text(session.set, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if (!session.setting.isNullOrBlank()) {
-                            if (!session.set.isNullOrBlank()) Spacer(Modifier.height(8.dp))
-                            Text("Setting (Environment)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(4.dp)); Text(session.setting, style = MaterialTheme.typography.bodySmall)
-                        }
+                SessionDetailCard {
+                    if (!session.set.isNullOrBlank()) {
+                        Text("Set (Mindset)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp)); Text(session.set, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (!session.setting.isNullOrBlank()) {
+                        if (!session.set.isNullOrBlank()) Spacer(Modifier.height(8.dp))
+                        Text("Setting (Environment)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp)); Text(session.setting, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -273,22 +257,14 @@ fun SessionTimelineScreen(
         val profile = session.profile
         if (profile != null && (profile.age != null || profile.gender != null || profile.heightCm != null || profile.weightKg != null)) {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.padding(14.dp)) {
-                        Text("Subject Profile", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            profile.age?.let { Column { Text("Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("$it", style = MaterialTheme.typography.bodySmall) } }
-                            profile.gender?.let { Column { Text("Gender", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(it, style = MaterialTheme.typography.bodySmall) } }
-                            profile.heightCm?.let { Column { Text("Height", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}cm", style = MaterialTheme.typography.bodySmall) } }
-                            profile.weightKg?.let { Column { Text("Weight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}kg", style = MaterialTheme.typography.bodySmall) } }
-                        }
+                SessionDetailCard {
+                    Text("Subject Profile", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        profile.age?.let { Column { Text("Age", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("$it", style = MaterialTheme.typography.bodySmall) } }
+                        profile.gender?.let { Column { Text("Gender", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(it, style = MaterialTheme.typography.bodySmall) } }
+                        profile.heightCm?.let { Column { Text("Height", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}cm", style = MaterialTheme.typography.bodySmall) } }
+                        profile.weightKg?.let { Column { Text("Weight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text("${it}kg", style = MaterialTheme.typography.bodySmall) } }
                     }
                 }
             }
@@ -325,14 +301,8 @@ fun SessionTimelineScreen(
             }
         } else {
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                SessionDetailCard {
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                             modifier = Modifier.size(44.dp)) {
                             Box(contentAlignment = Alignment.Center) {
@@ -367,20 +337,12 @@ fun SessionTimelineScreen(
     }
 }
 
-/**
- * Standard session-detail card shell: surfaceVariant fill, 12dp corners, the
- * hairline outlineVariant border and 14dp padding every other block on this
- * screen (Intention, Set & Setting, Subject Profile) already uses.
- */
+/** Every session-detail block goes through here, so the card style applies once. */
 @Composable
 private fun SessionDetailCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.padding(14.dp), content = content)
-    }
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        border = appCardBorder() ?: BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        content = content,
+    )
 }

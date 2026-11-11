@@ -67,6 +67,7 @@ fun SettingsScreen(
     var editBgOpacity by remember(themeConfig) { mutableStateOf(themeConfig.backgroundOpacity) }
     var editCardStyle by remember(themeConfig) { mutableStateOf(themeConfig.cardStyle) }
     var editCornerRadius by remember(themeConfig) { mutableStateOf(themeConfig.cornerRadius) }
+    var editDensity by remember(themeConfig) { mutableStateOf(themeConfig.density) }
     var editFontScale by remember(themeConfig) { mutableStateOf(themeConfig.fontScale) }
     var editFontFamily by remember(themeConfig) { mutableStateOf(themeConfig.fontFamily) }
     var editTextColor by remember(themeConfig) { mutableStateOf(themeConfig.textColor) }
@@ -80,7 +81,7 @@ fun SettingsScreen(
         baseTheme = editBaseTheme, primaryColor = editPrimary, secondaryColor = editSecondary,
         tertiaryColor = editTertiary, backgroundColor = editBgColor, surfaceColor = editSurfaceColor,
         backgroundImagePath = editBgImage?.takeIf { it.isNotBlank() }, backgroundOpacity = editBgOpacity,
-        cardStyle = editCardStyle, cornerRadius = editCornerRadius, fontScale = editFontScale,
+        cardStyle = editCardStyle, cornerRadius = editCornerRadius, density = editDensity, fontScale = editFontScale,
         fontFamily = editFontFamily, textColor = editTextColor,
         animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
         outlineStrength = editOutlineStrength, substanceAccentMode = editSubstanceAccentMode,
@@ -98,6 +99,7 @@ fun SettingsScreen(
         editBgOpacity = config.backgroundOpacity
         editCardStyle = config.cardStyle
         editCornerRadius = config.cornerRadius
+        editDensity = config.density
         editFontScale = config.fontScale
         editFontFamily = config.fontFamily
         editTextColor = config.textColor
@@ -141,9 +143,10 @@ fun SettingsScreen(
 
     CenteredContent {
     Box(modifier = Modifier.fillMaxSize()) {
+        val spacing = LocalSpacing.current
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().padding(spacing.screenPadding),
+            verticalArrangement = Arrangement.spacedBy(spacing.cardGap),
             state = scrollState
         ) {
         item { ThemeContent(
@@ -151,7 +154,8 @@ fun SettingsScreen(
             editBaseTheme = editBaseTheme, editPrimary = editPrimary, editSecondary = editSecondary,
             editTertiary = editTertiary, editBgColor = editBgColor, editSurfaceColor = editSurfaceColor,
             editBgImage = editBgImage, editBgOpacity = editBgOpacity, editCardStyle = editCardStyle,
-            editCornerRadius = editCornerRadius, editFontScale = editFontScale, editAnimationScale = editAnimationScale,
+            editCornerRadius = editCornerRadius, editDensity = editDensity,
+            editFontScale = editFontScale, editAnimationScale = editAnimationScale,
             editFontFamily = editFontFamily, editTextColor = editTextColor,
             editSurfaceTint = editSurfaceTint, editOutlineStrength = editOutlineStrength,
             editSubstanceAccentMode = editSubstanceAccentMode,
@@ -161,7 +165,8 @@ fun SettingsScreen(
             onTertiaryChange = { editTertiary = it }, onBgColorChange = { editBgColor = it },
             onSurfaceColorChange = { editSurfaceColor = it }, onBgImageChange = { editBgImage = it },
             onBgOpacityChange = { editBgOpacity = it }, onCardStyleChange = { editCardStyle = it },
-            onCornerRadiusChange = { editCornerRadius = it }, onFontScaleChange = { editFontScale = it },
+            onCornerRadiusChange = { editCornerRadius = it }, onDensityChange = { editDensity = it },
+            onFontScaleChange = { editFontScale = it },
             onFontFamilyChange = { editFontFamily = it }, onTextColorChange = { editTextColor = it },
             onSurfaceTintChange = { editSurfaceTint = it }, onOutlineStrengthChange = { editOutlineStrength = it },
             onSubstanceAccentModeChange = { editSubstanceAccentMode = it },

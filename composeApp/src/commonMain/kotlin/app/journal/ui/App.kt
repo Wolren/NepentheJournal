@@ -19,9 +19,11 @@ import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
+import app.journal.ui.theme.LocalSpacing
 import app.journal.ui.theme.LocalThemeConfig
 import app.journal.ui.theme.ThemeManager
 import app.journal.ui.theme.nepentheTypography
+import app.journal.ui.theme.spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,8 +62,10 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
             typography = nepentheTypography(themeConfig.fontFamily, themeConfig.fontScale),
             shapes = themeConfig.shapes
         ) {
-            AppDialogs(repo = repo, journalStore = journalStore, ready = ready)
-            AppNavigation(repo = repo, journalStore = journalStore, themeConfig = themeConfig, colorScheme = colorScheme)
+            CompositionLocalProvider(LocalSpacing provides themeConfig.density.spacing) {
+                AppDialogs(repo = repo, journalStore = journalStore, ready = ready)
+                AppNavigation(repo = repo, journalStore = journalStore, themeConfig = themeConfig, colorScheme = colorScheme)
+            }
         }  // closes MaterialTheme
     }  // closes CompositionLocalProvider
 }  // closes App

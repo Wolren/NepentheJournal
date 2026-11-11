@@ -15,7 +15,10 @@ import app.journal.data.IJournalRepository
 import app.journal.model.Dose
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.AppTextButton
+import app.journal.ui.components.appCardColors
+import app.journal.ui.components.appCardPadding
 import app.journal.util.currentTimeMillis
 import androidx.compose.ui.text.font.FontWeight
 
@@ -36,12 +39,12 @@ fun EditorInlineEventCard(
     var useIntensity by remember { mutableStateOf(event.intensity != null) }
 
     if (editing) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)),
-            shape = RoundedCornerShape(8.dp),
+        AppCard(
+            colors = appCardColors(alpha = 0.8f),
+            contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
                     val quickTypes = listOf(
                         TimelineEventType.OBSERVATION to "Obs",
@@ -118,12 +121,11 @@ fun EditorInlineEventCard(
             else -> MaterialTheme.colorScheme.primary
         }
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(8.dp),
+        AppCard(
+            contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.Top,
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {

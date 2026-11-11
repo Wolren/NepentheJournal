@@ -25,6 +25,7 @@ import app.journal.util.getDoseWikiTotal
 import app.journal.util.parseDurationProfile
 import app.journal.util.parseDurationValue
 import app.journal.util.parseDoseWikiDuration
+import app.journal.ui.components.AppCard
 import app.journal.ui.components.PhaseColors
 import kotlin.math.roundToInt
 
@@ -92,11 +93,8 @@ internal fun DurationTimelineSection(
 
     val timelineSpan = maxOf(totalMax, barPhases.maxOfOrNull { it.maxMinutes } ?: 1.0)
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Text("Duration", style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
             if (dwRoutes.size > 1) {

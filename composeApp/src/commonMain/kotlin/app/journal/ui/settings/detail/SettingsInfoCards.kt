@@ -32,9 +32,9 @@ internal fun AboutCardContent(aboutExpanded: Boolean, onToggle: () -> Unit) {
         Text("All data stored locally on device. No cloud, no accounts, no tracking.",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
-            shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(10.dp)) {
+        AppCard(colors = appCardColors(container = MaterialTheme.colorScheme.primaryContainer, alpha = 0.4f),
+            contentPadding = appCardPadding(dense = true), modifier = Modifier.fillMaxWidth()) {
+            Column {
                 Text("Pledge", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Spacer(Modifier.height(2.dp))
@@ -97,10 +97,8 @@ internal fun PrivacyCardContent(privacyExpanded: Boolean, onToggle: () -> Unit) 
 @Composable
 internal fun DeveloperCardContent(vm: app.journal.ui.settings.DataSettingsViewModel) {
     val crashLogStatus by vm.crashLogStatus.collectAsState()
-    Card(modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Build, null, tint = MaterialTheme.colorScheme.primary)
                 Text("Developer", style = MaterialTheme.typography.titleMedium)
