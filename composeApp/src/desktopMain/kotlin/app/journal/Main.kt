@@ -1,14 +1,22 @@
 package app.journal
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -88,18 +96,38 @@ fun main() {
             size = savedGeometry?.second ?: DpSize(1200.dp, 820.dp),
             position = savedGeometry?.first ?: WindowPosition(100.dp, 60.dp)
         )
-        LaunchedEffect(windowState) {
-            snapshotFlow { windowState.position to windowState.size }.collectLatest { (position, size) ->
-                delay(400)
-                WindowGeometryStore.save(position, size)
+        // F11 returns to the placement that was live before full screen, so a maximized window comes back maximized.
+        var restorePlacement by remember { mutableStateOf<WindowPlacement>(WindowPlacement.Floating) }
+        fun toggleFullscreen() {
+            if (windowState.placement == WindowPlacement.Fullscreen) {
+                windowState.placement = restorePlacement
+            } else {
+                restorePlacement = windowState.placement
+                windowState.placement = WindowPlacement.Fullscreen
             }
+        }
+        LaunchedEffect(windowState) {
+            snapshotFlow { Triple(windowState.placement, windowState.position, windowState.size) }
+                .collectLatest { (placement, position, size) ->
+                    // Full-screen geometry is the screen size, so saving it would reopen the window edge to edge.
+                    if (placement != WindowPlacement.Floating) return@collectLatest
+                    delay(400)
+                    WindowGeometryStore.save(position, size)
+                }
         }
 
         Window(
             onCloseRequest = ::exitApplication,
             state = windowState,
             title = "Nepenthe Journal",
-            icon = icon
+            icon = icon,
+            // KeyUp fires once per press; KeyDown repeats while the key is held and would flip the state.
+            onPreviewKeyEvent = { event ->
+                if (event.type == KeyEventType.KeyUp && event.key == Key.F11) {
+                    toggleFullscreen()
+                    true
+                } else false
+            }
         ) { App() }
     }
 }
