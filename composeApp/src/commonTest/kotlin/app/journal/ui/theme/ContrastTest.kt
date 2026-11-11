@@ -31,4 +31,16 @@ class ContrastTest {
     fun readableTextPicksBlackOnALightPage() {
         assertEquals(0xFF000000, readableTextOn(Color(0xFFF5F7FF)))
     }
+
+    @Test
+    fun ensureContrastReachesTheTarget() {
+        val fixed = ensureContrast(Color(0xFF333333), Color(0xFF000000), 3f)
+
+        assertTrue(contrastRatio(fixed, Color(0xFF000000)) >= 3f, "fixed colour still too dark")
+    }
+
+    @Test
+    fun ensureContrastLeavesAGoodColourAlone() {
+        assertEquals(Color.White, ensureContrast(Color.White, Color.Black, 3f))
+    }
 }

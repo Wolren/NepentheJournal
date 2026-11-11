@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -220,14 +221,24 @@ internal fun ThemeContent(
                         AppTextButton(onClick = { onTextColorChange(null); applyTheme() }) { Text("Use default text") }
                     }
                     val pageColor = Color(editBgColor)
-                    val pageContrast = contrastRatio(Color(effectiveText), pageColor)
-                    if (pageContrast < 4.5f) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                            Text("Text contrast ${(pageContrast * 10).toInt() / 10f} to 1, below 4.5",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                            AppTextButton(onClick = { onTextColorChange(readableTextOn(pageColor)); applyTheme() }) { Text("Fix") }
-                        }
+                    val textColor = Color(effectiveText)
+                    val cardColor = appCardContainer()
+                    ContrastNote("Text on the page", textColor, pageColor, 4.5f) {
+                        onTextColorChange(readableTextOn(pageColor)); applyTheme()
+                    }
+                    ContrastNote("Text on cards", textColor, cardColor, 4.5f) {
+                        onTextColorChange(readableTextOn(cardColor)); applyTheme()
+                    }
+                    val hintColor = lerp(pageColor, MaterialTheme.colorScheme.onSurfaceVariant, 0.6f)
+                    ContrastNote("Hint text", hintColor, pageColor, 4.5f, null)
+                    ContrastNote("Primary", Color(editPrimary), pageColor, 3f) {
+                        onPrimaryChange(ensureContrast(Color(editPrimary), pageColor, 3f).toArgb().toLong() and 0xFFFFFFFFL); applyTheme()
+                    }
+                    ContrastNote("Secondary", Color(editSecondary), pageColor, 3f) {
+                        onSecondaryChange(ensureContrast(Color(editSecondary), pageColor, 3f).toArgb().toLong() and 0xFFFFFFFFL); applyTheme()
+                    }
+                    ContrastNote("Tertiary", Color(editTertiary), pageColor, 3f) {
+                        onTertiaryChange(ensureContrast(Color(editTertiary), pageColor, 3f).toArgb().toLong() and 0xFFFFFFFFL); applyTheme()
                     }
                     Spacer(Modifier.height(12.dp))
                     Text("Background image", style = MaterialTheme.typography.labelLarge)
@@ -259,6 +270,23 @@ internal fun ThemeContent(
                     if (showUrlField) {
                         OutlinedTextField(value = editBgImage ?: "", onValueChange = { onBgImageChange(it); applyTheme() },
                             placeholder = { Text("https://example.com/wallpaper.jpg") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    if (!editBgImage.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        // Live preview of the image, its opacity, the shading and the scrim.
+                        Box(
+                            Modifier.fillMaxWidth().height(110.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                        ) {
+                            BackgroundImage(
+                                imagePath = editBgImage,
+                                opacity = editBgOpacity,
+                                gradient = editBackdropGradient,
+                                scrim = editBackdropScrim,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -452,3 +480,15 @@ private fun BackdropGradient.label(): String = when (this) {
 }
 /** Extensions the image picker offers for a backdrop file. */
 private val ImageExtensions = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif")
+/** One contrast finding with an optional one-click repair. */
+@Composable
+private fun ContrastNote(label: String, foreground: Color, background: Color, threshold: Float, onFix: (() -> Unit)?) {
+    val ratio = contrastRatio(foreground, background)
+    if (ratio >= threshold) return
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+        Text("$label contrast ${(ratio * 10).toInt() / 10f} to 1, below $threshold",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        if (onFix != null) AppTextButton(onClick = onFix) { Text("Fix") }
+    }
+}

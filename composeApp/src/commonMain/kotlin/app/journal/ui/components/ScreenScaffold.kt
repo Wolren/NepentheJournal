@@ -21,6 +21,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.journal.ui.theme.LocalThemeConfig
 import app.journal.util.isDesktopPlatform
 
 /**
@@ -49,9 +50,12 @@ fun ScreenScaffold(
         }
     } else Modifier
 
+    // With a backdrop image the overlay keeps a tint instead of a solid page, so the image reads through.
+    val hasBackdrop = !LocalThemeConfig.current.backgroundImagePath.isNullOrBlank()
     Scaffold(
         modifier = modifier.then(keyHandler),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (hasBackdrop) MaterialTheme.colorScheme.background.copy(alpha = 0.55f)
+                         else MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {

@@ -166,19 +166,31 @@ internal fun AppNavigation(
     val paletteCommands = remember(paletteSubstances, paletteSessions) {
         buildList {
             Screen.entries.forEach { screen ->
-                add(CommandItem(screen.label, "Open screen", "Screen") { selectedScreen = screen })
+                add(CommandItem("screen:${screen.name}", screen.label, "Open screen", "Screen", isAction = true) {
+                    selectedScreen = screen
+                })
             }
-            add(CommandItem("New session", "Open the session editor", "Action") { editingSessionId = "__new__" })
-            add(CommandItem("Start live session", "Start a timer now", "Action") { liveSessionId = "__new__" })
-            add(CommandItem("Calendar", "Sessions by day", "Action") { showCalendar = true })
-            add(CommandItem("Search", "Full text search", "Action") { showSearch = true })
+            add(CommandItem("action:new-session", "New session", "Open the session editor", "Action", isAction = true) {
+                editingSessionId = "__new__"
+            })
+            add(CommandItem("action:live-session", "Start live session", "Start a timer now", "Action", isAction = true) {
+                liveSessionId = "__new__"
+            })
+            add(CommandItem("action:calendar", "Calendar", "Sessions by day", "Action", isAction = true) {
+                showCalendar = true
+            })
+            add(CommandItem("action:search", "Search", "Full text search", "Action", isAction = true) {
+                showSearch = true
+            })
             paletteSubstances.sortedBy { it.name.lowercase() }.forEach { substance ->
-                add(CommandItem(substance.name, substance.substanceClass.joinToString(", "), "Substance") {
+                add(CommandItem("substance:${substance.id}", substance.name, substance.substanceClass.joinToString(", "), "Substance", isAction = false) {
                     selectedSubstanceId = substance.id
                 })
             }
             paletteSessions.sortedByDescending { it.startTime }.forEach { session ->
-                add(CommandItem(session.title, "Session", "Session") { selectedTimelineSessionId = session.id })
+                add(CommandItem("session:${session.id}", session.title, "Session", "Session", isAction = false) {
+                    selectedTimelineSessionId = session.id
+                })
             }
         }
     }

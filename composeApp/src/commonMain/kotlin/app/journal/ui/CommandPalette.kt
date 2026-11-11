@@ -43,34 +43,89 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.ui.components.AppCard
 import app.journal.ui.components.chipShape
+import app.journal.util.PlatformFile
 import kotlinx.coroutines.delay
 
-/** One row of the command palette: a label, an optional second line, and the group it belongs to. */
+/** One row of the command palette: a stable id, a label, an optional second line and its group. */
 data class CommandItem(
+    val id: String,
     val title: String,
     val detail: String?,
     val group: String,
+    val isAction: Boolean,
     val action: () -> Unit,
 )
 
 private const val PaletteMaxResults = 80
+private const val RecentLimit = 8
+
+/** The last commands run from the palette, newest first, so the empty state opens with them. */
+object PaletteRecents {
+    private fun path(): String = "${PlatformFile.dataDir()}/palette-recents.txt"
+
+    fun load(): List<String> = try {
+        if (PlatformFile.size(path()) < 0) emptyList()
+        else PlatformFile.readText(path()).lineSequence().filter { it.isNotBlank() }.take(RecentLimit).toList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    fun record(id: String) {
+        try {
+            val next = (listOf(id) + load().filter { it != id }).take(RecentLimit)
+            PlatformFile.writeText(path(), next.joinToString("\n"))
+        } catch (_: Exception) {
+            // Best effort: a palette that cannot remember must still work.
+        }
+    }
+}
 
 /**
- * Ctrl+K overlay: filters the command list as you type, moves with the arrow
- * keys, runs the highlighted row on Enter and closes on Escape.
+ * Scores a fuzzy match: every query character must appear in order. Lower is
+ * better, and a gap or a late position costs more than a contiguous hit.
+ */
+internal fun fuzzyScore(text: String, query: String): Int? {
+    if (query.isEmpty()) return 0
+    val haystack = text.lowercase()
+    val needle = query.lowercase()
+    var index = 0
+    var score = 0
+    for (char in needle) {
+        val found = haystack.indexOf(char, index)
+        if (found < 0) return null
+        score += found + if (found == index) 0 else 2
+        index = found + 1
+    }
+    if (haystack.startsWith(needle)) score -= 3
+    return score
+}
+
+/**
+ * Ctrl+K overlay: fuzzy filtered rows, recent commands first, and a ">" prefix
+ * that limits the list to actions. Arrow keys move, Enter runs, Escape closes.
  */
 @Composable
 fun CommandPalette(commands: List<CommandItem>, onDismiss: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(0) }
-    val results = remember(query, commands) {
-        val needle = query.trim()
-        val matched = if (needle.isEmpty()) commands else commands.filter {
-            it.title.contains(needle, ignoreCase = true) ||
-                it.detail?.contains(needle, ignoreCase = true) == true ||
-                it.group.contains(needle, ignoreCase = true)
+    val recentIds = remember { PaletteRecents.load() }
+    val trimmed = query.trim()
+    val actionsOnly = trimmed.startsWith(">")
+    val needle = if (actionsOnly) trimmed.removePrefix(">").trim() else trimmed
+
+    val results = remember(needle, actionsOnly, commands, recentIds) {
+        val base = if (actionsOnly) commands.filter { it.isAction } else commands
+        if (needle.isEmpty()) {
+            val recent = recentIds.mapNotNull { id -> base.firstOrNull { it.id == id } }
+            val rest = base.filterNot { item -> recentIds.contains(item.id) }
+            (recent + rest).take(PaletteMaxResults)
+        } else {
+            base.mapNotNull { item ->
+                val score = fuzzyScore(item.title, needle)
+                    ?: item.detail?.let { fuzzyScore(it, needle) }
+                score?.let { it to item }
+            }.sortedBy { it.first }.map { it.second }.take(PaletteMaxResults)
         }
-        matched.take(PaletteMaxResults)
     }
     LaunchedEffect(results.size) { if (selected >= results.size) selected = 0 }
 
@@ -86,7 +141,9 @@ fun CommandPalette(commands: List<CommandItem>, onDismiss: () -> Unit) {
     }
 
     fun run(item: CommandItem?) {
-        item?.action?.invoke()
+        if (item == null) return
+        PaletteRecents.record(item.id)
+        item.action()
         onDismiss()
     }
 
@@ -119,7 +176,7 @@ fun CommandPalette(commands: List<CommandItem>, onDismiss: () -> Unit) {
                     query = it
                     selected = 0
                 },
-                placeholder = { Text("Command, substance or session") },
+                placeholder = { Text("Command, substance or session. Type > for actions only") },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
