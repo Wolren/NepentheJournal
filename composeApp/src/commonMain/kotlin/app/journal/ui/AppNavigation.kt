@@ -237,6 +237,10 @@ internal fun AppNavigation(
             val isSoftwareRender = remember { isSoftwareRender() }
             val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
             val wideShell = windowWidth >= 840.dp
+            LaunchedEffect(wideShell, liveSessionId) {
+                // The pane only exists on the sessions screen, so a live session brings that screen forward.
+                if (wideShell && liveSessionId != null) selectedScreen = Screen.SESSIONS
+            }
             val animationScale = themeConfig.animationScale.coerceIn(0f, 1f)
             val animationSpeed = 0.4f + 0.6f * animationScale
             val slideSpec: androidx.compose.animation.core.FiniteAnimationSpec<IntOffset> = remember(isSoftwareRender, animationSpeed) {
@@ -250,7 +254,8 @@ internal fun AppNavigation(
                 targetState = when {
                     showSearch -> NavigationState.Search
                     companionSubstanceId != null -> NavigationState.CompanionSubstance
-                    liveSessionId != null -> NavigationState.LiveSession
+                    // A wide shell hosts the live session in the sessions pane instead of taking the window.
+                    liveSessionId != null && !wideShell -> NavigationState.LiveSession
                     editingSessionId != null -> NavigationState.EditorSession
                     !wideShell && selectedTimelineSessionId != null -> NavigationState.Timeline
                     editingSubstanceId != null -> NavigationState.EditorSubstance
@@ -292,57 +297,13 @@ internal fun AppNavigation(
                         )
                     }
                     NavigationState.LiveSession -> {
-                        val session = remember(stableLiveId) {
-                            stableLiveId?.let { id ->
-                                if (id == "__new__") null
-                                else repo.getSession(id)
-                            }
-                        }
-                        if (!libraryReady) {
-                            SubstanceLibraryGate(onBack = { liveSessionId = null })
-                        } else if (session != null) {
-                            LiveSessionScreen(
-                                repo = repo,
-                                session = session,
-                                onBack = { liveSessionId = null }
-                            )
-                        } else {
-                            var liveCreateError by remember { mutableStateOf<String?>(null) }
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Starting session...")
-                                    liveCreateError?.let { err ->
-                                        Spacer(Modifier.height(8.dp))
-                                        Text(err, color = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-                            val liveCreateKey = stableLiveId
-                            LaunchedEffect(liveCreateKey) {
-                                if (liveCreateKey != "__new__") return@LaunchedEffect
-                                val openLive = repo.sessions.value.firstOrNull {
-                                    it.id.startsWith("session:live:") && it.endTime == null
-                                }
-                                if (openLive != null) {
-                                    liveSessionId = openLive.id
-                                    return@LaunchedEffect
-                                }
-                                try {
-                                    val now = currentTimeMillis()
-                                val newSession = Session(
-                                    id = "session:live:${now}",
-                                    title = "Live Session",
-                                    startTime = now,
-                                    createdAt = now, updatedAt = now,
-                                    deviceOrigin = platformDeviceOrigin()
-                                )
-                                repo.upsertSession(newSession)
-                                liveSessionId = newSession.id
-                                } catch (e: Exception) {
-                                    liveCreateError = "Could not start session: ${e.message ?: "unknown error"}"
-                                }
-                            }
-                        }
+                        LiveSessionContent(
+                            repo = repo,
+                            liveId = stableLiveId,
+                            libraryReady = libraryReady,
+                            onLiveIdChange = { liveSessionId = it },
+                            onBack = { liveSessionId = null }
+                        )
                     }
                     NavigationState.EditorSession -> {
                         if (!libraryReady) {
@@ -543,15 +504,22 @@ internal fun AppNavigation(
                                                         )
                                                     }
                                                     Box(Modifier.weight(1f - listFraction).fillMaxHeight()) {
+                                                        val paneLiveId = liveSessionId
                                                         val paneSessionId = selectedTimelineSessionId
-                                                        if (paneSessionId != null) {
-                                                            SessionTimelineScreen(
+                                                        when {
+                                                            paneLiveId != null -> LiveSessionContent(
+                                                                repo = repo,
+                                                                liveId = paneLiveId,
+                                                                libraryReady = libraryReady,
+                                                                onLiveIdChange = { liveSessionId = it },
+                                                                onBack = { liveSessionId = null }
+                                                            )
+                                                            paneSessionId != null -> SessionTimelineScreen(
                                                                 repo = repo,
                                                                 sessionId = paneSessionId,
                                                                 onBack = { selectedTimelineSessionId = null }
                                                             )
-                                                        } else {
-                                                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                            else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                                 Text(
                                                                     "Select a session",
                                                                     style = MaterialTheme.typography.bodyLarge,
@@ -604,4 +572,60 @@ internal fun AppNavigation(
             }
         }  // closes outer Box(fillMaxSize)
     }  // closes Surface
+}
+
+/** Live session body shared by the narrow full screen and the wide sessions pane. */
+@Composable
+private fun LiveSessionContent(
+    repo: IJournalRepository,
+    liveId: String?,
+    libraryReady: Boolean,
+    onLiveIdChange: (String?) -> Unit,
+    onBack: () -> Unit,
+) {
+    val session = remember(liveId) {
+        liveId?.let { id -> if (id == "__new__") null else repo.getSession(id) }
+    }
+    if (!libraryReady) {
+        SubstanceLibraryGate(onBack = onBack)
+        return
+    }
+    if (session != null) {
+        LiveSessionScreen(repo = repo, session = session, onBack = onBack)
+        return
+    }
+    var liveCreateError by remember { mutableStateOf<String?>(null) }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Starting session...")
+            liveCreateError?.let { err ->
+                Spacer(Modifier.height(8.dp))
+                Text(err, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    LaunchedEffect(liveId) {
+        if (liveId != "__new__") return@LaunchedEffect
+        val openLive = repo.sessions.value.firstOrNull {
+            it.id.startsWith("session:live:") && it.endTime == null
+        }
+        if (openLive != null) {
+            onLiveIdChange(openLive.id)
+            return@LaunchedEffect
+        }
+        try {
+            val now = currentTimeMillis()
+            val newSession = Session(
+                id = "session:live:$now",
+                title = "Live Session",
+                startTime = now,
+                createdAt = now, updatedAt = now,
+                deviceOrigin = platformDeviceOrigin()
+            )
+            repo.upsertSession(newSession)
+            onLiveIdChange(newSession.id)
+        } catch (e: Exception) {
+            liveCreateError = "Could not start session: ${e.message ?: "unknown error"}"
+        }
+    }
 }
