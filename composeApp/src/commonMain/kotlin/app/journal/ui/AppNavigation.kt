@@ -428,6 +428,7 @@ internal fun AppNavigation(
                                 }
                             }
                         ) { innerPadding ->
+                            CompositionLocalProvider(LocalTopBarInset provides if (wide) AppTopBarHeight else 0.dp) {
                             Row(Modifier.padding(innerPadding).fillMaxSize()) {
                                 if (wide) {
                                     NavigationRail(containerColor = MaterialTheme.colorScheme.surface) {
@@ -476,7 +477,9 @@ internal fun AppNavigation(
                                             )
                                         }
                                         if (wide) {
-                                            BoxWithConstraints(Modifier.fillMaxSize()) {
+                                            // The shell bar spans both panes, so the split starts below it.
+                                            CompositionLocalProvider(LocalTopBarInset provides 0.dp) {
+                                            BoxWithConstraints(Modifier.fillMaxSize().padding(top = AppTopBarHeight)) {
                                                 val totalPx = with(LocalDensity.current) { maxWidth.toPx() }
                                                 val listFraction = sessionPaneFraction.coerceIn(0.25f, 0.65f)
                                                 Row(Modifier.fillMaxSize()) {
@@ -530,6 +533,7 @@ internal fun AppNavigation(
                                                     }
                                                 }
                                             }
+                                            }  // closes the pane inset provider
                                         } else {
                                             listContent()
                                         }
@@ -545,8 +549,15 @@ internal fun AppNavigation(
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(selectedScreen)
+                                if (wide) {
+                                    AppGlassTopBar(
+                                        title = selectedScreen.label,
+                                        onSearch = { showSearch = true }
+                                    )
+                                }
                                 }  // closes inner Box(weight)
                             }  // closes Row
+                            }  // closes the bar inset provider
                         }  // closes Scaffold innerPadding
                         }  // closes BoxWithConstraints
                     }  // closes "main" block

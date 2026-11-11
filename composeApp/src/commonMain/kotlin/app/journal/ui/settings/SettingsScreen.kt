@@ -1,5 +1,7 @@
 package app.journal.ui.settings
 
+import app.journal.ui.LocalTopBarInset
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -175,7 +177,8 @@ fun SettingsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(spacing.cardGap),
-            state = scrollState
+            state = scrollState,
+            contentPadding = PaddingValues(top = LocalTopBarInset.current)
         ) {
         if (visible(SettingsCategory.APPEARANCE)) item { ThemeContent(
             themeConfig = themeConfig, themeManager = themeManager,
