@@ -26,6 +26,7 @@ import app.journal.model.Dose
 import app.journal.model.StomachFullness
 import app.journal.model.Substance
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 import kotlinx.coroutines.launch
 
 val ROA_OPTIONS = listOf(
@@ -143,7 +144,7 @@ fun DoseEditDialog(
             } else null,
             createdAt = initialDose?.createdAt ?: now,
             updatedAt = now,
-            deviceOrigin = "desktop",
+            deviceOrigin = platformDeviceOrigin(),
             stomachFullness = stomachFullness,
             customUnitId = customUnit?.id
         )

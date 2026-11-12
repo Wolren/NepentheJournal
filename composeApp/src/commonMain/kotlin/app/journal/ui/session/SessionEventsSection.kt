@@ -17,6 +17,7 @@ import app.journal.ui.components.AppTextButton
 import app.journal.ui.components.AppTonalButton
 import app.journal.ui.components.SectionHeader
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 
 @Composable
 fun SessionEventsSection(
@@ -46,7 +47,7 @@ fun SessionEventsSection(
                 timestamp = now,
                 body = null,
                 createdAt = now, updatedAt = now,
-                deviceOrigin = "desktop"
+                deviceOrigin = platformDeviceOrigin()
             )
             repo.upsertTimelineEvent(newEvent)
             onEventAdded(newEvent)

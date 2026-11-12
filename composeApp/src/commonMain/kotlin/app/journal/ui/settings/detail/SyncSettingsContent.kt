@@ -15,6 +15,7 @@ import app.journal.ui.LocalJournalRepository
 import app.journal.sync.*
 import app.journal.ui.components.*
 import app.journal.ui.components.sync.*
+import app.journal.util.platformDeviceOrigin
 import kotlinx.coroutines.launch
 
 @Composable
@@ -75,8 +76,8 @@ internal fun SyncSettingsContent(
                         callbacks.onIsStartingHostChange(true)
                         scope.launch {
                             try {
-                                val cfg = SyncConfig(id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = "desktop",
-                                    deviceId = "desktop-main", displayName = "Windows Desktop",
+                                val cfg = SyncConfig(id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = platformDeviceOrigin(),
+                                    deviceId = "desktop-main", displayName = platformDeviceName(),
                                     listenerPort = state.manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT, continuousSync = state.continuousSync, enableDeltaSync = true)
                                 syncEngine.startHosting(cfg).fold(
                                     onSuccess = { callbacks.onLogLine(SyncLogEntry.Success("Hosting on port ${it.port}")) },

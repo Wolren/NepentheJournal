@@ -284,7 +284,8 @@ fun SettingsScreen(
 
         if (visible(SettingsCategory.JOURNAL)) item { MedicationsSettingsContent(repo = repo) }
 
-        if (visible(SettingsCategory.JOURNAL)) item { ObsidianSettingsCard() }
+        // A vault is a real folder written through the file API, which scoped storage refuses on a phone.
+        if (visible(SettingsCategory.JOURNAL) && isDesktopPlatform()) item { ObsidianSettingsCard() }
 
         if (visible(SettingsCategory.SYNC)) item {
             SyncSettingsContent(

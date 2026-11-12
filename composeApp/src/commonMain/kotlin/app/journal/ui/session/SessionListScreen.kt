@@ -30,6 +30,7 @@ import app.journal.util.currentTimeMillis
 import app.journal.util.formatRelativeTime
 import app.journal.util.isDesktopPlatform
 import app.journal.ui.session.SessionCard
+import app.journal.util.platformDeviceOrigin
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -241,7 +242,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
                         title = liveSessionTitle.ifBlank { "Live Session" },
                         startTime = now,
                         createdAt = now, updatedAt = now,
-                        deviceOrigin = "desktop"
+                        deviceOrigin = platformDeviceOrigin()
                     )
                     viewModel.repo.upsertSession(session)
                     onSessionClick(session.id)

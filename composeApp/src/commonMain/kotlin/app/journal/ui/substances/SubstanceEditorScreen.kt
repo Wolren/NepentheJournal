@@ -19,6 +19,7 @@ import app.journal.model.InteractionClasses
 import app.journal.model.Substance
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,7 +93,7 @@ fun SubstanceEditorScreen(
             cachedAt = now, sourceVersion = "manual",
             createdAt = substanceToEdit?.createdAt ?: now,
             updatedAt = now,
-            deviceOrigin = "desktop"
+            deviceOrigin = platformDeviceOrigin()
         )
         repo.upsertSubstance(substance)
         onBack()

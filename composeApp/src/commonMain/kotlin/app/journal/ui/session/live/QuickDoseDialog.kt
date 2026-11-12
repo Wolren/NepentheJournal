@@ -18,6 +18,7 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,20 +120,20 @@ internal fun QuickDoseDialog(
                     if (selectedSubstanceId.isBlank() && customSubstanceName.isNotBlank()) {
                         val now2 = currentTimeMillis()
                         repo.upsertSubstance(Substance(id = "live:${customSubstanceName.lowercase().replace(" ", "_")}", name = customSubstanceName,
-                            createdAt = now2, updatedAt = now2, deviceOrigin = "desktop", cachedAt = now2, sourceVersion = "live"))
+                            createdAt = now2, updatedAt = now2, deviceOrigin = platformDeviceOrigin(), cachedAt = now2, sourceVersion = "live"))
                         selectedSubstanceId = "live:${customSubstanceName.lowercase().replace(" ", "_")}"
                     }
                     val doseTime = now - (doseMinutesAgo.toLongOrNull() ?: 0L) * 60000L
                     repo.upsertDose(Dose(id = "dose:live:${now}_${session.id}", sessionId = session.id, substanceId = chosenSubstanceId,
                         routeOfAdministration = route, amount = amount.toDoubleOrNull() ?: 0.0, unit = unit,
-                        timestamp = doseTime, createdAt = now, updatedAt = now, deviceOrigin = "desktop"))
+                        timestamp = doseTime, createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                     val doseBody = listOfNotNull(
                         "$amount $unit $route".takeIf { it.isNotBlank() },
                         note.ifBlank { null }
                     ).joinToString("\n")
                     repo.upsertTimelineEvent(TimelineEvent(id = "event:dose:${now}_${session.id}", sessionId = session.id,
                         timestamp = doseTime, eventType = TimelineEventType.NOTE, label = "Dose: ${substances.find { it.id == chosenSubstanceId }?.name ?: customSubstanceName.ifBlank { chosenSubstanceId }}",
-                        body = doseBody.ifBlank { null }, createdAt = now, updatedAt = now, deviceOrigin = "desktop"))
+                        body = doseBody.ifBlank { null }, createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                     onDismiss()
                 }
             }, enabled = canSubmit) { Text("Log") }

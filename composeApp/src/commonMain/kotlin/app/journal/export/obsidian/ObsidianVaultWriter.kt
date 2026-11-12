@@ -2,7 +2,7 @@ package app.journal.export.obsidian
 
 /**
  * Platform-specific vault file operations.
- * Desktop actual uses java.io.File; Android actual uses SAF.
+ * Desktop uses java.io.File, iOS uses NSFileManager, and Android inherits the JVM file API.
  */
 expect object ObsidianVaultOps {
     fun validateVaultPath(dirPath: String): Boolean

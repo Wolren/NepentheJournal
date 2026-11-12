@@ -14,6 +14,7 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.platformDeviceOrigin
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +89,7 @@ internal fun AddEventDialog(
             AppTextButton(onClick = {
                 val event = (editEvent ?: TimelineEvent(
                     id = "event:${now}_${session.id}", sessionId = session.id, timestamp = timestamp, eventType = TimelineEventType.OBSERVATION, label = "New event",
-                    createdAt = now, updatedAt = now, deviceOrigin = editEvent?.deviceOrigin ?: "desktop"
+                    createdAt = now, updatedAt = now, deviceOrigin = editEvent?.deviceOrigin ?: platformDeviceOrigin()
                 )).copy(
                     eventType = eventTypes[selectedIndex].first, label = label.ifBlank { eventTypes[selectedIndex].second },
                     body = notes.ifBlank { null }, intensity = if (useIntensity) intensity else null,
