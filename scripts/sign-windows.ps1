@@ -57,6 +57,7 @@ if (-not $timestampUrl) { $timestampUrl = 'http://timestamp.digicert.com' }
 
 $signArgs = @()
 $tempPfx = $null
+$readOnlyTargets = @()
 $haveCredentials = $false
 try {
     if ($env:WINDOWS_SIGN_PFX_BASE64) {
@@ -89,6 +90,14 @@ try {
     $stampArgs = @()
     if ($timestampUrl -ne 'none') { $stampArgs = @('/tr', $timestampUrl, '/td', 'SHA256') }
 
+    # jpackage writes the launcher read-only, and signtool cannot write to that.
+    foreach ($file in $targets) {
+        if ((Get-Item $file).IsReadOnly) {
+            Set-ItemProperty -Path $file -Name IsReadOnly -Value $false
+            $readOnlyTargets += $file
+        }
+    }
+
     foreach ($file in $targets) {
         Write-Output "signing $file"
         $log = & $signTool sign /fd SHA256 @stampArgs @signArgs $file 2>&1
@@ -120,6 +129,9 @@ try {
     Write-Output "SIGNED $($targets.Count) file(s)"
     exit 0
 } finally {
+    foreach ($file in $readOnlyTargets) {
+        Set-ItemProperty -Path $file -Name IsReadOnly -Value $true -ErrorAction SilentlyContinue
+    }
     if ($tempPfx -and (Test-Path $tempPfx)) {
         Remove-Item -LiteralPath $tempPfx -Force
     }

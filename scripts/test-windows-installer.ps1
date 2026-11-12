@@ -3,12 +3,13 @@
 Installs the MSI silently, checks the payload and the Apps and Features entry, launches the app,
 then uninstalls and checks that both are gone. Exits non-zero on the first failed check.
 
-Needs an elevated shell, because the package installs per machine into Program Files.
+The install location comes from the ARP entry, so the script follows a per-user and a per-machine
+package alike. A per-machine package needs an elevated shell; a per-user package does not.
 Logs go to $env:TEMP\nepenthe-msi-install.log and the app log is printed on failure.
 #>
 param(
     [Parameter(Mandatory = $true)][string]$Msi,
-    [string]$InstallDir = (Join-Path $env:ProgramFiles 'Nepenthe Journal'),
+    [string]$InstallDir = '',
     [string]$ProductName = 'Nepenthe Journal',
     [int]$LaunchSeconds = 25
 )
@@ -18,6 +19,7 @@ $installLog = Join-Path $env:TEMP 'nepenthe-msi-install.log'
 $uninstallLog = Join-Path $env:TEMP 'nepenthe-msi-uninstall.log'
 $failures = New-Object System.Collections.Generic.List[string]
 $installed = $false
+$script:installPath = $InstallDir
 
 function Fail([string]$message) {
     $failures.Add($message) | Out-Null
@@ -44,11 +46,28 @@ function Find-ArpEntry {
     }
 }
 
+# jpackage sets ARPINSTALLLOCATION, so the ARP entry names the directory that the package used.
+function Resolve-InstallPath {
+    if ($script:installPath) { return $script:installPath }
+    $arp = Find-ArpEntry | Select-Object -First 1
+    if ($arp -and $arp.InstallLocation -and (Test-Path $arp.InstallLocation)) {
+        return $arp.InstallLocation.TrimEnd('\')
+    }
+    $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:LOCALAPPDATA) | Where-Object { $_ }
+    foreach ($root in $roots) {
+        $candidate = Join-Path $root $ProductName
+        if (Test-Path $candidate) { return $candidate }
+    }
+    Write-Output "note no install directory found, searching $($roots -join ', ')"
+    return ''
+}
+
 function Stop-InstalledProcesses {
+    if (-not $script:installPath) { return }
     Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
         $path = $null
         try { $path = $_.Path } catch { }
-        if ($path -and $path.StartsWith($InstallDir, [StringComparison]::OrdinalIgnoreCase)) {
+        if ($path -and $path.StartsWith($script:installPath, [StringComparison]::OrdinalIgnoreCase)) {
             Write-Output "stopping $($_.ProcessName) pid=$($_.Id)"
             Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
         }
@@ -65,19 +84,22 @@ try {
     $installed = $installExit -in @(0, 3010)
     if (-not $installed) {
         Fail "msiexec /i exited $installExit, see $installLog"
-        if (Test-Path $installLog) { Get-Content $installLog -Tail 25 | ForEach-Object { Write-Output "  $_" } }
+        if (Test-Path $installLog) { Get-Content $installLog -Tail 15 | ForEach-Object { Write-Output "  $_" } }
     }
 
     if ($installed) {
+        $script:installPath = Resolve-InstallPath
+        Write-Output "install directory: $($script:installPath)"
+
         Write-Output "=== payload ==="
-        $exe = Join-Path $InstallDir "$ProductName.exe"
+        $exe = if ($script:installPath) { Join-Path $script:installPath "$ProductName.exe" } else { '' }
         $checks = @(
             @{ Name = 'launcher exe'; Path = $exe },
-            @{ Name = 'bundled runtime'; Path = (Join-Path $InstallDir 'runtime\lib\modules') },
-            @{ Name = 'application jars'; Path = (Join-Path $InstallDir 'app') }
+            @{ Name = 'bundled runtime'; Path = (Join-Path $script:installPath 'runtime\lib\modules') },
+            @{ Name = 'application jars'; Path = (Join-Path $script:installPath 'app') }
         )
         foreach ($check in $checks) {
-            if (Test-Path $check.Path) {
+            if ($check.Path -and (Test-Path $check.Path)) {
                 Write-Output "ok $($check.Name)"
             } else {
                 Fail "missing $($check.Name) at $($check.Path)"
@@ -94,7 +116,7 @@ try {
             if ($arp.Publisher -ne 'Wolren') { Fail "Publisher is $($arp.Publisher), expected Wolren" }
         }
 
-        if (Test-Path $exe) {
+        if ($exe -and (Test-Path $exe)) {
             Write-Output "=== launch ==="
             $appLog = Join-Path $env:USERPROFILE '.nepenthe\nepenthe.log'
             $app = Start-Process -FilePath $exe -PassThru
@@ -125,17 +147,19 @@ try {
     $uninstallExit = Run-Msi "/x `"$Msi`" /qn /norestart /l*v `"$uninstallLog`""
     if ($uninstallExit -notin @(0, 1605, 3010)) {
         Fail "msiexec /x exited $uninstallExit, see $uninstallLog"
-        if (Test-Path $uninstallLog) { Get-Content $uninstallLog -Tail 25 | ForEach-Object { Write-Output "  $_" } }
+        if (Test-Path $uninstallLog) { Get-Content $uninstallLog -Tail 15 | ForEach-Object { Write-Output "  $_" } }
     }
 
-    $deadline = (Get-Date).AddSeconds(30)
-    while ((Test-Path $InstallDir) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
-    if (Test-Path $InstallDir) {
-        Write-Output "note install dir still present, contents:"
-        Get-ChildItem $InstallDir -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name)" }
-        Fail "install directory survived the uninstall: $InstallDir"
-    } else {
-        Write-Output "ok install directory removed"
+    if ($script:installPath) {
+        $deadline = (Get-Date).AddSeconds(30)
+        while ((Test-Path $script:installPath) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+        if (Test-Path $script:installPath) {
+            Write-Output "note install dir still present, contents:"
+            Get-ChildItem $script:installPath -ErrorAction SilentlyContinue | ForEach-Object { Write-Output "  $($_.Name)" }
+            Fail "install directory survived the uninstall: $($script:installPath)"
+        } else {
+            Write-Output "ok install directory removed"
+        }
     }
 
     if (Find-ArpEntry) {

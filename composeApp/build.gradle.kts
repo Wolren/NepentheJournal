@@ -267,6 +267,8 @@ compose.desktop {
                 menu = true
                 shortcut = true
                 upgradeUuid = "D07ABD38-858F-464A-ABF6-9405C622BB14"
+                // Per user: no administrator prompt, and the app lands next to the data it owns in the profile.
+                perUserInstall = true
             }
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/icon.png"))
@@ -275,13 +277,32 @@ compose.desktop {
                 iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
                 // The macOS-scoped override feeds only the Apple bundlers; global packageVersion, versionName, the About card and the release tag stay 0.1.0.
                 packageVersion = "1.0.0"
+                // Signing and notarization switch on only when CI holds a Developer ID, so other builds still package.
+                val macSignIdentity = providers.environmentVariable("MACOS_SIGN_IDENTITY").orNull?.takeIf { it.isNotBlank() }
+                if (macSignIdentity != null) {
+                    signing {
+                        sign.set(true)
+                        identity.set(macSignIdentity)
+                        providers.environmentVariable("MACOS_SIGN_KEYCHAIN").orNull?.takeIf { it.isNotBlank() }
+                            ?.let { keychain.set(it) }
+                    }
+                }
+                val notaryAppleId = providers.environmentVariable("MACOS_NOTARY_APPLE_ID").orNull?.takeIf { it.isNotBlank() }
+                val notaryPassword = providers.environmentVariable("MACOS_NOTARY_PASSWORD").orNull?.takeIf { it.isNotBlank() }
+                val notaryTeamId = providers.environmentVariable("MACOS_NOTARY_TEAM_ID").orNull?.takeIf { it.isNotBlank() }
+                if (notaryAppleId != null && notaryPassword != null && notaryTeamId != null) {
+                    notarization {
+                        appleID.set(notaryAppleId)
+                        password.set(notaryPassword)
+                        teamID.set(notaryTeamId)
+                    }
+                }
             }
         }
     }
 }
 
-// Startup must not hash 13 MB of bundled JSON on every launch (it measured ~114 ms desktop, seconds on a phone).
-// The fingerprint is computed here instead, once per build, from the canonical resource copy.
+// Hashing 13 MB of bundled JSON each launch cost ~114 ms desktop, so the build hashes it once.
 val generateSeedFingerprint by tasks.registering {
     description = "Generates SEED_BUNDLED_FINGERPRINT from the bundled seed and DoseWiki resources."
     val srcRoot = file("src")

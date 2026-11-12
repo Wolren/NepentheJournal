@@ -114,6 +114,18 @@ jobs:
           $msi = (Get-ChildItem composeApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
           ./scripts/test-windows-installer.ps1 -Msi $msi
 
+      - name: Build the portable image
+        run: ./gradlew :composeApp:createDistributable --no-daemon
+
+      - name: Zip and launch the portable image
+        shell: pwsh
+        run: |
+          $root = "composeApp/build/compose/binaries/main/app/Nepenthe Journal"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $zip = "dist/Nepenthe-Journal-windows-x64.zip"
+          & "$env:SystemRoot\System32\tar.exe" -a -c -f $zip -C (Resolve-Path $root).Path "."
+          ./scripts/test-windows-portable.ps1 -Zip $zip
+
       - name: Upload MSI
         uses: actions/upload-artifact@v7
         with:
