@@ -1,5 +1,6 @@
 name: Release
 
+# Signing needs WINDOWS_SIGN_PFX_BASE64 and WINDOWS_SIGN_PASSWORD, or WINDOWS_SIGN_THUMBPRINT, as repo secrets
 # The Compose Gradle plugin auto-provisions WiX 3.11 (downloadWix/unzipWix tasks) and jpackage comes from the Gradle JVM
 
 on:
@@ -60,6 +61,23 @@ jobs:
           cache-read-only: true
       - name: Build MSI
         run: ./gradlew :composeApp:packageMsi --no-daemon
+
+      # A tag must carry a trusted signature: the script fails -Required when no certificate is set.
+      - name: Sign the MSI
+        shell: pwsh
+        env:
+          WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
+          WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
+          WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi" -Required:($env:GITHUB_REF_TYPE -eq 'tag')
+
+      # Publishes only what installs: the signed MSI is installed, launched and removed again.
+      - name: Install, launch and uninstall the MSI
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem composeApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          ./scripts/test-windows-installer.ps1 -Msi $msi
+
       - uses: actions/upload-artifact@v7
         with:
           name: release-msi

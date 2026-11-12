@@ -77,6 +77,50 @@ jobs:
       - name: Run Android unit tests
         run: ./gradlew :composeApp:testDebugUnitTest --no-daemon
 
+  # Packaging belongs in CI: a broken MSI must fail a pull request, not the next tag.
+  windows-installer:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: corretto
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Build MSI
+        run: ./gradlew :composeApp:packageMsi --no-daemon
+
+      # Signs when the repository holds a certificate, skips on forks, so the path runs before a tag.
+      - name: Sign the MSI when a certificate is configured
+        shell: pwsh
+        env:
+          WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
+          WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
+          WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi"
+
+      - name: Install, launch and uninstall the MSI
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem composeApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          ./scripts/test-windows-installer.ps1 -Msi $msi
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msi
+          path: composeApp/build/compose/binaries/main/msi/*.msi
+          retention-days: 7
+
   android-build:
     runs-on: ubuntu-latest
     steps:
