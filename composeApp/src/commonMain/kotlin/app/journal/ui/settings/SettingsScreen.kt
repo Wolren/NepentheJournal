@@ -218,8 +218,9 @@ fun SettingsScreen(
             applyTheme = { applyTheme() }
         ) }
 
-        if (visible(SettingsCategory.APPEARANCE)) item { CompanionCard() }
-        if (visible(SettingsCategory.PREFERENCES)) item { KeybindCard() }
+        // Pets come from desktop folders and keybinds need a keyboard, so neither card exists on touch.
+        if (visible(SettingsCategory.APPEARANCE) && isDesktopPlatform()) item { CompanionCard() }
+        if (visible(SettingsCategory.PREFERENCES) && isDesktopPlatform()) item { KeybindCard() }
 
         if (visible(SettingsCategory.PREFERENCES)) item {
             val prefExpanded = remember { mutableStateOf(false) }
