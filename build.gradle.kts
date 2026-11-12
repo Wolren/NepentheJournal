@@ -28,7 +28,7 @@ subprojects {
             force(
                 // Netty 4.1.x: fixes 20+ CVEs (SNI, http/2 rapid reset, request smuggling, decompression bomb, CRLF injection, ipv6 filter bypass).
                 "io.netty:netty-handler:4.2.18.Final",
-                "io.netty:netty-codec-http2:4.2.18.Final",
+                "io.netty:netty-codec-http2:4.2.20.Final",
                 "io.netty:netty-codec-http:4.2.18.Final",
                 "io.netty:netty-codec:4.2.18.Final",
                 "io.netty:netty-common:4.2.18.Final",
