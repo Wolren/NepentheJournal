@@ -72,6 +72,8 @@ class ThemeManagerTest {
         assertEquals(Color.White, contrastColor(Color.Black), "dark backgrounds take white text")
         assertEquals(Color.Black, contrastColor(Color(0xFF90CAF9)), "light accent stays readable")
         assertEquals(Color.White, contrastColor(Color(0xFF0E1318)), "dark background stays readable")
+        assertEquals(Color.Black, contrastColor(Color(0xFF808080)), "a mid grey reads better with black text")
+        assertEquals(Color.Black, contrastColor(Color(0xFFFF7A7A)), "the shipped dark error accent takes black text")
     }
 
     @Test

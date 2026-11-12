@@ -56,7 +56,7 @@ class ThemeManager private constructor() {
         }
     }
 
-    private fun recomputeColorScheme(cfg: ThemeConfig, isDark: Boolean): ColorScheme {
+    internal fun recomputeColorScheme(cfg: ThemeConfig, isDark: Boolean): ColorScheme {
         val bg = cfg.background ?: if (isDark) Color(0xFF0E1511) else Color(0xFFF3F8EF)
         val surf = cfg.surface ?: if (isDark) Color(0xFF16211A) else Color(0xFFFFFFFF)
         val base = if (isDark) darkColorScheme() else lightColorScheme()
@@ -133,7 +133,7 @@ fun Color.luminance(): Float {
     return 0.2126f * channel(red) + 0.7152f * channel(green) + 0.0722f * channel(blue)
 }
 
-fun contrastColor(c: Color): Color = if (c.luminance() > 0.45f) Color.Black else Color.White
+fun contrastColor(c: Color): Color = readableColorOn(c)
 
 /** Linearly blends [base] with [overlay] at the given [ratio] (0 = base, 1 = overlay). */
 fun blend(base: Color, overlay: Color, ratio: Float): Color {
