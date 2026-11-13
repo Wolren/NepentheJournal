@@ -77,7 +77,7 @@ internal fun SyncSettingsContent(
                         scope.launch {
                             try {
                                 val cfg = SyncConfig(id = "config:local", createdAt = 0L, updatedAt = 0L, deviceOrigin = platformDeviceOrigin(),
-                                    deviceId = "desktop-main", displayName = platformDeviceName(),
+                                    deviceId = LocalDeviceId.current(), displayName = platformDeviceName(),
                                     listenerPort = state.manualPort.toIntOrNull() ?: SyncConfig.DEFAULT_PORT, continuousSync = state.continuousSync, enableDeltaSync = true)
                                 syncEngine.startHosting(cfg).fold(
                                     onSuccess = { callbacks.onLogLine(SyncLogEntry.Success("Hosting on port ${it.port}")) },
