@@ -10,6 +10,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
@@ -18,68 +20,91 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-/** Row index per petdex state, matching the 8 by 9 sheet every set ships. */
-private const val RowIdle = 0
-private const val RowWaving = 3
-private const val RowRunning = 7
-
-private const val FrameWidth = 192
-private const val FrameHeight = 208
-
 private const val GreetingMs = 2200L
+private const val ReactionHoldMs = 2000L
 
-/** Rest between animation cycles: idle rests longest, a running session keeps a short beat. */
-private fun restMs(row: Int): Long = when (row) {
-    RowRunning -> 1400L
-    RowWaving -> 2000L
-    else -> 3400L
-}
+/** The petdex sheets are drawn at 208 px tall; the display size scales from that, not from the asset. */
+private const val DisplayHeightDp = 208f
 
 /**
- * Draws the selected pet in the corner of the window. It waves once after
- * launch, runs while a live session is open, and idles otherwise.
+ * Draws the selected pet in a window corner. It waves after launch, runs while a live session
+ * is open, and idles otherwise; a check-in or an interaction warning plays a one-shot clip.
  */
 @Composable
 fun PetCompanion(state: PetState, modifier: Modifier = Modifier) {
     val settings by PetManager.instance.settings.collectAsState()
     if (!settings.enabled) return
-    val sheet = remember(settings.slug) { loadPetSheet(settings.slug) } ?: return
+    val pets = remember { availablePets() }
+    val slug = remember(settings.slug, pets) {
+        settings.slug.takeIf { chosen -> pets.any { it.slug == chosen } } ?: pets.firstOrNull()?.slug
+    } ?: return
+    val sheet = remember(slug) { loadPetSheet(slug) } ?: return
 
-    var greeting by remember(settings.slug) { mutableStateOf(true) }
-    LaunchedEffect(settings.slug) {
-        delay(GreetingMs)
-        greeting = false
-    }
-    val row = when {
-        greeting -> RowWaving
-        state == PetState.RUNNING -> RowRunning
-        else -> RowIdle
-    }
-    val frames = sheet.rowFrames.getOrElse(row) { 1 }
-    var frame by remember(row, frames) { mutableStateOf(0) }
-    LaunchedEffect(row, frames) {
-        while (true) {
-            for (step in 0 until frames) {
-                frame = step
-                delay(if (row == RowRunning) 90L else 150L)
-            }
-            // Hold the last frame so a cycle ends with a rest instead of a permanent loop.
-            frame = frames - 1
-            delay(restMs(row) + Random.nextLong(0L, 900L))
+    var reaction by remember(slug) { mutableStateOf<PetReaction?>(null) }
+    LaunchedEffect(slug) {
+        PetManager.instance.reactions.collect { next ->
+            reaction = next
+            delay(ReactionHoldMs)
+            if (reaction == next) reaction = null
         }
     }
 
+    var greeting by remember(slug) { mutableStateOf(true) }
+    LaunchedEffect(slug) {
+        delay(GreetingMs)
+        greeting = false
+    }
+
+    val baseName = when {
+        greeting -> "wave"
+        state == PetState.RUNNING -> "run"
+        else -> "idle"
+    }
+    val clip = reaction?.let { sheet.clip(it.clipName) }
+        ?: sheet.clip(baseName)
+        ?: sheet.clips.firstOrNull()
+        ?: return
+
+    var frame by remember(clip) { mutableStateOf(0) }
+    LaunchedEffect(clip) {
+        val stepMs = (1000f / clip.fps.coerceAtLeast(1f)).toLong()
+        while (true) {
+            for (step in 0 until clip.frames) {
+                frame = step
+                delay(stepMs)
+            }
+            frame = clip.frames - 1
+            if (!clip.loop) break
+            delay(clip.restMs + Random.nextLong(0L, 900L))
+        }
+    }
+
+    val height = DisplayHeightDp.dp * settings.scale
+    val width = height * (sheet.frameWidth.toFloat() / sheet.frameHeight.toFloat())
     Canvas(
         modifier = modifier
-            .size((FrameWidth * settings.scale).dp, (FrameHeight * settings.scale).dp)
+            .size(width, height)
             .semantics { contentDescription = "Companion" }
     ) {
+        // A soft lantern glow behind the sprite; the sheet itself stays flat so it compresses.
+        val glowRadius = size.minDimension * 0.72f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0x2EE6B05C), Color(0x00000000)),
+                center = center,
+                radius = glowRadius,
+            ),
+            radius = glowRadius,
+            center = center,
+        )
+        val columns = (sheet.image.width / sheet.frameWidth).coerceAtLeast(1)
+        val column = frame.coerceIn(0, clip.frames - 1).coerceIn(0, columns - 1)
         drawImage(
             image = sheet.image,
-            srcOffset = IntOffset((frame % frames) * sheet.frameWidth, row * sheet.frameHeight),
+            srcOffset = IntOffset(column * sheet.frameWidth, clip.row * sheet.frameHeight),
             srcSize = IntSize(sheet.frameWidth, sheet.frameHeight),
             dstOffset = IntOffset.Zero,
-            dstSize = IntSize(size.width.toInt(), size.height.toInt())
+            dstSize = IntSize(size.width.toInt(), size.height.toInt()),
         )
     }
 }

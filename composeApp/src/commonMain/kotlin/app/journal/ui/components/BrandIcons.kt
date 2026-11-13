@@ -1,7 +1,7 @@
 package app.journal.ui.components
 
 import androidx.compose.ui.graphics.ImageBitmap
-import app.journal.util.decodePngImage
+import app.journal.util.decodeImage
 
 /**
  * Official brand marks for the external article buttons (96px PNGs,
@@ -455,7 +455,7 @@ object BrandIcons {
             "dosewiki" -> DOSEWIKI_B64
             else -> return null
         }
-        val decoded = decodePngImage(b64)
+        val decoded = decodeImage(b64)
         cache[name] = decoded
         return decoded
     }

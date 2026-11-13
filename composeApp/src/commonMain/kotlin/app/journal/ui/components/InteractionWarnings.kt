@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.InteractionRisk
 import app.journal.model.rules.ActiveInteractionResult
 import app.journal.model.rules.InteractionWarningLevel
+import app.journal.ui.pet.PetManager
+import app.journal.ui.pet.PetReaction
 
 /** One warning line. [message] is set for class-rule warnings, null for catalog pairs. */
 private data class WarningRow(val a: String, val b: String, val message: String?)
@@ -34,6 +36,8 @@ fun InteractionWarnings(
     modifier: Modifier = Modifier,
 ) {
     if (result.isEmpty) return
+    // A new warning set reaches the companion once, not once per recomposition.
+    LaunchedEffect(result) { PetManager.instance.react(PetReaction.FAILURE) }
     val groups = remember(result) { buildGroups(result, substanceNameLookup) }
     val medicationNames = remember(result.medicationNames) {
         result.medicationNames.map { it.trim().lowercase() }.toSet()

@@ -1,6 +1,7 @@
 package app.journal.ui.pet
 
-/** Petdex sets live on the desktop; the phone has no companion. */
-actual fun availablePets(): List<PetInfo> = emptyList()
+/** Only the bundled pet exists on Android: there is no petdex folder to install one into. */
+actual fun availablePets(): List<PetInfo> = listOfNotNull(BundledPet.info())
 
-actual fun loadPetSheet(slug: String): PetSheet? = null
+actual fun loadPetSheet(slug: String): PetSheet? =
+    BundledPet.sheet()?.takeIf { slug == BundledPet.SLUG }

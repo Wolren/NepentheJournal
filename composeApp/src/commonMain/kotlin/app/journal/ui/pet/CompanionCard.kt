@@ -32,7 +32,7 @@ private fun PetCorner.label(): String = when (this) {
     PetCorner.BOTTOM_END -> "Bottom right"
 }
 
-/** Settings card for the petdex companion: pick a set, size it and pin it to a corner. */
+/** Settings card for the companion: pick a pet, size it, and pin it to a corner. */
 @Composable
 fun CompanionCard() {
     val settings by PetManager.instance.settings.collectAsState()
@@ -69,7 +69,7 @@ fun CompanionCard() {
         if (!settings.enabled) {
             Spacer(Modifier.height(8.dp))
             Text(
-                "The companion sits in a window corner and runs while a live session is open.",
+                "The companion sits in a corner, waves on launch, and runs while a live session is open.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

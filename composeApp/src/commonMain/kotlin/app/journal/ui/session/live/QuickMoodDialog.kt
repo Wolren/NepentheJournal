@@ -23,6 +23,8 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.ui.pet.PetManager
+import app.journal.ui.pet.PetReaction
 import app.journal.util.platformDeviceOrigin
 
 private val MoodOptions = listOf("Calm", "Euphoric", "Anxious", "Focused", "Tired", "Awestruck", "Introspective", "Happy", "Overwhelmed", "Peaceful")
@@ -93,6 +95,7 @@ internal fun QuickMoodDialog(
                     timestamp = now, eventType = TimelineEventType.OBSERVATION, label = label,
                     body = combinedNote.ifBlank { null }, intensity = intensity, createdAt = now, updatedAt = now,
                     deviceOrigin = platformDeviceOrigin()))
+                PetManager.instance.react(PetReaction.CHECK_IN)
                 onDismiss()
             }, enabled = canSave) { Text("Save") }
         },

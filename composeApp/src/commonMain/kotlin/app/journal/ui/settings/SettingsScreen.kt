@@ -40,6 +40,7 @@ import app.journal.ui.theme.*
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatRelativeTime
+import app.journal.ui.pet.availablePets
 import app.journal.util.isDesktopPlatform
 import app.journal.util.PlatformFile
 import app.journal.ui.settings.detail.SyncSettingsCallbacks
@@ -85,6 +86,8 @@ fun SettingsScreen(
     var editOutlineStrength by remember(themeConfig) { mutableStateOf(themeConfig.outlineStrength) }
     var editSubstanceAccentMode by remember(themeConfig) { mutableStateOf(themeConfig.substanceAccentMode) }
     var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
+    // Decoded once per screen: the companion card only exists where a pet can actually load.
+    val hasPets = remember { availablePets().isNotEmpty() }
 
     fun currentEditConfig(): ThemeConfig = ThemeConfig(
         baseTheme = editBaseTheme, primaryColor = editPrimary, secondaryColor = editSecondary,
@@ -218,8 +221,8 @@ fun SettingsScreen(
             applyTheme = { applyTheme() }
         ) }
 
-        // Pets come from desktop folders and keybinds need a keyboard, so neither card exists on touch.
-        if (visible(SettingsCategory.APPEARANCE) && isDesktopPlatform()) item { CompanionCard() }
+        // The companion appears wherever a pet loads; keybinds need a keyboard, so desktop only.
+        if (visible(SettingsCategory.APPEARANCE) && hasPets) item { CompanionCard() }
         if (visible(SettingsCategory.PREFERENCES) && isDesktopPlatform()) item { KeybindCard() }
 
         if (visible(SettingsCategory.PREFERENCES)) item {
