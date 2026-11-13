@@ -22,9 +22,10 @@ enum class PetState { IDLE, RUNNING, WAVING }
 /** A one-shot reaction the companion plays over its base state. */
 enum class PetReaction(val clipName: String) { CHECK_IN("checkin"), FAILURE("fail") }
 
+/** Off on first run: the companion appears only after the user switches it on. */
 @Serializable
 data class PetSettings(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val slug: String = "nightly-fox",
     val scale: Float = 0.5f,
     val corner: PetCorner = PetCorner.BOTTOM_END,
