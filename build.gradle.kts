@@ -16,7 +16,9 @@ buildscript {
                 "org.bouncycastle:bcprov-jdk18on:1.86",
                 "org.bouncycastle:bcpkix-jdk18on:1.86",
                 "org.bouncycastle:bcutil-jdk18on:1.86",
-                "org.apache.commons:commons-lang3:3.20.0"
+                "org.apache.commons:commons-lang3:3.20.0",
+                // AGP resolves Guava 33.4.0 on the plugin classpath; the CVE fix lands in 33.7.2.
+                "com.google.guava:guava:33.7.2-jre"
             )
         }
     }
@@ -51,7 +53,7 @@ subprojects {
                 "org.apache.httpcomponents.client5:httpclient5:5.6.4",
                 "org.apache.httpcomponents.core5:httpcore5:5.4.4",
                 "org.apache.httpcomponents.core5:httpcore5-h2:5.4.4",
-                "io.opentelemetry:opentelemetry-api:1.66.0"
+                "io.opentelemetry:opentelemetry-api:1.67.0"
             )
         }
     }
@@ -61,7 +63,9 @@ subprojects {
     buildscript {
         configurations.classpath {
             resolutionStrategy.force(
-                "org.freemarker:freemarker:2.3.35"
+                "org.freemarker:freemarker:2.3.35",
+                // The app module's own plugin classpath resolves Guava 32.1.3-jre, below the CVE fix.
+                "com.google.guava:guava:33.7.2-jre"
             )
         }
     }
