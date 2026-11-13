@@ -226,6 +226,10 @@ tasks.withType<Test>().configureEach {
             excludeTestsMatching("app.journal.data.DoseWikiLookupTest")
         }
     }
+    // Theme, keybinds, pets and the journal all hang off user.home, so tests get their own.
+    val testHome = layout.buildDirectory.dir("test-home/$name").get().asFile
+    testHome.mkdirs()
+    systemProperty("user.home", testHome.absolutePath)
 }
 
 // Device-level smoke coverage for the Android runtime path that no unit test reaches.
