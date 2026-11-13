@@ -1,6 +1,9 @@
 package app.journal
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -43,7 +46,9 @@ class AppSmokeTest {
     fun settingsTabShowsSyncCard() {
         waitFor("Dashboard")
         rule.onNodeWithText("Settings").performClick()
-        waitFor("Device Sync")
+        // Sections above the sync card grow as the library loads, so the card can start off-screen.
+        rule.onNodeWithTag("settings-list")
+            .performScrollToNode(hasText("Device Sync", substring = true))
         rule.onNodeWithText("Device Sync", substring = true).assertIsDisplayed()
     }
 
