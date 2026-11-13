@@ -1,6 +1,11 @@
 package app.journal.util
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import kotlin.io.encoding.Base64
+import org.jetbrains.skia.Image
 
-// TODO: UIImage-backed decode; brand icons and the bundled pet stay null on iOS until then.
-actual fun decodeImage(base64: String): ImageBitmap? = null
+/** iOS draws through Skiko, so the Skia decode matches desktop; null means the bytes are not an image. */
+actual fun decodeImage(base64: String): ImageBitmap? = runCatching {
+    Image.makeFromEncoded(Base64.decode(base64)).toComposeImageBitmap()
+}.getOrNull()

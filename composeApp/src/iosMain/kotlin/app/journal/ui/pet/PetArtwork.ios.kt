@@ -1,6 +1,7 @@
 package app.journal.ui.pet
 
-/** Petdex sets live on the desktop; iOS has no companion. */
-actual fun availablePets(): List<PetInfo> = emptyList()
+/** iOS ships the bundled pet; there are no petdex folders to install a set into. */
+actual fun availablePets(): List<PetInfo> = listOfNotNull(BundledPet.info())
 
-actual fun loadPetSheet(slug: String): PetSheet? = null
+actual fun loadPetSheet(slug: String): PetSheet? =
+    BundledPet.sheet()?.takeIf { slug == BundledPet.SLUG }
