@@ -25,6 +25,7 @@ DEFAULT_OUT = ROOT / "build" / "substance-db"
 TRIPSIT_PATH = Path(__file__).resolve().parent / "cache" / "tripsit_all_drugs.json"
 DC_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_navigation.json"
 DC_BANDS_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_dose_bands.jsonl"
+SMW_PATH = Path(__file__).resolve().parent / "cache" / "smw_only_seed.json"
 
 SCHEMA_VERSION = 4
 
@@ -571,6 +572,31 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         catalog.register_aliases(entry["id"])
         tripsit_created += 1
 
+    # The cached SMW dump holds 64 PsychonautWiki pages the bundled seed left out.
+    smw_added = 0
+    if SMW_PATH.exists():
+        for entry in seed_entries(load(SMW_PATH)):
+            if catalog.match([entry["name"]] + entry["aliases"]):
+                continue
+            catalog.register(entry)
+            for alias in entry["aliases"]:
+                catalog.rows["alias"].append((entry["id"], alias.strip(), "psychonautwiki"))
+            for label in entry["classes"]:
+                catalog.rows["class"].append((entry["id"], label.strip(), "psychonautwiki"))
+            for route in entry["routes"]:
+                catalog.rows["route"].append((entry["id"], route.strip()))
+            for item in entry["toxicity"]:
+                catalog.rows["toxicity"].append((entry["id"], item.strip()))
+            for item in entry["cross"]:
+                catalog.rows["cross"].append((entry["id"], item.strip()))
+            if entry["cid"]:
+                catalog.rows["identifier"].append((entry["id"], "pubchem_cid", str(entry["cid"]), "psychonautwiki"))
+            if entry["pwiki_id"]:
+                catalog.rows["identifier"].append((entry["id"], "psychonautwiki", entry["pwiki_id"], "psychonautwiki"))
+            catalog.rows["provenance"].append((entry["id"], "name", "psychonautwiki"))
+            catalog.register_aliases(entry["id"])
+            smw_added += 1
+
     # drug.community navigation adds named research chemicals without dose ladders.
     dc_created = 0
     for item in drug_community_source.load(DC_PATH):
@@ -713,6 +739,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "tripsit_created": tripsit_created,
         "tripsit_filled": tripsit_filled,
         "drug_community_created": dc_created,
+        "psychonautwiki_added": smw_added,
         "drug_community_filled": dc_filled,
     }
     return connection, counts
