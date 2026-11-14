@@ -73,6 +73,7 @@ import app.journal.ui.pet.PetManager
 import app.journal.ui.pet.PetState
 import app.journal.ui.keybind.KeybindManager
 import app.journal.util.TimeDisplayMode
+import app.journal.ui.components.KeepAliveTabs
 import app.journal.ui.components.SubstanceLibraryGate
 import app.journal.ui.dashboard.DashboardScreen
 import app.journal.ui.safer.SaferScreen
@@ -114,6 +115,9 @@ internal fun AppNavigation(
     colorScheme: ColorScheme,
 ) {
     var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    // Tabs opened once keep their composition, so switching back is a relayout, not a rebuild.
+    val visitedScreens = remember { mutableListOf(Screen.DASHBOARD) }
+    if (selectedScreen !in visitedScreens) visitedScreens.add(selectedScreen)
     var quickLogStatus by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     var editingSessionId by remember { mutableStateOf<String?>(null) }
@@ -465,7 +469,8 @@ internal fun AppNavigation(
                                     }
                                 }
                                 Box(Modifier.weight(1f).fillMaxSize()) {
-                                when (selectedScreen) {
+                                val tabContent: @Composable (Screen) -> Unit = { tab ->
+                                when (tab) {
                                     Screen.DASHBOARD -> DashboardScreen(
                                         repo = repo,
                                         onSearchClick = { showSearch = true }
@@ -562,7 +567,13 @@ internal fun AppNavigation(
                                     }
                                     Screen.SAFER -> SaferScreen()
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
-                                }  // closes when(selectedScreen)
+                                }  // closes when(tab)
+                                }  // closes tabContent
+                                KeepAliveTabs(
+                                    selectedIndex = visitedScreens.indexOf(selectedScreen),
+                                    tabCount = visitedScreens.size,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) { index -> tabContent(visitedScreens[index]) }
                                 }  // closes inner Box(weight)
                             }  // closes Row
                         }  // closes Scaffold innerPadding
