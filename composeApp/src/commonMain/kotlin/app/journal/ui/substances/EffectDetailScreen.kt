@@ -76,18 +76,6 @@ internal fun EffectDetailScreen(
     ScreenScaffold(title = article.name, onBack = onBack, selectable = true) {
         item {
             AppCard(modifier = Modifier.fillMaxWidth()) {
-                if (article.categories.isNotEmpty()) {
-                    Text(
-                        text = article.categories.joinToString("  ·  ") { label ->
-                            if (label in CATEGORY_KEYS) categoryLabel(label)
-                            else label.replaceFirstChar { it.uppercase() }
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                }
                 val matched = article.matchedName
                 if (matched != null && matched != article.name) {
                     Text(
@@ -95,12 +83,8 @@ internal fun EffectDetailScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(8.dp))
                 }
-            }
-        }
-
-        item {
-            AppCard(modifier = Modifier.fillMaxWidth()) {
                 EffectBody(blocks = blocks, onLinkClick = onLink)
             }
         }
