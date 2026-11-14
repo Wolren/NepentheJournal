@@ -1,5 +1,6 @@
 package app.journal.data
 
+import app.journal.catalog.CatalogSource
 import app.journal.log.Log
 import app.journal.model.DoseWikiDuration
 import app.journal.model.DoseWikiSubstance
@@ -83,6 +84,7 @@ object DoseWikiLookup {
      * Returns null if the substance has no duration data or is not found.
      */
     fun getDuration(substanceName: String): DoseWikiDuration? {
+        CatalogSource.durationFor(substanceName)?.let { return it }
         return getSubstance(substanceName)?.duration
     }
 }

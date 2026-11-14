@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
 DEFAULT_OUT = ROOT / "build" / "substance-db"
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -73,6 +73,7 @@ CREATE TABLE substance_cross_tolerance(
 CREATE TABLE dose_range(
     substance_id TEXT NOT NULL REFERENCES substance(id),
     route TEXT NOT NULL,
+    route_order INTEGER NOT NULL,
     tier TEXT NOT NULL,
     min REAL,
     max REAL,
@@ -83,6 +84,7 @@ CREATE TABLE dose_range(
 CREATE TABLE duration_stage(
     substance_id TEXT NOT NULL REFERENCES substance(id),
     route TEXT NOT NULL,
+    route_order INTEGER NOT NULL,
     stage TEXT NOT NULL,
     min REAL,
     max REAL,
@@ -303,22 +305,22 @@ def seed_entries(seed: dict) -> list[dict]:
 def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
     sid = entry["id"]
     dosage = (dw.get("dosage") or {}).get("routes") or []
-    for route in dosage:
+    for order, route in enumerate(dosage):
         name = (route.get("route") or "").strip()
         if not name:
             continue
-        cat.rows["route"].append((sid, name.lower()))
+        cat.rows["route"].append((sid, name))
         ranges = route.get("dose_ranges") or {}
         for tier in TIERS:
             band = ranges.get(tier)
             if not band or band.get("min") is None:
                 continue
             cat.rows["dose"].append(
-                (sid, name.lower(), band_words(tier), band.get("min"), band.get("max"),
+                (sid, name, order, band_words(tier), band.get("min"), band.get("max"),
                  band.get("unit"), "dosewiki")
             )
     duration = (dw.get("duration") or {}).get("routes") or []
-    for route in duration:
+    for order, route in enumerate(duration):
         name = (route.get("route") or "").strip()
         if not name:
             continue
@@ -328,17 +330,20 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
             if not value or value.get("min") is None:
                 continue
             cat.rows["duration"].append(
-                (sid, name.lower(), stage, value.get("min"), value.get("max"),
+                (sid, name, order, stage, value.get("min"), value.get("max"),
                  value.get("unit"), "dosewiki")
             )
-        if not entry.get("half_life"):
-            parsed = half_life_minutes(route.get("half_life"))
-            if parsed:
-                entry["half_life"] = parsed
-        if not entry.get("tmax"):
-            parsed = tmax_minutes(stages)
-            if parsed:
-                entry["tmax"] = parsed
+    # Kinetics come from the primary route only, oral first, matching the Kotlin ingest.
+    primary = next((r for r in duration if (r.get("route") or "").lower() == "oral"), None)
+    if primary is None:
+        primary = next((r for r in duration if r.get("stages")), None)
+    if primary is not None:
+        parsed_half_life = half_life_minutes(primary.get("half_life"))
+        if parsed_half_life:
+            entry["half_life"] = parsed_half_life
+        parsed_tmax = tmax_minutes(primary.get("stages"))
+        if parsed_tmax:
+            entry["tmax"] = parsed_tmax
 
     identification = dw.get("identification") or {}
     for alias in identification.get("alternative_names") or []:
@@ -346,12 +351,26 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
         if value and value.lower() != entry["name"].strip().lower():
             cat.rows["alias"].append((sid, value, "dosewiki"))
     classification = dw.get("classification") or {}
-    for label in (classification.get("chemical_class") or []) + (
-        classification.get("psychoactive_class") or []
-    ):
-        value = (label or "").strip()
-        if value:
-            cat.rows["class"].append((sid, value, "dosewiki"))
+    dw_classes = [
+        (label or "").strip()
+        for label in (classification.get("chemical_class") or [])
+        + (classification.get("psychoactive_class") or [])
+        if (label or "").strip()
+    ]
+    # DoseWiki replaces the seed's classes and routes whenever it carries any, as the Kotlin ingest does.
+    if dw_classes:
+        cat.rows["class"] = [row for row in cat.rows["class"] if row[0] != sid]
+        for label in dw_classes:
+            cat.rows["class"].append((sid, label, "dosewiki"))
+    dw_routes = [
+        (route.get("route") or "").strip()
+        for route in dosage
+        if (route.get("route") or "").strip()
+    ]
+    if dw_routes:
+        cat.rows["route"] = [row for row in cat.rows["route"] if row[0] != sid]
+        for label in dw_routes:
+            cat.rows["route"].append((sid, label))
     harm = dw.get("harm_potential") or {}
     addiction = harm.get("addiction") or {}
     if not entry.get("addiction"):
@@ -374,12 +393,13 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
             cat.rows["cross"].append((sid, value))
 
     subjective = dw.get("subjective_effects") or {}
+    dw_effects = []
     for domain in ("cognitive", "physical"):
         for group in (subjective.get(domain) or {}).values():
             for effect in group.get("effects") or []:
                 name = (effect.get("name") or "").strip()
                 if name:
-                    cat.rows["effect"].append(
+                    dw_effects.append(
                         (sid, name, domain, (effect.get("description") or "").strip() or None,
                          "dosewiki")
                     )
@@ -389,10 +409,13 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
             for effect in group.get("effects") or []:
                 name = (effect.get("name") or "").strip()
                 if name:
-                    cat.rows["effect"].append(
+                    dw_effects.append(
                         (sid, name, "sensory", (effect.get("description") or "").strip() or None,
                          "dosewiki")
                     )
+    if dw_effects:
+        cat.rows["effect"] = [row for row in cat.rows["effect"] if row[0] != sid]
+        cat.rows["effect"].extend(dw_effects)
     if dw.get("summary"):
         entry["summary"] = dw["summary"].strip() or entry.get("summary")
     cat.rows["provenance"].append((sid, "summary", "dosewiki"))
@@ -413,7 +436,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         for label in entry["classes"]:
             catalog.rows["class"].append((entry["id"], label.strip(), "psychonautwiki"))
         for route in entry["routes"]:
-            catalog.rows["route"].append((entry["id"], route.strip().lower()))
+            catalog.rows["route"].append((entry["id"], route.strip()))
         for item in entry["toxicity"]:
             catalog.rows["toxicity"].append((entry["id"], item.strip()))
         for item in entry["cross"]:
@@ -476,11 +499,11 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
     insert("cross", "INSERT OR IGNORE INTO substance_cross_tolerance VALUES(?,?)")
     insert(
         "dose",
-        "INSERT OR IGNORE INTO dose_range VALUES(?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO dose_range VALUES(?,?,?,?,?,?,?,?)",
     )
     insert(
         "duration",
-        "INSERT OR IGNORE INTO duration_stage VALUES(?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO duration_stage VALUES(?,?,?,?,?,?,?,?)",
     )
     insert(
         "effect",
@@ -579,3 +602,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

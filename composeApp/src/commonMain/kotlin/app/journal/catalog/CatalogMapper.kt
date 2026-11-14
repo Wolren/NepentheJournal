@@ -1,0 +1,157 @@
+package app.journal.catalog
+
+import app.journal.ingest.SubstanceClassNormalizer
+import app.journal.model.BindingdbData
+import app.journal.model.ChemblData
+import app.journal.model.ChemicalProperties
+import app.journal.model.IupharData
+import app.journal.model.PdspData
+import app.journal.model.Substance
+import app.journal.model.WikipediaData
+import app.journal.serde.AppJson
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+
+/**
+ * Projects the catalog database into the model rows the app already uses.
+ * Formatting matches the old ingest, so a migrated install renders identically.
+ */
+internal object CatalogMapper {
+
+    fun loadSubstances(now: Long, sourceVersion: String): List<Substance> {
+        val queries = SubstanceCatalog.database.catalogQueries
+        val rows = queries.selectAllSubstances {
+                id, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
+            RawSubstance(id, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
+        }.executeAsList()
+
+        val aliases = queries.selectAllAliases { substanceId, alias -> substanceId to alias }
+            .executeAsList().groupBy({ it.first }, { it.second })
+        val classes = queries.selectAllClasses { substanceId, label -> substanceId to label }
+            .executeAsList().groupBy({ it.first }, { it.second })
+        val routes = queries.selectAllRoutes { substanceId, route -> substanceId to route }
+            .executeAsList().groupBy({ it.first }, { it.second })
+        val doses = queries.selectAllDoseRanges { substanceId, route, order, tier, min, max, unit ->
+            substanceId to CatalogDoseRange(route, order, tier, min, max, unit)
+        }.executeAsList().groupBy({ it.first }, { it.second })
+        val durations = queries.selectAllDurationStages { substanceId, route, order, stage, min, max, unit ->
+            substanceId to CatalogDurationStage(route, order, stage, min, max, unit)
+        }.executeAsList().groupBy({ it.first }, { it.second })
+        val effects = queries.selectAllEffects { substanceId, name -> substanceId to name }
+            .executeAsList().groupBy({ it.first }, { it.second })
+        val identifiers = queries.selectAllIdentifiers { substanceId, scheme, value ->
+            Triple(substanceId, scheme, value)
+        }.executeAsList().groupBy({ it.first }, { it.second to it.third })
+
+        return rows.map { raw ->
+            val substanceDoses = doses[raw.id].orEmpty()
+            val substanceDurations = durations[raw.id].orEmpty()
+            val substanceIdentifiers = identifiers[raw.id].orEmpty().toMap()
+            val payload = decodePayload(raw.payload)
+            Substance(
+                id = raw.id,
+                cid = raw.cid,
+                createdAt = now,
+                updatedAt = now,
+                deviceOrigin = "system",
+                pwikiId = raw.pwikiId,
+                name = raw.name,
+                aliases = aliases[raw.id].orEmpty(),
+                summary = raw.summary,
+                substanceClass = SubstanceClassNormalizer.normalize(classes[raw.id].orEmpty()).distinct(),
+                routesOfAdministration = routes[raw.id].orEmpty(),
+                dosageBands = dosageBands(substanceDoses),
+                durationProfile = durationProfile(substanceDurations),
+                halfLifeMinutes = raw.halfLife,
+                tmaxMinutes = raw.tmax,
+                addictionPotential = raw.addiction,
+                toxicity = emptyList(),
+                crossTolerances = emptyList(),
+                effects = effects[raw.id].orEmpty(),
+                interactionClasses = emptyList(),
+                chemicalProperties = payload?.get("chemicalProperties")
+                    ?.let { decode<ChemicalProperties>(it) },
+                drugbankId = substanceIdentifiers["drugbank"],
+                unii = substanceIdentifiers["unii"],
+                atcCode = substanceIdentifiers["atc"],
+                chemblData = payload?.get("chemblData")?.let { decode<ChemblData>(it) },
+                iupharData = payload?.get("iupharData")?.let { decode<IupharData>(it) },
+                pdspData = payload?.get("pdspData")?.let { decode<PdspData>(it) },
+                bindingdbData = payload?.get("bindingdbData")?.let { decode<BindingdbData>(it) },
+                wikipediaData = payload?.get("wikipediaData")?.let { decode<WikipediaData>(it) },
+                sources = listOf(sourceVersion),
+                cachedAt = now,
+                sourceVersion = sourceVersion,
+            )
+        }
+    }
+
+    private data class RawSubstance(
+        val id: String,
+        val name: String,
+        val summary: String?,
+        val cid: Long?,
+        val pwikiId: String?,
+        val addiction: String?,
+        val halfLife: Double?,
+        val tmax: Double?,
+        val payload: String?,
+    )
+
+    private val doseOwner = HashMap<CatalogDoseRange, String>()
+    private val durationOwner = HashMap<CatalogDurationStage, String>()
+
+    /** The primary route is oral when present, else the earliest route in the source file. */
+    private fun primaryRoute(orders: List<Pair<String, Long>>): String? {
+        orders.firstOrNull { it.first.equals("oral", ignoreCase = true) }?.let { return it.first }
+        return orders.minByOrNull { it.second }?.first
+    }
+
+    private fun dosageBands(ranges: List<CatalogDoseRange>): Map<String, String> {
+        val route = primaryRoute(ranges.map { it.route to it.routeOrder }) ?: return emptyMap()
+        return buildMap {
+            for (range in ranges.filter { it.route == route }) {
+                format(range.min, range.max, range.unit)?.let { put(bandKey(range.tier), it) }
+            }
+        }
+    }
+
+    private fun durationProfile(stages: List<CatalogDurationStage>): Map<String, String> {
+        val route = primaryRoute(stages.map { it.route to it.routeOrder }) ?: return emptyMap()
+        return buildMap {
+            for (stage in stages.filter { it.route == route }) {
+                format(stage.min, stage.max, stage.unit)?.let { put(stageKey(stage.stage), it) }
+            }
+        }
+    }
+
+    private fun bandKey(tier: String): String = if (tier == "moderate") "common" else tier
+
+    private fun stageKey(stage: String): String = when (stage) {
+        "come_up" -> "comeup"
+        "after_effects" -> "afterglow"
+        "total_duration" -> "total"
+        else -> stage
+    }
+
+    /** "75-150 µg" and "10 µg", the shape the old ingest wrote into the model. */
+    private fun format(min: Double?, max: Double?, unit: String?): String? {
+        if (min == null) return null
+        val suffix = unit?.trim()?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+        return if (max != null && max != min) "${number(min)}-${number(max)}$suffix"
+        else "${number(min)}$suffix"
+    }
+
+    private fun number(value: Double): String =
+        if (value == kotlin.math.floor(value)) value.toLong().toString() else value.toString()
+
+    private fun decodePayload(raw: String?): JsonObject? {
+        if (raw.isNullOrBlank()) return null
+        return runCatching { AppJson.json.parseToJsonElement(raw) as JsonObject }.getOrNull()
+    }
+
+    private inline fun <reified T> decode(element: JsonElement): T? =
+        runCatching { AppJson.json.decodeFromJsonElement<T>(element) }.getOrNull()
+}
+

@@ -1,5 +1,6 @@
 package app.journal.data
 
+import app.journal.catalog.CatalogSource
 import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
@@ -143,8 +144,9 @@ object DataInitializer {
         purgeResumeMarkers(repo, store)
         abortStaleLiveSessions(repo, store)
 
-        // Step 2: Skip the bundled library when the persisted one matches the bundled resources.
-        val libraryFresh = repo.seedFingerprint.value == SEED_BUNDLED_FINGERPRINT &&
+        // Step 2: Skip the bundled library when the persisted one matches the bundled source.
+        val expectedFingerprint = CatalogSource.bundledFingerprint() ?: SEED_BUNDLED_FINGERPRINT
+        val libraryFresh = repo.seedFingerprint.value == expectedFingerprint &&
             repo.substances.value.isNotEmpty()
         if (libraryFresh) {
             Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
@@ -191,11 +193,27 @@ object DataInitializer {
         try {
             libraryBuildHook?.invoke()
 
-            val seedLoaded = tryLoadSeedWithRetry(repo)
+            // The bundled catalog replaces the JSON seed plus DoseWiki ingest; without it the old path runs.
+            val catalogFingerprint = CatalogSource.bundledFingerprint()
+            val seedLoaded = if (catalogFingerprint != null) {
+                _phase.value = "Loading substance catalog"
+                val substances = withContext(Dispatchers.Default) { CatalogSource.loadSubstances() }
+                if (substances.isNotEmpty()) {
+                    repo.applyBatch(substances = substances)
+                    Log.withTag("DataInit").i {
+                        "Loaded ${substances.size} substances from the bundled catalog"
+                    }
+                }
+                substances.isNotEmpty()
+            } else {
+                tryLoadSeedWithRetry(repo)
+            }
 
             // Step 3: Ingest DoseWiki data as the primary entity (overwrites matched seed rows, creates dw:{slug} rows for the rest).
-            _phase.value = "Merging DoseWiki data"
-            DoseWikiIngestor.ensureIngested(repo)
+            if (catalogFingerprint == null) {
+                _phase.value = "Merging DoseWiki data"
+                DoseWikiIngestor.ensureIngested(repo)
+            }
 
             // Effect articles are static reference data: parse them once, off the main thread.
             _phase.value = "Loading effect articles"
@@ -205,7 +223,7 @@ object DataInitializer {
             if (seedLoaded) {
                 migrateOldIds(repo)
                 // Stamp the fingerprint only on success: a failed seed load must retry next launch instead of looking fresh.
-                repo.setSeedFingerprint(SEED_BUNDLED_FINGERPRINT)
+                repo.setSeedFingerprint(catalogFingerprint ?: SEED_BUNDLED_FINGERPRINT)
             }
 
             _phase.value = "Applying taxonomy"

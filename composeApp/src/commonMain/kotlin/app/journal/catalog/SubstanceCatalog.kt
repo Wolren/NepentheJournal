@@ -12,6 +12,7 @@ expect object CatalogDriver {
 /** One dose tier for one route, as stored in the catalog. */
 data class CatalogDoseRange(
     val route: String,
+    val routeOrder: Long,
     val tier: String,
     val min: Double?,
     val max: Double?,
@@ -21,6 +22,7 @@ data class CatalogDoseRange(
 /** One duration stage for one route, in the source's own unit. */
 data class CatalogDurationStage(
     val route: String,
+    val routeOrder: Long,
     val stage: String,
     val min: Double?,
     val max: Double?,
@@ -49,7 +51,7 @@ data class CatalogSubstance(
  */
 object SubstanceCatalog {
 
-    private val database: CatalogDatabase by lazy { CatalogDatabase(CatalogDriver.open()) }
+    internal val database: CatalogDatabase by lazy { CatalogDatabase(CatalogDriver.open()) }
 
     fun contentVersion(): String? =
         database.catalogQueries.contentVersion().executeAsOneOrNull()
@@ -83,10 +85,10 @@ object SubstanceCatalog {
             classes = queries.selectClasses(id).executeAsList(),
             routes = queries.selectRoutes(id).executeAsList(),
             doseRanges = queries.selectDoseRanges(id).executeAsList().map {
-                CatalogDoseRange(it.route, it.tier, it.min, it.max, it.unit)
+                CatalogDoseRange(it.route, it.route_order, it.tier, it.min, it.max, it.unit)
             },
             durationStages = queries.selectDurationStages(id).executeAsList().map {
-                CatalogDurationStage(it.route, it.stage, it.min, it.max, it.unit)
+                CatalogDurationStage(it.route, it.route_order, it.stage, it.min, it.max, it.unit)
             },
             effects = queries.selectEffects(id).executeAsList().map { it.name },
             identifiers = queries.selectIdentifiers(id).executeAsList()
@@ -94,3 +96,4 @@ object SubstanceCatalog {
         )
     }
 }
+

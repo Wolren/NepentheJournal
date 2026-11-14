@@ -35,6 +35,7 @@ CREATE TABLE substance_route (
 CREATE TABLE dose_range (
     substance_id TEXT NOT NULL,
     route TEXT NOT NULL,
+    route_order INTEGER NOT NULL,
     tier TEXT NOT NULL,
     min REAL,
     max REAL,
@@ -46,6 +47,7 @@ CREATE TABLE dose_range (
 CREATE TABLE duration_stage (
     substance_id TEXT NOT NULL,
     route TEXT NOT NULL,
+    route_order INTEGER NOT NULL,
     stage TEXT NOT NULL,
     min REAL,
     max REAL,
@@ -101,10 +103,10 @@ selectRoutes:
 SELECT route FROM substance_route WHERE substance_id = ? ORDER BY route;
 
 selectDoseRanges:
-SELECT route, tier, min, max, unit FROM dose_range WHERE substance_id = ? ORDER BY route, tier;
+SELECT route, route_order, tier, min, max, unit FROM dose_range WHERE substance_id = ? ORDER BY route_order, tier;
 
 selectDurationStages:
-SELECT route, stage, min, max, unit FROM duration_stage WHERE substance_id = ? ORDER BY route, stage;
+SELECT route, route_order, stage, min, max, unit FROM duration_stage WHERE substance_id = ? ORDER BY route_order, stage;
 
 selectEffects:
 SELECT name, domain, description FROM substance_effect WHERE substance_id = ? ORDER BY name;
@@ -117,3 +119,27 @@ SELECT s.* FROM substance s
 WHERE s.name LIKE '%' || ? || '%'
    OR s.id IN (SELECT substance_id FROM substance_alias WHERE alias LIKE '%' || ? || '%')
 ORDER BY s.name;
+
+selectAllSubstances:
+SELECT * FROM substance ORDER BY id;
+
+selectAllAliases:
+SELECT substance_id, alias FROM substance_alias ORDER BY substance_id, alias;
+
+selectAllClasses:
+SELECT substance_id, class FROM substance_class ORDER BY substance_id, class;
+
+selectAllRoutes:
+SELECT substance_id, route FROM substance_route ORDER BY substance_id, route;
+
+selectAllDoseRanges:
+SELECT substance_id, route, route_order, tier, min, max, unit FROM dose_range ORDER BY substance_id, route_order, tier;
+
+selectAllDurationStages:
+SELECT substance_id, route, route_order, stage, min, max, unit FROM duration_stage ORDER BY substance_id, route_order, stage;
+
+selectAllEffects:
+SELECT substance_id, name FROM substance_effect ORDER BY substance_id, name;
+
+selectAllIdentifiers:
+SELECT substance_id, scheme, value AS ident_value FROM substance_identifier ORDER BY substance_id, scheme, ident_value;
