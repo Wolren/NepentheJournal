@@ -2,6 +2,7 @@ package app.journal.ui
 
 import app.journal.data.JournalRepository
 import app.journal.model.Medication
+import app.journal.model.Substance
 import app.journal.model.MedicationPreset
 import app.journal.model.Session
 import app.journal.sync.SyncTransport
@@ -10,6 +11,8 @@ import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
 import app.journal.ui.settings.detail.MedicationsSettingsContent
+import app.journal.ui.substances.SubstanceScreen
+import app.journal.ui.substances.SubstanceScreenViewModel
 import androidx.compose.material3.MaterialTheme
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -20,6 +23,8 @@ import kotlin.test.assertTrue
 
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 
 /**
@@ -114,6 +119,36 @@ class ComposeScreenSmokeTest {
         }
     }
 
+    @Test
+    fun substanceScreenSwitchesToTheBundledEffectLibrary() = runBlocking {
+        runComposeUiTest {
+            val repo = JournalRepository()
+            repo.upsertSubstance(
+                Substance(
+                    id = "sub:lsd", name = "LSD", substanceClass = listOf("Psychedelic"),
+                    aliases = emptyList(), routesOfAdministration = emptyList(),
+                    effects = emptyList(), toxicity = emptyList(),
+                    createdAt = 0L, updatedAt = 0L, cachedAt = 0L, sourceVersion = "test"
+                )
+            )
+            setContent {
+                SubstanceScreen(repo = repo, viewModel = SubstanceScreenViewModel(repo))
+            }
+            waitForIdle()
+
+            onNodeWithText("Effects").performClick()
+            waitForIdle()
+
+            assertTrue(
+                onAllNodesWithText("Search effects...").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the search field must switch to the effects placeholder"
+            )
+            waitUntil(timeoutMillis = 10_000) {
+                onAllNodesWithText("Anxiety")
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+            }
+        }
+    }
     @Test
     fun settingsScreenRendersTheThemeSection() = runBlocking {
         runComposeUiTest {

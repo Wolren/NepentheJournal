@@ -197,6 +197,10 @@ object DataInitializer {
             _phase.value = "Merging DoseWiki data"
             DoseWikiIngestor.ensureIngested(repo)
 
+            // Effect articles are static reference data: parse them once, off the main thread.
+            _phase.value = "Loading effect articles"
+            EffectLibrary.ensureLoaded()
+
             // Step 4: Migrate old session/dose references if ID scheme changed.
             if (seedLoaded) {
                 migrateOldIds(repo)

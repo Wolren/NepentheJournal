@@ -3,6 +3,8 @@ package app.journal.ui.substances.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.model.Substance
 import app.journal.ui.components.AppCard
+import app.journal.data.EffectLibrary
+import app.journal.ui.substances.sourceLabel
 
 @Composable
 internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
@@ -99,46 +103,58 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
 
     selectedEffect?.let { effectName ->
         val record = allEffects.find { it.name == effectName && substance.id in it.substanceIds }
-        val isDoseWiki = record?.id?.startsWith("effect:dw:") == true
-        val sourceName = if (isDoseWiki) "DoseWiki" else "PsychonautWiki"
-        val description = record?.description?.takeIf { it.isNotBlank() }
-            ?: allEffects.firstOrNull { it.name == effectName && !it.description.isNullOrBlank() }?.description
-        // PsychonautWiki effect index pages resolve as /wiki/<Name_with_underscores> (verified 20 Sep 2026: Euphoria, Geometry return 200).
-        val readMoreUrl = record?.url
+        val ownDescription = record?.description?.takeIf { it.isNotBlank() }
+        val article = EffectLibrary.article(effectName)
+        val sourceUrl = article?.url?.takeIf { it.isNotBlank() }
+            ?: record?.url
             ?: "https://psychonautwiki.org/wiki/${effectName.replace(" ", "_")}"
         AlertDialog(
             onDismissRequest = { selectedEffect = null },
             title = { Text(effectName, fontWeight = FontWeight.SemiBold) },
             text = {
-                Column {
-                    description?.let { desc ->
-                        Text(desc, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (ownDescription != null) {
+                        Text(ownDescription, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(10.dp))
                     }
-                    Text(
-                        "This effect is reported for ${substance.name} on $sourceName. " +
-                        "Would you like to read more about it?",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    if (article != null) {
+                        Text(
+                            text = article.body.ifBlank { article.summary },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = sourceLabel(article),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (ownDescription == null) {
+                        Text(
+                            "No bundled article for this effect yet. It is reported for " +
+                                "${substance.name}, and the source link has the full text.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    uriHandler.openUri(readMoreUrl)
-                    selectedEffect = null
-                }) {
-                    Text("Read more")
-                }
+                TextButton(onClick = { selectedEffect = null }) { Text("Close") }
             },
             dismissButton = {
-                TextButton(onClick = { selectedEffect = null }) {
-                    Text("Close")
+                TextButton(onClick = {
+                    uriHandler.openUri(sourceUrl)
+                    selectedEffect = null
+                }) {
+                    Text("Open source")
                 }
-            }
+            },
         )
     }
 }
-
 @Composable
 internal fun EffectFlowRow(
     effects: List<String>,

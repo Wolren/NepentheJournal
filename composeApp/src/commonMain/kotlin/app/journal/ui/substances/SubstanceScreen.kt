@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +34,9 @@ import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
 import app.journal.ui.components.*
+
+/** The Substances tab holds the substance library and the bundled effect library. */
+internal enum class LibraryMode { SUBSTANCES, EFFECTS }
 
 @Composable
 fun SubstanceScreen(
@@ -57,30 +61,59 @@ fun SubstanceScreen(
         if (!categoryDropdownExpanded) showSpecifics = false
     }
     val scrollState = rememberLazyListState()
+    val effectsScrollState = rememberLazyListState()
+    var mode by rememberSaveable { mutableStateOf(LibraryMode.SUBSTANCES) }
+    var effectQuery by rememberSaveable { mutableStateOf("") }
+    val activeQuery = if (mode == LibraryMode.SUBSTANCES) query else effectQuery
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = mode == LibraryMode.SUBSTANCES,
+                    onClick = { mode = LibraryMode.SUBSTANCES },
+                    label = { Text("Substances") },
+                )
+                FilterChip(
+                    selected = mode == LibraryMode.EFFECTS,
+                    onClick = { mode = LibraryMode.EFFECTS },
+                    label = { Text("Effects") },
+                )
+            }
+            Spacer(Modifier.height(4.dp))
             BoxWithConstraints {
                 val wideFilterMenu = maxWidth > 700.dp
                 OutlinedTextField(
-                    value = query,
-                    onValueChange = { viewModel.query.value = it },
-                    placeholder = { Text("Search substances...") },
+                    value = activeQuery,
+                    onValueChange = {
+                        if (mode == LibraryMode.SUBSTANCES) viewModel.query.value = it else effectQuery = it
+                    },
+                    placeholder = {
+                        Text(if (mode == LibraryMode.SUBSTANCES) "Search substances..." else "Search effects...")
+                    },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     trailingIcon = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.query.value = "" }) {
+                            if (activeQuery.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    viewModel.query.value = ""
+                                    effectQuery = ""
+                                }) {
                                     Icon(Icons.Default.Close, contentDescription = "Clear")
                                 }
                             }
-                            IconButton(onClick = { categoryDropdownExpanded = true }) {
-                                Icon(
-                                    Icons.Default.Label,
-                                    contentDescription = "Filter by category",
-                                    tint = if (activeBroad != null) MaterialTheme.colorScheme.primary
-                                           else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            if (mode == LibraryMode.SUBSTANCES) {
+                                IconButton(onClick = { categoryDropdownExpanded = true }) {
+                                    Icon(
+                                        Icons.Default.Label,
+                                        contentDescription = "Filter by category",
+                                        tint = if (activeBroad != null) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     },
@@ -205,7 +238,9 @@ fun SubstanceScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            if (results.isEmpty()) {
+            if (mode == LibraryMode.EFFECTS) {
+                EffectsLibrary(query = effectQuery, listState = effectsScrollState)
+            } else if (results.isEmpty()) {
                 val showEmptyState = rememberEmptyStateVisible(isEmpty = results.isEmpty())
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -260,14 +295,16 @@ fun SubstanceScreen(
             }
         }
 
-        FloatingActionButton(
-            onClick = onNewSubstance,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "New Substance")
+        if (mode == LibraryMode.SUBSTANCES) {
+            FloatingActionButton(
+                onClick = onNewSubstance,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New Substance")
+            }
         }
 
-        DesktopScrollbar(scrollState)
+        DesktopScrollbar(if (mode == LibraryMode.SUBSTANCES) scrollState else effectsScrollState)
     }
 }
 
