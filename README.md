@@ -77,6 +77,16 @@ Alongside DoseWiki, a 325-substance seed pre-processed from public sources adds 
 - **PDSP Ki Database** and **BindingDB:** binding affinity measurements
 - **Wikidata:** DrugBank, ChEBI, UNII, and ATC identifiers
 
+### Reference catalog build
+
+The app ships a read-only SQLite catalog instead of the two large JSON files at runtime (iOS still reads the JSON seed). Rebuild it with:
+
+```
+python scripts/build_substance_db.py
+```
+
+The script reads the bundled JSON snapshots and the cached source extracts under `scripts/cache/` (TripSit API, drug.community navigation and dose bands, PsychonautWiki SMW dump, Wikidata medicines), merges them with fixed precedence, writes `build/substance-db/substances.sqlite` plus `manifest.json`, and stamps `user_version = 1` for SQLDelight. The build is deterministic: two runs produce byte-identical output. Every field records the source that supplied it in `field_source`, which the substance detail screen shows.
+
 ---
 
 ## Using the app
