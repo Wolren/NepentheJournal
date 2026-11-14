@@ -21,6 +21,42 @@ def clean_name(raw: str) -> str:
     return raw.split(" (")[0].strip() or raw.strip()
 
 
+BAND_TIERS = {"threshold", "light", "common", "strong", "heavy"}
+
+
+def load_dose_bands(path: Path) -> dict[str, list[tuple[str, int, str, float, float | None, str]]]:
+    """Drug name -> (route, order, tier, low, high, unit) rows from the fetched JSONL."""
+    out: dict[str, list[tuple[str, int, str, float, float | None, str]]] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        groups = ((record.get("payload") or {}).get("dose_bands") or {}).get("groups") or []
+        rows: list[tuple[str, int, str, float, float | None, str]] = []
+        for order, group in enumerate(groups):
+            route = (group.get("route") or "").strip().lower()
+            if not route or route == "unspecified":
+                continue
+            for band in group.get("bands") or []:
+                tier = (band.get("band") or "").strip().lower()
+                if tier not in BAND_TIERS:
+                    continue
+                amount = band.get("amount") or {}
+                if amount.get("kind") == "text" or amount.get("lower") is None:
+                    continue
+                upper = amount.get("upper")
+                unit = (amount.get("units") or group.get("units") or "mg").strip()
+                rows.append(
+                    (route, order, tier, float(amount["lower"]),
+                     float(upper) if upper is not None else None, unit)
+                )
+        if rows:
+            out[record["drug"]] = rows
+    return out
+
+
 def load(path: Path) -> list[dict]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     out: list[dict] = []

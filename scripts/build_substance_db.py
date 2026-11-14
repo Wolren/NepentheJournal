@@ -24,6 +24,7 @@ RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
 DEFAULT_OUT = ROOT / "build" / "substance-db"
 TRIPSIT_PATH = Path(__file__).resolve().parent / "cache" / "tripsit_all_drugs.json"
 DC_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_navigation.json"
+DC_BANDS_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_dose_bands.jsonl"
 
 SCHEMA_VERSION = 4
 
@@ -451,6 +452,10 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
     cat.rows["provenance"].append((sid, "effects", "dosewiki"))
 
 
+def clean_dc_name(raw: str) -> str:
+    return raw.split(" (")[0].strip() or raw.strip()
+
+
 def parse_interaction_entry(raw: str) -> tuple[str, str | None]:
     """Split "Name (reason text)" into target name and reason, as the Kotlin ingest does."""
     raw = raw.strip()
@@ -589,6 +594,18 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         catalog.register_aliases(entry["id"])
         dc_created += 1
 
+    # drug.community dose bands fill substances that still carry no ladder.
+    dc_filled = 0
+    for drug_name, bands in drug_community_source.load_dose_bands(DC_BANDS_PATH).items():
+        target = catalog.match([clean_dc_name(drug_name), drug_name])
+        if not target or any(row[0] == target for row in catalog.rows["dose"]):
+            continue
+        for route, order, tier, low, high, unit in bands:
+            catalog.rows["dose"].append((target, route, order, tier, low, high, unit, "drug-community"))
+            catalog.rows["route"].append((target, route))
+        catalog.rows["provenance"].append((target, "dosage", "drug-community"))
+        dc_filled += 1
+
     # DoseWiki interactions resolve after every row exists, so created dw: targets are found.
     for dw, source_id in pairs:
         lists = dw.get("interactions") or {}
@@ -696,6 +713,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "tripsit_created": tripsit_created,
         "tripsit_filled": tripsit_filled,
         "drug_community_created": dc_created,
+        "drug_community_filled": dc_filled,
     }
     return connection, counts
 
