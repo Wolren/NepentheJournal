@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.play.publisher)
     alias(libs.plugins.kover)
+    alias(libs.plugins.sqldelight)
 }
 
 configurations.all {
@@ -64,6 +65,7 @@ kotlin {
                 implementation(libs.vico.compose.m3)
                 implementation(libs.koalaplot.core)
                 implementation(libs.kermit.core)
+                implementation(libs.sqldelight.runtime)
             }
         }
         val commonTest = getByName("commonTest") {
@@ -94,6 +96,7 @@ kotlin {
                 implementation(libs.zstd.jni)
                 // user32 calls for borderless full screen; AWT cannot undecorate a live window.
                 implementation(libs.jna.platform)
+                implementation(libs.sqldelight.jdbc)
             }
         }
         val desktopTest = getByName("desktopTest") {
@@ -115,6 +118,7 @@ kotlin {
                 implementation(libs.ktor.server.cio)
                 implementation(libs.ktor.serialization)
                 implementation(libs.kermit.core)
+                implementation(libs.sqldelight.native)
             }
         }
 
@@ -138,6 +142,7 @@ kotlin {
             dependencies {
                 // Android natives ship in the -jni AAR, not in the jar the desktop uses.
                 implementation("com.github.luben:zstd-jni:1.5.7-2@aar")
+                implementation(libs.sqldelight.android)
             }
         }
         androidMain.dependsOn(jvmMain)
@@ -169,6 +174,14 @@ dependencies {
 }
 
 // NOTE: SessionListViewModelTest was previously excluded because it appeared to deadlock (combine + runBlocking); fixed 2026-07-31, the class now runs in the suite.
+sqldelight {
+    databases {
+        create("CatalogDatabase") {
+            packageName.set("app.journal.catalog.db")
+        }
+    }
+}
+
 val uploadKeystoreFile = rootProject.file("keystore.properties")
 val hasUploadKeystore = uploadKeystoreFile.exists()
 
@@ -230,6 +243,10 @@ tasks.withType<Test>().configureEach {
     val testHome = layout.buildDirectory.dir("test-home/$name").get().asFile
     testHome.mkdirs()
     systemProperty("user.home", testHome.absolutePath)
+    // The reference catalog is a build artifact; catalog tests read the copy the builder produced.
+    rootProject.file("build/substance-db/substances.sqlite").takeIf { it.exists() }?.let {
+        systemProperty("nepenthe.catalog", it.absolutePath)
+    }
 }
 
 // Device-level smoke coverage for the Android runtime path that no unit test reaches.

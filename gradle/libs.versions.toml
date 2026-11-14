@@ -16,6 +16,7 @@ vico                   = "3.3.1"
 koalaplot              = "0.12.1"
 kermit                 = "2.2.0"
 jna                    = "5.17.0"
+sqldelight             = "2.4.1"
 
 bouncycastle = "1.86"
 
@@ -51,6 +52,10 @@ kermit-io               = { module = "co.touchlab:kermit-io",                ver
 zstd-jni               = { module = "com.github.luben:zstd-jni",             version = "1.5.7-2" }
 jna-platform           = { module = "net.java.dev.jna:jna-platform",         version.ref = "jna" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+sqldelight-runtime      = { module = "app.cash.sqldelight:runtime",          version.ref = "sqldelight" }
+sqldelight-android      = { module = "app.cash.sqldelight:android-driver",   version.ref = "sqldelight" }
+sqldelight-jdbc         = { module = "app.cash.sqldelight:sqlite-driver",    version.ref = "sqldelight" }
+sqldelight-native       = { module = "app.cash.sqldelight:native-driver",    version.ref = "sqldelight" }
 
 [plugins]
 kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",       version.ref = "kotlin" }
@@ -60,3 +65,4 @@ compose-multiplatform   = { id = "org.jetbrains.compose",                    ver
 android-application     = { id = "com.android.application",                  version.ref = "agp" }
 play-publisher          = { id = "com.github.triplet.play",                  version = "4.1.1" }
 kover                   = { id = "org.jetbrains.kotlinx.kover",      version = "0.9.11" }
+sqldelight              = { id = "app.cash.sqldelight",              version.ref = "sqldelight" }

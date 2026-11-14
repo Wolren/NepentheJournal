@@ -1,0 +1,119 @@
+CREATE TABLE substance (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    summary TEXT,
+    cid INTEGER,
+    pwiki_id TEXT,
+    addiction_potential TEXT,
+    half_life_minutes REAL,
+    tmax_minutes REAL,
+    source_version TEXT NOT NULL,
+    device_origin TEXT NOT NULL,
+    payload_json TEXT
+);
+
+CREATE TABLE substance_alias (
+    substance_id TEXT NOT NULL,
+    alias TEXT NOT NULL,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, alias)
+);
+
+CREATE TABLE substance_class (
+    substance_id TEXT NOT NULL,
+    class TEXT NOT NULL,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, class)
+);
+
+CREATE TABLE substance_route (
+    substance_id TEXT NOT NULL,
+    route TEXT NOT NULL,
+    PRIMARY KEY (substance_id, route)
+);
+
+CREATE TABLE dose_range (
+    substance_id TEXT NOT NULL,
+    route TEXT NOT NULL,
+    tier TEXT NOT NULL,
+    min REAL,
+    max REAL,
+    unit TEXT,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, route, tier)
+);
+
+CREATE TABLE duration_stage (
+    substance_id TEXT NOT NULL,
+    route TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    min REAL,
+    max REAL,
+    unit TEXT,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, route, stage)
+);
+
+CREATE TABLE substance_effect (
+    substance_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    domain TEXT,
+    description TEXT,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, name)
+);
+
+CREATE TABLE substance_identifier (
+    substance_id TEXT NOT NULL,
+    scheme TEXT NOT NULL,
+    value TEXT NOT NULL,
+    source TEXT NOT NULL,
+    PRIMARY KEY (substance_id, scheme, value)
+);
+
+CREATE TABLE meta (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+countSubstances:
+SELECT COUNT(*) FROM substance;
+
+contentVersion:
+SELECT value FROM meta WHERE key = 'content_version';
+
+selectById:
+SELECT * FROM substance WHERE id = ?;
+
+selectByName:
+SELECT * FROM substance WHERE name = ? COLLATE NOCASE;
+
+selectAll:
+SELECT * FROM substance ORDER BY name;
+
+selectAliases:
+SELECT alias FROM substance_alias WHERE substance_id = ? ORDER BY alias;
+
+selectClasses:
+SELECT class FROM substance_class WHERE substance_id = ? ORDER BY class;
+
+selectRoutes:
+SELECT route FROM substance_route WHERE substance_id = ? ORDER BY route;
+
+selectDoseRanges:
+SELECT route, tier, min, max, unit FROM dose_range WHERE substance_id = ? ORDER BY route, tier;
+
+selectDurationStages:
+SELECT route, stage, min, max, unit FROM duration_stage WHERE substance_id = ? ORDER BY route, stage;
+
+selectEffects:
+SELECT name, domain, description FROM substance_effect WHERE substance_id = ? ORDER BY name;
+
+selectIdentifiers:
+SELECT scheme, value AS ident_value FROM substance_identifier WHERE substance_id = ? ORDER BY scheme, value;
+
+selectByNameOrAlias:
+SELECT s.* FROM substance s
+WHERE s.name LIKE '%' || ? || '%'
+   OR s.id IN (SELECT substance_id FROM substance_alias WHERE alias LIKE '%' || ? || '%')
+ORDER BY s.name;
