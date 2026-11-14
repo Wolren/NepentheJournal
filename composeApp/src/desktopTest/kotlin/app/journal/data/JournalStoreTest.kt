@@ -102,7 +102,7 @@ class JournalStoreTest {
     fun saveAndLoadMultipleEntityTypes() = withTempHome { _ ->
         val repo = JournalRepository()
         repo.upsertSubstance(Substance(
-            id = "sub:1", name = "MDMA", createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
+            id = "sub:1", name = "MDMA", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("Empathogen"), routesOfAdministration = listOf("Oral"),
             effects = listOf("Euphoria"), dosageBands = emptyMap(),
             cachedAt = 0L, sourceVersion = "test"
@@ -267,7 +267,7 @@ class JournalStoreTest {
     fun versionedBackupsDontInterfereWithNormalSave() = withTempHome { _ ->
         val repo = JournalRepository()
         repo.upsertSubstance(Substance(
-            id = "sub:1", name = "MDMA", createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
+            id = "sub:1", name = "MDMA", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("Empathogen"), routesOfAdministration = listOf("Oral"),
             effects = listOf("Euphoria"), dosageBands = emptyMap(),
             cachedAt = 0L, sourceVersion = "test"
@@ -276,7 +276,7 @@ class JournalStoreTest {
         store.save()
 
         repo.upsertSubstance(Substance(
-            id = "sub:2", name = "LSD", createdAt = 0L, updatedAt = 0L, deviceOrigin = "system",
+            id = "sub:2", name = "LSD", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
             substanceClass = listOf("Classical Psychedelic"), routesOfAdministration = listOf("Oral"),
             effects = listOf("Visual"), dosageBands = emptyMap(),
             cachedAt = 0L, sourceVersion = "test"
@@ -645,3 +645,4 @@ class JournalStoreTest {
             "the file on disk must match what a fresh load reads back")
     }
 }
+

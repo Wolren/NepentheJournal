@@ -199,6 +199,7 @@ object DataInitializer {
             val catalogFingerprint = CatalogSource.bundledFingerprint()
             val seedLoaded = if (catalogFingerprint != null) {
                 _phase.value = "Loading substance catalog"
+                val userSubstances = repo.substances.value.filter { it.deviceOrigin != "system" }
                 val catalog = withContext(Dispatchers.Default) {
                     Triple(
                         CatalogSource.loadSubstances(),
@@ -217,6 +218,8 @@ object DataInitializer {
                             "${catalog.third.size} interactions from the bundled catalog"
                     }
                 }
+                // A user edit to a reference row outranks the bundled version.
+                if (userSubstances.isNotEmpty()) repo.applyBatch(substances = userSubstances)
                 catalog.first.isNotEmpty()
             } else {
                 tryLoadSeedWithRetry(repo)
@@ -475,3 +478,4 @@ object DataInitializer {
         store.save()
     }
 }
+

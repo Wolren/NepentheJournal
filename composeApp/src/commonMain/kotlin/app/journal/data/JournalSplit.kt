@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.catalog.CatalogSource
+import app.journal.model.VaultDocument
 import app.journal.serde.AppJson
 import kotlinx.serialization.encodeToString
 
@@ -27,21 +28,27 @@ internal object JournalSplit {
     fun merge(userText: String, libraryText: String?): Loaded {
         val user = decodeSnapshotWithRecovery(userText)
         val userSnapshot = user.snapshot
-        // A bundled catalog owns the reference rows; only user-created rows survive from the file.
+        // A bundled catalog owns the reference rows; user-created rows survive from either file.
         if (CatalogSource.bundledFingerprint() != null) {
             val library = libraryText?.let { text ->
                 decodeSnapshotWithRecovery(text).snapshot
             }
+            fun <T : VaultDocument> keepUser(rows: List<T>): List<T> =
+                rows.filter { it.deviceOrigin != "system" }
+            val substances = keepUser(userSnapshot.substances + library?.substances.orEmpty())
+            val interactions = keepUser(userSnapshot.interactions + library?.interactions.orEmpty())
+            val effects = keepUser(userSnapshot.effects + library?.effects.orEmpty())
             return Loaded(
                 snapshot = userSnapshot.copy(
-                    substances = library?.substances.orEmpty().filter { it.deviceOrigin != "system" },
-                    interactions = library?.interactions.orEmpty()
-                        .filter { it.deviceOrigin != "system" },
-                    effects = library?.effects.orEmpty().filter { it.deviceOrigin != "system" },
+                    substances = substances.distinctBy { it.id },
+                    interactions = interactions.distinctBy { it.id },
+                    effects = effects.distinctBy { it.id },
                 ),
                 userParseError = user.parseError,
                 libraryParseError = null,
-                needsLibraryWrite = false,
+                // Rows rescued from a legacy file must reach the library file on the next save.
+                needsLibraryWrite = substances.isNotEmpty() ||
+                    interactions.isNotEmpty() || effects.isNotEmpty(),
             )
         }
         if (libraryText == null) {

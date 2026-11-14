@@ -135,14 +135,13 @@ class FirstLaunchE2ETest {
         assertEquals(JournalSnapshot.CURRENT_VERSION, snapshot.version,
             "the store must be written at the current snapshot version")
         assertTrue(snapshot.sessions.isEmpty(), "fixture: no sessions on a cold start")
-        assertEquals(repo.substances.value.size, file.readMergedJournal().substances.size,
-            "everything the seed loaded must be on disk")
+        assertEquals(0, file.readMergedJournal().substances.size,
+            "reference rows come from the bundled catalog, not the store")
 
         val reread = JournalRepository()
         JournalStore(reread).load()
-        assertEquals(repo.substances.value.map { it.id }.sorted(),
-            reread.substances.value.map { it.id }.sorted(),
-            "a plain load must reproduce the seeded library exactly")
+        assertTrue(reread.substances.value.isEmpty(),
+            "a store-only load has no reference rows; the catalog supplies them at init")
     }
 
     // ---- 2: Second launch skips re-ingest and keeps user data
@@ -331,3 +330,5 @@ class FirstLaunchE2ETest {
         )
     }
 }
+
+
