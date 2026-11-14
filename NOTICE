@@ -48,3 +48,8 @@ the README, and are not relicensed under the GPL. drug.community states
 no explicit licence at the time of writing; the bundled rows are limited
 to names, class labels and dose bands, and removal is pending a written
 answer from the project.
+
+Medicine names and identifiers (PubChem CID, ATC, CAS, DrugBank)
+are derived from Wikidata (https://www.wikidata.org) under CC0 1.0,
+fetched with the SPARQL query cached in
+`scripts/cache/wikidata_medicines.json`.

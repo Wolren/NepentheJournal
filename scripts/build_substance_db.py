@@ -18,6 +18,7 @@ from pathlib import Path
 
 import drug_community_source
 import tripsit_source
+import wikidata_source
 
 ROOT = Path(__file__).resolve().parent.parent
 RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
@@ -26,6 +27,8 @@ TRIPSIT_PATH = Path(__file__).resolve().parent / "cache" / "tripsit_all_drugs.js
 DC_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_navigation.json"
 DC_BANDS_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_dose_bands.jsonl"
 SMW_PATH = Path(__file__).resolve().parent / "cache" / "smw_only_seed.json"
+WIKIDATA_PATH = Path(__file__).resolve().parent / "cache" / "wikidata_medicines.json"
+TARGET_SUBSTANCES = 1675
 
 SCHEMA_VERSION = 4
 
@@ -153,6 +156,12 @@ SOURCES = [
         "CC-BY-SA-4.0",
         "https://psychonautwiki.org/wiki/PsychonautWiki:Copyrights",
         "PsychonautWiki",
+    ),
+    (
+        "wikidata",
+        "CC0-1.0",
+        "https://www.wikidata.org",
+        "Wikidata medicine items",
     ),
     (
         "drug-community",
@@ -632,6 +641,31 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         catalog.rows["provenance"].append((target, "dosage", "drug-community"))
         dc_filled += 1
 
+    # Wikidata medicines fill the prescription breadth the community sources lack, up to the target count.
+    wikidata_added = 0
+    for item in wikidata_source.load(WIKIDATA_PATH):
+        if len(catalog.substances) >= TARGET_SUBSTANCES:
+            break
+        if catalog.match([item["name"]]):
+            continue
+        entry = {
+            "id": f"wd:{item['qid']}", "old_id": None, "name": item["name"],
+            "summary": None, "cid": item["cid"], "pwiki_id": None,
+            "aliases": [], "classes": ["medicine"], "routes": [],
+            "addiction": None, "half_life": None, "tmax": None,
+            "toxicity": [], "cross": [], "effects": [],
+            "source_version": "wikidata", "payload": {},
+        }
+        catalog.register(entry)
+        catalog.rows["class"].append((entry["id"], "medicine", "wikidata"))
+        for scheme, value in (("atc", item["atc"]), ("cas", item["cas"]), ("drugbank", item["drugbank"])):
+            if value:
+                catalog.rows["identifier"].append((entry["id"], scheme, value, "wikidata"))
+        catalog.rows["provenance"].append((entry["id"], "name", "wikidata"))
+        catalog.rows["provenance"].append((entry["id"], "classes", "wikidata"))
+        catalog.register_aliases(entry["id"])
+        wikidata_added += 1
+
     # DoseWiki interactions resolve after every row exists, so created dw: targets are found.
     for dw, source_id in pairs:
         lists = dw.get("interactions") or {}
@@ -740,6 +774,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "tripsit_filled": tripsit_filled,
         "drug_community_created": dc_created,
         "psychonautwiki_added": smw_added,
+        "wikidata_added": wikidata_added,
         "drug_community_filled": dc_filled,
     }
     return connection, counts

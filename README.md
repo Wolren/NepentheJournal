@@ -72,6 +72,7 @@ Alongside DoseWiki, a 325-substance seed pre-processed from public sources adds 
 - **PsychonautWiki:** substance classes, effects, interactions, dose ranges
 - **PubChem:** CIDs, molecular properties, synonyms
 - **TripSit:** combination interactions, risk assessments, and dose ladders for compounds DoseWiki does not cover
+- **Wikidata:** licensed medicines (PubChem CID, ATC, CAS and DrugBank identifiers) that extend the catalog to prescription drugs
 - **ChEMBL** and **IUPHAR/BPS Guide to Pharmacology:** binding and bioactivity data
 - **PDSP Ki Database** and **BindingDB:** binding affinity measurements
 - **Wikidata:** DrugBank, ChEBI, UNII, and ATC identifiers
@@ -214,7 +215,9 @@ Bundled reference data has its own terms (see [NOTICE](NOTICE)): DoseWiki substa
 - **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)): this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
 - **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)): public substance reference data accessed via their Semantic MediaWiki API and bundled as seed data.
 - **TripSit** ([tripsit.me](https://tripsit.me)): combination interaction and risk-assessment data, plus dose ladders for compounds outside DoseWiki.
+- **Wikidata** ([wikidata.org](https://www.wikidata.org)): medicine names and identifiers under CC0 1.0.
 - **IUPHAR/BPS Guide to Pharmacology**: ligand-target interaction data.
 - **PDSP Ki Database** (NIMH Psychoactive Drug Screening Program): Ki binding data.
 - **BindingDB**: public affinity measurements.
+
 
