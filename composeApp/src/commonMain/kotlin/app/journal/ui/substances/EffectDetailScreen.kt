@@ -1,6 +1,7 @@
 package app.journal.ui.substances
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -19,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,24 +105,6 @@ internal fun EffectDetailScreen(
             }
         }
 
-        if (article.seeAlso.isNotEmpty()) {
-            item {
-                AppCard(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "See also",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    LinkChips(
-                        links = article.seeAlso.map { it.label to it.target },
-                        onOpen = onLink,
-                    )
-                }
-            }
-        }
-
         if (reporters.isNotEmpty()) {
             item {
                 AppCard(modifier = Modifier.fillMaxWidth()) {
@@ -134,6 +118,24 @@ internal fun EffectDetailScreen(
                     LinkChips(
                         links = reporters.map { it.second to "substance:${it.first}" },
                         onOpen = { target -> onOpenSubstance(target.removePrefix("substance:")) },
+                    )
+                }
+            }
+        }
+
+        if (article.seeAlso.isNotEmpty()) {
+            item {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "See also",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinkChips(
+                        links = article.seeAlso.map { it.label to it.target },
+                        onOpen = onLink,
                     )
                 }
             }
@@ -168,9 +170,11 @@ private fun LinkChips(links: List<Pair<String, String>>, onOpen: (String) -> Uni
         modifier = Modifier.fillMaxWidth(),
     ) {
         links.forEach { (label, target) ->
+            val shape = RoundedCornerShape(6.dp)
+            // A clickable Surface enforces a 48dp touch target, which doubles the row gap.
             Surface(
-                onClick = { onOpen(target) },
-                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.clip(shape).clickable { onOpen(target) },
+                shape = shape,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 border = BorderStroke(
                     1.dp,
