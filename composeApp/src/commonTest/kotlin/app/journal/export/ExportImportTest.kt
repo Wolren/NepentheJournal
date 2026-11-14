@@ -165,4 +165,28 @@ class ExportImportTest {
         val count = ExportImport.importSessions(repo, bundleJson)
         assertEquals(0, count, "session with path traversal ID should be skipped")
     }
+
+    @Test
+    fun fullJournalRoundtripKeepsReferenceAndUserSubstances() {
+        val source = JournalRepository()
+        source.upsertSubstance(Substance(
+            id = "cid:5761", name = "LSD", createdAt = 1L, updatedAt = 1L,
+            deviceOrigin = "system", cachedAt = 1L, sourceVersion = "catalog"
+        ))
+        source.upsertSubstance(Substance(
+            id = "dw:mine", name = "My Blend", createdAt = 1L, updatedAt = 1L,
+            deviceOrigin = "desktop", cachedAt = 1L, sourceVersion = "user"
+        ))
+        source.upsertSession(sampleSession("s:2"))
+        source.upsertDose(sampleDose("d:2", "s:2").copy(substanceId = "dw:mine"))
+
+        val json = ExportImport.exportFullJournal(source)
+        val target = JournalRepository()
+        val result = ExportImport.importFullJournal(target, json)
+
+        assertNull(result.error)
+        assertEquals(2, target.substances.value.size)
+        assertEquals(1, target.sessions.value.size)
+        assertEquals("My Blend", target.substances.value.first { it.id == "dw:mine" }.name)
+    }
 }
