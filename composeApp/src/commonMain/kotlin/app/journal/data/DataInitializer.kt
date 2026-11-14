@@ -195,19 +195,21 @@ object DataInitializer {
         try {
             libraryBuildHook?.invoke()
 
-            // The bundled catalog replaces the JSON seed plus DoseWiki ingest; without it the old path runs.
+            var catalogApplied = false
             val catalogFingerprint = CatalogSource.bundledFingerprint()
             val seedLoaded = if (catalogFingerprint != null) {
                 _phase.value = "Loading substance catalog"
                 val userSubstances = repo.substances.value.filter { it.deviceOrigin != "system" }
                 val catalog = withContext(Dispatchers.Default) {
-                    Triple(
-                        CatalogSource.loadSubstances(),
-                        CatalogSource.loadEffects(),
-                        CatalogSource.loadInteractions(),
-                    )
+                    runCatching {
+                        Triple(
+                            CatalogSource.loadSubstances(),
+                            CatalogSource.loadEffects(),
+                            CatalogSource.loadInteractions(),
+                        )
+                    }.getOrNull()
                 }
-                if (catalog.first.isNotEmpty()) {
+                if (catalog != null && catalog.first.isNotEmpty()) {
                     repo.applyBatch(
                         substances = catalog.first,
                         effects = catalog.second,
@@ -217,16 +219,20 @@ object DataInitializer {
                         "Loaded ${catalog.first.size} substances, ${catalog.second.size} effects and " +
                             "${catalog.third.size} interactions from the bundled catalog"
                     }
+                    // A user edit to a reference row outranks the bundled version.
+                    if (userSubstances.isNotEmpty()) repo.applyBatch(substances = userSubstances)
+                    catalogApplied = true
+                    true
+                } else {
+                    Log.withTag("DataInit").w { "Catalog unusable, falling back to the JSON seed" }
+                    tryLoadSeedWithRetry(repo)
                 }
-                // A user edit to a reference row outranks the bundled version.
-                if (userSubstances.isNotEmpty()) repo.applyBatch(substances = userSubstances)
-                catalog.first.isNotEmpty()
             } else {
                 tryLoadSeedWithRetry(repo)
             }
 
             // Step 3: Ingest DoseWiki data as the primary entity (overwrites matched seed rows, creates dw:{slug} rows for the rest).
-            if (catalogFingerprint == null) {
+            if (!catalogApplied) {
                 _phase.value = "Merging DoseWiki data"
                 DoseWikiIngestor.ensureIngested(repo)
             }
@@ -478,4 +484,5 @@ object DataInitializer {
         store.save()
     }
 }
+
 
