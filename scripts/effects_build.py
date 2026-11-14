@@ -127,18 +127,60 @@ def attr(tag: str, name: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def strip_tags(text: str) -> str:
+    return re.sub(r"\[[^\]]*\]", "", text).strip()
+
+
+def link_target(location: str, title: str) -> dict | None:
+    """Site location to a link the app can resolve: bundled effect or web page."""
+    if not location:
+        return None
+    if location.startswith("/effects"):
+        slug = location[len("/effects"):].strip()
+        return {"target": "effect:" + slug, "label": title} if slug else None
+    url = "https://dose.wiki" + location if location.startswith("/") else location
+    return {"target": "url:" + url, "label": title}
+
+
 def clean_markup(text: str) -> str:
-    """DoseWiki rich text to plain paragraphs."""
+    """DoseWiki rich text to a small marker format the reader renders.
+
+    Markers: `## heading`, `- bullet`, `**bold**`, `*italic*`, `{{target|label}}`
+    links, and `:::level label | header` ... `:::` boxes.
+    """
     if not text:
         return ""
     text = html.unescape(text)
-    # Boxed blocks carry their title in an attribute; the title is the content that matters.
+
+    # Citations carry no readable content; drop the whole marker.
+    text = re.sub(r"\[ref[^\]]*\].*?\[/ref\]", "", text, flags=re.S)
+    text = re.sub(r"\[/?ref[^\]]*\]", "", text)
+
+    def inline_link(match: "re.Match[str]") -> str:
+        target = match.group(1).strip()
+        label = strip_tags(match.group(2))
+        if target.startswith("/effects"):
+            slug = target[len("/effects"):].strip()
+            return f"{{{{effect:{slug}|{label}}}}}" if slug else label
+        url = "https://dose.wiki" + target if target.startswith("/") else target
+        return f"{{{{url:{url}|{label}}}}}"
+
+    text = re.sub(r'\[int-link to="([^"]+)"\](.*?)\[/int-link\]', inline_link, text, flags=re.S)
+    text = re.sub(r"\[/?int-link[^\]]*\]", "", text)
+    text = re.sub(r"\[ext-link[^\]]*\](.*?)\[/ext-link\]", lambda m: strip_tags(m.group(1)), text, flags=re.S)
+    text = re.sub(r"\[/?ext-link[^\]]*\]", "", text)
+
+    text = re.sub(r"\[b\](.*?)\[/b\]", r"**\1**", text, flags=re.S)
+    text = re.sub(r"\[i\](.*?)\[/i\]", r"*\1*", text, flags=re.S)
+    text = re.sub(r"\[/?(u|s|em|strong)\]", "", text)
+
+    # Level boxes keep a block marker so the reader can draw them as stage cards.
     text = re.sub(
         r"\[headered-textbox[^\]]*\]",
-        lambda m: "\n\n## " + (attr(m.group(0), "header") or attr(m.group(0), "label")) + "\n\n",
+        lambda m: "\n\n:::level " + attr(m.group(0), "label") + " | " + attr(m.group(0), "header") + "\n",
         text,
     )
-    text = re.sub(r"\[/headered-textbox\]", "\n", text)
+    text = re.sub(r"\[/headered-textbox\]", "\n:::\n", text)
     text = re.sub(
         r"\[captioned-image[^\]]*\]",
         lambda m: "\n\n" + attr(m.group(0), "caption") + "\n\n",
@@ -152,33 +194,20 @@ def clean_markup(text: str) -> str:
         text,
     )
     text = re.sub(r"\[panel[^\]]*\]", lambda m: "\n\n## " + attr(m.group(0), "title") + "\n\n", text)
-    # Section headings keep a marker so the reader can render them as headings.
     text = re.sub(r"\[h[1-6][^\]]*\]", "\n\n## ", text)
     text = re.sub(r"\[/h[1-6]\]", "\n\n", text)
     text = re.sub(r"\[/panel\]|\[hr\s*/?\]", "\n\n", text)
     text = re.sub(r"\[li[^\]]*\]", "\n- ", text)
     text = re.sub(r"\[/li\]", "\n", text)
     text = re.sub(r"\[/?list[^\]]*\]", "\n\n", text)
-    # Any site tag that survived the specific passes is presentation, not content.
-    text = re.sub(r"\[/?[A-Za-z][^\]]*\]", "", text)
-    # Citation markers and inline cross-links carry site-specific tags; keep the
-    # visible text of a cross-link, drop a citation marker whole.
-    text = re.sub(r"\[ref[^\]]*\].*?\[/ref\]", "", text, flags=re.S)
-    text = re.sub(r"\[/?ref[^\]]*\]", "", text)
-    text = re.sub(r"\[(int|ext)-link[^\]]*\]", "", text)
-    text = re.sub(r"\[/(int|ext)-link\]", "", text)
     text = re.sub(r"\[url=[^\]]*\]", "", text)
     text = re.sub(r"\[/?url\]", "", text)
-    text = re.sub(r"\[/?(p|br|h\d|quote|center|hr|img|table|tr|td|th|math|code|youtube|video|embed)(=[^\]]*)?\]", "\n\n", text)
-    text = re.sub(r"\[/?li\]", "\n", text)
-    text = re.sub(r"\[/?list\]", "\n", text)
-    text = re.sub(r"\[/?(b|i|u|s|em|strong)\]", "", text)
-    text = re.sub(r"\[[a-z]+(=[^\]]*)?\]", "", text)
-    text = re.sub(r"\[/[a-z]+\]", "", text)
+    text = re.sub(r"\[/?(p|br|quote|center|img|table|tr|td|th|math|code|youtube|video|embed)(=[^\]]*)?\]", "\n\n", text)
+    # Any site tag that survived the specific passes is presentation, not content.
+    text = re.sub(r"\[/?[A-Za-z][^\]]*\]", "", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return "\n".join(line.strip() for line in text.split("\n")).strip()
-
 
 def clamp_body(text: str) -> str:
     if len(text) <= BODY_LIMIT:
@@ -340,6 +369,17 @@ def name_variants(name: str) -> list[str]:
     return out
 
 
+def see_also(item: dict) -> list:
+    links = []
+    for entry in item.get("see_also") or []:
+        if not isinstance(entry, dict):
+            continue
+        link = link_target(entry.get("location") or "", entry.get("title") or "")
+        if link:
+            links.append(link)
+    return links
+
+
 def build_article(record: dict, dosewiki_item: dict | None, pw_record: dict | None) -> dict | None:
     name = (record.get("name") or "").strip()
     categories = [slot for slot in CATEGORY_ORDER if slot in record.get("categories", set())]
@@ -362,6 +402,7 @@ def build_article(record: dict, dosewiki_item: dict | None, pw_record: dict | No
             "body": clamp_body(body),
             "source": "dosewiki",
             "url": f"https://dose.wiki/effects/{slug}",
+            "seeAlso": see_also(dosewiki_item),
         }
     if pw_record and (pw_record.get("extract") or "").strip():
         body = clamp_body(clean_markup(pw_record["extract"]))

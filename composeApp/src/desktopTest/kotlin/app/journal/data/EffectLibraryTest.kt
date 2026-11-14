@@ -42,4 +42,30 @@ class EffectLibraryTest {
         val matched = EffectArticle(name = "Auditory distortions", source = "psychonautwiki")
         assertEquals("psychonautwiki", matched.source)
     }
+
+    @Test
+    fun inlineLinkTargetsResolveToBundledArticles() {
+        assertTrue(EffectLibrary.ensureLoaded())
+        val drifting = EffectLibrary.articleBySlug("drifting")
+        assertNotNull(drifting, "an inline link slug must resolve to its article")
+
+        val withLinks = EffectLibrary.articles.value.filter { it.body.contains("{{") }
+        assertTrue(withLinks.size > 100, "expected inline links, found ${withLinks.size} articles")
+        val targets = withLinks.flatMap { article ->
+            Regex("\\{\\{(effect:[^|]+)\\|").findAll(article.body).map { it.groupValues[1] }.toList()
+        }
+        val resolvable = targets.filter { EffectLibrary.articleBySlug(it.removePrefix("effect:")) != null }
+        assertTrue(
+            resolvable.size >= targets.size / 2,
+            "at least half the inline effect links must resolve locally, got ${resolvable.size}/${targets.size}",
+        )
+    }
+
+    @Test
+    fun seenAlsoLinksAreBundledWithTheirTargets() {
+        assertTrue(EffectLibrary.ensureLoaded())
+        val withSeeAlso = EffectLibrary.articles.value.filter { it.seeAlso.isNotEmpty() }
+        assertTrue(withSeeAlso.size > 200, "expected curated see-also lists, found ${withSeeAlso.size}")
+        assertTrue(withSeeAlso.all { article -> article.seeAlso.all { it.target.isNotBlank() && it.label.isNotBlank() } })
+    }
 }

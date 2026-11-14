@@ -365,7 +365,16 @@ internal fun AppNavigation(
                     NavigationState.DetailEffect -> {
                         val name = selectedEffectName
                         if (name != null) {
-                            EffectDetailScreen(effectName = name, onBack = { selectedEffectName = null })
+                            EffectDetailScreen(
+                                effectName = name,
+                                onBack = { selectedEffectName = null },
+                                repo = repo,
+                                onOpenEffect = { selectedEffectName = it },
+                                onOpenSubstance = { id ->
+                                    selectedEffectName = null
+                                    selectedSubstanceId = id
+                                },
+                            )
                         }
                     }
                     NavigationState.DetailSubstance -> {

@@ -169,7 +169,7 @@ class ComposeScreenSmokeTest {
                 }
             }
             waitUntil(timeoutMillis = 10_000) {
-                onAllNodesWithText("Text from DoseWiki, CC0.")
+                onAllNodesWithText("Anxiety is medically recognized", substring = true)
                     .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
             }
             assertTrue(

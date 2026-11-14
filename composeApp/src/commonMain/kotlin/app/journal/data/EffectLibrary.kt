@@ -41,6 +41,7 @@ object EffectLibrary {
     val licenses: StateFlow<Map<String, String>> = _licenses.asStateFlow()
 
     private var byName: Map<String, EffectArticle>? = null
+    private var bySlug: Map<String, EffectArticle> = emptyMap()
 
     /** Parses the bundle once; safe to call again. Returns true when articles are available. */
     fun ensureLoaded(): Boolean {
@@ -54,6 +55,9 @@ object EffectLibrary {
             val bundle = json.decodeFromString<Bundle>(text)
             val articles = bundle.articles.filter { it.name.isNotBlank() }
             byName = articles.associateBy { key(it.name) }
+            // A label that matched another article copies its slug; the canonical entry wins.
+            bySlug = articles.sortedBy { if (it.matchedName == null) 0 else 1 }
+                .associateBy { it.slug }
             _articles.value = articles
             _generatedAt.value = bundle.generatedAt
             _licenses.value = bundle.licenses
@@ -67,6 +71,9 @@ object EffectLibrary {
 
     /** Article for an effect label as the substance data spells it. */
     fun article(name: String): EffectArticle? = byName?.get(key(name))
+
+    /** Article for a link target slug, used by inline links and see-also entries. */
+    fun articleBySlug(slug: String): EffectArticle? = bySlug[slug.trim().lowercase()]
 
     /** Lookup form shared by the bundle builder and the app. */
     fun key(name: String): String = name.lowercase().replace(NON_ALNUM, " ").trim()

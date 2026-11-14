@@ -1,13 +1,16 @@
 package app.journal.ui.substances
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.EffectLibrary
+import app.journal.data.IJournalRepository
 import app.journal.ui.components.AppCard
 import app.journal.ui.components.NotFoundBox
 import app.journal.ui.components.ScreenScaffold
@@ -34,6 +38,9 @@ import kotlinx.coroutines.withContext
 internal fun EffectDetailScreen(
     effectName: String,
     onBack: () -> Unit,
+    repo: IJournalRepository? = null,
+    onOpenEffect: (String) -> Unit = {},
+    onOpenSubstance: (String) -> Unit = {},
 ) {
     val articles by EffectLibrary.articles.collectAsState()
     LaunchedEffect(Unit) {
@@ -48,6 +55,21 @@ internal fun EffectDetailScreen(
         parseEffectBlocks(article.body.ifBlank { article.summary })
     }
     val uriHandler = LocalUriHandler.current
+
+    // Effect to effect and external links both flow through one handler.
+    val onLink: (String) -> Unit = { target ->
+        when {
+            target.startsWith("effect:") -> {
+                val slug = target.removePrefix("effect:")
+                val linked = EffectLibrary.articleBySlug(slug)
+                if (linked != null) onOpenEffect(linked.name)
+                else uriHandler.openUri("https://dose.wiki/effects/$slug")
+            }
+            target.startsWith("url:") -> uriHandler.openUri(target.removePrefix("url:"))
+        }
+    }
+
+    val reporters = reportersFor(repo, article.name)
 
     ScreenScaffold(title = article.name, onBack = onBack, selectable = true) {
         item {
@@ -66,7 +88,6 @@ internal fun EffectDetailScreen(
                 }
                 val matched = article.matchedName
                 if (matched != null && matched != article.name) {
-                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = "This text describes $matched.",
                         style = MaterialTheme.typography.labelSmall,
@@ -78,7 +99,43 @@ internal fun EffectDetailScreen(
 
         item {
             AppCard(modifier = Modifier.fillMaxWidth()) {
-                EffectBody(blocks)
+                EffectBody(blocks = blocks, onLinkClick = onLink)
+            }
+        }
+
+        if (article.seeAlso.isNotEmpty()) {
+            item {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "See also",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinkChips(
+                        links = article.seeAlso.map { it.label to it.target },
+                        onOpen = onLink,
+                    )
+                }
+            }
+        }
+
+        if (reporters.isNotEmpty()) {
+            item {
+                AppCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Reported by ${reporters.size} substances",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinkChips(
+                        links = reporters.map { it.second to "substance:${it.first}" },
+                        onOpen = { target -> onOpenSubstance(target.removePrefix("substance:")) },
+                    )
+                }
             }
         }
 
@@ -100,5 +157,51 @@ internal fun EffectDetailScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LinkChips(links: List<Pair<String, String>>, onOpen: (String) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        links.forEach { (label, target) ->
+            Surface(
+                onClick = { onOpen(target) },
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                ),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Substances that report this effect, from the ingested effect rows and the flat lists. */
+@Composable
+private fun reportersFor(repo: IJournalRepository?, effectName: String): List<Pair<String, String>> {
+    if (repo == null) return emptyList()
+    val effects by repo.effects.collectAsState()
+    val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
+    return remember(effects, substancesById, effectName) {
+        val ids = linkedSetOf<String>()
+        effects.filter { it.name.equals(effectName, ignoreCase = true) }
+            .forEach { record -> ids += record.substanceIds }
+        substancesById.values
+            .filter { substance -> substance.effects.any { it.equals(effectName, ignoreCase = true) } }
+            .forEach { substance -> ids += substance.id }
+        ids.mapNotNull { id -> substancesById[id]?.let { id to it.name } }
+            .sortedBy { it.second.lowercase() }
     }
 }
