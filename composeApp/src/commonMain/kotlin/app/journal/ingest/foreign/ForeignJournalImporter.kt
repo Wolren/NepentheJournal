@@ -201,10 +201,10 @@ object ForeignJournalImporter {
                 takenIds.add(substance.id)
                 displayName[substance.id] = substance.name
                 val name = substance.name.trim().lowercase()
-                if (name.isNotEmpty()) byName.putIfAbsent(name, substance.id)
+                if (name.isNotEmpty()) byName.getOrPut(name) { substance.id }
                 for (alias in substance.aliases) {
                     val key = alias.trim().lowercase()
-                    if (key.isNotEmpty()) byAlias.putIfAbsent(key, substance.id)
+                    if (key.isNotEmpty()) byAlias.getOrPut(key) { substance.id }
                 }
             }
         }
@@ -248,4 +248,5 @@ object ForeignJournalImporter {
         data class Failed(val message: String) : Parsed
     }
 }
+
 

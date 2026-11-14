@@ -5,6 +5,7 @@ import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import app.journal.catalog.db.CatalogDatabase
 import app.journal.util.readBundledResource
 import co.touchlab.sqliter.DatabaseConfiguration
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSBundle
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
@@ -27,6 +28,7 @@ actual object CatalogDriver {
     }
 
     /** The driver opens a database file, so the read-only asset is copied once per content version. */
+    @OptIn(ExperimentalForeignApi::class)
     private fun copyOnce(): String {
         val docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true)
             .firstOrNull() as? String ?: "."

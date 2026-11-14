@@ -103,7 +103,7 @@ internal object DrugsProParser {
                 val unit = unitOf(row.str("dose"))
                 byKey.getOrPut(key(day, name, amount)) { mutableListOf() }
                     .add(Row(route = row.str("roa"), unit = unit))
-                if (unit != null) unitByName.putIfAbsent(name.lowercase(), unit)
+                if (unit != null) unitByName.getOrPut(name.lowercase()) { unit }
             }
         }
 
@@ -135,3 +135,4 @@ internal object DrugsProParser {
     private const val MINUTES_PER_DAY = 1440
     private const val MILLIS_PER_DAY = 86_400_000L
 }
+
