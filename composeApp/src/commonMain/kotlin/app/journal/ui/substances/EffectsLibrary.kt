@@ -40,22 +40,57 @@ import kotlinx.coroutines.withContext
 internal data class EffectGroup(val label: String, val articles: List<EffectArticle>)
 
 internal val CATEGORY_KEYS = listOf("cognitive", "physical", "sensory")
+private val SENSORY_KEYS = listOf("visual", "auditory", "tactile", "gustatory", "olfactory", "multisensory")
+
+/** One entry of the effects category filter, shaped like the substance filter options. */
+internal data class EffectFilterOption(
+    val key: String,
+    val label: String,
+    val count: Int,
+    val parent: String? = null,
+)
+
+/** Broads with their counts, then the sensory specifics, derived from the bundled articles. */
+internal fun effectFilterOptions(articles: List<EffectArticle>): List<EffectFilterOption> {
+    val broads = CATEGORY_KEYS.mapNotNull { key ->
+        val count = articles.count { key in it.categories }
+        if (count == 0) null else EffectFilterOption(key, categoryLabel(key), count)
+    }
+    val sensory = SENSORY_KEYS.mapNotNull { key ->
+        val count = articles.count { key in it.categories }
+        if (count == 0) null else EffectFilterOption(key, categoryLabel(key), count, parent = "sensory")
+    }
+    return broads + sensory
+}
 
 /**
  * Filter by free text, then group by the first curated category the article
  * carries. Order is fixed (cognitive, physical, sensory, other) so the list
  * does not reshuffle between visits.
  */
-internal fun groupEffects(articles: List<EffectArticle>, query: String): List<EffectGroup> {
+internal fun groupEffects(
+    articles: List<EffectArticle>,
+    query: String,
+    broad: String? = null,
+    specific: String? = null,
+): List<EffectGroup> {
     val needle = query.trim().lowercase()
-    val matching = if (needle.isEmpty()) {
-        articles
-    } else {
-        articles.filter { article ->
+    var matching = when {
+        specific != null -> articles.filter { specific in it.categories }
+        broad != null -> articles.filter { broad in it.categories }
+        else -> articles
+    }
+    if (needle.isNotEmpty()) {
+        matching = matching.filter { article ->
             article.name.lowercase().contains(needle) ||
                 article.summary.lowercase().contains(needle) ||
                 article.body.lowercase().contains(needle)
         }
+    }
+    // An active filter names the list, so dual-category articles stay in the picked group.
+    val filterLabel = specific?.let { categoryLabel(it) } ?: broad?.let { categoryLabel(it) }
+    if (filterLabel != null) {
+        return listOf(EffectGroup(filterLabel, matching.sortedBy { it.name.lowercase() }))
     }
     val buckets = mutableMapOf<String, MutableList<EffectArticle>>()
     matching.forEach { article ->
@@ -73,6 +108,12 @@ internal fun categoryLabel(key: String): String = when (key) {
     "cognitive" -> "Cognitive"
     "physical" -> "Physical"
     "sensory" -> "Sensory"
+    "visual" -> "Visual"
+    "auditory" -> "Auditory"
+    "tactile" -> "Tactile"
+    "gustatory" -> "Gustatory"
+    "olfactory" -> "Olfactory"
+    "multisensory" -> "Multisensory"
     else -> "Other"
 }
 
@@ -85,13 +126,15 @@ internal fun sourceLabel(article: EffectArticle): String = when (article.source)
 internal fun EffectsLibrary(
     query: String,
     listState: LazyListState,
+    broad: String? = null,
+    specific: String? = null,
     onEffectClick: (String) -> Unit = {},
 ) {
     val articles by EffectLibrary.articles.collectAsState()
     LaunchedEffect(Unit) {
         withContext(Dispatchers.Default) { EffectLibrary.ensureLoaded() }
     }
-    val groups = remember(articles, query) { groupEffects(articles, query) }
+    val groups = remember(articles, query, broad, specific) { groupEffects(articles, query, broad, specific) }
     val showEmptyState = rememberEmptyStateVisible(isEmpty = articles.isEmpty() || groups.isEmpty())
 
     if (groups.isEmpty()) {

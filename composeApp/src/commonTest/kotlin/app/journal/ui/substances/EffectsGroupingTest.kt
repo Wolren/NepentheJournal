@@ -40,6 +40,37 @@ class EffectsGroupingTest {
     }
 
     @Test
+    fun broadFilterKeepsOnlyThatCategoryAndNamesTheList() {
+        val groups = groupEffects(articles, query = "", broad = "physical")
+        assertEquals(1, groups.size)
+        assertEquals("Physical", groups.single().label)
+        assertEquals(listOf("Nausea"), groups.single().articles.map { it.name })
+    }
+
+    @Test
+    fun specificFilterWinsOverTheBroad() {
+        val groups = groupEffects(articles, query = "", broad = "sensory", specific = "visual")
+        assertEquals("Visual", groups.single().label)
+        assertEquals(listOf("Visual drifting"), groups.single().articles.map { it.name })
+    }
+
+    @Test
+    fun anArticleWithTwoCategoriesStaysInTheFilteredList() {
+        val multi = listOf(article("Anxiety", "cognitive", "physical"))
+        val groups = groupEffects(multi, query = "", broad = "physical")
+        assertEquals("Physical", groups.single().label)
+        assertEquals(listOf("Anxiety"), groups.single().articles.map { it.name })
+    }
+
+    @Test
+    fun filterOptionsCountBroadsAndSensorySpecifics() {
+        val options = effectFilterOptions(articles)
+        assertEquals(listOf("cognitive", "physical", "sensory", "visual"), options.map { it.key })
+        assertEquals(1, options.first { it.key == "cognitive" }.count)
+        assertEquals(null, options.first { it.key == "sensory" }.parent)
+        assertEquals("sensory", options.first { it.key == "visual" }.parent)
+    }
+    @Test
     fun articlesSortAlphabeticallyInsideAGroup() {
         val cognitive = listOf(article("Zoning out", "cognitive"), article("Analysis enhancement", "cognitive"))
         val group = groupEffects(cognitive, "").single()

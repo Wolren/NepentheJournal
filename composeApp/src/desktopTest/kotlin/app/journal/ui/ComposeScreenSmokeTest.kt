@@ -23,6 +23,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -157,9 +161,57 @@ class ComposeScreenSmokeTest {
             onNodeWithText("Anxiety").performClick()
             waitForIdle()
             assertEquals(listOf("Anxiety"), opened, "a tapped card must open its article")
+
+            // The category filter mirrors the substance filter: one menu, broads then sensory specifics.
+            onAllNodesWithContentDescription("Filter by category")
+                .fetchSemanticsNodes(atLeastOneRootRequired = false)
+                .first()
+            onNode(hasContentDescription("Filter by category")).performClick()
+            waitForIdle()
+            assertTrue(
+                onAllNodesWithText("Sensory specifics").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the effects filter must open with the sensory specifics"
+            )
+            onNode(hasText("Physical (", substring = true) and hasAnyAncestor(isPopup())).performClick()
+            waitForIdle()
+            assertTrue(
+                onAllNodesWithText("Physical (", substring = true)
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "a broad filter must keep the physical group"
+            )
+            assertEquals(
+                0,
+                onAllNodesWithText("Cognitive (", substring = true)
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).size,
+                "a broad filter must drop the other groups",
+            )
         }
     }
 
+    @Test
+    fun effectsLibraryHonoursTheBroadFilter() = runBlocking {
+        runComposeUiTest {
+            setContent {
+                MaterialTheme {
+                    app.journal.ui.substances.EffectsLibrary(
+                        query = "",
+                        listState = androidx.compose.foundation.lazy.rememberLazyListState(),
+                        broad = "physical",
+                    )
+                }
+            }
+            waitUntil(timeoutMillis = 15_000) {
+                onAllNodesWithText("Physical (", substring = true)
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+            }
+            assertEquals(
+                0,
+                onAllNodesWithText("Cognitive (", substring = true)
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).size,
+                "only the physical group may remain",
+            )
+        }
+    }
     @Test
     fun effectDetailScreenRendersTheBundledArticle() = runBlocking {
         runComposeUiTest {

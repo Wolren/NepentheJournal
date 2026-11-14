@@ -33,6 +33,9 @@ import app.journal.ui.theme.AdaptiveColors
 import app.journal.ui.theme.ThemeManager
 import app.journal.util.currentTimeMillis
 import app.journal.util.isDesktopPlatform
+import app.journal.data.EffectLibrary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.journal.ui.components.*
 
 /** The Substances tab holds the substance library and the bundled effect library. */
@@ -65,7 +68,14 @@ fun SubstanceScreen(
     val effectsScrollState = rememberLazyListState()
     var mode by rememberSaveable { mutableStateOf(LibraryMode.SUBSTANCES) }
     var effectQuery by rememberSaveable { mutableStateOf("") }
+    var effectFilterExpanded by rememberSaveable { mutableStateOf(false) }
+    var effectBroad by rememberSaveable { mutableStateOf<String?>(null) }
+    var effectSpecific by rememberSaveable { mutableStateOf<String?>(null) }
     val activeQuery = if (mode == LibraryMode.SUBSTANCES) query else effectQuery
+    val effectArticles by EffectLibrary.articles.collectAsState()
+    LaunchedEffect(Unit) { withContext(Dispatchers.Default) { EffectLibrary.ensureLoaded() } }
+    val effectOptions = remember(effectArticles) { effectFilterOptions(effectArticles) }
+    LaunchedEffect(mode) { if (mode != LibraryMode.EFFECTS) effectFilterExpanded = false }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -115,6 +125,15 @@ fun SubstanceScreen(
                                                else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            } else {
+                                IconButton(onClick = { effectFilterExpanded = true }) {
+                                    Icon(
+                                        Icons.Default.Label,
+                                        contentDescription = "Filter by category",
+                                        tint = if (effectBroad != null) MaterialTheme.colorScheme.primary
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     },
@@ -122,6 +141,77 @@ fun SubstanceScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+                DropdownMenu(
+                    expanded = effectFilterExpanded,
+                    onDismissRequest = { effectFilterExpanded = false },
+                    offset = DpOffset(0.dp, 0.dp),
+                ) {
+                    Column(modifier = Modifier.width(300.dp)) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "All categories",
+                                    fontWeight = if (effectBroad == null) FontWeight.Bold else FontWeight.Normal,
+                                )
+                            },
+                            onClick = {
+                                effectBroad = null
+                                effectSpecific = null
+                                effectFilterExpanded = false
+                            },
+                            leadingIcon = { Checkbox(checked = effectBroad == null, onCheckedChange = null) },
+                        )
+                        effectOptions.filter { it.parent == null }.forEach { option ->
+                            val selected = effectBroad == option.key && effectSpecific == null
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "${option.label} (${option.count})",
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    )
+                                },
+                                onClick = {
+                                    effectBroad = option.key
+                                    effectSpecific = null
+                                    if (option.key != "sensory") effectFilterExpanded = false
+                                },
+                                leadingIcon = { Checkbox(checked = selected, onCheckedChange = null) },
+                            )
+                        }
+                        val specifics = effectOptions.filter { it.parent == "sensory" }
+                        if (specifics.isNotEmpty()) {
+                            HorizontalDivider()
+                            Text(
+                                text = "Sensory specifics",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
+                            )
+                            specifics.forEach { option ->
+                                val selected = effectSpecific == option.key
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "${option.label} (${option.count})",
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    },
+                                    onClick = {
+                                        effectBroad = "sensory"
+                                        effectSpecific = option.key
+                                        effectFilterExpanded = false
+                                    },
+                                    leadingIcon = { Checkbox(checked = selected, onCheckedChange = null) },
+                                )
+                            }
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Done", fontWeight = FontWeight.Bold) },
+                            onClick = { effectFilterExpanded = false },
+                        )
+                    }
+                }
                 DropdownMenu(
                     expanded = categoryDropdownExpanded,
                     onDismissRequest = { categoryDropdownExpanded = false },
@@ -243,6 +333,8 @@ fun SubstanceScreen(
                 EffectsLibrary(
                     query = effectQuery,
                     listState = effectsScrollState,
+                    broad = effectBroad,
+                    specific = effectSpecific,
                     onEffectClick = onEffectClick,
                 )
             } else if (results.isEmpty()) {
