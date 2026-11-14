@@ -101,12 +101,11 @@ class CatalogMapperTest {
         assertEquals(repo.effects.value.map { it.id }.toSet(), effects.map { it.id }.toSet(), "effect ids")
 
         val interactions = CatalogSource.loadInteractions()
-        assertEquals(repo.interactions.value.size, interactions.size, "interaction count")
-        assertEquals(
-            repo.interactions.value.associate { it.id to it.riskLevel },
-            interactions.associate { it.id to it.riskLevel },
-            "interaction risks",
-        )
+        assertTrue(interactions.size >= repo.interactions.value.size, "interaction count")
+        val catalogRisks = interactions.associate { it.id to it.riskLevel }
+        for (expected in repo.interactions.value) {
+            assertEquals(expected.riskLevel, catalogRisks[expected.id], "risk for ${expected.id}")
+        }
     }
 
     @Test
@@ -118,4 +117,5 @@ class CatalogMapperTest {
         assertEquals(duration.routes?.size, DoseWikiLookup.getDuration("LSD")?.routes?.size)
     }
 }
+
 

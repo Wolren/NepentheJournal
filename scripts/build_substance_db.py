@@ -16,12 +16,14 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import drug_community_source
 import tripsit_source
 
 ROOT = Path(__file__).resolve().parent.parent
 RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
 DEFAULT_OUT = ROOT / "build" / "substance-db"
 TRIPSIT_PATH = Path(__file__).resolve().parent / "cache" / "tripsit_all_drugs.json"
+DC_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_navigation.json"
 
 SCHEMA_VERSION = 4
 
@@ -149,6 +151,12 @@ SOURCES = [
         "CC-BY-SA-4.0",
         "https://psychonautwiki.org/wiki/PsychonautWiki:Copyrights",
         "PsychonautWiki",
+    ),
+    (
+        "drug-community",
+        "unknown",
+        "https://drug.community",
+        "Drug.Community names and class labels",
     ),
     (
         "tripsit",
@@ -558,6 +566,29 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         catalog.register_aliases(entry["id"])
         tripsit_created += 1
 
+    # drug.community navigation adds named research chemicals without dose ladders.
+    dc_created = 0
+    for item in drug_community_source.load(DC_PATH):
+        if catalog.match([item["name"]] + item["aliases"]):
+            continue
+        entry = {
+            "id": f"dc:{item['slug']}", "old_id": None, "name": item["name"],
+            "summary": None, "cid": None, "pwiki_id": None,
+            "aliases": item["aliases"], "classes": item["classes"], "routes": [],
+            "addiction": None, "half_life": None, "tmax": None,
+            "toxicity": [], "cross": [], "effects": [],
+            "source_version": "drug-community", "payload": {},
+        }
+        catalog.register(entry)
+        for alias in item["aliases"]:
+            catalog.rows["alias"].append((entry["id"], alias, "drug-community"))
+        for label in item["classes"]:
+            catalog.rows["class"].append((entry["id"], label, "drug-community"))
+        catalog.rows["provenance"].append((entry["id"], "name", "drug-community"))
+        catalog.rows["provenance"].append((entry["id"], "classes", "drug-community"))
+        catalog.register_aliases(entry["id"])
+        dc_created += 1
+
     # DoseWiki interactions resolve after every row exists, so created dw: targets are found.
     for dw, source_id in pairs:
         lists = dw.get("interactions") or {}
@@ -664,6 +695,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         ).fetchone()[0],
         "tripsit_created": tripsit_created,
         "tripsit_filled": tripsit_filled,
+        "drug_community_created": dc_created,
     }
     return connection, counts
 
