@@ -24,6 +24,7 @@ Downloads are cached under scripts/cache/ (regenerable, gitignored):
     EffectIndex.json, pw_effects.json
 """
 
+import html
 import json
 import os
 import re
@@ -121,17 +122,59 @@ def download_effect_index() -> list:
     return items
 
 
+def attr(tag: str, name: str) -> str:
+    match = re.search(name + r'="([^"]*)"', tag)
+    return match.group(1).strip() if match else ""
+
+
 def clean_markup(text: str) -> str:
     """DoseWiki rich text to plain paragraphs."""
     if not text:
         return ""
+    text = html.unescape(text)
+    # Boxed blocks carry their title in an attribute; the title is the content that matters.
+    text = re.sub(
+        r"\[headered-textbox[^\]]*\]",
+        lambda m: "\n\n## " + (attr(m.group(0), "header") or attr(m.group(0), "label")) + "\n\n",
+        text,
+    )
+    text = re.sub(r"\[/headered-textbox\]", "\n", text)
+    text = re.sub(
+        r"\[captioned-image[^\]]*\]",
+        lambda m: "\n\n" + attr(m.group(0), "caption") + "\n\n",
+        text,
+    )
+    text = re.sub(r"\[(subarticle|toc)[^\]]*\]", "", text)
+    text = re.sub(r"\[/subarticle\]", "", text)
+    text = re.sub(
+        r"\[markdown[^\]]*\]",
+        lambda m: "\n\n## " + attr(m.group(0), "text").lstrip("# ").strip() + "\n\n",
+        text,
+    )
+    text = re.sub(r"\[panel[^\]]*\]", lambda m: "\n\n## " + attr(m.group(0), "title") + "\n\n", text)
+    # Section headings keep a marker so the reader can render them as headings.
+    text = re.sub(r"\[h[1-6][^\]]*\]", "\n\n## ", text)
+    text = re.sub(r"\[/h[1-6]\]", "\n\n", text)
+    text = re.sub(r"\[/panel\]|\[hr\s*/?\]", "\n\n", text)
+    text = re.sub(r"\[li[^\]]*\]", "\n- ", text)
+    text = re.sub(r"\[/li\]", "\n", text)
+    text = re.sub(r"\[/?list[^\]]*\]", "\n\n", text)
+    # Any site tag that survived the specific passes is presentation, not content.
+    text = re.sub(r"\[/?[A-Za-z][^\]]*\]", "", text)
+    # Citation markers and inline cross-links carry site-specific tags; keep the
+    # visible text of a cross-link, drop a citation marker whole.
+    text = re.sub(r"\[ref[^\]]*\].*?\[/ref\]", "", text, flags=re.S)
+    text = re.sub(r"\[/?ref[^\]]*\]", "", text)
+    text = re.sub(r"\[(int|ext)-link[^\]]*\]", "", text)
+    text = re.sub(r"\[/(int|ext)-link\]", "", text)
     text = re.sub(r"\[url=[^\]]*\]", "", text)
-    text = text.replace("[/url]", "").replace("[/b]", "").replace("[/i]", "").replace("[/u]", "")
-    text = re.sub(r"\[/?(p|br|h\d|quote|center)\]", "\n\n", text)
+    text = re.sub(r"\[/?url\]", "", text)
+    text = re.sub(r"\[/?(p|br|h\d|quote|center|hr|img|table|tr|td|th|math|code|youtube|video|embed)(=[^\]]*)?\]", "\n\n", text)
     text = re.sub(r"\[/?li\]", "\n", text)
     text = re.sub(r"\[/?list\]", "\n", text)
-    text = re.sub(r"\[/?(b|i|u)\]", "", text)
+    text = re.sub(r"\[/?(b|i|u|s|em|strong)\]", "", text)
     text = re.sub(r"\[[a-z]+(=[^\]]*)?\]", "", text)
+    text = re.sub(r"\[/[a-z]+\]", "", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return "\n".join(line.strip() for line in text.split("\n")).strip()

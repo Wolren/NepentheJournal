@@ -43,7 +43,8 @@ fun SubstanceScreen(
     repo: IJournalRepository = LocalJournalRepository.current,
     viewModel: SubstanceScreenViewModel = remember(repo) { SubstanceScreenViewModel.create(repo) },
     onSubstanceClick: (String) -> Unit = {},
-    onNewSubstance: () -> Unit = {}
+    onNewSubstance: () -> Unit = {},
+    onEffectClick: (String) -> Unit = {},
 ) {
     val results by viewModel.results.collectAsState(initial = emptyList())
     val broadOptions by viewModel.broadOptions.collectAsState(initial = emptyList())
@@ -239,7 +240,11 @@ fun SubstanceScreen(
             Spacer(Modifier.height(4.dp))
 
             if (mode == LibraryMode.EFFECTS) {
-                EffectsLibrary(query = effectQuery, listState = effectsScrollState)
+                EffectsLibrary(
+                    query = effectQuery,
+                    listState = effectsScrollState,
+                    onEffectClick = onEffectClick,
+                )
             } else if (results.isEmpty()) {
                 val showEmptyState = rememberEmptyStateVisible(isEmpty = results.isEmpty())
                 Box(

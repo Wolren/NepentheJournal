@@ -90,6 +90,7 @@ import app.journal.ui.substances.SubstanceDetailScreen
 import app.journal.ui.substances.SubstanceEditorScreen
 import app.journal.ui.substances.SubstanceCompanionScreen
 import app.journal.ui.substances.SubstanceScreen
+import app.journal.ui.substances.EffectDetailScreen
 import app.journal.ui.substances.SubstanceScreenViewModel
 import app.journal.ui.theme.BackgroundImage
 import app.journal.ui.theme.ThemeConfig
@@ -165,6 +166,7 @@ internal fun AppNavigation(
     val showFavs by sessionListViewModel.showFavoritesOnly.collectAsState()
     var liveSessionId by remember { mutableStateOf<String?>(null) }
     var companionSubstanceId by remember { mutableStateOf<String?>(null) }
+    var selectedEffectName by remember { mutableStateOf<String?>(null) }
     // Substance ids and interaction warnings come from the bundled library; every dosing surface waits for it.
     val libraryReady by DataInitializer.libraryReadyFlow.collectAsState()
     val paletteSubstances by repo.substances.collectAsState()
@@ -251,6 +253,7 @@ internal fun AppNavigation(
                     liveSessionId != null -> liveSessionId = null
                     showSearch -> showSearch = false
                     companionSubstanceId != null -> companionSubstanceId = null
+                    selectedEffectName != null -> selectedEffectName = null
                     editingSessionId != null -> editingSessionId = null
                     selectedTimelineSessionId != null -> selectedTimelineSessionId = null
                     editingSubstanceId != null -> editingSubstanceId = null
@@ -279,6 +282,7 @@ internal fun AppNavigation(
                 targetState = when {
                     showSearch -> NavigationState.Search
                     companionSubstanceId != null -> NavigationState.CompanionSubstance
+                    selectedEffectName != null -> NavigationState.DetailEffect
                     // A wide shell hosts the live session in the sessions pane instead of taking the window.
                     liveSessionId != null && !wideShell -> NavigationState.LiveSession
                     editingSessionId != null -> NavigationState.EditorSession
@@ -358,6 +362,12 @@ internal fun AppNavigation(
                             onBack = { editingSubstanceId = null }
                         )
                     }
+                    NavigationState.DetailEffect -> {
+                        val name = selectedEffectName
+                        if (name != null) {
+                            EffectDetailScreen(effectName = name, onBack = { selectedEffectName = null })
+                        }
+                    }
                     NavigationState.DetailSubstance -> {
                         val id = stableSubstanceId
                         if (id != null) {
@@ -368,6 +378,7 @@ internal fun AppNavigation(
                                 onEdit = { editingId -> editingSubstanceId = editingId; selectedSubstanceId = null },
                                 onCompanion = { companionSubstanceId = id },
                                 onOpenSubstance = { selectedSubstanceId = it },
+                                onEffectClick = { selectedEffectName = it },
                             )
                         }
                     }
@@ -568,7 +579,8 @@ internal fun AppNavigation(
                                         SubstanceScreen(
                                             viewModel = substanceViewModel,
                                             onSubstanceClick = { id -> selectedSubstanceId = id },
-                                            onNewSubstance = { editingSubstanceId = "__new__" }
+                                            onNewSubstance = { editingSubstanceId = "__new__" },
+                                            onEffectClick = { selectedEffectName = it },
                                         )
                                     }
                                     Screen.SAFER -> SaferScreen()

@@ -14,4 +14,5 @@ sealed interface NavigationState {
     data object DetailSubstance : NavigationState
     data object EditorSubstance : NavigationState
     data object CompanionSubstance : NavigationState
+    data object DetailEffect : NavigationState
 }

@@ -3,26 +3,24 @@ package app.journal.ui.substances.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.data.IJournalRepository
 import app.journal.model.Substance
 import app.journal.ui.components.AppCard
-import app.journal.data.EffectLibrary
-import app.journal.ui.substances.sourceLabel
 
 @Composable
-internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
+internal fun EffectsSection(
+    repo: IJournalRepository,
+    substance: Substance,
+    onEffectClick: (String) -> Unit = {},
+) {
     val allEffects by repo.effects.collectAsState()
-    var selectedEffect by remember { mutableStateOf<String?>(null) }
 
     val categorized = remember(substance.id, allEffects) {
         allEffects.filter { substance.id in it.substanceIds }
@@ -85,11 +83,11 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(4.dp))
-                    EffectFlowRow(effects.map { it.name }, onEffectClick = { selectedEffect = it })
+                    EffectFlowRow(effects.map { it.name }, onEffectClick = onEffectClick)
                     Spacer(Modifier.height(8.dp))
                 }
             } else if (hasFlat) {
-                EffectFlowRow(flatEffects, onEffectClick = { selectedEffect = it })
+                EffectFlowRow(flatEffects, onEffectClick = onEffectClick)
             }
 
             val count = if (hasCategorized) categorized.sumOf { (_, effects) -> effects.size } else flatEffects.size
@@ -98,63 +96,8 @@ internal fun EffectsSection(repo: IJournalRepository, substance: Substance) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-
-    val uriHandler = LocalUriHandler.current
-
-    selectedEffect?.let { effectName ->
-        val record = allEffects.find { it.name == effectName && substance.id in it.substanceIds }
-        val ownDescription = record?.description?.takeIf { it.isNotBlank() }
-        val article = EffectLibrary.article(effectName)
-        val sourceUrl = article?.url?.takeIf { it.isNotBlank() }
-            ?: record?.url
-            ?: "https://psychonautwiki.org/wiki/${effectName.replace(" ", "_")}"
-        AlertDialog(
-            onDismissRequest = { selectedEffect = null },
-            title = { Text(effectName, fontWeight = FontWeight.SemiBold) },
-            text = {
-                Column(
-                    Modifier
-                        .heightIn(max = 420.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    if (ownDescription != null) {
-                        Text(ownDescription, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(10.dp))
-                    }
-                    if (article != null) {
-                        Text(
-                            text = article.body.ifBlank { article.summary },
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = sourceLabel(article),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else if (ownDescription == null) {
-                        Text(
-                            "No bundled article for this effect yet. It is reported for " +
-                                "${substance.name}, and the source link has the full text.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedEffect = null }) { Text("Close") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    uriHandler.openUri(sourceUrl)
-                    selectedEffect = null
-                }) {
-                    Text("Open source")
-                }
-            },
-        )
-    }
 }
+
 @Composable
 internal fun EffectFlowRow(
     effects: List<String>,

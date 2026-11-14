@@ -11,6 +11,7 @@ import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
 import app.journal.ui.settings.detail.MedicationsSettingsContent
+import app.journal.ui.substances.EffectDetailScreen
 import app.journal.ui.substances.SubstanceScreen
 import app.journal.ui.substances.SubstanceScreenViewModel
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -131,8 +133,13 @@ class ComposeScreenSmokeTest {
                     createdAt = 0L, updatedAt = 0L, cachedAt = 0L, sourceVersion = "test"
                 )
             )
+            val opened = mutableListOf<String>()
             setContent {
-                SubstanceScreen(repo = repo, viewModel = SubstanceScreenViewModel(repo))
+                SubstanceScreen(
+                    repo = repo,
+                    viewModel = SubstanceScreenViewModel(repo),
+                    onEffectClick = { opened += it },
+                )
             }
             waitForIdle()
 
@@ -147,6 +154,28 @@ class ComposeScreenSmokeTest {
                 onAllNodesWithText("Anxiety")
                     .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
             }
+            onNodeWithText("Anxiety").performClick()
+            waitForIdle()
+            assertEquals(listOf("Anxiety"), opened, "a tapped card must open its article")
+        }
+    }
+
+    @Test
+    fun effectDetailScreenRendersTheBundledArticle() = runBlocking {
+        runComposeUiTest {
+            setContent {
+                MaterialTheme {
+                    EffectDetailScreen(effectName = "Anxiety", onBack = {})
+                }
+            }
+            waitUntil(timeoutMillis = 10_000) {
+                onAllNodesWithText("Text from DoseWiki, CC0.")
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
+            }
+            assertTrue(
+                onAllNodesWithText("Anxiety").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the top bar must carry the article title"
+            )
         }
     }
     @Test

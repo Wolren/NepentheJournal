@@ -65,6 +65,7 @@ fun SubstanceDetailScreen(
     onEdit: (String) -> Unit = {},
     onCompanion: () -> Unit = {},
     onOpenSubstance: (String) -> Unit = {},
+    onEffectClick: (String) -> Unit = {},
 ) {
     val allInteractions by repo.interactions.collectAsState()
     val allSessions by repo.sessions.collectAsState()
@@ -362,7 +363,7 @@ fun SubstanceDetailScreen(
             }
         }
 
-        item { EffectsSection(repo = repo, substance = substance) }
+        item { EffectsSection(repo = repo, substance = substance, onEffectClick = onEffectClick) }
 
         if (relatedInteractions.isNotEmpty()) {
             item { InteractionsSection(repo = repo, interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
