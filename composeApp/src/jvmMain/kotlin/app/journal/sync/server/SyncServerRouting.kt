@@ -1,10 +1,10 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
-import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
+import app.journal.sync.SyncLibrary
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
@@ -86,7 +86,7 @@ class SyncServerRouter(
      * deviceOrigin "system" row from a pull page. A missing header keeps the full transfer.
      */
     private fun sameBundledLibrary(call: ApplicationCall): Boolean =
-        call.request.headers[SyncEndpoints.SEED_FINGERPRINT_HEADER] == SEED_BUNDLED_FINGERPRINT
+        call.request.headers[SyncEndpoints.SEED_FINGERPRINT_HEADER] == SyncLibrary.fingerprint()
 
     fun installRouting(app: Application) {
         app.install(WebSockets) {
@@ -104,7 +104,7 @@ class SyncServerRouter(
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
-                        seedFingerprint = SEED_BUNDLED_FINGERPRINT
+                        seedFingerprint = SyncLibrary.fingerprint()
                     )),
                     ContentType.Application.Json
                 )
@@ -119,7 +119,7 @@ class SyncServerRouter(
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
-                        seedFingerprint = SEED_BUNDLED_FINGERPRINT
+                        seedFingerprint = SyncLibrary.fingerprint()
                     )),
                     ContentType.Application.Json
                 )
@@ -650,3 +650,4 @@ class SyncServerRouter(
         }
     }
 }
+

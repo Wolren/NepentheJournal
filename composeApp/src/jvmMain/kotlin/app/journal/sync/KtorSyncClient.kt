@@ -1,7 +1,6 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
-import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.serde.AppJson
 import app.journal.log.Log
 import app.journal.model.*
@@ -187,7 +186,7 @@ class KtorSyncClient(
         val httpResponse = client.get("${endpoint(host, port)}$uri") {
             header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
             header(SyncAuthenticator.AUTH_HEADER, authHeader)
-            header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SEED_BUNDLED_FINGERPRINT)
+            header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SyncLibrary.fingerprint())
         }
         val rawBody = httpResponse.bodyAsText()
         val aesKey = aesEncryptionKey(sharedSecret!!)
@@ -386,7 +385,7 @@ class KtorSyncClient(
                     header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
                     header(SyncAuthenticator.AUTH_HEADER, authHeader)
                     header(SyncEndpoints.PUSH_PHASE_HEADER, pushPhase)
-                    header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SEED_BUNDLED_FINGERPRINT)
+                    header(SyncEndpoints.SEED_FINGERPRINT_HEADER, SyncLibrary.fingerprint())
                     setBody(encryptedBody)
                 }
                 // Read raw body, base64-decode, decrypt, then deserialize
@@ -559,3 +558,4 @@ class KtorSyncClient(
         ): List<T> = items.filter { timestamp(it) > since }
     }
 }
+

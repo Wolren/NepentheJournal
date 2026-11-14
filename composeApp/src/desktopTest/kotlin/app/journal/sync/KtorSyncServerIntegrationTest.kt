@@ -1,7 +1,6 @@
 package app.journal.sync
 
 import app.journal.data.JournalRepository
-import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.model.Dose
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
@@ -992,7 +991,7 @@ class KtorSyncServerIntegrationTest {
 
             val bootstrap = KtorSyncClient(repo = clientRepo, deviceId = "skip-client", deviceName = "Skip")
             val hostInfo = bootstrap.requestHostInfo("127.0.0.1", port).getOrThrow()
-            assertEquals(SEED_BUNDLED_FINGERPRINT, hostInfo.seedFingerprint,
+            assertEquals(SyncLibrary.fingerprint(), hostInfo.seedFingerprint,
                 "the host must advertise its bundled-library fingerprint")
             val token = authenticator.generatePairingToken()
             val pairing = bootstrap.completePairing(
@@ -1011,7 +1010,7 @@ class KtorSyncServerIntegrationTest {
                 val push = client.pushChanges(
                     host = "127.0.0.1", port = port,
                     deviceId = "skip-client", deviceName = "Skip", since = 0L,
-                    skipBundled = hostInfo.seedFingerprint == SEED_BUNDLED_FINGERPRINT
+                    skipBundled = hostInfo.seedFingerprint == SyncLibrary.fingerprint()
                 )
                 assertTrue(push.isSuccess, "push must succeed: ${push.exceptionOrNull()?.message}")
                 assertTrue(repo.interactions.value.none { it.id.startsWith("int:client-bundled-") },
@@ -1032,3 +1031,4 @@ class KtorSyncServerIntegrationTest {
         }
     }
 }
+

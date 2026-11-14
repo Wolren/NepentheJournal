@@ -35,12 +35,16 @@ object CatalogSource {
     }.getOrNull()
 
     /** Fingerprint from the tiny bundled manifest, readable without opening the database. */
-    fun bundledFingerprint(): String? = runCatching {
-        val text = readBundledResource("/manifest.json") ?: return null
-        val version = AppJson.json.parseToJsonElement(text).jsonObject["content_version"]
-            ?.jsonPrimitive?.content
-        version?.takeIf { it.isNotBlank() }?.let { "db:$it" }
-    }.getOrNull()
+    fun bundledFingerprint(): String? = cachedFingerprint
+
+    private val cachedFingerprint: String? by lazy {
+        runCatching {
+            val text = readBundledResource("/manifest.json") ?: return@runCatching null
+            val version = AppJson.json.parseToJsonElement(text).jsonObject["content_version"]
+                ?.jsonPrimitive?.content
+            version?.takeIf { it.isNotBlank() }?.let { "db:$it" }
+        }.getOrNull()
+    }
 
     fun loadSubstances(): List<Substance> =
         CatalogMapper.loadSubstances(currentTimeMillis(), SOURCE_VERSION)

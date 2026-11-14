@@ -3,6 +3,7 @@ package app.journal.sync
 import app.journal.serde.AppJson
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
+import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.util.crypto.secureRandomBytes
@@ -69,6 +70,13 @@ object SyncEndpoints {
     const val SEED_FINGERPRINT_HEADER = "X-Sync-Seed"
 }
 
+/** Identity of the bundled reference library both peers must share. */
+object SyncLibrary {
+    /** Catalog content version when the bundle carries the database, else the JSON seed constant. */
+    fun fingerprint(): String =
+        app.journal.catalog.CatalogSource.bundledFingerprint() ?: SEED_BUNDLED_FINGERPRINT
+}
+
 
 object SyncAuth {
     const val AUTH_HEADER = "X-Sync-Auth"
@@ -120,9 +128,13 @@ fun buildSyncBatch(
 
     val sessions = changed(repo.sessions.value, since) { it.updatedAt }
     val doses = changed(repo.doses.value, since) { it.updatedAt }
+    // Reference rows ship with the app on both devices; only user-created rows travel.
     val substances = changed(repo.substances.value, since) { it.updatedAt }
+        .filter { it.deviceOrigin != "system" }
     val effects = changed(repo.effects.value, since) { it.updatedAt }
+        .filter { it.deviceOrigin != "system" }
     val interactions = changed(repo.interactions.value, since) { it.updatedAt }
+        .filter { it.deviceOrigin != "system" }
     val notes = changed(repo.notes.value, since) { it.updatedAt }
     val timelineEvents = changed(repo.timelineEvents.value, since) { it.updatedAt }
     val customUnits = changed(repo.customUnits.value, since) { it.updatedAt }

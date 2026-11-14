@@ -1,10 +1,10 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
-import app.journal.data.SEED_BUNDLED_FINGERPRINT
 import app.journal.log.Log
 import app.journal.model.SyncConfig
 import app.journal.sync.DiscoveryMode
+import app.journal.sync.SyncLibrary
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -289,7 +289,7 @@ class SyncTransport(
                         ?: peerSeedFingerprints[existingPeer.deviceId]
                         ?: discoveryOps.probeHostInfo(peer)?.seedFingerprint
                             ?.also { peerSeedFingerprints[existingPeer.deviceId] = it }
-                    val skipBundled = peerSeed != null && peerSeed == SEED_BUNDLED_FINGERPRINT
+                    val skipBundled = peerSeed != null && peerSeed == SyncLibrary.fingerprint()
                     appendDebug("Pushing changes to ${peer.host}:${peer.port} since $since (bundled rows ${if (skipBundled) "skipped" else "included"})")
                     val exchange = client.pushChanges(
                         host = peer.host, port = peer.port,
@@ -328,8 +328,7 @@ class SyncTransport(
             } else {
                 appendDebug("No existing peer by fingerprint/deviceId for ${peer.host}:${peer.port}")
 
-                // Probe even when a token is typed: a manual host:port carries no fingerprint, and a left-over
-                // token is usually stale by the second press, so pairing first fails what trust could resume.
+                // Probe before pairing: a manual host:port has no fingerprint, and a leftover token is usually stale.
                 appendDebug("Attempting fingerprint-based re-connect")
                 try {
                     val probeClient = KtorSyncClient(
@@ -608,3 +607,4 @@ class SyncTransport(
         )
     }
 }
+

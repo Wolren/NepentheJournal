@@ -16,7 +16,7 @@ import app.journal.util.currentTimeMillis
  */
 object SyncLimits {
     const val MAX_ITEMS_DEFAULT = 500
-    // Measured seed max is 325 substances; headroom for user customs.
+    // User-created substances only: the reference catalog ships with the app and never travels.
     const val MAX_SUBSTANCES = 1000
     const val MAX_EFFECTS = 100
     const val MAX_INTERACTIONS = 100
