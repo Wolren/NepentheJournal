@@ -566,6 +566,7 @@ def main() -> int:
     content_version = source_digest(args.sources)[:16]
     connection.execute("INSERT INTO meta VALUES('content_version', ?)", (content_version,))
     connection.execute("INSERT INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
+    connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     connection.commit()
 
     path = write_database(connection, args.out, content_version, counts)

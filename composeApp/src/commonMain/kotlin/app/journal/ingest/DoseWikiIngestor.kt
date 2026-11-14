@@ -101,8 +101,12 @@ object DoseWikiIngestor {
                 Log.withTag("DoseWiki").w { "Resource $RESOURCE_PATH not found" }
                 return
             }
-        // The typed list decode wins on the real 7.7 MB file; the lenient per-entry path is the fallback (see parseSlim).
         val substances = parseSlim(text) ?: return
+        ingest(repo, substances)
+    }
+
+    /** Applies decoded entries; the bundled text and the catalog parity test share this path. */
+    internal fun ingest(repo: IJournalRepository, substances: List<DoseWikiSubstance>) {
         DoseWikiLookup.adopt(substances)
 
         val now = currentTimeMillis()

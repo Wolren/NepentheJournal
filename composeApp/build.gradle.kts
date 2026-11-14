@@ -148,6 +148,10 @@ kotlin {
         androidMain.dependsOn(jvmMain)
         desktopMain.dependsOn(jvmMain)
         val iosMain = getByName("iosMain") { dependsOn(commonMain) }
+        // The reference catalog is one build artifact shared by every target, never a checked-in copy.
+        val catalogDir = rootProject.file("build/substance-db")
+        desktopMain.resources.srcDir(catalogDir)
+        iosMain.resources.srcDir(catalogDir)
         listOf(iosArm64(), iosSimulatorArm64()).forEach {
             getByName("${it.name}Main").dependsOn(iosMain)
         }
@@ -191,7 +195,7 @@ android {
     compileSdk = 37
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
-    sourceSets["main"].assets.srcDirs("src/androidMain/assets")
+    sourceSets["main"].assets.srcDirs("src/androidMain/assets", rootProject.file("build/substance-db"))
     defaultConfig {
         applicationId = "app.journal.nepenthe"
         minSdk = 26
@@ -247,6 +251,7 @@ tasks.withType<Test>().configureEach {
     rootProject.file("build/substance-db/substances.sqlite").takeIf { it.exists() }?.let {
         systemProperty("nepenthe.catalog", it.absolutePath)
     }
+    systemProperty("nepenthe.substanceSources", project.file("src/desktopMain/resources").absolutePath)
 }
 
 // Device-level smoke coverage for the Android runtime path that no unit test reaches.
