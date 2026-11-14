@@ -40,4 +40,13 @@ class SubstanceCatalogTest {
         val hits = SubstanceCatalog.search("acid")
         assertTrue(hits.isNotEmpty(), "alias search should find LSD by its street name")
     }
+
+    @Test
+    fun shipsEverySourceWithItsLicence() {
+        if (!available) return
+        val sources = CatalogSource.sources().associateBy { it.name }
+        assertTrue("dosewiki" in sources, "DoseWiki rows need a source entry")
+        assertTrue("drug-community" in sources, "drug.community rows need a source entry")
+        assertTrue(sources.values.all { it.licence.isNotBlank() && it.url.isNotBlank() })
+    }
 }

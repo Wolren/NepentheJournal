@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import app.journal.catalog.CatalogSource
 import app.journal.ui.components.*
 
 @Composable
@@ -31,6 +32,16 @@ internal fun AboutCardContent(aboutExpanded: Boolean, onToggle: () -> Unit) {
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("All data stored locally on device. No cloud, no accounts, no tracking.",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val sources = remember { CatalogSource.sources() }
+        if (sources.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text("Reference data", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            sources.forEach { source ->
+                Text("${source.name} · ${source.licence}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Spacer(Modifier.height(8.dp))
         AppCard(colors = appCardColors(container = MaterialTheme.colorScheme.primaryContainer, alpha = 0.4f),
             contentPadding = appCardPadding(dense = true), modifier = Modifier.fillMaxWidth()) {

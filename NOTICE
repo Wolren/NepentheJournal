@@ -39,3 +39,12 @@ from TripSit (https://tripsit.me), fetched via `scripts/fetch_tripsit.py`.
 TripSit's non-commercial attribution terms are retained: this data is
 bundled for offline use with attribution here and in the README, and is
 not relicensed under the GPL.
+
+Substance names, aliases, class labels and dose ladders are partly
+derived from drug.community (https://drug.community), fetched via
+`scripts/fetch_drug_community.py`. Dose ladders from TripSit and
+drug.community are bundled for offline use with attribution here and in
+the README, and are not relicensed under the GPL. drug.community states
+no explicit licence at the time of writing; the bundled rows are limited
+to names, class labels and dose bands, and removal is pending a written
+answer from the project.

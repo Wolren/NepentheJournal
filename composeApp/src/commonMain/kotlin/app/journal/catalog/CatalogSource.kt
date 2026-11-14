@@ -20,6 +20,9 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 object CatalogSource {
 
+    /** One bundled reference source and the licence its rows ship under. */
+    data class CatalogSourceInfo(val name: String, val licence: String, val url: String)
+
     /** content_version from the manifest text, the cache key for extracted database copies. */
     fun versionFrom(manifestText: String?): String? {
         val text = manifestText ?: return null
@@ -52,6 +55,13 @@ object CatalogSource {
     fun loadEffects(): List<Effect> = CatalogMapper.loadEffects(currentTimeMillis())
 
     fun loadInteractions(): List<Interaction> = CatalogMapper.loadInteractions(currentTimeMillis())
+
+    /** Every bundled source with its licence, for the in-app attribution list. */
+    fun sources(): List<CatalogSourceInfo> = runCatching {
+        SubstanceCatalog.database.catalogQueries.selectSources { name, licence, url ->
+            CatalogSourceInfo(name, licence, url)
+        }.executeAsList()
+    }.getOrDefault(emptyList())
 
     /** Structured duration for a substance name, the shape [DoseWikiDuration] callers expect. */
     fun durationFor(name: String): DoseWikiDuration? {

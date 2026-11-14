@@ -91,6 +91,13 @@ CREATE TABLE reference_interaction (
     sources TEXT NOT NULL
 );
 
+CREATE TABLE source (
+    name TEXT NOT NULL PRIMARY KEY,
+    licence TEXT NOT NULL,
+    url TEXT NOT NULL,
+    attribution TEXT
+);
+
 CREATE TABLE meta (
     key TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL
@@ -158,6 +165,9 @@ SELECT substance_id, route, route_order, stage, min, max, unit FROM duration_sta
 
 selectAllEffects:
 SELECT substance_id, name FROM substance_effect ORDER BY substance_id, name;
+
+selectSources:
+SELECT name, licence, url FROM source ORDER BY name;
 
 selectAllIdentifiers:
 SELECT substance_id, scheme, value AS ident_value FROM substance_identifier ORDER BY substance_id, scheme, ident_value;
