@@ -1,5 +1,6 @@
 package app.journal.data
 
+import app.journal.catalog.CatalogSource
 import app.journal.serde.AppJson
 import kotlinx.serialization.encodeToString
 
@@ -26,6 +27,23 @@ internal object JournalSplit {
     fun merge(userText: String, libraryText: String?): Loaded {
         val user = decodeSnapshotWithRecovery(userText)
         val userSnapshot = user.snapshot
+        // A bundled catalog owns the reference rows; only user-created rows survive from the file.
+        if (CatalogSource.bundledFingerprint() != null) {
+            val library = libraryText?.let { text ->
+                decodeSnapshotWithRecovery(text).snapshot
+            }
+            return Loaded(
+                snapshot = userSnapshot.copy(
+                    substances = library?.substances.orEmpty().filter { it.deviceOrigin != "system" },
+                    interactions = library?.interactions.orEmpty()
+                        .filter { it.deviceOrigin != "system" },
+                    effects = library?.effects.orEmpty().filter { it.deviceOrigin != "system" },
+                ),
+                userParseError = user.parseError,
+                libraryParseError = null,
+                needsLibraryWrite = false,
+            )
+        }
         if (libraryText == null) {
             return Loaded(
                 snapshot = userSnapshot,
@@ -72,14 +90,18 @@ internal object JournalSplit {
             )
         )
 
-    /** Library file payload: the three library lists plus the snapshot envelope. */
-    fun libraryText(snapshot: JournalSnapshot): String =
-        AppJson.json.encodeToString(
+    /** Library file payload: user-created rows only when a catalog owns the reference data. */
+    fun libraryText(snapshot: JournalSnapshot): String {
+        val referenceOwned = CatalogSource.bundledFingerprint() != null
+        fun <T : app.journal.model.VaultDocument> List<T>.userRows(): List<T> =
+            if (referenceOwned) filter { it.deviceOrigin != "system" } else this
+        return AppJson.json.encodeToString(
             JournalSnapshot(
                 savedAt = snapshot.savedAt,
-                substances = snapshot.substances,
-                interactions = snapshot.interactions,
-                effects = snapshot.effects,
+                substances = snapshot.substances.userRows(),
+                interactions = snapshot.interactions.userRows(),
+                effects = snapshot.effects.userRows(),
             )
         )
+    }
 }

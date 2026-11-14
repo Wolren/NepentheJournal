@@ -144,34 +144,36 @@ object DataInitializer {
         purgeResumeMarkers(repo, store)
         abortStaleLiveSessions(repo, store)
 
-        // Step 2: Skip the bundled library when the persisted one matches the bundled source.
-        val expectedFingerprint = CatalogSource.bundledFingerprint() ?: SEED_BUNDLED_FINGERPRINT
-        val libraryFresh = repo.seedFingerprint.value == expectedFingerprint &&
-            repo.substances.value.isNotEmpty()
-        if (libraryFresh) {
-            Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
-            // Taxonomy still runs here: a sync-imported dw: substance needs its curated tags.
-            var libraryDirty = false
-            _phase.value = "Applying taxonomy"
-            val taggedCount = DosewikiTaxonomy.applyTags(repo)
-            if (taggedCount > 0) {
-                libraryDirty = true
-                Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
+        // A bundled catalog is authoritative on every launch; otherwise the persisted JSON library wins.
+        val catalogFingerprint = CatalogSource.bundledFingerprint()
+        if (catalogFingerprint == null) {
+            val libraryFresh = repo.seedFingerprint.value == SEED_BUNDLED_FINGERPRINT &&
+                repo.substances.value.isNotEmpty()
+            if (libraryFresh) {
+                Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
+                // Taxonomy still runs here: a sync-imported dw: substance needs its curated tags.
+                var libraryDirty = false
+                _phase.value = "Applying taxonomy"
+                val taggedCount = DosewikiTaxonomy.applyTags(repo)
+                if (taggedCount > 0) {
+                    libraryDirty = true
+                    Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
+                }
+                _phase.value = "Applying interaction classes"
+                if (enrichInteractionClasses(repo) > 0) libraryDirty = true
+                if (isTestDataEnabled() && repo.substances.value.size >= 2) {
+                    FuzzSeed.generate(repo)
+                    libraryDirty = true
+                }
+                if (libraryDirty) {
+                    _phase.value = "Saving library"
+                    store.save()
+                }
+                _phase.value = "Library ready"
+                _libraryReadyFlow.value = true
+                logStartup(repo, startedAt, loadMs, libraryMs = null)
+                return
             }
-            _phase.value = "Applying interaction classes"
-            if (enrichInteractionClasses(repo) > 0) libraryDirty = true
-            if (isTestDataEnabled() && repo.substances.value.size >= 2) {
-                FuzzSeed.generate(repo)
-                libraryDirty = true
-            }
-            if (libraryDirty) {
-                _phase.value = "Saving library"
-                store.save()
-            }
-            _phase.value = "Library ready"
-            _libraryReadyFlow.value = true
-            logStartup(repo, startedAt, loadMs, libraryMs = null)
-            return
         }
 
         _phase.value = "Loading bundled library"
@@ -197,14 +199,25 @@ object DataInitializer {
             val catalogFingerprint = CatalogSource.bundledFingerprint()
             val seedLoaded = if (catalogFingerprint != null) {
                 _phase.value = "Loading substance catalog"
-                val substances = withContext(Dispatchers.Default) { CatalogSource.loadSubstances() }
-                if (substances.isNotEmpty()) {
-                    repo.applyBatch(substances = substances)
+                val catalog = withContext(Dispatchers.Default) {
+                    Triple(
+                        CatalogSource.loadSubstances(),
+                        CatalogSource.loadEffects(),
+                        CatalogSource.loadInteractions(),
+                    )
+                }
+                if (catalog.first.isNotEmpty()) {
+                    repo.applyBatch(
+                        substances = catalog.first,
+                        effects = catalog.second,
+                        interactions = catalog.third,
+                    )
                     Log.withTag("DataInit").i {
-                        "Loaded ${substances.size} substances from the bundled catalog"
+                        "Loaded ${catalog.first.size} substances, ${catalog.second.size} effects and " +
+                            "${catalog.third.size} interactions from the bundled catalog"
                     }
                 }
-                substances.isNotEmpty()
+                catalog.first.isNotEmpty()
             } else {
                 tryLoadSeedWithRetry(repo)
             }

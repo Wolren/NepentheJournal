@@ -68,6 +68,48 @@ class CatalogMapperTest {
     }
 
     @Test
+    fun referenceEffectsAndInteractionsMatchTheIngest() {
+        if (!available) return
+        val directory = File(System.getProperty("nepenthe.substanceSources"))
+        val repo = JournalRepository()
+        repo.applySnapshot(
+            AppJson.json.decodeFromString<JournalSnapshot>(
+                directory.resolve("psychonautwiki_seed.json").readText(),
+            ),
+        )
+        DoseWikiIngestor.reset()
+        DoseWikiIngestor.ingest(
+            repo,
+            AppJson.json.decodeFromString<List<DoseWikiSubstance>>(
+                directory.resolve("dosewiki_slim.json").readText(),
+            ),
+        )
+
+        val effects = CatalogSource.loadEffects()
+        val runtimeIds = repo.effects.value.map { it.id }.toSet()
+        val catalogIds = effects.map { it.id }.toSet()
+        if (runtimeIds != catalogIds) {
+            val runtimeOnly = runtimeIds - catalogIds
+            val catalogOnly = catalogIds - runtimeIds
+            println("effects runtime=${runtimeIds.size} catalog=${catalogIds.size}")
+            println("runtime only: " + repo.effects.value.filter { it.id in runtimeOnly }.take(12)
+                .joinToString { "${it.substanceIds.firstOrNull()}/${it.name}/${it.category}" })
+            println("catalog only: " + effects.filter { it.id in catalogOnly }.take(12)
+                .joinToString { "${it.substanceIds.firstOrNull()}/${it.name}/${it.category}" })
+        }
+        assertEquals(repo.effects.value.size, effects.size, "effect count")
+        assertEquals(repo.effects.value.map { it.id }.toSet(), effects.map { it.id }.toSet(), "effect ids")
+
+        val interactions = CatalogSource.loadInteractions()
+        assertEquals(repo.interactions.value.size, interactions.size, "interaction count")
+        assertEquals(
+            repo.interactions.value.associate { it.id to it.riskLevel },
+            interactions.associate { it.id to it.riskLevel },
+            "interaction risks",
+        )
+    }
+
+    @Test
     fun durationLookupReadsTheCatalog() {
         if (!available) return
         val duration = assertNotNull(CatalogSource.durationFor("LSD"))

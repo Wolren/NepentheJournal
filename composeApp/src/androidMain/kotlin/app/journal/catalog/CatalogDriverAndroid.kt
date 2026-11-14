@@ -8,20 +8,26 @@ import app.journal.catalog.db.CatalogDatabase
 actual object CatalogDriver {
 
     actual fun open(): SqlDriver {
-        copyAssetOnce()
-        return AndroidSqliteDriver(CatalogDatabase.Schema, NepentheApp.appContext, CATALOG_FILE)
+        val name = copyAssetOnce()
+        return AndroidSqliteDriver(CatalogDatabase.Schema, NepentheApp.appContext, name)
     }
 
-    /** The driver opens a database file, so the read-only asset is copied into the databases dir once. */
-    private fun copyAssetOnce() {
+    /** The driver opens a database file, so the read-only asset is copied in once per content version. */
+    private fun copyAssetOnce(): String {
         val context = NepentheApp.appContext
-        val target = context.getDatabasePath(CATALOG_FILE)
-        if (target.exists() && target.length() > 0L) return
+        val version = CatalogSource.versionFrom(
+            runCatching { context.assets.open(MANIFEST_FILE).bufferedReader().readText() }.getOrNull(),
+        ) ?: "unversioned"
+        val name = "catalog-$version.sqlite"
+        val target = context.getDatabasePath(name)
+        if (target.exists() && target.length() > 0L) return name
         target.parentFile?.mkdirs()
         context.assets.open(CATALOG_FILE).use { input ->
             target.outputStream().use { output -> input.copyTo(output) }
         }
+        return name
     }
 
     private const val CATALOG_FILE = "substances.sqlite"
+    private const val MANIFEST_FILE = "manifest.json"
 }

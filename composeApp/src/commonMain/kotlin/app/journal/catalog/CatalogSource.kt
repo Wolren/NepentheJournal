@@ -4,6 +4,8 @@ import app.journal.model.DoseWikiDuration
 import app.journal.model.DoseWikiDurationRoute
 import app.journal.model.DoseWikiStage
 import app.journal.model.DoseWikiStages
+import app.journal.model.Effect
+import app.journal.model.Interaction
 import app.journal.model.Substance
 import app.journal.serde.AppJson
 import app.journal.util.currentTimeMillis
@@ -17,6 +19,15 @@ import kotlinx.serialization.json.jsonPrimitive
  * without the generated asset keeps the old JSON ingest path.
  */
 object CatalogSource {
+
+    /** content_version from the manifest text, the cache key for extracted database copies. */
+    fun versionFrom(manifestText: String?): String? {
+        val text = manifestText ?: return null
+        return runCatching {
+            AppJson.json.parseToJsonElement(text).jsonObject["content_version"]
+                ?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+        }.getOrNull()
+    }
 
     /** Fingerprint of the loaded catalog, or null when the database cannot open. */
     fun fingerprint(): String? = runCatching {
@@ -33,6 +44,10 @@ object CatalogSource {
 
     fun loadSubstances(): List<Substance> =
         CatalogMapper.loadSubstances(currentTimeMillis(), SOURCE_VERSION)
+
+    fun loadEffects(): List<Effect> = CatalogMapper.loadEffects(currentTimeMillis())
+
+    fun loadInteractions(): List<Interaction> = CatalogMapper.loadInteractions(currentTimeMillis())
 
     /** Structured duration for a substance name, the shape [DoseWikiDuration] callers expect. */
     fun durationFor(name: String): DoseWikiDuration? {

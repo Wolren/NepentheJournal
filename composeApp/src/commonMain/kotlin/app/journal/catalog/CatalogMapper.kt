@@ -2,6 +2,9 @@ package app.journal.catalog
 
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.model.BindingdbData
+import app.journal.model.Effect
+import app.journal.model.Interaction
+import app.journal.model.InteractionRisk
 import app.journal.model.ChemblData
 import app.journal.model.ChemicalProperties
 import app.journal.model.IupharData
@@ -22,8 +25,8 @@ internal object CatalogMapper {
     fun loadSubstances(now: Long, sourceVersion: String): List<Substance> {
         val queries = SubstanceCatalog.database.catalogQueries
         val rows = queries.selectAllSubstances {
-                id, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
-            RawSubstance(id, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
+                id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
+            RawSubstance(id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
         }.executeAsList()
 
         val aliases = queries.selectAllAliases { substanceId, alias -> substanceId to alias }
@@ -51,6 +54,7 @@ internal object CatalogMapper {
             val payload = decodePayload(raw.payload)
             Substance(
                 id = raw.id,
+                oldId = raw.oldId,
                 cid = raw.cid,
                 createdAt = now,
                 updatedAt = now,
@@ -87,8 +91,49 @@ internal object CatalogMapper {
         }
     }
 
+    /** Reference effects keyed exactly as the old ingest keyed them, so ids stay stable. */
+    fun loadEffects(now: Long): List<Effect> {
+        val rows = SubstanceCatalog.database.catalogQueries.selectAllReferenceEffects {
+                substanceId, name, category, description ->
+            Effect(
+                id = "effect:dw:$substanceId:${name.hashCode().toLong() and 0x7FFFFFFF}",
+                createdAt = now,
+                updatedAt = now,
+                name = name,
+                description = description,
+                category = category,
+                substanceIds = listOf(substanceId),
+            )
+        }.executeAsList()
+        return rows.distinctBy { it.id }
+    }
+
+    fun loadInteractions(now: Long): List<Interaction> {
+        val rows = SubstanceCatalog.database.catalogQueries.selectAllReferenceInteractions {
+                id, a, b, risk, description, sources ->
+            Interaction(
+                id = id,
+                createdAt = now,
+                updatedAt = now,
+                substanceAId = a,
+                substanceBId = b,
+                riskLevel = riskOf(risk),
+                description = description,
+                sources = decodeSources(sources),
+            )
+        }.executeAsList()
+        return rows
+    }
+
+    private fun riskOf(raw: String): InteractionRisk =
+        InteractionRisk.entries.firstOrNull { it.name == raw } ?: InteractionRisk.UNKNOWN
+
+    private fun decodeSources(raw: String): List<String> =
+        runCatching { AppJson.json.decodeFromString<List<String>>(raw) }.getOrDefault(emptyList())
+
     private data class RawSubstance(
         val id: String,
+        val oldId: String?,
         val name: String,
         val summary: String?,
         val cid: Long?,

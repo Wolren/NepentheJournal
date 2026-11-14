@@ -1,5 +1,6 @@
 CREATE TABLE substance (
     id TEXT NOT NULL PRIMARY KEY,
+    old_id TEXT,
     name TEXT NOT NULL,
     summary TEXT,
     cid INTEGER,
@@ -73,6 +74,23 @@ CREATE TABLE substance_identifier (
     PRIMARY KEY (substance_id, scheme, value)
 );
 
+CREATE TABLE reference_effect (
+    substance_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    PRIMARY KEY (substance_id, name)
+);
+
+CREATE TABLE reference_interaction (
+    id TEXT NOT NULL PRIMARY KEY,
+    substance_a TEXT NOT NULL,
+    substance_b TEXT NOT NULL,
+    risk TEXT NOT NULL,
+    description TEXT,
+    sources TEXT NOT NULL
+);
+
 CREATE TABLE meta (
     key TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL
@@ -143,3 +161,9 @@ SELECT substance_id, name FROM substance_effect ORDER BY substance_id, name;
 
 selectAllIdentifiers:
 SELECT substance_id, scheme, value AS ident_value FROM substance_identifier ORDER BY substance_id, scheme, ident_value;
+
+selectAllReferenceEffects:
+SELECT substance_id, name, category, description FROM reference_effect ORDER BY substance_id, name;
+
+selectAllReferenceInteractions:
+SELECT id, substance_a, substance_b, risk, description, sources FROM reference_interaction ORDER BY id;

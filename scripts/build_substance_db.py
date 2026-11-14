@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
 DEFAULT_OUT = ROOT / "build" / "substance-db"
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -32,6 +32,7 @@ CREATE TABLE source(
 );
 CREATE TABLE substance(
     id TEXT PRIMARY KEY,
+    old_id TEXT,
     name TEXT NOT NULL,
     summary TEXT,
     cid INTEGER,
@@ -112,6 +113,21 @@ CREATE TABLE field_source(
     field TEXT NOT NULL,
     source TEXT NOT NULL,
     PRIMARY KEY(substance_id, field, source)
+);
+CREATE TABLE reference_effect(
+    substance_id TEXT NOT NULL REFERENCES substance(id),
+    name TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    PRIMARY KEY(substance_id, name)
+);
+CREATE TABLE reference_interaction(
+    id TEXT PRIMARY KEY,
+    substance_a TEXT NOT NULL,
+    substance_b TEXT NOT NULL,
+    risk TEXT NOT NULL,
+    description TEXT,
+    sources TEXT NOT NULL
 );
 CREATE VIRTUAL TABLE substance_fts USING fts5(
     id UNINDEXED,
@@ -275,6 +291,7 @@ def seed_entries(seed: dict) -> list[dict]:
         out.append(
             {
                 "id": raw["id"],
+                "old_id": raw.get("oldId"),
                 "name": raw["name"],
                 "summary": raw.get("summary"),
                 "cid": raw.get("cid"),
@@ -414,7 +431,6 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
                          "dosewiki")
                     )
     if dw_effects:
-        cat.rows["effect"] = [row for row in cat.rows["effect"] if row[0] != sid]
         cat.rows["effect"].extend(dw_effects)
     if dw.get("summary"):
         entry["summary"] = dw["summary"].strip() or entry.get("summary")
@@ -424,9 +440,35 @@ def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
     cat.rows["provenance"].append((sid, "effects", "dosewiki"))
 
 
+def parse_interaction_entry(raw: str) -> tuple[str, str | None]:
+    """Split "Name (reason text)" into target name and reason, as the Kotlin ingest does."""
+    raw = raw.strip()
+    open_at = raw.find(" (")
+    if open_at < 0:
+        return raw, None
+    name = raw[:open_at].strip()
+    reason = raw[open_at + 2:].strip()
+    if reason.endswith(")"):
+        reason = reason[:-1].strip()
+    if not name:
+        return raw, None
+    return name, (reason or None)
+
+
 def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
     dosewiki = load(sources_dir / "dosewiki_slim.json")
     seed = load(sources_dir / "psychonautwiki_seed.json")
+
+    interactions: dict[str, tuple] = {}
+    for row in seed.get("interactions") or []:
+        interactions[row["id"]] = (
+            row["id"],
+            row["substanceAId"],
+            row["substanceBId"],
+            row["riskLevel"],
+            row.get("description"),
+            json.dumps(row.get("sources") or [], sort_keys=True),
+        )
 
     catalog = Catalog()
     for entry in seed_entries(seed):
@@ -441,8 +483,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
             catalog.rows["toxicity"].append((entry["id"], item.strip()))
         for item in entry["cross"]:
             catalog.rows["cross"].append((entry["id"], item.strip()))
-        for effect in entry["effects"]:
-            catalog.rows["effect"].append((entry["id"], effect.strip(), None, None, "psychonautwiki"))
+        # Effect entities come from DoseWiki only; the seed carries effect names, not rows.
         if entry["cid"]:
             catalog.rows["identifier"].append(
                 (entry["id"], "pubchem_cid", str(entry["cid"]), "psychonautwiki")
@@ -452,6 +493,7 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
                 (entry["id"], "psychonautwiki", entry["pwiki_id"], "psychonautwiki")
             )
 
+    pairs: list[tuple] = []
     for dw in dosewiki:
         name = (dw.get("title") or "").strip()
         if not name:
@@ -471,6 +513,25 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
             catalog.register(entry)
         apply_dosewiki(catalog, entry, dw)
         catalog.register_aliases(entry["id"])
+        pairs.append((dw, entry["id"]))
+
+    # DoseWiki interactions resolve after every row exists, so created dw: targets are found.
+    for dw, source_id in pairs:
+        lists = dw.get("interactions") or {}
+        for key, risk in (("dangerous", "DANGEROUS"), ("unsafe", "UNSAFE"), ("caution", "UNCERTAIN")):
+            for raw in lists.get(key) or []:
+                if not (raw or "").strip():
+                    continue
+                target_name, reason = parse_interaction_entry(raw)
+                target = catalog.match([target_name])
+                if not target or target == source_id:
+                    continue
+                a, b = sorted((source_id, target))
+                interaction_id = f"interaction:{a}:{b}"
+                interactions[interaction_id] = (
+                    interaction_id, a, b, risk, reason,
+                    json.dumps(["dosewiki", "tripsit"], sort_keys=True),
+                )
 
     connection = sqlite3.connect(":memory:")
     connection.executescript(SCHEMA)
@@ -479,9 +540,9 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
     for entry in sorted(catalog.substances.values(), key=lambda item: item["id"]):
         payload = entry.get("payload") or {}
         connection.execute(
-            "INSERT INTO substance VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO substance VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (
-                entry["id"], entry["name"], entry.get("summary"), entry.get("cid"),
+                entry["id"], entry.get("old_id"), entry["name"], entry.get("summary"), entry.get("cid"),
                 entry.get("pwiki_id"), entry.get("addiction"), entry.get("half_life"),
                 entry.get("tmax"), entry.get("source_version") or "mixed",
                 "system", json.dumps(payload, sort_keys=True) if payload else None,
@@ -518,6 +579,18 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "INSERT OR IGNORE INTO field_source VALUES(?,?,?)",
     )
 
+    effect_rows = {}
+    for (substance_id, name, category, description, _source) in catalog.rows["effect"]:
+        effect_rows[(substance_id, name)] = (substance_id, name, category, description)
+    connection.executemany(
+        "INSERT OR REPLACE INTO reference_effect VALUES(?,?,?,?)",
+        sorted(effect_rows.values(), key=str),
+    )
+    connection.executemany(
+        "INSERT OR REPLACE INTO reference_interaction VALUES(?,?,?,?,?,?)",
+        sorted(interactions.values(), key=str),
+    )
+
     for entry in sorted(catalog.substances.values(), key=lambda item: item["id"]):
         aliases = " ".join(
             sorted({alias for (sid, alias, _src) in catalog.rows["alias"] if sid == entry["id"]})
@@ -540,14 +613,23 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "identifiers": connection.execute(
             "SELECT COUNT(*) FROM substance_identifier"
         ).fetchone()[0],
+        "reference_effects": connection.execute(
+            "SELECT COUNT(*) FROM reference_effect"
+        ).fetchone()[0],
+        "reference_interactions": connection.execute(
+            "SELECT COUNT(*) FROM reference_interaction"
+        ).fetchone()[0],
     }
     return connection, counts
 
 
 def source_digest(sources_dir: Path) -> str:
+    """Fingerprint of everything that shapes the output: sources, schema and this builder."""
     digest = hashlib.sha256()
     for name in ("dosewiki_slim.json", "psychonautwiki_seed.json"):
         digest.update((sources_dir / name).read_bytes())
+    digest.update(SCHEMA.encode("utf-8"))
+    digest.update(Path(__file__).read_bytes())
     return digest.hexdigest()
 
 
