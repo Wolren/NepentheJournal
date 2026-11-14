@@ -172,6 +172,34 @@ class SessionListViewModelTest {
     }
 
     @Test
+    fun `dose grouping and name map are computed once and shared`() = runBlocking {
+        val vm = SessionListViewModel(makeRepo())
+        val firstGroup = vm.dosesBySession.first { it.isNotEmpty() }
+        val secondGroup = vm.dosesBySession.first { it.isNotEmpty() }
+        assertSame(firstGroup, secondGroup, "a re-subscribe must reuse the grouped map")
+        assertEquals(2, firstGroup["s:1"]?.size)
+
+        val firstNames = vm.substanceNameMap.first { it.isNotEmpty() }
+        val secondNames = vm.substanceNameMap.first { it.isNotEmpty() }
+        assertSame(firstNames, secondNames, "a re-subscribe must reuse the name map")
+        assertEquals("LSD", firstNames["sub:lsd"])
+    }
+
+    @Test
+    fun `a new dose refreshes the grouped map`() = runBlocking {
+        val repo = makeRepo()
+        val vm = SessionListViewModel(repo)
+        vm.dosesBySession.first { it.isNotEmpty() }
+        repo.upsertDose(Dose(
+            id = "d:5", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            sessionId = "s:4", substanceId = "sub:lsd",
+            routeOfAdministration = "Oral", amount = 50.0, unit = "ug",
+            timestamp = 2000L
+        ))
+        val after = vm.dosesBySession.first { it.containsKey("s:4") }
+        assertEquals(1, after["s:4"]?.size)
+    }
+    @Test
     fun `clearFilters resets all filters`() = runBlocking {
         val vm = SessionListViewModel(makeRepo())
         vm.filterSubstanceIds.value = setOf("sub:mdma")

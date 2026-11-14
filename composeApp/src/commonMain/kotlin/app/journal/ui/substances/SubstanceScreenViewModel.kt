@@ -46,8 +46,13 @@ class SubstanceScreenViewModel(
         val specificsByBroad: Map<String, List<String>>,
     )
 
-    private val annotatedSubstances: Flow<List<AnnotatedSubstance>> = realSubstances.map { list ->
-        list.map { sub ->
+    private var annotatedSource: List<Substance>? = null
+    private var annotatedCache: List<AnnotatedSubstance> = emptyList()
+
+    // Taxonomy annotation is the heaviest pass here; the repository reuses its list instance between mutations.
+    private fun annotated(list: List<Substance>): List<AnnotatedSubstance> {
+        if (annotatedSource === list) return annotatedCache
+        val computed = list.map { sub ->
             val broads = vmBroads(sub)
             AnnotatedSubstance(
                 substance = sub,
@@ -55,7 +60,12 @@ class SubstanceScreenViewModel(
                 specificsByBroad = broads.associateWith { broad -> vmSpecifics(sub, broad) },
             )
         }
+        annotatedSource = list
+        annotatedCache = computed
+        return computed
     }
+
+    private val annotatedSubstances: Flow<List<AnnotatedSubstance>> = realSubstances.map { list -> annotated(list) }
 
     /**
      * Level one: broad categories present in the data, in taxonomy order,

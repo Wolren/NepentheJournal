@@ -1,6 +1,7 @@
 package app.journal.ui.session
 
 import app.journal.data.IJournalRepository
+import app.journal.model.Dose
 import app.journal.model.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,18 +16,28 @@ class SessionListViewModel(
 ) {
     val sessions: StateFlow<List<Session>> = repo.sessions
 
+    /** Grouped once per data change and kept, so a tab revisit does not regroup every dose. */
+    val dosesBySession: StateFlow<Map<String, List<Dose>>> = repo.doses
+        .map { doses -> doses.groupBy { it.sessionId } }
+        .stateIn(scope, SharingStarted.Eagerly, emptyMap())
+
+    /** Name lookup kept alive for the same reason. */
+    val substanceNameMap: StateFlow<Map<String, String>> = repo.substances
+        .map { substances -> substances.associate { it.id to it.name } }
+        .stateIn(scope, SharingStarted.Eagerly, emptyMap())
     val filterSubstanceIds = MutableStateFlow<Set<String>>(emptySet())
     val showFavoritesOnly = MutableStateFlow(false)
     val consumerFilter = MutableStateFlow<String?>(null)
     val searchQuery = MutableStateFlow("")
 
-    val allSessionSubstances = combine(repo.doses, repo.substances) { doses, subs ->
-        val nameMap = subs.associate { it.id to it.name }
-        doses.map { it.substanceId }
-            .distinct()
-            .mapNotNull { id -> nameMap[id]?.let { name -> SubstanceFilterItem(id, name) } }
-            .sortedBy { it.name }
-    }
+    val allSessionSubstances: StateFlow<List<SubstanceFilterItem>> =
+        combine(repo.doses, repo.substances) { doses, subs ->
+            val nameMap = subs.associate { it.id to it.name }
+            doses.map { it.substanceId }
+                .distinct()
+                .mapNotNull { id -> nameMap[id]?.let { name -> SubstanceFilterItem(id, name) } }
+                .sortedBy { it.name }
+        }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
     val allConsumers = sessions.map { list ->
         list.mapNotNull { it.consumerName }.distinct().sorted()

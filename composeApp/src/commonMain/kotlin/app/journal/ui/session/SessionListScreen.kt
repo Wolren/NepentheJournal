@@ -53,10 +53,8 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     onCycleTimeDisplay: () -> Unit = {}
 ) {
     val sessions by viewModel.filteredSessions.collectAsState(initial = emptyList())
-    val allDoses by repo.doses.collectAsState()
-    val allSubstances by repo.substances.collectAsState()
-    val dosesBySession = remember(allDoses) { allDoses.groupBy { it.sessionId } }
-    val substanceNameMap = remember(allSubstances) { allSubstances.associate { it.id to it.name } }
+    val dosesBySession by viewModel.dosesBySession.collectAsState()
+    val substanceNameMap by viewModel.substanceNameMap.collectAsState()
     var showLiveDialog by remember { mutableStateOf(false) }
     var liveSessionTitle by remember { mutableStateOf("") }
 
@@ -64,7 +62,7 @@ fun SessionListScreen(repo: IJournalRepository = LocalJournalRepository.current,
     val filterSubstanceIds by viewModel.filterSubstanceIds.collectAsState()
     val consumerFilter by viewModel.consumerFilter.collectAsState()
     val showFavs by viewModel.showFavoritesOnly.collectAsState()
-    val allSessionSubstances by viewModel.allSessionSubstances.collectAsState(initial = emptyList())
+    val allSessionSubstances by viewModel.allSessionSubstances.collectAsState()
     val allConsumers by viewModel.allConsumers.collectAsState(initial = emptyList())
     val scrollState = rememberLazyListState()
 

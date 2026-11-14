@@ -39,6 +39,7 @@ import app.journal.ui.theme.isDarkTheme
 fun DashboardScreen(
     repo: IJournalRepository = LocalJournalRepository.current,
     onSearchClick: () -> Unit = {},
+    viewModel: DashboardViewModel = remember(repo) { DashboardViewModel.create(repo) },
 ) {
     val sessions by repo.sessions.collectAsState()
     val useRelativeTime by remember { mutableStateOf(true) }
@@ -47,8 +48,7 @@ fun DashboardScreen(
     val showTrendChart by repo.showSessionsTrendChart.collectAsState()
 
     val toleranceVersion by repo.toleranceVersion.collectAsState()
-    val calculator = remember { ToleranceCalculator(repo) }
-    val toleranceAll = remember(toleranceVersion) { calculator.calculate() }
+    val toleranceAll = remember(toleranceVersion) { viewModel.toleranceCalculator.calculate() }
     val toleranceList = remember(toleranceAll) {
         val nonNone = toleranceAll.filter { it.level != ToleranceLevel.NONE }
         val noneCapped = toleranceAll.filter { it.level == ToleranceLevel.NONE }.take(5)
@@ -57,27 +57,8 @@ fun DashboardScreen(
     val totalSessions = sessions.size
     val totalSubstances = substances.size
 
-    // One id gives name map per emission instead of repo.getSubstance (a repo lock acquire) once per dose
-    val substanceNames = remember(substances) { substances.associate { it.id to it.name } }
-
-    val substanceSessionPairs = remember(doses, substanceNames) {
-        doses.mapNotNull { dose ->
-            val name = substanceNames[dose.substanceId]
-            if (name != null) name to dose.sessionId else null
-        }
-    }
-
-    val substancesByDate = remember(doses, substanceNames) {
-        val map = mutableMapOf<LocalDate, MutableSet<String>>()
-        val tz = TimeZone.currentSystemDefault()
-        for (dose in doses) {
-            val date = Instant.fromEpochMilliseconds(dose.timestamp)
-                .toLocalDateTime(tz).date
-            val name = substanceNames[dose.substanceId] ?: dose.substanceId
-            map.getOrPut(date) { mutableSetOf() }.add(name)
-        }
-        map.mapValues { (_, names) -> names.sorted() }
-    }
+    val substanceSessionPairs by viewModel.substanceSessionPairs.collectAsState()
+    val substancesByDate by viewModel.substancesByDate.collectAsState()
 
     var clickedDayInfo by remember { mutableStateOf<DaySubstanceInfo?>(null) }
     val scrollState = rememberLazyListState()

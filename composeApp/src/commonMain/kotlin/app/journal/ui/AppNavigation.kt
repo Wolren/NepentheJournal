@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -73,9 +74,9 @@ import app.journal.ui.pet.PetManager
 import app.journal.ui.pet.PetState
 import app.journal.ui.keybind.KeybindManager
 import app.journal.util.TimeDisplayMode
-import app.journal.ui.components.KeepAliveTabs
 import app.journal.ui.components.SubstanceLibraryGate
 import app.journal.ui.dashboard.DashboardScreen
+import app.journal.ui.dashboard.DashboardViewModel
 import app.journal.ui.safer.SaferScreen
 import app.journal.ui.search.SearchOverlay
 import app.journal.ui.session.CalendarScreen
@@ -89,6 +90,7 @@ import app.journal.ui.substances.SubstanceDetailScreen
 import app.journal.ui.substances.SubstanceEditorScreen
 import app.journal.ui.substances.SubstanceCompanionScreen
 import app.journal.ui.substances.SubstanceScreen
+import app.journal.ui.substances.SubstanceScreenViewModel
 import app.journal.ui.theme.BackgroundImage
 import app.journal.ui.theme.ThemeConfig
 import kotlinx.coroutines.flow.filterNotNull
@@ -115,9 +117,11 @@ internal fun AppNavigation(
     colorScheme: ColorScheme,
 ) {
     var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
-    // Tabs opened once keep their composition, so switching back is a relayout, not a rebuild.
-    val visitedScreens = remember { mutableListOf(Screen.DASHBOARD) }
-    if (selectedScreen !in visitedScreens) visitedScreens.add(selectedScreen)
+    // Tab state (scroll offset, settings section) survives a switch without keeping the screen composed.
+    val tabStateHolder = rememberSaveableStateHolder()
+    // One instance per app run: the derived maps and the tolerance cache outlive every visit.
+    val dashboardViewModel = remember(repo) { DashboardViewModel.create(repo) }
+    val substanceViewModel = remember(repo) { SubstanceScreenViewModel.create(repo) }
     var quickLogStatus by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     var editingSessionId by remember { mutableStateOf<String?>(null) }
@@ -473,7 +477,8 @@ internal fun AppNavigation(
                                 when (tab) {
                                     Screen.DASHBOARD -> DashboardScreen(
                                         repo = repo,
-                                        onSearchClick = { showSearch = true }
+                                        onSearchClick = { showSearch = true },
+                                        viewModel = dashboardViewModel,
                                     )
                                     Screen.SESSIONS -> {
                                         val listContent: @Composable () -> Unit = {
@@ -561,6 +566,7 @@ internal fun AppNavigation(
                                         SubstanceLibraryGate()
                                     } else {
                                         SubstanceScreen(
+                                            viewModel = substanceViewModel,
                                             onSubstanceClick = { id -> selectedSubstanceId = id },
                                             onNewSubstance = { editingSubstanceId = "__new__" }
                                         )
@@ -569,11 +575,9 @@ internal fun AppNavigation(
                                     Screen.SETTINGS -> SettingsScreen(repo = repo, syncEngine = syncEngine)
                                 }  // closes when(tab)
                                 }  // closes tabContent
-                                KeepAliveTabs(
-                                    selectedIndex = visitedScreens.indexOf(selectedScreen),
-                                    tabCount = visitedScreens.size,
-                                    modifier = Modifier.fillMaxSize(),
-                                ) { index -> tabContent(visitedScreens[index]) }
+                                tabStateHolder.SaveableStateProvider(selectedScreen.name) {
+                                    tabContent(selectedScreen)
+                                }
                                 }  // closes inner Box(weight)
                             }  // closes Row
                         }  // closes Scaffold innerPadding
