@@ -88,19 +88,6 @@ internal fun DataSettingsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
-                Text("Import from another app", style = MaterialTheme.typography.labelLarge)
-                Text(
-                    "PsychonautWiki Journal, PsyLog, DrugsPRO, or a CSV/TSV with substance, dose and time columns.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                AppOutlinedButton(onClick = { vm.importForeignJournal() }, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Import journal from another app")
-                }
-                Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppOutlinedButton(
                         onClick = { passphraseAction = PassphraseAction.SEAL },
@@ -132,29 +119,6 @@ internal fun DataSettingsContent(
                         color = if (msg.contains("failed"))
                             MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                Text("CSV Export (analysis)", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(4.dp))
-                Text("One row per entity, R/Pandas-friendly format.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppOutlinedButton(onClick = { vm.exportSessionsCsv() }, modifier = Modifier.weight(1f)) {
-                        Text("Sessions CSV", maxLines = 1)
-                    }
-                    AppOutlinedButton(onClick = { vm.exportDosesCsv() }, modifier = Modifier.weight(1f)) {
-                        Text("Doses CSV", maxLines = 1)
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppOutlinedButton(onClick = { vm.exportSubstancesCsv() }, modifier = Modifier.weight(1f)) {
-                        Text("Substances CSV", maxLines = 1)
-                    }
-                    AppOutlinedButton(onClick = { vm.exportZip() }, modifier = Modifier.weight(1f)) {
-                        Text("All (Zip)", maxLines = 1)
-                    }
                 }
                 Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                 Text("Backup", style = MaterialTheme.typography.labelLarge)

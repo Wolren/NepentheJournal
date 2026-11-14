@@ -44,6 +44,12 @@ class DataSettingsViewModel(
 
     val dataStatus = MutableStateFlow<String?>(null)
 
+    /** Status line of the "Import from another app" card. */
+    val foreignImportStatus = MutableStateFlow<String?>(null)
+
+    /** Status line of the CSV export card. */
+    val csvStatus = MutableStateFlow<String?>(null)
+
     val crashLogStatus = MutableStateFlow<String?>(null)
 
 
@@ -178,13 +184,13 @@ class DataSettingsViewModel(
             if (path != null) {
                 try {
                     if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
-                        dataStatus.value = "Import failed: file too large (max 50 MB)"
+                        foreignImportStatus.value = "Import failed: file too large (max 50 MB)"
                         return@launch
                     }
                     val content = PlatformFile.readText(path)
-                    dataStatus.value = describeForeignImport(ForeignJournalImporter.import(repo, content))
+                    foreignImportStatus.value = describeForeignImport(ForeignJournalImporter.import(repo, content))
                 } catch (e: Exception) {
-                    dataStatus.value = userMessage("Data", "Import failed", e)
+                    foreignImportStatus.value = userMessage("Data", "Import failed", e)
                 }
             }
         }
@@ -271,9 +277,9 @@ class DataSettingsViewModel(
                 try {
                     val csv = CsvExporter.exportSessionsCsv(repo)
                     PlatformFile.writeText(path, csv)
-                    dataStatus.value = "Exported ${repo.sessions.value.size} sessions as CSV"
+                    csvStatus.value = "Exported ${repo.sessions.value.size} sessions as CSV"
                 } catch (e: Exception) {
-                    dataStatus.value = userMessage("Data", "CSV export failed", e)
+                    csvStatus.value = userMessage("Data", "CSV export failed", e)
                 }
             }
         }
@@ -286,9 +292,9 @@ class DataSettingsViewModel(
                 try {
                     val csv = CsvExporter.exportDosesCsv(repo)
                     PlatformFile.writeText(path, csv)
-                    dataStatus.value = "Exported doses as CSV"
+                    csvStatus.value = "Exported doses as CSV"
                 } catch (e: Exception) {
-                    dataStatus.value = userMessage("Data", "CSV export failed", e)
+                    csvStatus.value = userMessage("Data", "CSV export failed", e)
                 }
             }
         }
@@ -301,9 +307,9 @@ class DataSettingsViewModel(
                 try {
                     val csv = CsvExporter.exportSubstancesCsv(repo)
                     PlatformFile.writeText(path, csv)
-                    dataStatus.value = "Exported ${repo.substances.value.size} substances as CSV"
+                    csvStatus.value = "Exported ${repo.substances.value.size} substances as CSV"
                 } catch (e: Exception) {
-                    dataStatus.value = userMessage("Data", "CSV export failed", e)
+                    csvStatus.value = userMessage("Data", "CSV export failed", e)
                 }
             }
         }
@@ -315,9 +321,9 @@ class DataSettingsViewModel(
             if (path != null) {
                 try {
                     val count = ZipExporter.exportAll(repo as JournalRepository, path)
-                    dataStatus.value = "Exported $count CSV files as zip"
+                    csvStatus.value = "Exported $count CSV files as zip"
                 } catch (e: Exception) {
-                    dataStatus.value = userMessage("Data", "ZIP export failed", e)
+                    csvStatus.value = userMessage("Data", "ZIP export failed", e)
                 }
             }
         }

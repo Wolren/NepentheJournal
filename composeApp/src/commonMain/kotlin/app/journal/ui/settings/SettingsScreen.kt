@@ -284,6 +284,10 @@ fun SettingsScreen(
             )
         }
 
+        if (visible(SettingsCategory.DATA)) item { ForeignImportSettingsCard(vm = dataViewModel) }
+
+        if (visible(SettingsCategory.DATA)) item { CsvExportSettingsCard(vm = dataViewModel) }
+
         if (visible(SettingsCategory.JOURNAL)) item { PeopleSettingsContent(repo = repo) }
 
         if (visible(SettingsCategory.JOURNAL)) item { MedicationsSettingsContent(repo = repo) }
