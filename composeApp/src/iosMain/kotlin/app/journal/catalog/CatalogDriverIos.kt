@@ -37,8 +37,17 @@ actual object CatalogDriver {
             fileManager.createDirectoryAtPath(
                 directory, withIntermediateDirectories = true, attributes = null, error = null,
             )
-            val source = NSBundle.mainBundle.pathForResource("substances", ofType = "sqlite")
-                ?: return directory
+            val executableDir = NSBundle.mainBundle.executablePath?.substringBeforeLast('/')
+            val candidates = listOfNotNull(
+                NSBundle.mainBundle.pathForResource("substances", ofType = "sqlite"),
+                NSBundle.mainBundle.pathForResource(
+                    "substances", ofType = "sqlite", inDirectory = "compose-resources",
+                ),
+                executableDir?.let { "$it/compose-resources/$CATALOG_FILE" },
+                executableDir?.let { "$it/$CATALOG_FILE" },
+            )
+            val source = candidates.firstOrNull { fileManager.fileExistsAtPath(it) }
+                ?: error("Bundled substance catalog is missing from the iOS bundle")
             fileManager.copyItemAtPath(source, toPath = target, error = null)
         }
         return directory
