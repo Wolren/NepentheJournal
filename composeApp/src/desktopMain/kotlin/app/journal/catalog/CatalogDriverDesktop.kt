@@ -6,6 +6,8 @@ import java.io.File
 
 actual object CatalogDriver {
 
+    actual val supported: Boolean = true
+
     actual fun open(): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:${resolvePath()}")
 
     /** Tests point nepenthe.catalog at the built file; the app extracts a versioned copy once. */

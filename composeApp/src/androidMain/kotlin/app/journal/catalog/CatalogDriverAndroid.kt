@@ -7,6 +7,8 @@ import app.journal.catalog.db.CatalogDatabase
 
 actual object CatalogDriver {
 
+    actual val supported: Boolean = true
+
     actual fun open(): SqlDriver {
         val name = copyAssetOnce()
         return AndroidSqliteDriver(CatalogDatabase.Schema, NepentheApp.appContext, name)

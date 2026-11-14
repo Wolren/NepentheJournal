@@ -34,8 +34,8 @@ object CatalogSource {
         SubstanceCatalog.contentVersion()?.let { "db:$it" }
     }.getOrNull()
 
-    /** Fingerprint from the tiny bundled manifest, readable without opening the database. */
-    fun bundledFingerprint(): String? = cachedFingerprint
+    /** Fingerprint from the tiny bundled manifest, or null when this target cannot open the catalog. */
+    fun bundledFingerprint(): String? = if (CatalogDriver.supported) cachedFingerprint else null
 
     private val cachedFingerprint: String? by lazy {
         runCatching {

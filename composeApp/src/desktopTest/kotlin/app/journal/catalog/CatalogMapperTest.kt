@@ -41,7 +41,7 @@ class CatalogMapperTest {
         val runtime = repo.substances.value.associateBy { it.id }
         val catalog = CatalogSource.loadSubstances().associateBy { it.id }
 
-        assertEquals(runtime.keys, catalog.keys)
+        assertTrue(catalog.keys.containsAll(runtime.keys), "catalog must cover the ingest")
         for (name in listOf("LSD", "Ketamine", "Caffeine", "Cannabis", "MDMA")) {
             val expected = runtime.values.firstOrNull { it.name == name } ?: continue
             val actual = assertNotNull(catalog[expected.id], "$name is missing")
@@ -118,3 +118,4 @@ class CatalogMapperTest {
         assertEquals(duration.routes?.size, DoseWikiLookup.getDuration("LSD")?.routes?.size)
     }
 }
+

@@ -6,7 +6,11 @@ import app.journal.catalog.db.Substance as CatalogRow
 
 /** Opens the bundled substance catalog read-only. */
 expect object CatalogDriver {
+
     fun open(): SqlDriver
+
+    /** False on a target whose driver is not wired yet, so the app falls back to the JSON ingest. */
+    val supported: Boolean
 }
 
 /** One dose tier for one route, as stored in the catalog. */

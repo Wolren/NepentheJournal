@@ -16,9 +16,12 @@ import sqlite3
 import sys
 from pathlib import Path
 
+import tripsit_source
+
 ROOT = Path(__file__).resolve().parent.parent
 RESOURCES = ROOT / "composeApp" / "src" / "desktopMain" / "resources"
 DEFAULT_OUT = ROOT / "build" / "substance-db"
+TRIPSIT_PATH = Path(__file__).resolve().parent / "cache" / "tripsit_all_drugs.json"
 
 SCHEMA_VERSION = 4
 
@@ -515,6 +518,46 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         catalog.register_aliases(entry["id"])
         pairs.append((dw, entry["id"]))
 
+    # TripSit fills compounds the community sources miss and gaps where DoseWiki carries no ladder.
+    tripsit_created = 0
+    tripsit_filled = 0
+    for item in tripsit_source.load(TRIPSIT_PATH):
+        matched = catalog.match([item["name"]] + item["aliases"])
+        if matched:
+            has_dose = any(row[0] == matched for row in catalog.rows["dose"])
+            if has_dose or not item["dose"]:
+                continue
+            for order, (route, tier, low, high, unit) in enumerate(item["dose"]):
+                catalog.rows["dose"].append((matched, route, order, tier, low, high, unit, "tripsit"))
+                catalog.rows["route"].append((matched, route))
+            catalog.rows["provenance"].append((matched, "dosage", "tripsit"))
+            tripsit_filled += 1
+            continue
+        entry = {
+            "id": f"tripsit:{item['slug']}", "old_id": None, "name": item["name"],
+            "summary": item["summary"], "cid": None, "pwiki_id": None,
+            "aliases": item["aliases"], "classes": item["classes"], "routes": [],
+            "addiction": None, "half_life": None, "tmax": None,
+            "toxicity": [], "cross": [], "effects": [],
+            "source_version": "tripsit", "payload": {},
+        }
+        catalog.register(entry)
+        for alias in item["aliases"]:
+            catalog.rows["alias"].append((entry["id"], alias, "tripsit"))
+        for label in item["classes"]:
+            catalog.rows["class"].append((entry["id"], label, "tripsit"))
+        if item["summary"]:
+            catalog.rows["provenance"].append((entry["id"], "summary", "tripsit"))
+        seen_routes = set()
+        for order, (route, tier, low, high, unit) in enumerate(item["dose"]):
+            catalog.rows["dose"].append((entry["id"], route, order, tier, low, high, unit, "tripsit"))
+            if route not in seen_routes:
+                seen_routes.add(route)
+                catalog.rows["route"].append((entry["id"], route))
+            catalog.rows["provenance"].append((entry["id"], "dosage", "tripsit"))
+        catalog.register_aliases(entry["id"])
+        tripsit_created += 1
+
     # DoseWiki interactions resolve after every row exists, so created dw: targets are found.
     for dw, source_id in pairs:
         lists = dw.get("interactions") or {}
@@ -619,6 +662,8 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "reference_interactions": connection.execute(
             "SELECT COUNT(*) FROM reference_interaction"
         ).fetchone()[0],
+        "tripsit_created": tripsit_created,
+        "tripsit_filled": tripsit_filled,
     }
     return connection, counts
 
@@ -671,11 +716,20 @@ def main() -> int:
     content_version = source_digest(args.sources)[:16]
     connection.execute("INSERT INTO meta VALUES('content_version', ?)", (content_version,))
     connection.execute("INSERT INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
-    connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+    # SQLDelight opens a bundled file with the schema version it generated (1), so the
+    # file must not advertise a newer version or Android treats it as a downgrade.
+    connection.execute("PRAGMA user_version = 1")
     connection.commit()
 
     path = write_database(connection, args.out, content_version, counts)
     connection.close()
+
+    check = sqlite3.connect(path)
+    version = check.execute("PRAGMA user_version").fetchone()[0]
+    check.close()
+    if version != 1:
+        print(f"user_version is {version}, expected 1 for the SQLDelight schema", file=sys.stderr)
+        return 3
 
     print(json.dumps({"database": str(path), "content_version": content_version, **counts},
                      indent=2))

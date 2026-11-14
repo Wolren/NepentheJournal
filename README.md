@@ -71,7 +71,7 @@ Alongside DoseWiki, a 325-substance seed pre-processed from public sources adds 
 
 - **PsychonautWiki:** substance classes, effects, interactions, dose ranges
 - **PubChem:** CIDs, molecular properties, synonyms
-- **TripSit:** combination interactions and risk assessments
+- **TripSit:** combination interactions, risk assessments, and dose ladders for compounds DoseWiki does not cover
 - **ChEMBL** and **IUPHAR/BPS Guide to Pharmacology:** binding and bioactivity data
 - **PDSP Ki Database** and **BindingDB:** binding affinity measurements
 - **Wikidata:** DrugBank, ChEBI, UNII, and ATC identifiers
@@ -206,14 +206,15 @@ Nepenthe Journal does not collect, transmit, or sell any personal information. N
 
 Code: GNU General Public License v3.0. See [LICENSE](LICENSE).
 
-Bundled reference data has its own terms (see [NOTICE](NOTICE)): DoseWiki substance prose is [CC0 1.0](https://dose.wiki/docs/license); interaction risk data derived from TripSit retains TripSit's non-commercial attribution; PsychonautWiki-derived seed data is sourced from the public Semantic MediaWiki API and used under fair use / public data principles, with attribution below.
+Bundled reference data has its own terms (see [NOTICE](NOTICE)): DoseWiki substance prose is [CC0 1.0](https://dose.wiki/docs/license); TripSit interaction risk and dose data retain TripSit's non-commercial attribution; PsychonautWiki-derived seed data is sourced from the public Semantic MediaWiki API and used under fair use / public data principles, with attribution below.
 
 ## Acknowledgments
 
 - **DoseWiki** ([dose.wiki](https://dose.wiki/)): the primary reference source: dosage, duration, interactions, pharmacology, and subjective effects for 577 substances, released as CC0 open data.
 - **PsychonautWiki Journal** by Isaak Hanimann ([GitHub](https://github.com/isaakhanimann/psychonautwiki-journal-android)): this project's feature reference and conceptual predecessor, licensed under GPL-3.0-or-later. Nepenthe Journal is a derivative work ported to Compose Multiplatform with a redesigned architecture and new features.
 - **PsychonautWiki** ([psychonautwiki.org](https://psychonautwiki.org)): public substance reference data accessed via their Semantic MediaWiki API and bundled as seed data.
-- **TripSit** ([tripsit.me](https://tripsit.me)): combination interaction and risk-assessment data.
+- **TripSit** ([tripsit.me](https://tripsit.me)): combination interaction and risk-assessment data, plus dose ladders for compounds outside DoseWiki.
 - **IUPHAR/BPS Guide to Pharmacology**: ligand-target interaction data.
 - **PDSP Ki Database** (NIMH Psychoactive Drug Screening Program): Ki binding data.
 - **BindingDB**: public affinity measurements.
+
