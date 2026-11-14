@@ -87,6 +87,19 @@ internal fun DataSettingsContent(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Spacer(Modifier.height(8.dp))
+                Text("Import from another app", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "PsychonautWiki Journal, PsyLog, DrugsPRO, or a CSV/TSV with substance, dose and time columns.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(4.dp))
+                AppOutlinedButton(onClick = { vm.importForeignJournal() }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Import journal from another app")
+                }
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppOutlinedButton(

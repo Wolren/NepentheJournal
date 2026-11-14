@@ -43,6 +43,7 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 - [x] **Standing medications:** daily prescriptions (SSRIs, MAOIs, lithium, benzodiazepines, opioids, stimulants) join the interaction check while active, and past doses count until their elimination window closes
 - [x] Trip-report export in the [DoseWiki trip-report format](https://josiekins.xyz/html-craft/dosewiki-trip-report-format.html)
 - [x] Import/export (JSON, CSV) and auto-backup rotation
+- [x] Import dose journals from other apps: PsychonautWiki Journal, PsyLog, DrugsPRO, and any CSV/TSV table with substance, dose and time columns
 - [x] Offline-first: journaling, bundled reference data, and P2P sync work without internet (the FDA drug-label card needs network, see below)
 
 ---

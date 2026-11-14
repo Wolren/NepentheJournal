@@ -8,6 +8,8 @@ import app.journal.export.CsvExporter
 import app.journal.export.EncryptedBackup
 import app.journal.export.ExportImport
 import app.journal.export.ZipExporter
+import app.journal.ingest.foreign.ForeignImportResult
+import app.journal.ingest.foreign.ForeignJournalImporter
 import app.journal.log.Log
 import app.journal.log.collectLogs
 import app.journal.ui.components.userMessage
@@ -164,6 +166,53 @@ class DataSettingsViewModel(
                 }
             }
         }
+    }
+
+    /** Reads a PsychonautWiki Journal, PsyLog, DrugsPRO or CSV export and applies it. */
+    fun importForeignJournal() {
+        scope.launch {
+            val path = FilePicker.openFile(
+                "Journal exports",
+                listOf("json", "csv", "tsv", "txt"),
+            )
+            if (path != null) {
+                try {
+                    if (PlatformFile.size(path) > ExportImport.MAX_IMPORT_BYTES) {
+                        dataStatus.value = "Import failed: file too large (max 50 MB)"
+                        return@launch
+                    }
+                    val content = PlatformFile.readText(path)
+                    dataStatus.value = describeForeignImport(ForeignJournalImporter.import(repo, content))
+                } catch (e: Exception) {
+                    dataStatus.value = userMessage("Data", "Import failed", e)
+                }
+            }
+        }
+    }
+
+    /** Status line for one foreign import: what came in, or why nothing did. */
+    private fun describeForeignImport(result: ForeignImportResult): String {
+        result.error?.let { return "Import failed: $it" }
+        val source = result.format?.label ?: "the file"
+        if (result.doses == 0) {
+            return if (result.duplicatesSkipped > 0) {
+                "Nothing new: all ${result.duplicatesSkipped} doses are already in your journal"
+            } else {
+                "No doses found in $source"
+            }
+        }
+        val duplicates = if (result.duplicatesSkipped > 0) {
+            ", ${result.duplicatesSkipped} duplicates skipped"
+        } else {
+            ""
+        }
+        val substances = if (result.substancesCreated > 0) {
+            ", ${result.substancesCreated} new substances"
+        } else {
+            ""
+        }
+        return "Imported ${result.sessions} sessions, ${result.doses} doses from $source" +
+            substances + duplicates
     }
 
     /** Writes a zstd-compressed, passphrase-sealed backup that is safe to store off-device. */
