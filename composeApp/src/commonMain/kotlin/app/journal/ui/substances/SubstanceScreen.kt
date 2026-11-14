@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -86,12 +87,18 @@ fun SubstanceScreen(
                 FilterChip(
                     selected = mode == LibraryMode.SUBSTANCES,
                     onClick = { mode = LibraryMode.SUBSTANCES },
-                    label = { Text("Substances") },
+                    label = {
+                        Text("Substances", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    },
+                    modifier = Modifier.weight(1f),
                 )
                 FilterChip(
                     selected = mode == LibraryMode.EFFECTS,
                     onClick = { mode = LibraryMode.EFFECTS },
-                    label = { Text("Effects") },
+                    label = {
+                        Text("Effects", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    },
+                    modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(4.dp))
