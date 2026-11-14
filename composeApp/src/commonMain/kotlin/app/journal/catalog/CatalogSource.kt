@@ -56,6 +56,13 @@ object CatalogSource {
 
     fun loadInteractions(): List<Interaction> = CatalogMapper.loadInteractions(currentTimeMillis())
 
+    /** Field name to the sources that supplied it, empty for user-created rows. */
+    fun provenanceFor(substanceId: String): Map<String, List<String>> = runCatching {
+        SubstanceCatalog.database.catalogQueries.selectFieldSources(substanceId) { field, source ->
+            field to source
+        }.executeAsList().groupBy({ it.first }, { it.second })
+    }.getOrDefault(emptyMap())
+
     /** Every bundled source with its licence, for the in-app attribution list. */
     fun sources(): List<CatalogSourceInfo> = runCatching {
         SubstanceCatalog.database.catalogQueries.selectSources { name, licence, url ->

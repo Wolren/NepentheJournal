@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import app.journal.catalog.CatalogSource
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
 import app.journal.data.DoseWikiLookup
@@ -570,6 +571,21 @@ fun SubstanceDetailScreen(
                         Text(formatDateShort(dLocal.date),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        item {
+            val provenance = remember(substance.id) { CatalogSource.provenanceFor(substance.id) }
+            if (provenance.isNotEmpty()) {
+                SectionCard(title = "Data sources") {
+                    provenance.forEach { (field, sources) ->
+                        Text(
+                            "$field: ${sources.joinToString(", ")}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

@@ -42,6 +42,13 @@ class SubstanceCatalogTest {
     }
 
     @Test
+    fun reportsWhichSourceSuppliedEachField() {
+        if (!available) return
+        assertEquals(listOf("dosewiki"), CatalogSource.provenanceFor("cid:5761")["dosage"])
+        assertEquals(listOf("drug-community"), CatalogSource.provenanceFor("dc:2c-ef")["dosage"])
+    }
+
+    @Test
     fun shipsEverySourceWithItsLicence() {
         if (!available) return
         val sources = CatalogSource.sources().associateBy { it.name }
