@@ -28,6 +28,7 @@ DC_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_navigation
 DC_BANDS_PATH = Path(__file__).resolve().parent / "cache" / "drug_community_dose_bands.jsonl"
 SMW_PATH = Path(__file__).resolve().parent / "cache" / "smw_only_seed.json"
 WIKIDATA_PATH = Path(__file__).resolve().parent / "cache" / "wikidata_medicines.json"
+AFFINITY_PATH = Path(__file__).resolve().parent / "cache" / "mneme_affinity.json"
 TARGET_SUBSTANCES = 1675
 
 SCHEMA_VERSION = 4
@@ -343,6 +344,9 @@ def seed_entries(seed: dict) -> list[dict]:
 
 def apply_dosewiki(cat: Catalog, entry: dict, dw: dict) -> None:
     sid = entry["id"]
+    slug = (dw.get("slug") or "").strip()
+    if slug:
+        cat.rows["identifier"].append((sid, "dosewiki", slug, "dosewiki"))
     dosage = (dw.get("dosage") or {}).get("routes") or []
     for order, route in enumerate(dosage):
         name = (route.get("route") or "").strip()
@@ -481,7 +485,14 @@ def parse_interaction_entry(raw: str) -> tuple[str, str | None]:
     return name, (reason or None)
 
 
-def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
+def load_affinity(path: Path) -> dict:
+    """MNEME export keyed by catalog id; a missing file leaves the seed payloads alone."""
+    if not path.exists():
+        return {}
+    return load(path)
+
+
+def build(sources_dir: Path, affinity_path: Path = AFFINITY_PATH) -> tuple[sqlite3.Connection, dict]:
     dosewiki = load(sources_dir / "dosewiki_slim.json")
     seed = load(sources_dir / "psychonautwiki_seed.json")
 
@@ -684,6 +695,25 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
                     json.dumps(["dosewiki", "tripsit"], sort_keys=True),
                 )
 
+    # MNEME payloads arrive keyed by catalog id and outrank the seed's five source blobs.
+    affinity = load_affinity(affinity_path)
+    affinity_covered = 0
+    if affinity:
+        payloads = affinity.get("payloads") or {}
+        by_cid: dict[int, dict] = {}
+        for catalog_id, payload in payloads.items():
+            entry = catalog.substances.get(catalog_id)
+            if entry and entry.get("cid"):
+                by_cid.setdefault(int(entry["cid"]), payload)
+        for entry in catalog.substances.values():
+            payload = payloads.get(entry["id"]) or by_cid.get(int(entry["cid"] or 0))
+            if not payload:
+                continue
+            merged = dict(entry.get("payload") or {})
+            merged.update(payload)
+            entry["payload"] = merged
+            affinity_covered += 1
+
     connection = sqlite3.connect(":memory:")
     connection.executescript(SCHEMA)
     connection.executemany("INSERT INTO source VALUES(?,?,?,?)", SOURCES)
@@ -776,15 +806,18 @@ def build(sources_dir: Path) -> tuple[sqlite3.Connection, dict]:
         "psychonautwiki_added": smw_added,
         "wikidata_added": wikidata_added,
         "drug_community_filled": dc_filled,
+        "affinity_substances": affinity_covered,
     }
     return connection, counts
 
 
-def source_digest(sources_dir: Path) -> str:
+def source_digest(sources_dir: Path, affinity_path: Path = AFFINITY_PATH) -> str:
     """Fingerprint of everything that shapes the output: sources, schema and this builder."""
     digest = hashlib.sha256()
     for name in ("dosewiki_slim.json", "psychonautwiki_seed.json"):
         digest.update((sources_dir / name).read_bytes())
+    if affinity_path.exists():
+        digest.update(affinity_path.read_bytes())
     digest.update(SCHEMA.encode("utf-8"))
     digest.update(Path(__file__).read_bytes())
     return digest.hexdigest()
@@ -818,14 +851,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sources", type=Path, default=RESOURCES)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    parser.add_argument("--affinity", type=Path, default=AFFINITY_PATH,
+                        help="MNEME export JSON; absent means seed payloads only")
     args = parser.parse_args()
 
     if not (args.sources / "dosewiki_slim.json").exists():
         print(f"missing dosewiki_slim.json under {args.sources}", file=sys.stderr)
         return 2
 
-    connection, counts = build(args.sources)
-    content_version = source_digest(args.sources)[:16]
+    connection, counts = build(args.sources, args.affinity)
+    content_version = source_digest(args.sources, args.affinity)[:16]
     connection.execute("INSERT INTO meta VALUES('content_version', ?)", (content_version,))
     connection.execute("INSERT INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     # SQLDelight opens a bundled file with the schema version it generated (1), so the
