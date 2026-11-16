@@ -1,5 +1,7 @@
 package app.journal.model
 
+import app.journal.util.PlatformLock
+
 /**
  * Two-level taxonomy for the substances browser.
  *
@@ -17,6 +19,9 @@ package app.journal.model
 data class BroadCategory(val id: String, val label: String)
 
 object SubstanceTaxonomy {
+
+    private val broadCacheMap = HashMap<String, Set<String>>()
+    private val broadCache = PlatformLock()
 
     val PSYCHEDELICS = BroadCategory("psychedelics", "Psychedelics")
     val ENTACTOGENS = BroadCategory("entactogens", "Entactogens")
@@ -68,6 +73,11 @@ object SubstanceTaxonomy {
     fun broadsOf(rawClass: String?): Set<String> {
         val raw = rawClass?.trim()?.lowercase() ?: return setOf(OTHER.id)
         if (raw.isEmpty()) return setOf(OTHER.id)
+        // Memoised: the tables are static and a substance screen asks per class per broad.
+        return broadCache.withLock { broadCacheMap.getOrPut(raw) { matchBroads(raw) } }
+    }
+
+    private fun matchBroads(raw: String): Set<String> {
         val out = mutableSetOf<String>()
 
         if (raw.has("cannabinoid", "naphthoyl", "indazole", "benzoyl", "dibenzopyran", "carboxamide")) {
