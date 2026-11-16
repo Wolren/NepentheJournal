@@ -2,6 +2,7 @@ package app.journal.ui.session.timeline
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,8 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatClockTime
+import app.journal.util.formatDateShort
 import app.journal.ui.session.timeline.phaseColors
 
 @Composable
@@ -29,6 +32,7 @@ internal fun EventCard(
     repo: IJournalRepository,
     onDelete: ((TimelineEvent) -> Unit)? = null
 ) {
+    var expanded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var editLabel by remember { mutableStateOf(event.label) }
     var editBody by remember { mutableStateOf(event.body ?: "") }
@@ -72,48 +76,75 @@ internal fun EventCard(
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(Modifier.fillMaxWidth()) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)) {
-                    Box(
-                        Modifier.size(26.dp).background(accent.copy(alpha = 0.14f), CircleShape)
-                    )
-                    Surface(
-                        modifier = Modifier.size(30.dp),
-                        shape = CircleShape,
-                        color = accent.copy(alpha = 0.12f),
-                        border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(icon, null, tint = accent, modifier = Modifier.size(16.dp))
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(start = 10.dp, top = 12.dp, bottom = 12.dp)) {
+                        Box(
+                            Modifier.size(26.dp).background(accent.copy(alpha = 0.14f), CircleShape)
+                        )
+                        Surface(
+                            modifier = Modifier.size(30.dp),
+                            shape = CircleShape,
+                            color = accent.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(icon, null, tint = accent, modifier = Modifier.size(16.dp))
+                            }
                         }
+                    }
+                    Row(Modifier.padding(12.dp).weight(1f), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(event.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Surface(
+                                    shape = RoundedCornerShape(5.dp),
+                                    color = accent.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+                                ) {
+                                    Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                }
+                            }
+                            if (!event.body.isNullOrBlank()) { Spacer(Modifier.height(2.dp)); Text(event.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            if (event.intensity != null) {
+                                Spacer(Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("Intensity:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) { Text("${event.intensity}/10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)) }
+                                }
+                            }
+                        }
+                        Icon(
+                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (expanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                 }
-                Row(Modifier.padding(12.dp).weight(1f), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(event.label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Surface(
-                                shape = RoundedCornerShape(5.dp),
-                                color = accent.copy(alpha = 0.12f),
-                                border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
-                            ) {
-                                Text("+${mins}m", style = MaterialTheme.typography.labelSmall, color = accent,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                // Editing and removing sit behind the expansion: a timeline row cannot be deleted by accident.
+                if (expanded) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${formatDateShort(event.timestamp)} ${formatClockTime(event.timestamp)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        AppTextButton(onClick = { editing = true }) { Text("Edit") }
+                        if (onDelete != null) {
+                            AppTextButton(onClick = { onDelete(event) }) {
+                                Text("Delete", color = MaterialTheme.colorScheme.error)
                             }
                         }
-                        if (!event.body.isNullOrBlank()) { Spacer(Modifier.height(2.dp)); Text(event.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        if (event.intensity != null) {
-                            Spacer(Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Intensity:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) { Text("${event.intensity}/10", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)) }
-                            }
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        if (onDelete != null) { IconButton(onClick = { onDelete(event) }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error) } }
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package app.journal.ui.session.live
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,8 @@ import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
 import app.journal.util.currentTimeMillis
+import app.journal.util.formatClockTime
+import app.journal.util.formatDateShort
 
 sealed class LiveTimelineItem {
     data class Event(val event: TimelineEvent) : LiveTimelineItem()
@@ -32,6 +35,7 @@ internal fun LiveEventCard(
     repo: IJournalRepository,
     onDelete: ((TimelineEvent) -> Unit)? = null
 ) {
+    var expanded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var editLabel by remember { mutableStateOf(event.label) }
     var editBody by remember { mutableStateOf(event.body ?: "") }
@@ -82,7 +86,7 @@ internal fun LiveEventCard(
     } else {
         AppCard(contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.Top) {
                 Surface(modifier = Modifier.size(36.dp), shape = CircleShape,
                     color = when (event.eventType) {
                         TimelineEventType.SIDE_EFFECT, TimelineEventType.EMERGENCY -> InteractionColors.dangerous.copy(alpha = 0.15f)
@@ -123,17 +127,31 @@ internal fun LiveEventCard(
                             }
                         }
                     }
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (onDelete != null) {
-                        IconButton(onClick = { onDelete(event) }, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                    // Editing and removing sit behind the expansion: a running session cannot be deleted by accident.
+                    if (expanded) {
+                        HorizontalDivider(Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${formatDateShort(event.timestamp)} ${formatClockTime(event.timestamp)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            AppTextButton(onClick = { editing = true }) { Text("Edit") }
+                            if (onDelete != null) {
+                                AppTextButton(onClick = { onDelete(event) }) {
+                                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp).clickable { expanded = !expanded },
+                )
             }
         }
     }

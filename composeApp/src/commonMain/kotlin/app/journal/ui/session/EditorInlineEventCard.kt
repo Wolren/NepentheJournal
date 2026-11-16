@@ -1,5 +1,6 @@
 package app.journal.ui.session
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ fun EditorInlineEventCard(
     onUpdated: (TimelineEvent) -> Unit,
     onDelete: () -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(autoEdit) }
     var editLabel by remember { mutableStateOf(event.label) }
     var editBody by remember { mutableStateOf(event.body ?: "") }
@@ -125,7 +127,8 @@ fun EditorInlineEventCard(
             contentPadding = appCardPadding(dense = true),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top,
+            Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -155,14 +158,25 @@ fun EditorInlineEventCard(
                         }
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    IconButton(onClick = { editing = true }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Edit, "Edit", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Delete, "Delete", modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.error)
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+                // Editing and removing sit behind the expansion: a draft event cannot be deleted by accident.
+                if (expanded) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Spacer(Modifier.weight(1f))
+                        AppTextButton(onClick = { editing = true }, modifier = Modifier.testTag("event-edit")) { Text("Edit") }
+                        AppTextButton(onClick = onDelete, modifier = Modifier.testTag("event-delete")) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
