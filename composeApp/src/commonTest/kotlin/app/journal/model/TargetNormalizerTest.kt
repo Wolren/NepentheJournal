@@ -133,6 +133,19 @@ class TargetNormalizerTest {
     }
 
     @Test
+    fun muscarinicAndNicotinicSitesGetShortLabels() {
+        assertEquals("M1", TargetNormalizer.normalize("Muscarinic acetylcholine receptor M1").label)
+        assertEquals("M5", TargetNormalizer.normalize("Muscarinic acetylcholine receptor M5").label)
+        assertDifferentTargets("Muscarinic acetylcholine receptor M1", "Muscarinic acetylcholine receptor M2")
+        assertEquals("\u03b14 nAChR", TargetNormalizer.normalize("Neuronal acetylcholine receptor subunit alpha-4").label)
+        assertSameTarget("Neuronal acetylcholine receptor subunit alpha-3/beta-2", "Cholinergic, Nicotinic Alpha3Beta2")
+        assertEquals(
+            "\u03b14\u03b22 nAChR",
+            TargetNormalizer.normalize("Cholinergic, Nicotinic Alpha4Beta2").label,
+        )
+    }
+
+    @Test
     fun unknownTargetsKeepOwnGroup() {
         val a = TargetNormalizer.normalize("Carnitine O-palmitoyltransferase 2, mitochondrial")
         val b = TargetNormalizer.normalize("Vasopressin V1a receptor")

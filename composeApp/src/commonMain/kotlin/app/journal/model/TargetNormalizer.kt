@@ -41,6 +41,7 @@ object TargetNormalizer {
         opioid(flat)?.let { return it }
         glutamate(flat)?.let { return it }
         gaba(flat)?.let { return it }
+        cholinergic(flat)?.let { return it }
 
         val label = stripSuffixWords(cleaned)
         return NormalizedTarget("x:" + label.lowercase(), label)
@@ -195,6 +196,30 @@ object TargetNormalizer {
         return null
     }
 
+
+    private val muscarinicNumber = Regex("\\bm\\s*([1-5])\\b")
+    private val nicotinicSubunit = Regex("(alpha|beta)\\s*(\\d)")
+
+    /**
+     * Acetylcholine sites collapse to short labels. Without this, M1 to M5 all
+     * render as one truncated "Muscarinic acetylcholine ..." row.
+     */
+    private fun cholinergic(flat: String): NormalizedTarget? {
+        if (flat.contains("muscarinic")) {
+            val n = muscarinicNumber.find(flat)?.groupValues?.get(1)
+            return if (n != null) NormalizedTarget("chrm$n", "M$n") else NormalizedTarget("chrm", "Muscarinic")
+        }
+        if (flat.contains("vesicular acetylcholine")) return NormalizedTarget("slc17a3", "VAChT")
+        if (flat.contains("nicotinic") || (flat.contains("acetylcholine") && flat.contains("subunit"))) {
+            val units = nicotinicSubunit.findAll(flat).toList()
+            if (units.isNotEmpty()) {
+                val chain = units.joinToString("") { greekSymbols[it.groupValues[1]].orEmpty() + it.groupValues[2] }
+                return NormalizedTarget("nachr:$chain", "$chain nAChR")
+            }
+            return NormalizedTarget("nachr", "nAChR")
+        }
+        return null
+    }
 
     private val suffixWords = Regex("\\s+(receptors?|transporters?|channels?|enzymes?|proteins?|subunits?|subtype)\\s*\$")
     private val parenTail = Regex("\\s*\\([^)]*\\)\\s*\$")
