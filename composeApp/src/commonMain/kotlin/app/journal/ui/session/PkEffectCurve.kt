@@ -30,6 +30,8 @@ fun pkEffectSamples(
     substance: Substance,
     startMs: Long,
     endMs: Long? = null,
+    /** Active metabolite's half-life, so a prodrug clears with the species the user feels. */
+    metaboliteHalfLifeMinutes: Double? = null,
 ): PkEffectCurve? {
     if (doses.isEmpty()) return null
     val timed = doses
@@ -45,8 +47,9 @@ fun pkEffectSamples(
         ?.let { (it.first + it.second) / 2.0 }
         ?: totalDurationMinutes(phases)
     val tmaxFromData = substance.tmaxMinutes
-    val halfLifeFromSource = substance.halfLifeMinutes != null
-    val halfLife = substance.halfLifeMinutes
+    val halfLifeFromSource = substance.halfLifeMinutes != null || metaboliteHalfLifeMinutes != null
+    val halfLife = metaboliteHalfLifeMinutes
+        ?: substance.halfLifeMinutes
         ?: totalMinutes?.let { total -> PkCurve.estimateHalfLifeMinutes(total, tmaxFromData ?: total * 0.25) }
         ?: return null
     val tmax = (tmaxFromData ?: halfLife * 0.35).coerceAtLeast(1.0)
@@ -66,8 +69,7 @@ fun pkEffectSamples(
         stepMs = step,
     )
     if (series.isEmpty()) return null
-    // A dose far above the band would clamp at 10 and flatten the peak into a plateau, so the
-    // shape is scaled to its own maximum and that maximum is what the dose decides.
+    // Scale to the curve's own peak: a dose above the band would clamp at 10 and flatten.
     val rawPeak = series.maxOf { it.second }.takeIf { it > 0.0 } ?: return null
     val targetPeak = 10.0 * minOf(1.0, rawPeak)
     val samples = series.map { (timestamp, level) ->

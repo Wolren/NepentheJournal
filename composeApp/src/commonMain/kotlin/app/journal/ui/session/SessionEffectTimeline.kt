@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.model.Substance
+import app.journal.model.Prodrugs
 import app.journal.model.TimelineEvent
 import app.journal.ui.charts.TickLabel
 import app.journal.ui.charts.TickLabelRow
@@ -73,14 +74,20 @@ internal fun SessionEffectTimeline(
             listOf(EffectCurveLayer(substanceId = null, samples = logged))
         } else {
             val firstDose = doses.minOfOrNull { it.timestamp } ?: session.startTime
+            val halfLifeByMetabolite = substancesById.values.associate { it.name.lowercase() to it.halfLifeMinutes }
             doses.groupBy { it.substanceId }
                 .mapNotNull { (substanceId, group) ->
                     val substance = substancesById[substanceId] ?: return@mapNotNull null
+                    // A prodrug clears as its metabolite, so borrow that half-life.
+                    val metaboliteHalfLife = Prodrugs.forSubstance(substance.name)?.let { link ->
+                        Prodrugs.metaboliteHalfLife(link) { name -> halfLifeByMetabolite[name.lowercase()] }
+                    }
                     // No window: the curve runs to its own tail, so the chart sees the whole effect.
                     val pk = pkEffectSamples(
                         doses = group,
                         substance = substance,
                         startMs = minOf(firstDose, group.minOf { it.timestamp }),
+                        metaboliteHalfLifeMinutes = metaboliteHalfLife,
                     )
                     if (pk != null && pk.samples.size >= 2) {
                         return@mapNotNull EffectCurveLayer(substanceId, pk.samples)
@@ -98,8 +105,16 @@ internal fun SessionEffectTimeline(
         doses.groupBy { it.substanceId }.entries.firstNotNullOfOrNull { (id, group) ->
             val substance = substancesById[id] ?: return@firstNotNullOfOrNull null
             val window = group.minOf { it.timestamp }..group.maxOf { it.timestamp }.coerceAtLeast(group.minOf { it.timestamp } + 1)
-            pkEffectSamples(group, substance, window.first, window.last)?.let { pk ->
-                val source = if (pk.halfLifeFromSource) "from data" else "estimated from duration"
+            val link = Prodrugs.forSubstance(substance.name)
+            val metaboliteHalfLife = link?.let {
+                Prodrugs.metaboliteHalfLife(it) { name -> substancesById.values.firstOrNull { s -> s.name.equals(name, true) }?.halfLifeMinutes }
+            }
+            pkEffectSamples(group, substance, window.first, window.last, metaboliteHalfLife)?.let { pk ->
+                val source = when {
+                    metaboliteHalfLife != null -> "active metabolite ${link?.metabolite}, from data"
+                    pk.halfLifeFromSource -> "from data"
+                    else -> "estimated from duration"
+                }
                 "${substance.name}: half-life ${formatHalfLife(pk.halfLifeMinutes)} ($source)"
             }
         }

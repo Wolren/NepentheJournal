@@ -211,6 +211,8 @@ fun DashboardScreen(
                 }
             }
 
+            item { DoseEquivalenceCard() }
+
             item { Spacer(Modifier.height(8.dp)) }
         }
 
