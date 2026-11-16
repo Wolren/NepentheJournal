@@ -44,6 +44,8 @@ class SubstanceScreenViewModel(
         val substance: Substance,
         val broads: Set<String>,
         val specificsByBroad: Map<String, List<String>>,
+        /** Name, aliases and classes lowercased once, so a query scan allocates nothing. */
+        val haystack: String,
     )
 
     private var annotatedSource: List<Substance>? = null
@@ -58,6 +60,11 @@ class SubstanceScreenViewModel(
                 substance = sub,
                 broads = broads,
                 specificsByBroad = broads.associateWith { broad -> vmSpecifics(sub, broad) },
+                haystack = buildString {
+                    append(sub.name)
+                    sub.aliases.forEach { append('\u0000').append(it) }
+                    sub.substanceClass.forEach { append('\u0000').append(it) }
+                }.lowercase(),
             )
         }
         annotatedSource = list
@@ -126,12 +133,8 @@ class SubstanceScreenViewModel(
 
         if (q.isNotBlank()) {
             val lq = q.lowercase()
-            result = result.filter { item ->
-                val sub = item.substance
-                sub.name.lowercase().contains(lq) ||
-                sub.aliases.any { it.lowercase().contains(lq) } ||
-                sub.substanceClass.any { it.lowercase().contains(lq) }
-            }
+            // One substring test on the prebuilt haystack replaces three lowercase scans per row.
+            result = result.filter { item -> lq in item.haystack }
         }
 
         result.map { it.substance }
