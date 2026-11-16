@@ -40,6 +40,8 @@ internal fun ThemeContent(
     editDensity: Density,
     editWindowOpacity: Float, editCardOpacity: Float,
     editFontScale: Float, editAnimationScale: Float, editGithubGreen: Boolean,
+    editPharmacologyChart: PharmacologyChart,
+    editSourcePriority: List<String>,
     editFontFamily: AppFontFamily, editTextColor: Long?,
     editSurfaceTint: Float?, editOutlineStrength: Float?,
     editSubstanceAccentMode: SubstanceAccentMode,
@@ -56,6 +58,8 @@ internal fun ThemeContent(
     onSurfaceTintChange: (Float?) -> Unit, onOutlineStrengthChange: (Float?) -> Unit,
     onSubstanceAccentModeChange: (SubstanceAccentMode) -> Unit,
     onGithubGreenChange: (Boolean) -> Unit,
+    onPharmacologyChartChange: (PharmacologyChart) -> Unit,
+    onSourcePriorityChange: (List<String>) -> Unit,
     onPresetSelect: (ThemePreset) -> Unit,
     onConfigImport: (ThemeConfig) -> Unit,
     applyTheme: () -> Unit,
@@ -194,6 +198,55 @@ internal fun ThemeContent(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+                Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Receptor chart", style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = editPharmacologyChart == PharmacologyChart.GROUPED,
+                            onClick = { onPharmacologyChartChange(PharmacologyChart.GROUPED); applyTheme() },
+                            label = { Text("Binding") },
+                        )
+                        FilterChip(
+                            selected = editPharmacologyChart == PharmacologyChart.BARS,
+                            onClick = { onPharmacologyChartChange(PharmacologyChart.BARS); applyTheme() },
+                            label = { Text("Potency") },
+                        )
+                        FilterChip(
+                            selected = editPharmacologyChart == PharmacologyChart.ACTION,
+                            onClick = { onPharmacologyChartChange(PharmacologyChart.ACTION); applyTheme() },
+                            label = { Text("Action") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Source priority", style = MaterialTheme.typography.bodyMedium)
+                    Text("tap to promote", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    editSourcePriority.forEachIndexed { index, source ->
+                        FilterChip(
+                            selected = index == 0,
+                            onClick = {
+                                onSourcePriorityChange(
+                                    listOf(source) + editSourcePriority.filter { it != source },
+                                )
+                                applyTheme()
+                            },
+                            label = { Text("${index + 1} $source", style = MaterialTheme.typography.labelSmall) },
+                        )
+                    }
+                }
+                Text(
+                    "The sheet under a receptor lists every source in this order.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Spacer(Modifier.height(8.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {

@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
@@ -151,12 +150,6 @@ fun SubstanceDetailScreen(
     ) {
         item {
             Spacer(Modifier.height(4.dp))
-            val dwSlug = remember(substance.id, substance.name) {
-                if (substance.id.startsWith("dw:")) substance.id.removePrefix("dw:")
-                else substance.name.lowercase()
-                    .replace(Regex("[^a-z0-9]+"), "-").trim('-')
-            }
-            val uriHandler = LocalUriHandler.current
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     SelectableText(substance.name, style = MaterialTheme.typography.headlineMedium.copy(
@@ -171,32 +164,10 @@ fun SubstanceDetailScreen(
                         )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    val dwIcon = remember { BrandIcons.get("dosewiki") }
-                    val pwIcon = remember { BrandIcons.get("psychonautwiki") }
-                    val wikiIcon = remember { BrandIcons.get("wikipedia") }
-                    if (dwIcon != null) {
-                        IconButton(onClick = { uriHandler.openUri("https://dose.wiki/$dwSlug") }) {
-                            Image(dwIcon, contentDescription = "Open DoseWiki article",
-                                modifier = Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)))
-                        }
-                    }
-                    if (pwIcon != null) {
-                        IconButton(onClick = { uriHandler.openUri("https://psychonautwiki.org/wiki/${substance.name.replace(" ", "_")}") }) {
-                            Image(pwIcon, contentDescription = "Open PsychonautWiki article",
-                                modifier = Modifier.size(24.dp))
-                        }
-                    }
-                    if (wikiIcon != null) {
-                        IconButton(onClick = { uriHandler.openUri("https://en.wikipedia.org/wiki/Special:Search?search=${substance.name.replace(" ", "+")}") }) {
-                            Image(wikiIcon, contentDescription = "Open Wikipedia article",
-                                modifier = Modifier.size(24.dp))
-                        }
-                    }
-                }
+                ArticleLinkIcons(substance)
             }
             Spacer(Modifier.height(4.dp))
-            if (substance.substanceClass.isNotEmpty()) {
+            if (substance.substanceClass.isNotEmpty() || Prodrugs.forSubstance(substance.name) != null) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -212,6 +183,21 @@ fun SubstanceDetailScreen(
                                 cls,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = clsColor,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    // A prodrug is felt as its metabolite, so the badge names the active species.
+                    Prodrugs.forSubstance(substance.name)?.let { link ->
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                "prodrug \u2192 ${link.metabolite}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
@@ -580,9 +566,9 @@ fun SubstanceDetailScreen(
             val provenance = remember(substance.id) { CatalogSource.provenanceFor(substance.id) }
             if (provenance.isNotEmpty()) {
                 SectionCard(title = "Data sources") {
-                    provenance.forEach { (field, sources) ->
+                    CatalogSource.sourcesToFields(provenance).forEach { (source, fields) ->
                         Text(
-                            "$field: ${sources.joinToString(", ")}",
+                            "$source: ${fields.joinToString(", ")}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

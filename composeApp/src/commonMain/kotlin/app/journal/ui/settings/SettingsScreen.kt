@@ -87,6 +87,8 @@ fun SettingsScreen(
     var editOutlineStrength by remember(themeConfig) { mutableStateOf(themeConfig.outlineStrength) }
     var editSubstanceAccentMode by remember(themeConfig) { mutableStateOf(themeConfig.substanceAccentMode) }
     var editGithubGreen by remember(themeConfig) { mutableStateOf(themeConfig.githubGreenActivity) }
+    var editPharmacologyChart by remember(themeConfig) { mutableStateOf(themeConfig.pharmacologyChart) }
+    var editSourcePriority by remember(themeConfig) { mutableStateOf(themeConfig.pharmacologySourcePriority) }
     // Decoded once per screen: the companion card only exists where a pet can actually load.
     val hasPets = remember { availablePets().isNotEmpty() }
 
@@ -99,7 +101,9 @@ fun SettingsScreen(
         fontFamily = editFontFamily, textColor = editTextColor,
         animationScale = editAnimationScale, surfaceTint = editSurfaceTint,
         outlineStrength = editOutlineStrength, substanceAccentMode = editSubstanceAccentMode,
-        githubGreenActivity = editGithubGreen, windowOpacity = editWindowOpacity, cardOpacity = editCardOpacity
+        githubGreenActivity = editGithubGreen, pharmacologyChart = editPharmacologyChart,
+        pharmacologySourcePriority = editSourcePriority,
+        windowOpacity = editWindowOpacity, cardOpacity = editCardOpacity
     )
 
     fun setEditConfig(config: ThemeConfig) {
@@ -126,6 +130,8 @@ fun SettingsScreen(
         editOutlineStrength = config.outlineStrength
         editSubstanceAccentMode = config.substanceAccentMode
         editGithubGreen = config.githubGreenActivity
+        editPharmacologyChart = config.pharmacologyChart
+        editSourcePriority = config.pharmacologySourcePriority
     }
 
     fun applyTheme() {
@@ -198,7 +204,8 @@ fun SettingsScreen(
             editFontFamily = editFontFamily, editTextColor = editTextColor,
             editSurfaceTint = editSurfaceTint, editOutlineStrength = editOutlineStrength,
             editSubstanceAccentMode = editSubstanceAccentMode,
-            editGithubGreen = editGithubGreen,
+            editGithubGreen = editGithubGreen, editPharmacologyChart = editPharmacologyChart,
+        editSourcePriority = editSourcePriority,
             onBaseThemeChange = { editBaseTheme = it },
             onPrimaryChange = { editPrimary = it }, onSecondaryChange = { editSecondary = it },
             onTertiaryChange = { editTertiary = it }, onBgColorChange = { editBgColor = it },
@@ -214,6 +221,8 @@ fun SettingsScreen(
             onSubstanceAccentModeChange = { editSubstanceAccentMode = it },
             onAnimationScaleChange = { editAnimationScale = it },
             onGithubGreenChange = { editGithubGreen = it },
+            onPharmacologyChartChange = { editPharmacologyChart = it },
+        onSourcePriorityChange = { editSourcePriority = it },
             onPresetSelect = { preset ->
                 setEditConfig(preset.applyTo(currentEditConfig(), isDarkNow))
                 applyTheme()

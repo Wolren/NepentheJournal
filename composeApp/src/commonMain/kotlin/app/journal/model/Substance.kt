@@ -33,7 +33,9 @@ data class Bioactivity(
     val units: String? = null,
     val relation: String? = null,
     val targetId: String? = null,
+    val targetName: String? = null,
     val assay: String? = null,
+    val action: String? = null,
 )
 
 /**
@@ -192,6 +194,7 @@ data class Substance(
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",
     val pwikiId: String? = null,
+    val dosewikiSlug: String? = null,
     val name: String,
     val aliases: List<String> = emptyList(),
     val summary: String? = null,

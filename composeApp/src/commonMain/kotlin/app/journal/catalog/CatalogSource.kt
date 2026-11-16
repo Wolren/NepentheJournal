@@ -63,6 +63,17 @@ object CatalogSource {
         }.executeAsList().groupBy({ it.first }, { it.second })
     }.getOrDefault(emptyMap())
 
+    /**
+     * Inverts provenance to one entry per source, so a source that feeds several
+     * fields is named once. Sort: most fields first, then name.
+     */
+    fun sourcesToFields(provenance: Map<String, List<String>>): List<Pair<String, List<String>>> =
+        provenance.entries
+            .flatMap { (field, sources) -> sources.map { it to field } }
+            .groupBy({ it.first }, { it.second })
+            .map { (source, fields) -> source to fields.distinct().sorted() }
+            .sortedWith(compareByDescending<Pair<String, List<String>>> { it.second.size }.thenBy { it.first })
+
     /** Every bundled source with its licence, for the in-app attribution list. */
     fun sources(): List<CatalogSourceInfo> = runCatching {
         SubstanceCatalog.database.catalogQueries.selectSources { name, licence, url ->

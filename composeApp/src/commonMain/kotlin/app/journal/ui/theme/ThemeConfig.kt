@@ -9,6 +9,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.Serializable
 
+/** Catalog sources in the order the app trusts them; the comparison sheet follows this order. */
+val DEFAULT_SOURCE_PRIORITY = listOf("IUPHAR", "ChEMBL", "BindingDB", "PDSP", "Wikipedia")
+
 @Immutable
 @Serializable
 data class ThemeConfig(
@@ -32,6 +35,9 @@ data class ThemeConfig(
     val outlineStrength: Float? = null,
     val substanceAccentMode: SubstanceAccentMode = SubstanceAccentMode.ADAPTIVE,
     val githubGreenActivity: Boolean = false,
+    val pharmacologyChart: PharmacologyChart = PharmacologyChart.GROUPED,
+    /** Which source wins when the same field comes from several; the rest are shown as alternatives. */
+    val pharmacologySourcePriority: List<String> = DEFAULT_SOURCE_PRIORITY,
     val windowOpacity: Float = 1f,
     val cardOpacity: Float = 1f,
     val backdropGradient: BackdropGradient = BackdropGradient.NONE,
@@ -65,6 +71,9 @@ data class ThemeConfig(
 
 enum class BaseTheme { DARK, LIGHT, SYSTEM, CUSTOM }
 enum class CardStyle { ELEVATED, FILLED, OUTLINED }
+
+/** Receptor chart on the substance screen: binding dot plot, potency bars or action classes. */
+enum class PharmacologyChart { GROUPED, BARS, ACTION }
 enum class CornerRadius { SMALL, MEDIUM, LARGE }
 enum class Density { COMPACT, COMFORTABLE, SPACIOUS }
 enum class AppFontFamily { SANS, SERIF, MONO }
