@@ -103,6 +103,36 @@ class TargetNormalizerTest {
     }
 
     @Test
+    fun gabaSubunitsKeepTheirOwnLabel() {
+        // The plain label cut all of these to one identical "Gamma-aminobutyric ..." row.
+        assertEquals("GABA-A \u03b16", TargetNormalizer.normalize("Gamma-aminobutyric acid receptor subunit alpha-6").label)
+        assertEquals("GABA-A \u03b12", TargetNormalizer.normalize("Gamma-aminobutyric acid receptor subunit alpha-2").label)
+        assertDifferentTargets(
+            "Gamma-aminobutyric acid receptor subunit alpha-6",
+            "Gamma-aminobutyric acid receptor subunit alpha-2",
+        )
+        assertDifferentTargets(
+            "Gamma-aminobutyric acid receptor subunit alpha-6",
+            "GABA A Alpha6Beta2Gamma2",
+        )
+    }
+
+    @Test
+    fun gabaSitesMergeAcrossSpellings() {
+        assertSameTarget("GABA-A receptor; anion channel", "GABAA receptor", "GABA A")
+        assertSameTarget("GABA<sub>B</sub> receptor", "GABA-B receptor", "GABA B")
+        assertSameTarget("Sodium- and chloride-dependent GABA transporter 1", "GABA transporter 1")
+        assertEquals("GABA-A BZD site", TargetNormalizer.normalize("GABA A Benzodiazepine").label)
+        assertEquals("GABA-A \u03b11\u03b22\u03b32", TargetNormalizer.normalize("GABA A Alpha1Beta2Gamma2").label)
+    }
+
+    @Test
+    fun gabaNamesDoNotCatchOtherDrugs() {
+        assertEquals("Gabapentin", TargetNormalizer.normalize("Gabapentin").label)
+        assertDifferentTargets("Gabapentin", "GABA-A")
+    }
+
+    @Test
     fun unknownTargetsKeepOwnGroup() {
         val a = TargetNormalizer.normalize("Carnitine O-palmitoyltransferase 2, mitochondrial")
         val b = TargetNormalizer.normalize("Vasopressin V1a receptor")

@@ -40,6 +40,7 @@ object TargetNormalizer {
         taar(flat)?.let { return it }
         opioid(flat)?.let { return it }
         glutamate(flat)?.let { return it }
+        gaba(flat)?.let { return it }
 
         val label = stripSuffixWords(cleaned)
         return NormalizedTarget("x:" + label.lowercase(), label)
@@ -203,6 +204,43 @@ object TargetNormalizer {
         t = parenTail.replace(t, "")
         t = suffixWords.replace(t, "")
         return spaces.replace(t, " ").trim().ifEmpty { cleaned.trim() }
+    }
+
+    private val greekSymbols = mapOf(
+        "alpha" to "\u03b1", "beta" to "\u03b2", "gamma" to "\u03b3",
+        "delta" to "\u03b4", "epsilon" to "\u03b5", "pi" to "\u03c0",
+        "theta" to "\u03b8", "rho" to "\u03c1",
+    )
+    private val gabaSubunit = Regex("(alpha|beta|gamma|delta|epsilon|pi|theta|rho)\\s*(\\d)")
+    private val gatNumber = Regex("transporter\\s*(\\d)")
+
+    /**
+     * GABA sites collapse to short, distinct labels. Sources name one subunit
+     * "Gamma-aminobutyric acid receptor subunit alpha-6" and another
+     * "GABA A Alpha6Beta2Gamma2"; the plain label truncates them all alike.
+     */
+    private fun gaba(flat: String): NormalizedTarget? {
+        val tokens = flat.split(" ")
+        val isGaba = "gaba" in tokens || flat.contains("gamma aminobutyric") ||
+            tokens.any { it.startsWith("gaba") && it != "gabapentin" }
+        if (!isGaba) return null
+        if (flat.contains("transporter")) {
+            val n = gatNumber.find(flat)?.groupValues?.get(1)
+            return if (n != null) NormalizedTarget("gat$n", "GAT-$n") else NormalizedTarget("gat", "GAT")
+        }
+        val units = gabaSubunit.findAll(flat).toList()
+        if (units.size > 1) {
+            val chain = units.joinToString("") { greekSymbols[it.groupValues[1]].orEmpty() + it.groupValues[2] }
+            return NormalizedTarget("gabaa:$chain", "GABA-A $chain")
+        }
+        units.firstOrNull()?.let { unit ->
+            val greek = unit.groupValues[1]
+            val n = unit.groupValues[2]
+            return NormalizedTarget("gabaa:$greek$n", "GABA-A ${greekSymbols[greek].orEmpty()}$n")
+        }
+        if (flat.contains("benzodiazepine")) return NormalizedTarget("gabaa:bzd", "GABA-A BZD site")
+        if (flat.replace(" ", "").contains("gabab")) return NormalizedTarget("gabab", "GABA-B")
+        return NormalizedTarget("gabaa", "GABA-A")
     }
 
     private fun titleLabel(flat: String): String =
