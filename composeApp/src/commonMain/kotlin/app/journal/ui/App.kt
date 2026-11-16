@@ -19,6 +19,7 @@ import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
 import app.journal.data.JournalStore
+import app.journal.log.StartupClock
 import app.journal.ui.theme.LocalSpacing
 import app.journal.ui.theme.LocalThemeConfig
 import app.journal.ui.theme.ThemeManager
@@ -28,7 +29,9 @@ import app.journal.ui.theme.spacing
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(repo: IJournalRepository = JournalRepository.instance) {
+    remember { StartupClock.mark("App compose"); Unit }
     val themeManager = remember { ThemeManager.instance.also { it.restore() } }
+    remember { StartupClock.mark("theme restored"); Unit }
     val themeConfig by themeManager.config.collectAsState()
 
     // Show a loading screen until DataInitializer.initializedFlow opens, never a blank window.
@@ -36,6 +39,10 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val phase by DataInitializer.phase.collectAsState()
 
     val journalStore = remember(repo) { JournalStore(repo) }
+
+    // Splash leaves the first frame to the window, so this mark is the composition, not the paint.
+    LaunchedEffect(Unit) { StartupClock.mark("splash composed") }
+    LaunchedEffect(ready) { if (ready) StartupClock.mark("journal gate open") }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -56,10 +63,15 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     ) {
         val isDark = themeManager.isDarkTheme()
         val colorScheme = themeManager.colorScheme(isDark)
+        // Typography builds ~15 TextStyles; rebuilding it every recomposition re-typesets the whole tree.
+        val typography = remember(themeConfig.fontFamily, themeConfig.fontScale) {
+            nepentheTypography(themeConfig.fontFamily, themeConfig.fontScale)
+        }
+        remember { StartupClock.mark("theme ready"); Unit }
 
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = nepentheTypography(themeConfig.fontFamily, themeConfig.fontScale),
+            typography = typography,
             shapes = themeConfig.shapes
         ) {
             CompositionLocalProvider(LocalSpacing provides themeConfig.density.spacing) {

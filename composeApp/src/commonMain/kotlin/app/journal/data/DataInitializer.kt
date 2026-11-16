@@ -5,6 +5,7 @@ import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.DosewikiTaxonomy
 import app.journal.ingest.SubstanceClassNormalizer
 import app.journal.log.Log
+import app.journal.log.StartupClock
 import app.journal.model.*
 import app.journal.model.rules.InteractionClassEnricher
 import app.journal.util.PlatformLock
@@ -74,6 +75,12 @@ object DataInitializer {
     /** Splash progress label: startup runs off the UI thread, so a silent splash reads as a freeze. */
     val phase: StateFlow<String> = _phase.asStateFlow()
 
+    /** Publishes a phase label and stamps it on the startup clock, so the log shows per-phase cost. */
+    private fun phase(label: String) {
+        _phase.value = label
+        StartupClock.mark(label)
+    }
+
     /** Test seam: a suspending hook at the start of the library build. */
     internal var libraryBuildHook: (suspend () -> Unit)? = null
 
@@ -88,7 +95,7 @@ object DataInitializer {
             libraryJob?.cancel()
             libraryJob = null
         }
-        _phase.value = "Loading journal"
+        phase("Loading journal")
         _libraryReadyFlow.value = false
         _initializedFlow.value = false
     }
@@ -130,7 +137,7 @@ object DataInitializer {
         val startedAt = currentTimeMillis()
 
         // Step 1: Load user data from disk first (to check for old IDs)
-        _phase.value = "Reading saved journal"
+        phase("Reading saved journal")
         store.load()
         val loadMs = currentTimeMillis() - startedAt
 
@@ -153,30 +160,30 @@ object DataInitializer {
                 Log.withTag("DataInit").i { "Seed unchanged, skipping re-ingest" }
                 // Taxonomy still runs here: a sync-imported dw: substance needs its curated tags.
                 var libraryDirty = false
-                _phase.value = "Applying taxonomy"
+                phase("Applying taxonomy")
                 val taggedCount = DosewikiTaxonomy.applyTags(repo)
                 if (taggedCount > 0) {
                     libraryDirty = true
                     Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
                 }
-                _phase.value = "Applying interaction classes"
+                phase("Applying interaction classes")
                 if (enrichInteractionClasses(repo) > 0) libraryDirty = true
                 if (isTestDataEnabled() && repo.substances.value.size >= 2) {
                     FuzzSeed.generate(repo)
                     libraryDirty = true
                 }
                 if (libraryDirty) {
-                    _phase.value = "Saving library"
+                    phase("Saving library")
                     store.save()
                 }
-                _phase.value = "Library ready"
+                phase("Library ready")
                 _libraryReadyFlow.value = true
                 logStartup(repo, startedAt, loadMs, libraryMs = null)
                 return
             }
         }
 
-        _phase.value = "Loading bundled library"
+        phase("Loading bundled library")
         libraryJob = libraryScope.launch { buildLibrary(repo, store, scope, startedAt, loadMs) }
     }
 
@@ -198,15 +205,17 @@ object DataInitializer {
             var catalogApplied = false
             val catalogFingerprint = CatalogSource.bundledFingerprint()
             val seedLoaded = if (catalogFingerprint != null) {
-                _phase.value = "Loading substance catalog"
+                phase("Loading substance catalog")
                 val userSubstances = repo.substances.value.filter { it.deviceOrigin != "system" }
                 val catalog = withContext(Dispatchers.Default) {
                     runCatching {
-                        Triple(
-                            CatalogSource.loadSubstances(),
-                            CatalogSource.loadEffects(),
-                            CatalogSource.loadInteractions(),
-                        )
+                        val substances = CatalogSource.loadSubstances()
+                        StartupClock.mark("catalog substances")
+                        val effects = CatalogSource.loadEffects()
+                        StartupClock.mark("catalog effects")
+                        val interactions = CatalogSource.loadInteractions()
+                        StartupClock.mark("catalog interactions")
+                        Triple(substances, effects, interactions)
                     }.getOrNull()
                 }
                 if (catalog != null && catalog.first.isNotEmpty()) {
@@ -233,12 +242,12 @@ object DataInitializer {
 
             // Step 3: Ingest DoseWiki data as the primary entity (overwrites matched seed rows, creates dw:{slug} rows for the rest).
             if (!catalogApplied) {
-                _phase.value = "Merging DoseWiki data"
+                phase("Merging DoseWiki data")
                 DoseWikiIngestor.ensureIngested(repo)
             }
 
             // Effect articles are static reference data: parse them once, off the main thread.
-            _phase.value = "Loading effect articles"
+            phase("Loading effect articles")
             EffectLibrary.ensureLoaded()
 
             // Step 4: Migrate old session/dose references if ID scheme changed.
@@ -248,13 +257,13 @@ object DataInitializer {
                 repo.setSeedFingerprint(catalogFingerprint ?: SEED_BUNDLED_FINGERPRINT)
             }
 
-            _phase.value = "Applying taxonomy"
+            phase("Applying taxonomy")
             val taggedCount = DosewikiTaxonomy.applyTags(repo)
             if (taggedCount > 0) {
                 Log.withTag("DataInit").i { "Tagged $taggedCount substances with curated taxonomy" }
             }
 
-            _phase.value = "Applying interaction classes"
+            phase("Applying interaction classes")
             enrichInteractionClasses(repo)
 
             // Re-arm auto-save so the build's own mutations do not queue a second full save.
@@ -266,7 +275,7 @@ object DataInitializer {
             }
 
             // One write per launch: ingest and tagging used to save separately, doubling a multi-second encode on phones.
-            _phase.value = "Saving library"
+            phase("Saving library")
             store.save()
 
             // Step 5: If test mode, generate fuzz sessions on top of seed/disk data.
@@ -278,16 +287,16 @@ object DataInitializer {
 
             // A reset() during the final save must not reopen the gate for a cancelled build.
             currentCoroutineContext().ensureActive()
-            _phase.value = "Library ready"
+            phase("Library ready")
             logStartup(repo, startedAt, loadMs, libraryMs = currentTimeMillis() - buildStartedAt)
             _libraryReadyFlow.value = true
         } catch (e: CancellationException) {
             // reset() cancelled the build: a new launch rebuilds it, so the gate stays closed.
-            _phase.value = "Library build cancelled"
+            phase("Library build cancelled")
             throw e
         } catch (e: Throwable) {
             Log.withTag("DataInit").e(e) { "Library build failed; opening the gate on the loaded data" }
-            _phase.value = "Library unavailable"
+            phase("Library unavailable")
             _libraryReadyFlow.value = true
         }
     }

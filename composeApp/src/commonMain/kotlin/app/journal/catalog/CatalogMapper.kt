@@ -1,6 +1,7 @@
 package app.journal.catalog
 
 import app.journal.ingest.SubstanceClassNormalizer
+import app.journal.log.StartupClock
 import app.journal.model.BindingdbData
 import app.journal.model.Effect
 import app.journal.model.Interaction
@@ -12,9 +13,8 @@ import app.journal.model.PdspData
 import app.journal.model.Substance
 import app.journal.model.WikipediaData
 import app.journal.serde.AppJson
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
+import app.journal.util.parallelMap
+import kotlinx.serialization.Serializable
 
 /**
  * Projects the catalog database into the model rows the app already uses.
@@ -24,10 +24,12 @@ internal object CatalogMapper {
 
     fun loadSubstances(now: Long, sourceVersion: String): List<Substance> {
         val queries = SubstanceCatalog.database.catalogQueries
+        StartupClock.mark("catalog driver ready")
         val rows = queries.selectAllSubstances {
                 id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
             RawSubstance(id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
         }.executeAsList()
+        StartupClock.mark("catalog substance rows ${rows.size}")
 
         val aliases = queries.selectAllAliases { substanceId, alias -> substanceId to alias }
             .executeAsList().groupBy({ it.first }, { it.second })
@@ -46,8 +48,10 @@ internal object CatalogMapper {
         val identifiers = queries.selectAllIdentifiers { substanceId, scheme, value ->
             Triple(substanceId, scheme, value)
         }.executeAsList().groupBy({ it.first }, { it.second to it.third })
+        StartupClock.mark("catalog queries done")
 
-        return rows.map { raw ->
+        // Row mapping is pure and per-row, so the lanes can decode payloads in parallel.
+        return parallelMap(rows) { raw ->
             val substanceDoses = doses[raw.id].orEmpty()
             val substanceDurations = durations[raw.id].orEmpty()
             val substanceIdentifiers = identifiers[raw.id].orEmpty().toMap()
@@ -74,16 +78,16 @@ internal object CatalogMapper {
                 crossTolerances = emptyList(),
                 effects = effects[raw.id].orEmpty(),
                 interactionClasses = emptyList(),
-                chemicalProperties = payload?.get("chemicalProperties")
-                    ?.let { decode<ChemicalProperties>(it) },
+                chemicalProperties = payload?.chemicalProperties,
                 drugbankId = substanceIdentifiers["drugbank"],
+                dosewikiSlug = substanceIdentifiers["dosewiki"],
                 unii = substanceIdentifiers["unii"],
                 atcCode = substanceIdentifiers["atc"],
-                chemblData = payload?.get("chemblData")?.let { decode<ChemblData>(it) },
-                iupharData = payload?.get("iupharData")?.let { decode<IupharData>(it) },
-                pdspData = payload?.get("pdspData")?.let { decode<PdspData>(it) },
-                bindingdbData = payload?.get("bindingdbData")?.let { decode<BindingdbData>(it) },
-                wikipediaData = payload?.get("wikipediaData")?.let { decode<WikipediaData>(it) },
+                chemblData = payload?.chemblData,
+                iupharData = payload?.iupharData,
+                pdspData = payload?.pdspData,
+                bindingdbData = payload?.bindingdbData,
+                wikipediaData = payload?.wikipediaData,
                 sources = listOf(sourceVersion),
                 cachedAt = now,
                 sourceVersion = sourceVersion,
@@ -144,8 +148,19 @@ internal object CatalogMapper {
         val payload: String?,
     )
 
-    private val doseOwner = HashMap<CatalogDoseRange, String>()
-    private val durationOwner = HashMap<CatalogDurationStage, String>()
+    /**
+     * The substance payload as stored: pharmacology blocks keyed by field name. One
+     * typed pass decodes 9.6 MB of payload; the tree-then-decode path cost twice that.
+     */
+    @Serializable
+    private data class CatalogPayload(
+        val chemicalProperties: ChemicalProperties? = null,
+        val chemblData: ChemblData? = null,
+        val iupharData: IupharData? = null,
+        val pdspData: PdspData? = null,
+        val bindingdbData: BindingdbData? = null,
+        val wikipediaData: WikipediaData? = null,
+    )
 
     /** The primary route is oral when present, else the earliest route in the source file. */
     private fun primaryRoute(orders: List<Pair<String, Long>>): String? {
@@ -191,12 +206,8 @@ internal object CatalogMapper {
     private fun number(value: Double): String =
         if (value == kotlin.math.floor(value)) value.toLong().toString() else value.toString()
 
-    private fun decodePayload(raw: String?): JsonObject? {
+    private fun decodePayload(raw: String?): CatalogPayload? {
         if (raw.isNullOrBlank()) return null
-        return runCatching { AppJson.json.parseToJsonElement(raw) as JsonObject }.getOrNull()
+        return runCatching { AppJson.json.decodeFromString<CatalogPayload>(raw) }.getOrNull()
     }
-
-    private inline fun <reified T> decode(element: JsonElement): T? =
-        runCatching { AppJson.json.decodeFromJsonElement<T>(element) }.getOrNull()
 }
-

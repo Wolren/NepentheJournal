@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
@@ -24,6 +25,7 @@ import androidx.compose.ui.window.rememberWindowState
 import app.journal.data.DataInitializer
 import app.journal.data.JournalRepository
 import app.journal.log.Log
+import app.journal.log.StartupClock
 import app.journal.log.initLogging
 import app.journal.ui.App
 import app.journal.ui.keybind.KeybindManager
@@ -49,7 +51,26 @@ private fun loadAppIcon(): Painter {
 }
 
 fun main() {
-    System.setProperty("skiko.renderApi", "SOFTWARE")
+    // JDK mirrors the OS process start here; Java 9+ only, so keep the local fallback for old runtimes.
+    StartupClock.start(
+        ProcessHandle.current().info().startInstant()
+            .map { it.toEpochMilli() }
+            .orElse(System.currentTimeMillis())
+    )
+    StartupClock.mark("main entered")
+    // Software stays default: this GPU tears under OpenGL. -Dnepenthe.renderApi overrides it.
+    System.setProperty("skiko.renderApi", System.getProperty("nepenthe.renderApi") ?: "SOFTWARE")
+    // AWT plus Skiko cost 235 ms cold; a main-group thread shares the AWT AppContext.
+    if (System.getProperty("nepenthe.warmup") != "false") {
+        Thread(Thread.currentThread().threadGroup, {
+            runCatching {
+                java.awt.Toolkit.getDefaultToolkit()
+                java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()
+                org.jetbrains.skiko.Library.load()
+                StartupClock.mark("awt + skiko warm")
+            }
+        }, "startup-warmup").apply { isDaemon = true }.start()
+    }
     val appDataDir = System.getProperty("user.home")?.let { "$it/.nepenthe" }
     if (appDataDir != null) {
         // Belt to initLogging's suspenders: the dir must exist before any writer, crash dump, or store file touches it.
@@ -58,6 +79,7 @@ fun main() {
         } catch (_: Exception) { /* initLogging still adds the console writer */ }
     }
     initLogging(appDataDir)
+    StartupClock.mark("logging ready")
 
     val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -93,12 +115,15 @@ fun main() {
     )
 
     val repo = JournalRepository.instance
+    StartupClock.mark("repository singleton")
     autoSaveScope.launch {
         DataInitializer.ensureInitialized(repo, autoSaveScope)
     }
 
     application {
+        remember { StartupClock.mark("compose application"); Unit }
         val icon = remember { loadAppIcon() }
+        remember { StartupClock.mark("app icon"); Unit }
         val keybinds by KeybindManager.instance.settings.collectAsState()
         val savedGeometry = remember { WindowGeometryStore.load() }
         val windowState = rememberWindowState(
@@ -118,6 +143,7 @@ fun main() {
                 }
         }
 
+        remember { StartupClock.mark("pre window"); Unit }
         Window(
             onCloseRequest = ::exitApplication,
             state = windowState,
@@ -131,9 +157,12 @@ fun main() {
                 } else false
             }
         ) {
+            remember { StartupClock.mark("window content"); Unit }
             val borderless = remember { NativeFullscreen { window.windowHandle } }
             LaunchedEffect(Unit) {
+                StartupClock.mark("window composed")
                 Log.withTag("Window").i { "native handle 0x${window.windowHandle.toString(16)}" }
+                withFrameNanos { StartupClock.mark("first frame") }
             }
             LaunchedEffect(fullscreen) {
                 // Collect the store directly: the window must fade even before the app composition settles.
