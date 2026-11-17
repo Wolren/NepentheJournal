@@ -29,7 +29,8 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun LiveSessionScreen(
     repo: IJournalRepository = LocalJournalRepository.current,
-    session: Session, onBack: () -> Unit
+    session: Session, onBack: () -> Unit,
+    freeformSaveDelayMs: Long = 600L
 ) {
     val listState = rememberLazyListState()
 
@@ -76,6 +77,32 @@ fun LiveSessionScreen(
     var editSetting by remember(live.id) { mutableStateOf(live.setting ?: "") }
     var editIntention by remember(live.id) { mutableStateOf(live.intention ?: "") }
 
+    // Free writing lives outside the lazy items, so recycling a row never drops keystrokes.
+    var freeformText by remember(live.id) { mutableStateOf(live.freeform.orEmpty()) }
+    var freeformSaved by remember(live.id) { mutableStateOf(live.freeform.orEmpty()) }
+    var freeformSaving by remember(live.id) { mutableStateOf(false) }
+
+    fun commitFreeform() {
+        if (freeformText == freeformSaved) return
+        // Re-read the session first: a dialog may have changed another field since this composition.
+        val stored = repo.getSession(live.id) ?: live
+        repo.upsertSession(stored.copy(freeform = freeformText.ifBlank { null }, updatedAt = currentTimeMillis()))
+        freeformSaved = freeformText
+    }
+
+    LaunchedEffect(freeformText) {
+        if (freeformText == freeformSaved) {
+            freeformSaving = false
+            return@LaunchedEffect
+        }
+        freeformSaving = true
+        delay(freeformSaveDelayMs)
+        commitFreeform()
+        freeformSaving = false
+    }
+
+    DisposableEffect(live.id) { onDispose { commitFreeform() } }
+
     LaunchedEffect(sessionEvents.size) {
         val lastIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
         if (sessionEvents.isNotEmpty() && lastIndex >= sessionEvents.size - 2)
@@ -91,14 +118,22 @@ fun LiveSessionScreen(
             onIntentionChange = { editIntention = it },
             onSave = {
                 repo.upsertSession(live.copy(title = editTitle, set = editSet.ifBlank { null }, setting = editSetting.ifBlank { null },
-                    intention = editIntention.ifBlank { null }, updatedAt = currentTimeMillis()))
+                    intention = editIntention.ifBlank { null }, freeform = freeformText.ifBlank { null }, updatedAt = currentTimeMillis()))
+                freeformSaved = freeformText
                 showEditDialog = false
             }, onDismiss = { showEditDialog = false })
     }
     if (showEndConfirm) {
         AlertDialog(onDismissRequest = { showEndConfirm = false }, title = { Text("End session?") },
             text = { Text("Set the session end time to now and return to the session list.") },
-            confirmButton = { AppTextButton(onClick = { repo.upsertSession(live.copy(endTime = currentTimeMillis(), updatedAt = currentTimeMillis())); showEndConfirm = false; onBack() }) { Text("End") } },
+            confirmButton = { AppTextButton(onClick = {
+                val now = currentTimeMillis()
+                val stored = repo.getSession(live.id) ?: live
+                repo.upsertSession(stored.copy(endTime = now, freeform = freeformText.ifBlank { null }, updatedAt = now))
+                freeformSaved = freeformText
+                showEndConfirm = false
+                onBack()
+            }) { Text("End") } },
             dismissButton = { AppTextButton(onClick = { showEndConfirm = false }) { Text("Cancel") } })
     }
     if (deletingLiveEvent != null) {
@@ -164,6 +199,14 @@ fun LiveSessionScreen(
                     Box(Modifier.weight(1f)) { PhaseChip("Offset", TimelineEventType.OFFSET, session, repo) }
                 }
             }
+        }
+
+        item {
+            FreeWritingCard(
+                value = freeformText,
+                onValueChange = { freeformText = it },
+                saving = freeformSaving
+            )
         }
 
         if (mergedTimeline.isNotEmpty()) {

@@ -51,6 +51,7 @@ fun SessionEditorScreen(
     val intention by viewModel.intention.collectAsState()
     val outcome by viewModel.outcome.collectAsState()
     val notes by viewModel.notes.collectAsState()
+    val freeform by viewModel.freeform.collectAsState()
     val tags by viewModel.tags.collectAsState()
     val isFavorite by viewModel.isFavorite.collectAsState()
     val rating by viewModel.rating.collectAsState()
@@ -273,6 +274,13 @@ fun SessionEditorScreen(
                 outcome = outcome, onOutcomeChange = { viewModel.outcome.value = it },
                 notes = notes, onNotesChange = { viewModel.notes.value = it },
                 tags = tags, onTagsChange = { viewModel.tags.value = it }
+            )
+        }
+
+        item {
+            SessionFreeWritingSection(
+                freeform = freeform,
+                onFreeformChange = { viewModel.freeform.value = it }
             )
         }
 

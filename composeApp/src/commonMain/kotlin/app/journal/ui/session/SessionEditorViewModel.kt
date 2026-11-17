@@ -50,6 +50,7 @@ class SessionEditorViewModel(
     val intention = MutableStateFlow(sessionToEdit?.intention ?: "")
     val outcome = MutableStateFlow(sessionToEdit?.outcome ?: "")
     val notes = MutableStateFlow(sessionToEdit?.notes ?: "")
+    val freeform = MutableStateFlow(sessionToEdit?.freeform ?: "")
     val tags = MutableStateFlow(sessionToEdit?.tags?.joinToString(", ") ?: "")
     val isFavorite = MutableStateFlow(sessionToEdit?.isFavorite ?: false)
     val rating = MutableStateFlow(sessionToEdit?.rating?.toString() ?: "")
@@ -80,7 +81,7 @@ class SessionEditorViewModel(
         sessionToEdit?.let { repo.dosesForSession(it.id).map { d -> d.id }.toSet() } ?: emptySet()
 
     private val watchedFields: List<Flow<Any?>> = listOf(
-        title, consumerName, personId, set, setting, intention, outcome, notes,
+        title, consumerName, personId, set, setting, intention, outcome, notes, freeform,
         tags, rating, shulginRating, profileAge, profileGender, profileHeightCm,
         profileWeightKg, sessionDoses,
     )
@@ -99,6 +100,7 @@ class SessionEditorViewModel(
             intention.value != (s?.intention ?: "") ||
             outcome.value != (s?.outcome ?: "") ||
             notes.value != (s?.notes ?: "") ||
+            freeform.value != (s?.freeform ?: "") ||
             tags.value != (s?.tags?.joinToString(", ") ?: "") ||
             rating.value != (s?.rating?.toString() ?: "") ||
             shulginRating.value != (s?.shulginRating ?: "") ||
@@ -166,6 +168,7 @@ class SessionEditorViewModel(
             intention = intention.value.ifBlank { null },
             outcome = outcome.value.ifBlank { null },
             notes = notes.value.ifBlank { null },
+            freeform = freeform.value.ifBlank { null },
             tags = tags.value.split(",").map { it.trim() }.filter { it.isNotEmpty() },
             rating = if (useShulgin) {
                 shulginRating.value.let { s ->

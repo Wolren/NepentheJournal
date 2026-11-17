@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import app.journal.data.JournalRepository
 import app.journal.model.Dose
@@ -112,6 +113,48 @@ class SessionEditingE2ETest {
             assertEquals(true, closed)
             assertEquals("Original", repo.getSession(session.id)?.title)
             assertEquals(1, repo.dosesForSession(session.id).size)
+        }
+    }
+
+    @Test
+    fun freeWritingSavesWithTheSession() {
+        val repo = JournalRepository()
+        val session = testSession()
+        repo.upsertSession(session)
+
+        val viewModel = SessionEditorViewModel(repo, session)
+        viewModel.freeform.value = "## Later\n\ntyped after the fact"
+        viewModel.save()
+
+        assertEquals("## Later\n\ntyped after the fact", repo.getSession(session.id)?.freeform)
+    }
+
+    @Test
+    fun typingFreeWritingInTheEditorPersists() = runBlocking {
+        runComposeUiTest {
+            val repo = JournalRepository()
+            repo.upsertSubstance(testSubstance())
+            val session = testSession()
+            repo.upsertSession(session)
+
+            setContent {
+                MaterialTheme {
+                    SessionEditorScreen(
+                        repo = repo,
+                        sessionToEdit = session,
+                        onBack = {},
+                    )
+                }
+            }
+            waitForIdle()
+
+            onNodeWithTag("screen-list").performScrollToNode(hasTestTag("session-freeform"))
+            onNodeWithTag("session-freeform").performTextInput("# free note")
+            waitForIdle()
+            onNodeWithTag("session-save").performClick()
+            waitForIdle()
+
+            assertEquals("# free note", repo.getSession(session.id)?.freeform)
         }
     }
 

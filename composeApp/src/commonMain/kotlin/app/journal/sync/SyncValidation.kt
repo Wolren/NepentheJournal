@@ -202,6 +202,7 @@ internal fun validateSession(s: Session): String? {
     if ((s.intention?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "Session intention too long"
     if ((s.outcome?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "Session outcome too long"
     if ((s.notes?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "Session notes too long"
+    if ((s.freeform?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "Session freeform too long"
     if (s.rating != null && (s.rating < SyncLimits.MIN_SESSION_RATING || s.rating > SyncLimits.MAX_SESSION_RATING)) {
         return "Invalid rating"
     }

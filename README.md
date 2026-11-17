@@ -33,6 +33,7 @@ Existing substance tracking tools require accounts, upload data to servers, or l
 - [x] **DoseWiki reference catalog:** 577 substances with dosage by route, duration stages, interaction charts, pharmacology, and subjective-effect profiles, bundled offline as CC0 open data
 - [x] **One merged offline catalog:** DoseWiki records plus a PsychonautWiki-derived seed (325 substances) are reconciled into a single catalog at startup. No reference API is ever called at runtime
 - [x] Session tracking with substances, doses, ROAs, check-ins, and timeline events
+- [x] **Free-form session writing:** a Markdown body beside the themed fields, autosaved while a session runs and copied verbatim into the Obsidian export
 - [x] Tolerance dashboard per substance based on last ingestion time and frequency
 - [x] Activity heatmap showing session frequency over time
 - [x] Dose duration curves (intensity-over-time bezier) for every substance route, built from DoseWiki duration profiles

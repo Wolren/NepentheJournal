@@ -277,7 +277,8 @@ object ExportImport {
         if ((session.set?.length ?: 0) > MAX_IMPORT_FIELD_LEN ||
             (session.setting?.length ?: 0) > MAX_IMPORT_FIELD_LEN ||
             (session.intention?.length ?: 0) > MAX_IMPORT_FIELD_LEN ||
-            (session.outcome?.length ?: 0) > MAX_IMPORT_FIELD_LEN
+            (session.outcome?.length ?: 0) > MAX_IMPORT_FIELD_LEN ||
+            (session.freeform?.length ?: 0) > MAX_IMPORT_FIELD_LEN
         ) {
             errors.add("session text field too long")
         }

@@ -254,6 +254,17 @@ fun SessionTimelineScreen(
             }
         }
 
+        val writtenBody = session.freeform
+        if (!writtenBody.isNullOrBlank()) {
+            item {
+                SessionDetailCard {
+                    Text("Free writing", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    SelectableText(writtenBody, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
         val profile = session.profile
         if (profile != null && (profile.age != null || profile.gender != null || profile.heightCm != null || profile.weightKg != null)) {
             item {

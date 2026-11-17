@@ -64,6 +64,18 @@ class SearchIndexFreshnessTest {
     }
 
     @Test
+    fun sessionFreeWritingIsSearchable() {
+        val repo = JournalRepository()
+        repo.upsertSession(
+            session("s:free", "Writing probe").copy(freeform = "obsidianquill fragment")
+        )
+        assertTrue(
+            repo.search("obsidianquill").any { it.entityId == "s:free" },
+            "free writing must enter the session search index"
+        )
+    }
+
+    @Test
     fun sessionChildBatchSaveIsSearchFreshOnFirstQuery() {
         val repo = JournalRepository()
         repo.upsertSession(session("s:batch", "Launchpad two"))

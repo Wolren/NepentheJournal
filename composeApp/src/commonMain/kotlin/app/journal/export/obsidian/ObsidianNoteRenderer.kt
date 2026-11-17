@@ -132,6 +132,15 @@ fun renderSessionToObsidianNote(
         appendLine()
         appendLine()
 
+        // Raw markdown: the writer's own headings, lists and links must survive into the vault.
+        if (!session.freeform.isNullOrBlank()) {
+            appendLine("## Free writing")
+            appendLine()
+            append(session.freeform)
+            appendLine()
+            appendLine()
+        }
+
         if (session.set != null || session.setting != null || session.intention != null) {
             appendLine("## Set & Setting")
             appendLine()

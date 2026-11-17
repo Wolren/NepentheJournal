@@ -182,6 +182,7 @@ fun buildDoseWikiReport(
     val sortedEvents = events.sortedBy { it.timestamp }
     val introParagraphs = mutableListOf<String>()
     session.intention?.trim()?.takeIf { it.isNotEmpty() }?.let { introParagraphs.add(it) }
+    session.freeform?.trim()?.takeIf { it.isNotEmpty() }?.let { introParagraphs.add(it) }
     session.notes?.trim()?.takeIf { it.isNotEmpty() }?.let { introParagraphs.add(it) }
     notes.sortedBy { it.updatedAt }
         .map { it.body.trim() }

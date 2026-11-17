@@ -47,7 +47,7 @@ data class JournalSnapshot(
     val showSessionsTrendChart: Boolean = false
 ) {
     companion object {
-        const val CURRENT_VERSION = 8
+        const val CURRENT_VERSION = 9
     }
 }
 

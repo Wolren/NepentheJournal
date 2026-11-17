@@ -56,6 +56,8 @@ data class Session(
     val intention: String? = null,
     val outcome: String? = null,
     val notes: String? = null,
+    /** Free-form markdown writing for the session; exported verbatim, so Obsidian renders its headings and lists. */
+    val freeform: String? = null,
     val rating: Int? = null,
     val shulginRating: String? = null,
     val checkins: List<CheckIn> = emptyList(),

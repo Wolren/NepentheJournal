@@ -91,6 +91,13 @@ class SyncValidatorsTest {
     }
 
     @Test
+    fun sessionFreeformTooLongRejected() {
+        val batch = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(session("s:1").copy(freeform = "A".repeat(65537))))
+        assertNotNull(validateSyncBatch(batch))
+    }
+
+    @Test
     fun sessionIdTooLongRejected() {
         val batch = SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             sessions = listOf(session("a".repeat(129))))

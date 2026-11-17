@@ -116,6 +116,57 @@ class ObsidianNoteRendererTest {
     }
 
     @Test
+    fun rendersFreeWritingVerbatim() {
+        val session = sampleSession().copy(
+            freeform = "## Fragments\n\n- colour breathing\n- [[LSD]] thread\n\n**Bold** kept."
+        )
+        val note = renderSessionToObsidianNote(
+            session = session,
+            doses = emptyList(),
+            notes = emptyList(),
+            timelineEvents = emptyList(),
+            substanceNameResolver = substanceResolver
+        )
+
+        assertTrue(note.content.contains("## Free writing"), "free writing section must exist")
+        assertTrue(note.content.contains("## Fragments"), "writer headings must survive verbatim")
+        assertTrue(note.content.contains("- colour breathing"), "list markers must survive, not be escaped")
+        assertTrue(note.content.contains("[[LSD]] thread"), "wikilinks must survive verbatim")
+        assertTrue(note.content.contains("**Bold** kept."), "emphasis must survive verbatim")
+    }
+
+    @Test
+    fun omitsFreeWritingSectionWhenBlank() {
+        val session = sampleSession().copy(freeform = "   \n  ")
+        val note = renderSessionToObsidianNote(
+            session = session,
+            doses = emptyList(),
+            notes = emptyList(),
+            timelineEvents = emptyList(),
+            substanceNameResolver = substanceResolver
+        )
+        assertFalse(note.content.contains("## Free writing"), "blank writing must not add an empty section")
+    }
+
+    @Test
+    fun freeWritingRoundTripsThroughTheCanonicalBlock() {
+        val session = sampleSession().copy(freeform = "kept as typed\nsecond line")
+        val note = renderSessionToObsidianNote(
+            session = session,
+            doses = emptyList(),
+            notes = emptyList(),
+            timelineEvents = emptyList(),
+            substanceNameResolver = substanceResolver
+        )
+
+        val json = ObsidianNoteImporter.extractCanonicalBlock(note.content)
+        assertNotNull(json, "Should extract canonical block")
+        val parsed = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<ObsidianCanonicalBlock>(json)
+        assertEquals("kept as typed\nsecond line", parsed.session.freeform)
+    }
+
+    @Test
     fun slugifyTests() {
         assertEquals("lsd-exploration", slugify("LSD Exploration!"))
         assertEquals("a-wild-trip-2026", slugify("A Wild/Trip: 2026!"))

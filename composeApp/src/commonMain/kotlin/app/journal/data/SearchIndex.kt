@@ -74,7 +74,7 @@ class SearchIndex {
                 score = 10,
                 texts = listOfNotNull(
                     session.title, session.set, session.setting,
-                    session.intention, session.outcome,
+                    session.intention, session.outcome, session.freeform,
                     session.shulginRating, dt.date.toString()
                 )
             )

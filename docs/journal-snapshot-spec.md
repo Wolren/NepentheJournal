@@ -33,10 +33,11 @@ The format is designed to be:
 | 5       | Added `showSessionsTrendChart`, `useShulginRating`, `useSubstanceColors` to snapshot settings. Schema published as standalone JSON Schema. |
 | 7       | Added persons, tombstones, `ratingScaleMode`, `welcomeCompleted` and `seedFingerprint`. Version 6 was skipped; no schema file ships for it. |
 | 8       | Added `medications`: device-local standing medications for the interaction check. |
+| 9       | Added `Session.freeform`: free-form markdown writing for the session body, exported verbatim to Obsidian. |
 
 **Migration policy:**
 - The app loads any version >= 1 with `ignoreUnknownKeys = true`.
-- On write, the app always writes `CURRENT_VERSION` (currently 8).
+- On write, the app always writes `CURRENT_VERSION` (currently 9).
 - Fields unknown to the running build are ignored on load and are not written back. Do not run an older build against a newer journal.
 - There is no automated data migration between versions - each version adds fields that are optional (`null` or `default` values are acceptable).
 
@@ -189,6 +190,7 @@ A journal session representing a single experience. Groups doses, timeline event
 | `intention` | `string` | no | `null` | Session intention. |
 | `outcome` | `string` | no | `null` | Session outcome reflection. |
 | `notes` | `string` | no | `null` | Free-text notes. |
+| `freeform` | `string` | no | `null` | Free-form markdown writing for the session body. Copied verbatim into the Obsidian export. |
 | `rating` | `int` | no | `null` | 1-10 numeric rating (when Shulgin is off). |
 | `shulginRating` | `string` | no | `null` | Shulgin scale: `+/-`, `+`, `++`, `+++`, `++++`. |
 | `checkins` | `CheckIn[]` | no | `[]` | In-session check-in snapshots. |
