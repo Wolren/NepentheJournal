@@ -34,6 +34,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
+          set -euo pipefail
+          # Without the secrets the step would write an empty keystore and bundletool would fail with "Tag number over 30".
+          missing=""
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD PLAY_SERVICE_ACCOUNT_JSON; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            exit 1
+          fi
           echo "$KEYSTORE_BASE64" | base64 -d > nepenthe-upload.keystore
           cat > keystore.properties <<EOF
           storeFile=nepenthe-upload.keystore
