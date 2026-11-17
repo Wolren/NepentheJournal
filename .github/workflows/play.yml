@@ -7,9 +7,8 @@ concurrency:
 # NOTE: pins Java 17 for the Android toolchain; CI/CodeQL use Java 21.
 
 on:
+  # Dispatch only: a tag must not start a publish run, and no release has gone to Play yet.
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: read
