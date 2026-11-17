@@ -34,6 +34,7 @@ Code under `desktopMain`, `androidMain`, `iosMain` is platform-specific.
 - `ExposedDropdownMenuBox` + `menuAnchor()` steals focus inside Dialogs on Desktop - use inline `LazyColumn` for search results instead
 - `SelectionContainer` crashes Skia software renderer - avoid wrapping `LazyColumn` or `Box` content
 - Software renderer must be forced in `Main.kt`: `skiko.renderApi=SOFTWARE` (no GPU passthrough on dev machine)
+- Win32 window calls (borderless full screen, caption colour, opacity) are Windows-only: JNA cannot load `User32` or `Dwmapi` on Linux or macOS, so keep every new call behind `HostOs.isWindows` or the app dies before its first frame
 
 ### Tests
 - Desktop tests run via `./gradlew desktopTest` - requires `ulimit -u 16384` on git-bash (default is 256, causes daemon crashes)

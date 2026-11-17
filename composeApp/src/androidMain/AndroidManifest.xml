@@ -8,6 +8,7 @@
     <application
         android:name=".NepentheApp"
         android:allowBackup="false"
+        android:enableOnBackInvokedCallback="true"
         android:label="Nepenthe Journal"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

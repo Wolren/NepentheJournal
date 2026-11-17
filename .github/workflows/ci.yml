@@ -81,6 +81,54 @@ jobs:
         run: ./gradlew :composeApp:testDebugUnitTest --no-daemon
 
   # Packaging belongs in CI: a broken MSI must fail a pull request, not the next tag.
+  # The two jobs below catch the other failure class: a bundle that builds but dies before its first frame.
+  desktop-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Build the substance catalog
+        run: python3 scripts/build_substance_db.py
+
+      - name: Install Xvfb and GTK 3
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb libgtk-3-0
+
+      - name: Launch the desktop app under Xvfb
+        run: xvfb-run -a bash scripts/test-desktop-launch.sh
+
+  desktop-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Build the substance catalog
+        run: python3 scripts/build_substance_db.py
+
+      - name: Launch the desktop app
+        run: bash scripts/test-desktop-launch.sh
+
   windows-installer:
     runs-on: windows-latest
     defaults:

@@ -164,9 +164,18 @@ jobs:
           if-no-files-found: error
 
   dmg:
-    name: macOS DMG
+    name: macOS DMG (${{ matrix.arch }})
     needs: verify-version
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Intel Macs cannot run the arm64 image, so both hosted macOS images ship a DMG.
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
     env:
       MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
       MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -201,6 +210,15 @@ jobs:
 
       - name: Build DMG
         run: ./gradlew :composeApp:packageDmg --no-daemon
+
+      - name: Tag the DMG with its architecture
+        run: |
+          set -euo pipefail
+          for f in composeApp/build/compose/binaries/main/dmg/*.dmg; do
+            mv "$f" "${f%.dmg}-${{ matrix.arch }}.dmg"
+          done
+          ls -l composeApp/build/compose/binaries/main/dmg
+
       - name: Dump jpackage logs on failure
         if: failure()
         run: |
@@ -220,7 +238,7 @@ jobs:
           echo "DMG is signed, notarized and stapled: $DMG"
       - uses: actions/upload-artifact@v7
         with:
-          name: release-dmg
+          name: release-dmg-${{ matrix.arch }}
           path: composeApp/build/compose/binaries/main/dmg/*.dmg
           if-no-files-found: error
 

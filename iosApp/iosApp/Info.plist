@@ -44,8 +44,11 @@
     <dict/>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
-        <string>armv7</string>
+        <string>arm64</string>
     </array>
+    <!-- AES-GCM at rest, HMAC sync auth and ECDH pairing are all standard crypto, so the exemption applies. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <!-- Compose aborts at startup without this key: it unlocks 120 Hz on ProMotion iPhones. -->
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>

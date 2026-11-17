@@ -45,7 +45,8 @@ jobs:
 
       - name: Build signed AAB
         run: |
-          ./gradlew :composeApp:bundleRelease --no-daemon --stacktrace
+          ./gradlew :composeApp:bundleRelease --no-daemon --stacktrace \
+            -Pnepenthe.versionCode=${{ github.run_number }}
 
       - name: Upload to Google Play (internal track)
         run: |

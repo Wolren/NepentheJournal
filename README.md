@@ -141,6 +141,19 @@ P2P sync copies your journal between your own devices on the same local network:
 
 Desktop (the primary target), Android, and iOS share one codebase, with platform-specific handling for file I/O, clipboard, back navigation, and windows. See [docs/CROSS_PLATFORM.md](docs/CROSS_PLATFORM.md) for the full guide.
 
+## Platform support
+
+| Target | Minimum | Notes |
+|--------|---------|-------|
+| Windows | 10 (1809) or later, x64 | MSI and portable zip, both install per user; the bundled JDK 17 sets the floor |
+| Windows on ARM | 11 | Runs the x64 build under emulation |
+| macOS | 11 or later on Apple Silicon | Signed and notarized DMG; an Intel DMG ships for x64 Macs |
+| Linux | x64 desktop with GTK 3 | DEB package; X11, or Wayland through XWayland |
+| Android | 8.0 (API 26) | ARM builds; Obsidian vault sync is desktop-only |
+| iOS | 16.0 | iPhone and iPad |
+
+Android and iOS keep the journal inside the app sandbox, sealed with a device-held key. Use the JSON or CSV export to move data between phones, or LAN sync to move it between your own devices.
+
 ---
 
 ## Tech stack

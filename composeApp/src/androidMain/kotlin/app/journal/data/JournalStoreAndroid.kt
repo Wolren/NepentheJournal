@@ -61,7 +61,15 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
         try {
             val raw = target.readBytes()
-            val text = if (JournalAtRest.looksEncrypted(raw)) JournalAtRest.open(raw) else raw.decodeToString()
+            val text = if (JournalAtRest.looksEncrypted(raw)) {
+                // A Keystore reset loses the key: keep the sealed bytes instead of saving empty data over them.
+                try {
+                    JournalAtRest.open(raw)
+                } catch (e: Exception) {
+                    quarantineUnreadable(e)
+                    return@withLock
+                }
+            } else raw.decodeToString()
             // Same recovery path + issue flags as JournalStoreDesktop so the App.kt recovery banner works on Android too (audit high).
             val loaded = JournalSplit.merge(text, readLibraryText())
             if (loaded.userParseError != null) {
@@ -78,6 +86,31 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             savedLibraryVersion = if (loaded.needsLibraryWrite) -1L else repo.libraryVersion.value
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
+        }
+    }
+
+    /**
+     * Renames a sealed journal the at-rest key can no longer open, so a save
+     * cannot overwrite it. The recovery notice names the kept copy.
+     */
+    private fun quarantineUnreadable(cause: Exception) {
+        val stamp = System.currentTimeMillis()
+        val kept = mutableListOf<String>()
+        val candidates = listOf(
+            File(dataPath()) to "journal-data.json",
+            File(backupPath()) to "journal-data.json.bak",
+        )
+        for ((file, name) in candidates) {
+            if (!file.exists()) continue
+            val keptFile = File(baseDir, "$name.unreadable-$stamp")
+            val moved = file.renameTo(keptFile) || file.copyTo(keptFile, overwrite = true).exists()
+            if (moved) kept.add(keptFile.name)
+        }
+        lastLoadHadIssues = true
+        lastLoadIssueSummary = buildString {
+            append("This device can no longer decrypt the journal (${cause.message ?: cause::class.simpleName}). ")
+            if (kept.isEmpty()) append("No sealed copy could be set aside.")
+            else append("Sealed copies are kept as ${kept.joinToString()}.")
         }
     }
 

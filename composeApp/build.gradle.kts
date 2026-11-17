@@ -200,7 +200,8 @@ android {
         applicationId = "app.journal.nepenthe"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Play rejects a reused code: CI passes the run number, local builds fall back to 1.
+        versionCode = providers.gradleProperty("nepenthe.versionCode").orNull?.toIntOrNull() ?: 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -227,6 +228,8 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            // zstd-jni's x86_64 .so is 4 KB aligned; Play needs 16 KB, and debug keeps every ABI.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             if (hasUploadKeystore) signingConfig = signingConfigs.getByName("release")
         }
     }
@@ -275,8 +278,7 @@ compose.desktop {
         mainClass = "app.journal.MainKt"
         // Empty assistive_technologies: a stale system-wide Java Access Bridge registration makes AWT abort startup (AWTError, no window).
         jvmArgs("-Djavax.accessibility.assistive_technologies=")
-        // AppCDS: an archive of the startup classes halves class loading, the dominant
-        // startup cost. Auto-created on JDK 19+, ignored elsewhere, so it never fails a launch.
+        // AppCDS archive halves class loading; JDK 19+ only, ignored elsewhere so a launch never fails.
         jvmArgs("-XX:+IgnoreUnrecognizedVMOptions")
         jvmArgs("-XX:+AutoCreateSharedArchive")
         jvmArgs("-XX:SharedArchiveFile=\$APPDIR/nepenthe.jsa")

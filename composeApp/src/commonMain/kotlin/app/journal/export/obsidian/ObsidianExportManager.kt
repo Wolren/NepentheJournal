@@ -3,6 +3,7 @@ package app.journal.export.obsidian
 import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.util.currentTimeMillis
+import app.journal.util.isDesktopPlatform
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -24,6 +25,8 @@ object ObsidianExportManager {
         sessionId: String,
         config: ObsidianExportConfig
     ): String? {
+        // The vault is a plain path a phone sandbox cannot reach; the settings card is desktop only.
+        if (!isDesktopPlatform()) return null
         val session = repo.getSession(sessionId) ?: return null
         return writeSessionNote(repo, session, config)
     }
@@ -35,6 +38,11 @@ object ObsidianExportManager {
         repo: IJournalRepository,
         config: ObsidianExportConfig
     ): ObsidianExportResult {
+        if (!isDesktopPlatform()) return ObsidianExportResult(
+            written = 0,
+            errors = listOf("Obsidian vault sync is desktop only"),
+            totalDurationMs = 0
+        )
         val start = currentTimeMillis()
         val sessions = repo.sessions.value
         val dir = config.resolvedDir()
@@ -66,6 +74,9 @@ object ObsidianExportManager {
         repo: IJournalRepository,
         config: ObsidianExportConfig
     ): ObsidianImportResult {
+        if (!isDesktopPlatform()) {
+            return ObsidianImportResult(errors = listOf("Obsidian vault sync is desktop only"))
+        }
         val dir = config.resolvedDir()
         if (!ObsidianVaultOps.validateVaultPath(config.vaultPath)) {
             return ObsidianImportResult(errors = listOf("Vault path is not valid: ${config.vaultPath}"))
