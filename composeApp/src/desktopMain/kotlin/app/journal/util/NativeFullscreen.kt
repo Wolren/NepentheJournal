@@ -11,14 +11,26 @@ import java.awt.Rectangle
  * frame has a peer, so the style bits are rewritten on the native handle.
  * The handle comes from the ComposeWindow, because reflecting into sun.awt is blocked.
  */
-class NativeFullscreen(private val nativeHandle: () -> Long) {
+class NativeFullscreen(nativeHandle: () -> Long) {
+
+    private val windows: WindowsFullscreen? =
+        if (HostOs.isWindows) WindowsFullscreen(nativeHandle) else null
+
+    /** Returns false when Win32 is unavailable or the handle is missing, so the caller can fall back. */
+    fun enter(): Boolean = windows?.enter() ?: false
+
+    /** Returns false when Win32 is unavailable, so the caller can fall back. */
+    fun exit(): Boolean = windows?.exit() ?: false
+}
+
+/** The Win32 path. Kept in its own class so the JNA User32 load never runs off Windows. */
+private class WindowsFullscreen(private val nativeHandle: () -> Long) {
 
     private val user32 = User32.INSTANCE
     private var savedStyle: Int? = null
     private var savedExStyle: Int? = null
     private var savedBounds: Rectangle? = null
 
-    /** Returns false when the platform handle is missing, so the caller can fall back. */
     fun enter(): Boolean {
         if (savedStyle != null) return true
         val hwnd = handle() ?: return false
@@ -46,7 +58,6 @@ class NativeFullscreen(private val nativeHandle: () -> Long) {
         )
     }
 
-    /** Restores the frame style and the bounds captured by [enter]. */
     fun exit(): Boolean {
         val style = savedStyle ?: return false
         val exStyle = savedExStyle ?: style

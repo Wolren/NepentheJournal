@@ -22,10 +22,17 @@
     <string>1</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <!-- Must match the type the app browses and advertises (_nepenthe._tcp in LanDiscoveryIos). -->
     <key>NSBonjourServices</key>
     <array>
-        <string>_nepenthe-sync._tcp</string>
+        <string>_nepenthe._tcp</string>
     </array>
+    <!-- iOS 17 and macOS 14 block cleartext to IP addresses and .local hosts under ATS; LAN sync is plain http. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Nepenthe Journal uses the local network to discover and sync with other devices running the app.</string>
     <key>UIApplicationSceneManifest</key>

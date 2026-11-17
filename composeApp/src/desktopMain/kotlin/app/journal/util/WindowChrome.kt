@@ -24,7 +24,7 @@ object WindowChrome {
 
     /** [argb] is the app background; Windows stores colors as blue, green, red. */
     fun applyDark(handle: Long, argb: Long) {
-        if (handle == 0L) return
+        if (handle == 0L || !HostOs.isWindows) return
         val hwnd = Pointer.createConstant(handle)
         try {
             setInt(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, 1)

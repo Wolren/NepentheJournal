@@ -16,6 +16,8 @@ object WindowOpacity {
 
     /** Returns false when the handle is missing or the call fails. */
     fun apply(handle: Long, opacity: Float): Boolean {
+        // Layered windows are Win32-only; success keeps theme changes quiet elsewhere.
+        if (!HostOs.isWindows) return true
         if (handle == 0L) {
             Log.withTag("Window").w { "window opacity skipped: no handle" }
             return false
