@@ -212,7 +212,8 @@ class SyncTransport(
             }
         }
 
-    override suspend fun stopHosting() {
+    // JmDNS close and the Netty stop block the caller: keep them off the UI dispatcher.
+    override suspend fun stopHosting() = withContext(Dispatchers.IO) {
         server?.stop()
         server = null
         appendDebug("Sync server stopped")
