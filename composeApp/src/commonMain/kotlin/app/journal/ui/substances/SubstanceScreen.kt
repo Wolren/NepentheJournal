@@ -39,8 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.journal.ui.components.*
 
-/** The Substances tab holds the substance library and the bundled effect library. */
-internal enum class LibraryMode { SUBSTANCES, EFFECTS }
+/** The Substances tab holds the library, the effect library and the dose equivalence converter. */
+internal enum class LibraryMode { SUBSTANCES, EFFECTS, EQUIVALENCE }
 
 @Composable
 fun SubstanceScreen(
@@ -67,6 +67,7 @@ fun SubstanceScreen(
     }
     val scrollState = rememberLazyListState()
     val effectsScrollState = rememberLazyListState()
+    val equivalenceScrollState = rememberLazyListState()
     var mode by rememberSaveable { mutableStateOf(LibraryMode.SUBSTANCES) }
     var effectQuery by rememberSaveable { mutableStateOf("") }
     var effectFilterExpanded by rememberSaveable { mutableStateOf(false) }
@@ -100,102 +101,85 @@ fun SubstanceScreen(
                     },
                     modifier = Modifier.weight(1f),
                 )
+                FilterChip(
+                    selected = mode == LibraryMode.EQUIVALENCE,
+                    onClick = { mode = LibraryMode.EQUIVALENCE },
+                    label = {
+                        Text("Equivalence", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                    },
+                    modifier = Modifier.weight(1f),
+                )
             }
             Spacer(Modifier.height(4.dp))
-            BoxWithConstraints {
-                val wideFilterMenu = maxWidth > 700.dp
-                OutlinedTextField(
-                    value = activeQuery,
-                    onValueChange = {
-                        if (mode == LibraryMode.SUBSTANCES) viewModel.query.value = it else effectQuery = it
-                    },
-                    placeholder = {
-                        Text(if (mode == LibraryMode.SUBSTANCES) "Search substances..." else "Search effects...")
-                    },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (activeQuery.isNotEmpty()) {
-                                IconButton(onClick = {
-                                    viewModel.query.value = ""
-                                    effectQuery = ""
-                                }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+            if (mode != LibraryMode.EQUIVALENCE) {
+                BoxWithConstraints {
+                    val wideFilterMenu = maxWidth > 700.dp
+                    OutlinedTextField(
+                        value = activeQuery,
+                        onValueChange = {
+                            if (mode == LibraryMode.SUBSTANCES) viewModel.query.value = it else effectQuery = it
+                        },
+                        placeholder = {
+                            Text(if (mode == LibraryMode.SUBSTANCES) "Search substances..." else "Search effects...")
+                        },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (activeQuery.isNotEmpty()) {
+                                    IconButton(onClick = {
+                                        viewModel.query.value = ""
+                                        effectQuery = ""
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Clear")
+                                    }
+                                }
+                                if (mode == LibraryMode.SUBSTANCES) {
+                                    IconButton(onClick = { categoryDropdownExpanded = true }) {
+                                        Icon(
+                                            Icons.Default.Label,
+                                            contentDescription = "Filter by category",
+                                            tint = if (activeBroad != null) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else {
+                                    IconButton(onClick = { effectFilterExpanded = true }) {
+                                        Icon(
+                                            Icons.Default.Label,
+                                            contentDescription = "Filter by category",
+                                            tint = if (effectBroad != null) MaterialTheme.colorScheme.primary
+                                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
-                            if (mode == LibraryMode.SUBSTANCES) {
-                                IconButton(onClick = { categoryDropdownExpanded = true }) {
-                                    Icon(
-                                        Icons.Default.Label,
-                                        contentDescription = "Filter by category",
-                                        tint = if (activeBroad != null) MaterialTheme.colorScheme.primary
-                                               else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            } else {
-                                IconButton(onClick = { effectFilterExpanded = true }) {
-                                    Icon(
-                                        Icons.Default.Label,
-                                        contentDescription = "Filter by category",
-                                        tint = if (effectBroad != null) MaterialTheme.colorScheme.primary
-                                               else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                DropdownMenu(
-                    expanded = effectFilterExpanded,
-                    onDismissRequest = { effectFilterExpanded = false },
-                    offset = DpOffset(0.dp, 0.dp),
-                ) {
-                    Column(modifier = Modifier.width(300.dp)) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "All categories",
-                                    fontWeight = if (effectBroad == null) FontWeight.Bold else FontWeight.Normal,
-                                )
-                            },
-                            onClick = {
-                                effectBroad = null
-                                effectSpecific = null
-                                effectFilterExpanded = false
-                            },
-                            leadingIcon = { Checkbox(checked = effectBroad == null, onCheckedChange = null) },
-                        )
-                        effectOptions.filter { it.parent == null }.forEach { option ->
-                            val selected = effectBroad == option.key && effectSpecific == null
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    DropdownMenu(
+                        expanded = effectFilterExpanded,
+                        onDismissRequest = { effectFilterExpanded = false },
+                        offset = DpOffset(0.dp, 0.dp),
+                    ) {
+                        Column(modifier = Modifier.width(300.dp)) {
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        "${option.label} (${option.count})",
-                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        "All categories",
+                                        fontWeight = if (effectBroad == null) FontWeight.Bold else FontWeight.Normal,
                                     )
                                 },
                                 onClick = {
-                                    effectBroad = option.key
+                                    effectBroad = null
                                     effectSpecific = null
-                                    if (option.key != "sensory") effectFilterExpanded = false
+                                    effectFilterExpanded = false
                                 },
-                                leadingIcon = { Checkbox(checked = selected, onCheckedChange = null) },
+                                leadingIcon = { Checkbox(checked = effectBroad == null, onCheckedChange = null) },
                             )
-                        }
-                        val specifics = effectOptions.filter { it.parent == "sensory" }
-                        if (specifics.isNotEmpty()) {
-                            HorizontalDivider()
-                            Text(
-                                text = "Sensory specifics",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
-                            )
-                            specifics.forEach { option ->
-                                val selected = effectSpecific == option.key
+                            effectOptions.filter { it.parent == null }.forEach { option ->
+                                val selected = effectBroad == option.key && effectSpecific == null
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -204,130 +188,157 @@ fun SubstanceScreen(
                                         )
                                     },
                                     onClick = {
-                                        effectBroad = "sensory"
-                                        effectSpecific = option.key
-                                        effectFilterExpanded = false
+                                        effectBroad = option.key
+                                        effectSpecific = null
+                                        if (option.key != "sensory") effectFilterExpanded = false
                                     },
                                     leadingIcon = { Checkbox(checked = selected, onCheckedChange = null) },
                                 )
                             }
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Done", fontWeight = FontWeight.Bold) },
-                            onClick = { effectFilterExpanded = false },
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = categoryDropdownExpanded,
-                    onDismissRequest = { categoryDropdownExpanded = false },
-                    offset = DpOffset(0.dp, 0.dp),
-                ) {
-                    val wideMenu = wideFilterMenu
-                    @Composable
-                    fun BroadPane() {
-                        Column(modifier = Modifier.width(300.dp)) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text("All categories",
-                                        fontWeight = if (activeBroad == null) FontWeight.Bold else FontWeight.Normal)
-                                },
-                                onClick = { viewModel.selectBroad(null); categoryDropdownExpanded = false },
-                                leadingIcon = {
-                                    Checkbox(
-                                        checked = activeBroad == null,
-                                        onCheckedChange = null,
-                                    )
-                                }
-                            )
-                            if (broadOptions.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("No categories", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                    onClick = { categoryDropdownExpanded = false },
-                                    enabled = false
+                            val specifics = effectOptions.filter { it.parent == "sensory" }
+                            if (specifics.isNotEmpty()) {
+                                HorizontalDivider()
+                                Text(
+                                    text = "Sensory specifics",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp),
                                 )
-                            } else {
-                                broadOptions.forEach { broad ->
-                                    val isSelected = broad.id == activeBroad
+                                specifics.forEach { option ->
+                                    val selected = effectSpecific == option.key
                                     DropdownMenuItem(
                                         text = {
-                                            Text("${broad.label} (${broad.count})",
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                            Text(
+                                                "${option.label} (${option.count})",
+                                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                            )
                                         },
                                         onClick = {
-                                            viewModel.selectBroad(if (isSelected) null else broad.id)
+                                            effectBroad = "sensory"
+                                            effectSpecific = option.key
+                                            effectFilterExpanded = false
                                         },
+                                        leadingIcon = { Checkbox(checked = selected, onCheckedChange = null) },
+                                    )
+                                }
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Done", fontWeight = FontWeight.Bold) },
+                                onClick = { effectFilterExpanded = false },
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false },
+                        offset = DpOffset(0.dp, 0.dp),
+                    ) {
+                        val wideMenu = wideFilterMenu
+                        @Composable
+                        fun BroadPane() {
+                            Column(modifier = Modifier.width(300.dp)) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("All categories",
+                                            fontWeight = if (activeBroad == null) FontWeight.Bold else FontWeight.Normal)
+                                    },
+                                    onClick = { viewModel.selectBroad(null); categoryDropdownExpanded = false },
+                                    leadingIcon = {
+                                        Checkbox(
+                                            checked = activeBroad == null,
+                                            onCheckedChange = null,
+                                        )
+                                    }
+                                )
+                                if (broadOptions.isEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text("No categories", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                        onClick = { categoryDropdownExpanded = false },
+                                        enabled = false
+                                    )
+                                } else {
+                                    broadOptions.forEach { broad ->
+                                        val isSelected = broad.id == activeBroad
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text("${broad.label} (${broad.count})",
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                            },
+                                            onClick = {
+                                                viewModel.selectBroad(if (isSelected) null else broad.id)
+                                            },
+                                            leadingIcon = {
+                                                Checkbox(
+                                                    checked = isSelected,
+                                                    onCheckedChange = null,
+                                                )
+                                            },
+                                            trailingIcon = {
+                                                IconButton(
+                                                    onClick = {
+                                                        if (!isSelected) {
+                                                            viewModel.selectBroad(broad.id)
+                                                            showSpecifics = true
+                                                        } else {
+                                                            showSpecifics = !showSpecifics
+                                                        }
+                                                    }
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.KeyboardArrowRight,
+                                                        contentDescription = "Show specifics",
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    }
+                                    HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text = { Text("Done", fontWeight = FontWeight.Bold) },
+                                        onClick = { categoryDropdownExpanded = false },
+                                    )
+                                }
+                            }
+                        }
+                        @Composable
+                        fun SpecificPane() {
+                            Column(modifier = Modifier.width(300.dp)) {
+                                specificOptions.forEach { specific ->
+                                    val specificSelected = specific.label in activeSpecifics
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("${specific.label} (${specific.count})",
+                                                fontWeight = if (specificSelected) FontWeight.Bold else FontWeight.Normal,
+                                                style = MaterialTheme.typography.bodyMedium)
+                                        },
+                                        onClick = { viewModel.toggleSpecific(specific.label) },
                                         leadingIcon = {
                                             Checkbox(
-                                                checked = isSelected,
+                                                checked = specificSelected,
                                                 onCheckedChange = null,
                                             )
                                         },
-                                        trailingIcon = {
-                                            IconButton(
-                                                onClick = {
-                                                    if (!isSelected) {
-                                                        viewModel.selectBroad(broad.id)
-                                                        showSpecifics = true
-                                                    } else {
-                                                        showSpecifics = !showSpecifics
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.KeyboardArrowRight,
-                                                    contentDescription = "Show specifics",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            }
-                                        },
                                     )
                                 }
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("Done", fontWeight = FontWeight.Bold) },
-                                    onClick = { categoryDropdownExpanded = false },
-                                )
                             }
                         }
-                    }
-                    @Composable
-                    fun SpecificPane() {
-                        Column(modifier = Modifier.width(300.dp)) {
-                            specificOptions.forEach { specific ->
-                                val specificSelected = specific.label in activeSpecifics
-                                DropdownMenuItem(
-                                    text = {
-                                        Text("${specific.label} (${specific.count})",
-                                            fontWeight = if (specificSelected) FontWeight.Bold else FontWeight.Normal,
-                                            style = MaterialTheme.typography.bodyMedium)
-                                    },
-                                    onClick = { viewModel.toggleSpecific(specific.label) },
-                                    leadingIcon = {
-                                        Checkbox(
-                                            checked = specificSelected,
-                                            onCheckedChange = null,
-                                        )
-                                    },
-                                )
+                        if (wideMenu) {
+                            Row {
+                                BroadPane()
+                                if (activeBroad != null && showSpecifics) {
+                                    VerticalDivider()
+                                    SpecificPane()
+                                }
                             }
-                        }
-                    }
-                    if (wideMenu) {
-                        Row {
-                            BroadPane()
-                            if (activeBroad != null && showSpecifics) {
-                                VerticalDivider()
-                                SpecificPane()
-                            }
-                        }
-                    } else {
-                        Column {
-                            BroadPane()
-                            if (activeBroad != null && showSpecifics) {
-                                HorizontalDivider()
-                                SpecificPane()
+                        } else {
+                            Column {
+                                BroadPane()
+                                if (activeBroad != null && showSpecifics) {
+                                    HorizontalDivider()
+                                    SpecificPane()
+                                }
                             }
                         }
                     }
@@ -344,6 +355,12 @@ fun SubstanceScreen(
                     specific = effectSpecific,
                     onEffectClick = onEffectClick,
                 )
+            } else if (mode == LibraryMode.EQUIVALENCE) {
+                LazyColumn(
+                    state = equivalenceScrollState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { DoseEquivalenceCard() }
+                }
             } else if (results.isEmpty()) {
                 val showEmptyState = rememberEmptyStateVisible(isEmpty = results.isEmpty())
                 Box(

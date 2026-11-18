@@ -1,4 +1,4 @@
-package app.journal.ui.dashboard
+package app.journal.ui.substances
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

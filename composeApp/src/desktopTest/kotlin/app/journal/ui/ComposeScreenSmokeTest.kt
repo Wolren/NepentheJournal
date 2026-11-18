@@ -189,6 +189,33 @@ class ComposeScreenSmokeTest {
     }
 
     @Test
+    fun substanceScreenExposesEquivalenceAsTheThirdLibraryTab() = runBlocking {
+        runComposeUiTest {
+            val repo = JournalRepository()
+            setContent {
+                SubstanceScreen(
+                    repo = repo,
+                    viewModel = SubstanceScreenViewModel(repo),
+                )
+            }
+            waitForIdle()
+
+            onNodeWithText("Equivalence").performClick()
+            waitForIdle()
+
+            assertTrue(
+                onAllNodesWithText("Dose equivalence").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "the third library tab must open the dose equivalence converter"
+            )
+            assertEquals(
+                0,
+                onAllNodesWithText("Search substances...").fetchSemanticsNodes(atLeastOneRootRequired = false).size,
+                "the converter tab must not show the substance search field"
+            )
+        }
+    }
+
+    @Test
     fun effectsLibraryHonoursTheBroadFilter() = runBlocking {
         runComposeUiTest {
             setContent {
