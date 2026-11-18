@@ -26,7 +26,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.journal.ui.theme.*
 import app.journal.ui.components.*
+import app.journal.log.Log
 import app.journal.util.FilePicker
+import app.journal.util.ThemeImageStore
 import app.journal.util.isDesktopPlatform
 import kotlinx.coroutines.launch
 
@@ -301,8 +303,18 @@ internal fun ThemeContent(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AppTonalButton(onClick = {
                             pickerScope.launch {
-                                FilePicker.openFile("Images", ImageExtensions, title = "Choose a background image")
-                                    ?.let { picked -> onBgImageChange(picked); applyTheme() }
+                                val picked = FilePicker.openFile(
+                                    "Images", ImageExtensions, title = "Choose a background image"
+                                ) ?: return@launch
+                                val stored = ThemeImageStore.adopt(picked)
+                                if (stored == null) {
+                                    Log.withTag("Theme").w {
+                                        "Backdrop copy failed; the pick lasts this session only"
+                                    }
+                                }
+                                ThemeImageStore.discard(editBgImage)
+                                onBgImageChange(stored ?: picked)
+                                applyTheme()
                             }
                         }) { Text("Choose image") }
                         Text(
@@ -314,7 +326,13 @@ internal fun ThemeContent(
                             modifier = Modifier.weight(1f)
                         )
                         if (editBgImage != null) {
-                            AppIconButton(onClick = { onBgImageChange(null); applyTheme() }, icon = Icons.Default.Close, contentDescription = "Clear")
+                            AppIconButton(onClick = {
+                                pickerScope.launch {
+                                    ThemeImageStore.discard(editBgImage)
+                                    onBgImageChange(null)
+                                    applyTheme()
+                                }
+                            }, icon = Icons.Default.Close, contentDescription = "Clear")
                         }
                     }
                     AppTextButton(onClick = { showUrlField = !showUrlField }) {

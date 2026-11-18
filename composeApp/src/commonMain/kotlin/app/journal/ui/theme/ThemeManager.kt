@@ -29,7 +29,16 @@ class ThemeManager private constructor() {
 
     /** Loads the saved theme once at startup; tests keep the in-memory default. */
     fun restore() {
-        ThemeStore.load()?.let { _config.value = it; cachedConfigHash = 0 }
+        val saved = ThemeStore.load() ?: return
+        // A content:// backdrop lost its read grant when the old process died; it can never load.
+        val live = if (saved.backgroundImagePath?.startsWith("content://") == true) {
+            saved.copy(backgroundImagePath = null)
+        } else {
+            saved
+        }
+        _config.value = live
+        cachedConfigHash = 0
+        if (live !== saved) ThemeStore.save(live)
     }
 
     fun presetDark() { update(ThemeDefaults.Dark) }

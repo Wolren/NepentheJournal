@@ -69,4 +69,37 @@ actual object PlatformFile {
     actual fun dataDir(): String {
         return NepentheApp.appContext.filesDir.absolutePath
     }
+
+    actual fun copyToLocal(source: String, target: String): Boolean {
+        val out = File(target)
+        return try {
+            out.parentFile?.mkdirs()
+            if (source.startsWith("content://")) {
+                val input = NepentheApp.appContext.contentResolver.openInputStream(Uri.parse(source))
+                    ?: return false
+                input.use { ins -> out.outputStream().use { outs -> ins.copyTo(outs) } }
+            } else {
+                File(source).copyTo(out, overwrite = true)
+            }
+            out.length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    actual fun delete(target: String): Boolean {
+        if (target.startsWith("content://")) {
+            return try {
+                NepentheApp.appContext.contentResolver.delete(Uri.parse(target), null, null) >= 0
+            } catch (_: Exception) {
+                false
+            }
+        }
+        return try {
+            val file = File(target)
+            !file.exists() || file.delete()
+        } catch (_: Exception) {
+            false
+        }
+    }
 }

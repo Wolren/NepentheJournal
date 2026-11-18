@@ -66,4 +66,23 @@ actual object PlatformFile {
         ).firstOrNull() as? String ?: NSTemporaryDirectory()
         return "$docs/.nepenthe"
     }
+
+    actual fun copyToLocal(source: String, target: String): Boolean {
+        return try {
+            val parent = (target as NSString).stringByDeletingLastPathComponent
+            fileManager.createDirectoryAtPath(parent, withIntermediateDirectories = true,
+                attributes = null, error = null)
+            fileManager.copyItemAtPath(source.removePrefix("file://"), toPath = target, error = null)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    actual fun delete(target: String): Boolean {
+        return try {
+            !fileManager.fileExistsAtPath(target) || fileManager.removeItemAtPath(target, null)
+        } catch (_: Exception) {
+            false
+        }
+    }
 }

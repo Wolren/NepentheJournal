@@ -18,4 +18,11 @@ expect object PlatformFile {
      */
     fun size(path: String): Long
     fun dataDir(): String
+    /**
+     * Copies [source] to [target], creating the parent directory, and returns
+     * whether the copy landed. [source] may be a path or a content:// URI.
+     */
+    fun copyToLocal(source: String, target: String): Boolean
+    /** Deletes [target]; true when the file is gone afterwards. */
+    fun delete(target: String): Boolean
 }

@@ -28,4 +28,24 @@ actual object PlatformFile {
         return System.getProperty("user.home")?.let { "$it/.nepenthe" }
             ?: throw IllegalStateException("Cannot determine home directory")
     }
+
+    actual fun copyToLocal(source: String, target: String): Boolean {
+        return try {
+            val out = File(target)
+            out.parentFile?.mkdirs()
+            File(source).copyTo(out, overwrite = true)
+            out.length() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    actual fun delete(target: String): Boolean {
+        return try {
+            val file = File(target)
+            !file.exists() || file.delete()
+        } catch (_: Exception) {
+            false
+        }
+    }
 }
