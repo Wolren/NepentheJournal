@@ -4,6 +4,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import app.journal.serde.AppJson
 import kotlinx.serialization.json.JsonObject
@@ -70,6 +71,9 @@ object OpenFdaClient {
                 contraindications = extractList("contraindications"),
                 warnings = extractList("warnings_and_cautions")
             ))
+        } catch (e: CancellationException) {
+            // Cards leave the composition mid-fetch; a cancelled fetch is not a failure.
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
