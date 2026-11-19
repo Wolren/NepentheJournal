@@ -44,6 +44,10 @@ The Release workflow fails its version guard when these drift:
   so the Apple bundlers see 1.0.0 while everything else stays 0.1.0. Bump
   this value together with the other surfaces on a version change (any
   nonzero-first version).
+- **Windows signing on alpha tags**: a stable tag refuses to publish an
+  unsigned MSI. An `-alpha` tag builds and publishes unsigned when no
+  certificate secret is configured, and the release title carries
+  `(unsigned)` so the artifact state is not a surprise.
 - **Windows upgrade identity**: `upgradeUuid` in `composeApp/build.gradle.kts`
   is pinned (`D07ABD38-858F-464A-ABF6-9405C622BB14`). Never regenerate it:
   changing it breaks in-place upgrades of installed copies.

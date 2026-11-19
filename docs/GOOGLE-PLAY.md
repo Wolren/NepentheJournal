@@ -10,8 +10,9 @@ store until you decide the framing passes review.
 ## Pipeline overview
 
 ```
-tag v* / manual trigger
+manual dispatch
   -> .github/workflows/play.yml
+  (a tag never starts a Play publish while the secrets are absent)
   -> restore secrets (keystore + service account)
   -> ./gradlew :composeApp:bundleRelease   (signed AAB)
   -> ./gradlew :composeApp:publishBundle   (GPP -> internal track)
@@ -101,3 +102,5 @@ rejection is a data point, not a blocker: the pipeline costs nothing to keep.
 - 2026-07-31: Play pipeline added (GPP 4.0.0, conditional signing, internal
   track default). F-Droid remains primary; Play is opportunistic pending
   review outcome.
+- 2026-11-19: tag trigger dropped until the five repository secrets exist, so
+  a release tag cannot fail on a Play run. Publishing is manual dispatch only.

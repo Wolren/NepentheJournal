@@ -71,7 +71,7 @@ jobs:
           WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
           WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
           WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
-        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi" -Required:($env:GITHUB_REF_TYPE -eq 'tag')
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$')
 
       # Publishes only what installs: the signed MSI is installed, launched and removed again.
       - name: Install, launch and uninstall the MSI
@@ -112,7 +112,7 @@ jobs:
           WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
           WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
           WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
-        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/app/Nepenthe Journal/Nepenthe Journal.exe" -Required:($env:GITHUB_REF_TYPE -eq 'tag')
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/app/Nepenthe Journal/Nepenthe Journal.exe" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$')
 
       - name: Zip the image
         shell: pwsh
@@ -265,12 +265,17 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
         run: |
           set -euo pipefail
           # An -alpha tag publishes as a GitHub prerelease: no releases/latest pointer.
           if [[ "$GITHUB_REF_NAME" == *-alpha ]]; then PRERELEASE=--prerelease; else PRERELEASE=; fi
+          # Without a signing certificate the installers are unsigned; say so
+          # on the release itself instead of leaving it to the user to find out.
+          TITLE="Nepenthe Journal $GITHUB_REF_NAME"
+          if [ -z "${WINDOWS_SIGN_PFX_BASE64:-}" ]; then TITLE="$TITLE (unsigned)"; fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Nepenthe Journal $GITHUB_REF_NAME" \
+            --title "$TITLE" \
             --generate-notes $PRERELEASE \
             dist/*.msi dist/*.zip dist/*.deb dist/*.dmg dist/SHA256SUMS.txt
