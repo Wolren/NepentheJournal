@@ -40,7 +40,7 @@ sha256sum composeApp/build/outputs/apk/release/*.apk
 | No machine-specific paths in build files | yes |
 | JDK: F-Droid uses JDK 17 | yes (compileOptions VERSION_17) |
 | AGP/SDK resolved from `ANDROID_HOME` | yes (no sdk.dir needed) |
-| Version code / name in `defaultConfig` | yes (`versionCode 1`, `versionName 0.1.0`) |
+| Version code / name in `defaultConfig` | yes (`versionCode 1`, `versionName 0.1.0-alpha`) |
 | Release build reproducible | verified by CI workflow |
 | License metadata | GPL-3.0, LICENSE file at repo root |
 | Anti-features | none (no ads, no tracking, no non-free deps) |
@@ -49,7 +49,7 @@ sha256sum composeApp/build/outputs/apk/release/*.apk
 
 When ready to publish:
 
-1. Create a GitHub release tagged `v<versionName>` (e.g. `v0.1.0`). F-Droid
+1. Create a GitHub release tagged `v<versionName>` (e.g. `v0.1.0-alpha`). F-Droid
    tracks release tags via the `CurrentVersion` field.
 2. Fork `fdroid/fdroiddata` and add a metadata file:
    `metadata/app.journal.nepenthe.yml`:
@@ -67,7 +67,7 @@ Changelog: https://github.com/Wolren/NepentheJournal/releases
 AutoName: Nepenthe Journal
 Description: |-
   Offline-first harm reduction journal for substance sessions. Tracks
-  doses, routes, effects, and tolerance; includes a 325+ substance
+  doses, routes, effects, and tolerance; includes a 1,600+ substance
   library with dosage and pharmacology data, an interaction checker,
   safer use guides, and optional encrypted LAN-only P2P sync. No
   accounts, no cloud, no ads, no telemetry.
@@ -76,15 +76,15 @@ Repo: https://github.com/Wolren/NepentheJournal.git
 Binaries: https://github.com/Wolren/NepentheJournal/releases/download/v%v/app-journal-nepenthe-%v.apk
 
 Builds:
-  - versionName: 0.1.0
+  - versionName: 0.1.0-alpha
     versionCode: 1
-    commit: v0.1.0
+    commit: v0.1.0-alpha
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.1.0
+CurrentVersion: 0.1.0-alpha
 CurrentVersionCode: 1
 ```
 

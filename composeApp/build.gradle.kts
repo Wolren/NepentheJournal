@@ -202,7 +202,10 @@ android {
         targetSdk = 36
         // Play rejects a reused code: CI passes the run number, local builds fall back to 1.
         versionCode = providers.gradleProperty("nepenthe.versionCode").orNull?.toIntOrNull() ?: 1
-        versionName = "0.1.0"
+        // The alpha suffix is the user-visible release stage: Android accepts it,
+        // while packageVersion below stays numeric because jpackage (MSI/DEB/DMG)
+        // parses it as a number.
+        versionName = "0.1.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // Duplicate META-INF files from netty-codec-native-quic platform jars (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the 2026-09 ktor/netty bumps; dedupe license copies.

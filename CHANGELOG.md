@@ -8,11 +8,11 @@ Nepenthe Journal is free software under GPL-3.0-or-later.
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-19
+## [0.1.0-alpha] - 2026-11-19
 
-First release: desktop on Windows, macOS and Linux, and Android, from one Kotlin
-Multiplatform codebase. The iOS app builds and passes its simulator test suite,
-but ships through no store channel in this release.
+First public alpha: desktop on Windows, macOS and Linux, and Android, from one
+Kotlin Multiplatform codebase. The iOS app builds and passes its simulator test
+suite, but ships through no store channel in this release.
 
 ### Added
 
@@ -127,5 +127,5 @@ but ships through no store channel in this release.
 - Store pipelines: fastlane metadata for Android, an F-Droid source-reproducibility
   gate, and a dispatch-only Google Play internal track upload.
 
-[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.1.0-alpha...HEAD
+[0.1.0-alpha]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.1.0-alpha

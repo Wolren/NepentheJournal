@@ -34,13 +34,14 @@ jobs:
           test -n "$V" || { echo "::error::packageVersion not found in build.gradle.kts"; exit 1; }
           echo "packageVersion=$V"
           grep -qF "versionName = \"$V\"" composeApp/build.gradle.kts \
-            || { echo "::error::versionName does not match packageVersion $V"; exit 1; }
+            || grep -qF "versionName = \"$V-alpha\"" composeApp/build.gradle.kts \
+            || { echo "::error::versionName does not match packageVersion $V (or $V-alpha)"; exit 1; }
           grep -qF "Nepenthe Journal v$V" \
               composeApp/src/commonMain/kotlin/app/journal/ui/settings/detail/SettingsInfoCards.kt \
             || { echo "::error::About card string does not match version $V"; exit 1; }
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            test "$GITHUB_REF_NAME" = "v$V" \
-              || { echo "::error::tag $GITHUB_REF_NAME does not match version v$V"; exit 1; }
+            test "$GITHUB_REF_NAME" = "v$V" -o "$GITHUB_REF_NAME" = "v$V-alpha" \
+              || { echo "::error::tag $GITHUB_REF_NAME does not match version v$V or v$V-alpha"; exit 1; }
           fi
           echo "VERSION_OK $V"
 
@@ -265,8 +266,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          # An -alpha tag publishes as a GitHub prerelease: no releases/latest pointer.
+          if [[ "$GITHUB_REF_NAME" == *-alpha ]]; then PRERELEASE=--prerelease; else PRERELEASE=; fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Nepenthe Journal $GITHUB_REF_NAME" \
-            --generate-notes \
+            --generate-notes $PRERELEASE \
             dist/*.msi dist/*.zip dist/*.deb dist/*.dmg dist/SHA256SUMS.txt

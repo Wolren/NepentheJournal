@@ -8,6 +8,8 @@ Offline-first journal for tracking psychoactive substance sessions, monitoring t
 
 No cloud, no accounts, no surveillance. Data lives on your device. Optional P2P sync between your own devices over LAN.
 
+**Status: alpha.** This is the first release. The feature set and the on-disk format can still change, so keep a sealed backup of your journal.
+
 [![License: GPL v3](https://img.shields.io/github/license/Wolren/NepentheJournal)](LICENSE)
 [![Last commit](https://img.shields.io/github/last-commit/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/commits)
 [![Issues](https://img.shields.io/github/issues/Wolren/NepentheJournal)](https://github.com/Wolren/NepentheJournal/issues)

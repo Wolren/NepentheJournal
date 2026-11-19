@@ -6,8 +6,8 @@ The Release workflow fails its version guard when these drift:
 
 | Surface              | File                                                    |
 |----------------------|---------------------------------------------------------|
-| `versionName`        | `composeApp/build.gradle.kts` (android block)           |
-| `packageVersion`     | `composeApp/build.gradle.kts` (nativeDistributions)     |
+| `versionName`        | `composeApp/build.gradle.kts` (android block), may carry an `-alpha` suffix |
+| `packageVersion`     | `composeApp/build.gradle.kts` (nativeDistributions), numeric only |
 | About card string    | `composeApp/src/commonMain/.../detail/SettingsInfoCards.kt` |
 | macOS `packageVersion` (intentionally different) | `composeApp/build.gradle.kts` (macOS block) |
 
@@ -17,11 +17,13 @@ The Release workflow fails its version guard when these drift:
 2. Push to master; CI, CodeQL and fdroid must be green.
 3. Optional dry run: Actions -> Release -> Run workflow. Builds MSI, DEB and
    DMG as workflow artifacts and publishes nothing.
-4. Tag and push the tag (must equal `packageVersion`):
+4. Tag and push the tag. It must equal `v<packageVersion>`, optionally with the
+   `-alpha` suffix while the project is in alpha; an `-alpha` tag publishes as a
+   GitHub prerelease:
 
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v0.1.0-alpha
+   git push origin v0.1.0-alpha
    ```
 
 5. The Release workflow re-checks the version guard, builds all three
