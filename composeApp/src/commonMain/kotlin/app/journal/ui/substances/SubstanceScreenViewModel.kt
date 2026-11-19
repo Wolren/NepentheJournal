@@ -2,6 +2,7 @@ package app.journal.ui.substances
 
 import app.journal.data.IJournalRepository
 import app.journal.model.Substance
+import app.journal.model.SubstancePopularity
 import app.journal.model.SubstanceSearch
 import app.journal.model.SubstanceTaxonomy
 import kotlinx.coroutines.FlowPreview
@@ -49,6 +50,8 @@ class SubstanceScreenViewModel(
         val nameLower: String,
         val aliasesLower: List<String>,
         val classesLower: List<String>,
+        /** Popularity tier, fixed per substance: only breaks a search tie. */
+        val popularity: Int,
     )
 
     private var annotatedSource: List<Substance>? = null
@@ -66,6 +69,7 @@ class SubstanceScreenViewModel(
                 nameLower = sub.name.lowercase(),
                 aliasesLower = sub.aliases.map { it.lowercase() },
                 classesLower = sub.substanceClass.map { it.lowercase() },
+                popularity = SubstancePopularity.tierOf(sub.name),
             )
         }
         annotatedSource = list
@@ -145,6 +149,7 @@ class SubstanceScreenViewModel(
                 .sortedWith(
                     compareBy(
                         { (_, rank) -> rank },
+                        { (item, _) -> item.popularity },
                         { (item, _) -> item.substance.name.length },
                         { (item, _) -> item.nameLower },
                     )

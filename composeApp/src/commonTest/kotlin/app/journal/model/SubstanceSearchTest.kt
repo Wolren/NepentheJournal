@@ -82,15 +82,30 @@ class SubstanceSearchTest {
 
     @Test
     fun tiesFallBackToShorterThenAlphabetical() {
+        // All three are tier-3 analogs of equal match quality, so the fallback
+        // keys decide: same length, then alphabetical.
         val items = listOf(
-            substance("1P-LSD"),
-            substance("1B-LSD"),
             substance("1V-LSD"),
+            substance("1B-LSD"),
+            substance("1D-LSD"),
         )
         assertEquals(
-            listOf("1B-LSD", "1P-LSD", "1V-LSD"),
+            listOf("1B-LSD", "1D-LSD", "1V-LSD"),
             SubstanceSearch.rank(items, "lsd").map { it.name },
             "equal ranks keep a deterministic order",
+        )
+    }
+
+    @Test
+    fun popularityBreaksTheTieBeforeAlphabetical() {
+        val items = listOf(
+            substance("1B-LSD"),
+            substance("1P-LSD"),
+        )
+        assertEquals(
+            listOf("1P-LSD", "1B-LSD"),
+            SubstanceSearch.rank(items, "lsd").map { it.name },
+            "1P-LSD is the better known analog, so it leads despite sorting later",
         )
     }
 

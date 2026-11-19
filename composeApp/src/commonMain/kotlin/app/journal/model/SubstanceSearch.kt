@@ -18,8 +18,9 @@ package app.journal.model
  * 50 the name contains the query
  * 60 an alias or class contains the query
  *
- * Ties fall back to shorter name, then alphabetical, so the result is stable
- * and never depends on repository order.
+ * Ties fall back to popularity tier, then shorter name, then alphabetical, so
+ * the result is stable and never depends on repository order. Popularity lives
+ * in [SubstancePopularity] and only breaks ties: a better match always wins.
  */
 object SubstanceSearch {
 
@@ -84,6 +85,7 @@ object SubstanceSearch {
             .sortedWith(
                 compareBy(
                     { (_, rank) -> rank },
+                    { (substance, _) -> SubstancePopularity.tierOf(substance.name) },
                     { (substance, _) -> substance.name.length },
                     { (substance, _) -> substance.name.lowercase() },
                 )
