@@ -14,14 +14,6 @@ plugins {
     alias(libs.plugins.sqldelight)
 }
 
-configurations.all {
-    resolutionStrategy.eachDependency {
-        if (requested.group.startsWith("io.netty")) {
-            useVersion("4.2.17.Final")
-        }
-    }
-}
-
 kotlin {
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)

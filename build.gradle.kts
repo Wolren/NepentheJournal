@@ -29,16 +29,16 @@ subprojects {
         resolutionStrategy {
             force(
                 // Netty 4.1.x: fixes 20+ CVEs (SNI, http/2 rapid reset, request smuggling, decompression bomb, CRLF injection, ipv6 filter bypass).
-                "io.netty:netty-handler:4.2.18.Final",
+                "io.netty:netty-handler:4.2.20.Final",
                 "io.netty:netty-codec-http2:4.2.20.Final",
-                "io.netty:netty-codec-http:4.2.18.Final",
+                "io.netty:netty-codec-http:4.2.20.Final",
                 "io.netty:netty-codec:4.2.20.Final",
-                "io.netty:netty-common:4.2.18.Final",
+                "io.netty:netty-common:4.2.20.Final",
                 "io.netty:netty-buffer:4.2.20.Final",
-                "io.netty:netty-transport:4.2.18.Final",
-                "io.netty:netty-resolver:4.2.18.Final",
+                "io.netty:netty-transport:4.2.20.Final",
+                "io.netty:netty-resolver:4.2.20.Final",
                 "io.netty:netty-transport-native-unix-common:4.2.20.Final",
-                "io.netty:netty-handler-proxy:4.2.18.Final",
+                "io.netty:netty-handler-proxy:4.2.20.Final",
                 "io.netty:netty-codec-socks:4.2.20.Final",
                 // Bouncy Castle: GOST CTR keystream reuse (critical), broken algorithm
                 "org.bouncycastle:bcprov-jdk18on:1.86",
