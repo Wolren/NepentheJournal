@@ -10,6 +10,8 @@ import app.journal.ui.components.EMPTY_STATE_DELAY_MS
 import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
+import app.journal.ui.settings.DataSettingsViewModel
+import app.journal.ui.settings.detail.DiagnosticsCardContent
 import app.journal.ui.settings.detail.MedicationsSettingsContent
 import app.journal.ui.settings.detail.PreferencesCardContent
 import app.journal.ui.substances.EffectDetailScreen
@@ -277,6 +279,31 @@ class ComposeScreenSmokeTest {
             assertTrue(
                 onAllNodesWithText("Manage").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SettingsScreen must render the theme manage action"
+            )
+        }
+    }
+
+    @Test
+    fun diagnosticsCardExportsLogsButOffersNoSyntheticData() = runBlocking {
+        runComposeUiTest {
+            val repo = JournalRepository()
+            val vm = DataSettingsViewModel(repo)
+            setContent {
+                MaterialTheme { DiagnosticsCardContent(vm = vm) }
+            }
+            waitForIdle()
+
+            assertTrue(
+                onAllNodesWithText("Export logs and crash dumps")
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                "diagnostics card must keep the log export action"
+            )
+            // Synthetic sessions are a developer path only: a shipped build must not
+            // offer to wipe the journal and fill it with sample data.
+            assertTrue(
+                onAllNodesWithText("Load test data")
+                    .fetchSemanticsNodes(atLeastOneRootRequired = false).isEmpty(),
+                "the diagnostics card must not offer synthetic test data"
             )
         }
     }

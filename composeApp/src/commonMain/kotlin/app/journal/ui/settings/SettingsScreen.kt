@@ -315,7 +315,7 @@ fun SettingsScreen(
         if (visible(SettingsCategory.ABOUT)) item { PrivacyCardContent(privacyExpanded = privacyExpanded, onToggle = { privacyExpanded = !privacyExpanded }) }
 
         if (visible(SettingsCategory.ABOUT)) item {
-            DeveloperCardContent(vm = dataViewModel)
+            DiagnosticsCardContent(vm = dataViewModel)
         }
 
         item { Spacer(Modifier.height(16.dp)) }

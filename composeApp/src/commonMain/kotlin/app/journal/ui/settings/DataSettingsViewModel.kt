@@ -68,16 +68,6 @@ class DataSettingsViewModel(
     }
 
 
-    fun resetWithTestData() {
-        scope.launch {
-            try {
-                DataInitializer.resetWithTestData(repo)
-                dataStatus.value = "Test data loaded (${repo.sessions.value.size} sessions, ${repo.substances.value.size} substances)"
-            } catch (e: Exception) {
-                dataStatus.value = userMessage("Settings", "Test data failed", e)
-            }
-        }
-    }
 
     fun exportCrashLogs() {
         scope.launch(CoroutineExceptionHandler { _, e ->

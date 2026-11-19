@@ -485,13 +485,6 @@ object DataInitializer {
         }
     }
 
-    fun resetWithTestData(repo: IJournalRepository) {
-        repo.clearAll()
-        tryLoadSeed(repo)
-        FuzzSeed.generate(repo)
-        val store = JournalStore(repo as JournalRepository)
-        store.save()
-    }
 }
 
 

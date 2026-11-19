@@ -92,6 +92,8 @@ suite, but ships through no store channel in this release.
   fentanyl scaffolds, synthetic cannabinoid indoles) guarded by tests.
 - Light theme contrast, selectable text on desktop, timeline curve rendering, and
   a long list of layout overflows found in the UI audits.
+- Settings no longer ship the developer action that wiped the journal and filled
+  it with synthetic sample sessions. The Diagnostics card keeps the log export.
 
 ### Security
 

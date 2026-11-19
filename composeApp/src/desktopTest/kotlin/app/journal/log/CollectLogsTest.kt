@@ -7,7 +7,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertFalse
 
 /**
- * Pins the diagnostics bundle behind the Settings > Developer export button.
+ * Pins the diagnostics bundle behind the Settings > Diagnostics export button.
  * PRIVACY.md and the in-app privacy card now promise users that rolling logs
  * and crash dumps can be exported by hand, so both must appear in the output.
  */
