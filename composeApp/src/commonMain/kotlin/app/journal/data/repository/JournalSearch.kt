@@ -62,14 +62,15 @@ internal class JournalSearch(
     }
 
     internal fun rebuildSearchIndexLocked() {
+        val substances = substancesStore.all
         searchIndex.rebuild(
             sessions = sessionsStore.all,
-            substances = substancesStore.all,
+            substances = substances,
             notes = notesStore.all,
             doses = dosesStore.all,
             timelineEvents = timelineEventsStore.all,
             effects = effectsStore.all,
-            substanceNames = substancesStore.all.associate { it.id to it.name }
+            substanceNames = substances.associate { it.id to it.name }
         )
         searchIndexDirty = false
     }

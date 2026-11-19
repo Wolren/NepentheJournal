@@ -3,7 +3,6 @@ package app.journal.data
 import androidx.compose.runtime.Immutable
 import app.journal.model.*
 import app.journal.util.PlatformLock
-import app.journal.util.currentTimeMillis
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -21,37 +20,80 @@ data class SearchResult(
 )
 
 /**
- * Token separator shared by index building and query parsing: any run of
- * whitespace or punctuation splits a token, en-dashes included. Hoisted so
- * the two paths can never drift apart (they were two copies of the same
- * inline regex).
+ * Token scanner shared by index building and query parsing, so the two paths
+ * can never drift apart (they used to be two copies of one regex).
+ *
+ * A token is a maximal run of characters outside the separator set: ASCII
+ * whitespace plus `,;:.!?()[]{}<>/\@#$%^&*+=|~`"'` and the en/em dashes.
+ * Separator runs collapse, and no empty token is ever produced, which is the
+ * shape `Regex.split(...).filter { it.length >= 2 }` had. The regex split was
+ * the single largest cost of a rebuild (102 ms of 144 ms on a 4000-session
+ * journal): per-token Matcher bookkeeping plus an intermediate list per
+ * entity. A char loop allocates only the token strings themselves.
  */
-private val TOKEN_SEPARATOR =
-    Regex("[\\s,;:.!?()\\[\\]{}<>/\\\\@#\\$%^&*+=|~`\\\"'\\u2013\\u2014]+")
+internal object SearchTokenizer {
+
+    private val ASCII_SEPARATORS = BooleanArray(128).also { table ->
+        for (c in " \t\n\u000B\u000C\r,;:.!?()[]{}<>/\\@#\$%^&*+=|~`\"'") {
+            table[c.code] = true
+        }
+    }
+
+    private fun isSeparator(c: Char): Boolean =
+        if (c.code < 128) ASCII_SEPARATORS[c.code] else c == '\u2013' || c == '\u2014'
+
+    /** Calls [sink] once per token of [text], in order, without trimming or lowercasing. */
+    fun forEachToken(text: CharSequence, sink: (String) -> Unit) {
+        var start = -1
+        for (i in text.indices) {
+            if (isSeparator(text[i])) {
+                if (start >= 0) {
+                    sink(text.substring(start, i))
+                    start = -1
+                }
+            } else if (start < 0) {
+                start = i
+            }
+        }
+        if (start >= 0) sink(text.substring(start))
+    }
+
+    /** Tokens of [text] at least [minLength] characters long, in order. */
+    fun tokens(text: CharSequence, minLength: Int = 2): List<String> {
+        val out = ArrayList<String>()
+        forEachToken(text) { if (it.length >= minLength) out.add(it) }
+        return out
+    }
+}
 
 /**
  * Lightweight full-text search index for the journal.
  *
  * Builds a simple inverted index from all text fields of all entity types.
  * The dataset is small enough that a full rebuild from scratch is fast
- * (< 10ms for a typical journal), so the index is never maintained
+ * (tens of ms for a typical journal), so the index is never maintained
  * incrementally. JournalRepository marks it dirty on every mutation and
  * rebuilds lazily inside search(), so results are never stale; bulk applies
  * also mark it dirty.
  *
- * Locking and scoring (wave4): [search] only holds [lock] long enough to
- * copy the inverted index out ([snapshotIndex]); the scoring pass runs on
- * that immutable snapshot with NO lock held, so a keystroke search can
- * never block (or be blocked by) a concurrent rebuild, and scoring itself
- * is a single linear pass (see [scoreSearchSnapshot]).
+ * Locking and scoring (wave5): a rebuild builds a brand-new word map and
+ * publishes it in one assignment, so [snapshotIndex] hands out the frozen
+ * map itself instead of copying every bucket on every keystroke (the copy was
+ * 3-4 ms per keystroke on a 4000-session journal). Scoring then runs on that
+ * immutable snapshot with NO lock held, so a keystroke search can never block
+ * (or be blocked by) a concurrent rebuild, and scoring itself is a single
+ * linear pass (see [scoreSearchSnapshot]). A reader that took the previous
+ * snapshot keeps a consistent, fully usable view: rebuilds never mutate a
+ * published map.
  */
 class SearchIndex {
 
-    private val index = mutableMapOf<String, MutableSet<SearchResult>>()
+    /** The frozen publication; replaced whole on each [rebuild], never mutated afterwards. */
+    private var published: Map<String, List<SearchResult>> = emptyMap()
     private var isBuilt = false
     private val lock = PlatformLock()
 
-    val isEmpty: Boolean get() = !isBuilt
+    val isEmpty: Boolean get() = lock.withLock { !isBuilt }
 
     fun rebuild(
         sessions: List<Session>,
@@ -62,13 +104,13 @@ class SearchIndex {
         effects: List<Effect>,
         substanceNames: Map<String, String>
     ) = lock.withLock {
-        index.clear()
-        isBuilt = false
+        val index = LinkedHashMap<String, MutableList<SearchResult>>(512)
+        val zone = TimeZone.currentSystemDefault()
 
         for (session in sessions) {
-            val dt = Instant.fromEpochMilliseconds(session.startTime)
-                .toLocalDateTime(TimeZone.currentSystemDefault())
+            val dt = Instant.fromEpochMilliseconds(session.startTime).toLocalDateTime(zone)
             indexEntity(
+                index,
                 "session", session.id,
                 title = session.title,
                 score = 10,
@@ -82,6 +124,7 @@ class SearchIndex {
 
         for (sub in substances) {
             indexEntity(
+                index,
                 "substance", sub.id,
                 title = sub.name,
                 score = 8,
@@ -96,6 +139,7 @@ class SearchIndex {
 
         for (note in notes) {
             indexEntity(
+                index,
                 "note", note.id,
                 title = note.title ?: "Untitled note",
                 score = 5,
@@ -106,6 +150,7 @@ class SearchIndex {
         for (dose in doses) {
             val subName = substanceNames[dose.substanceId] ?: dose.substanceId
             indexEntity(
+                index,
                 "dose", dose.id,
                 title = "$subName (${dose.amount} ${dose.unit})",
                 score = 3,
@@ -118,6 +163,7 @@ class SearchIndex {
 
         for (event in timelineEvents) {
             indexEntity(
+                index,
                 "event", event.id,
                 title = event.label,
                 score = 3,
@@ -127,6 +173,7 @@ class SearchIndex {
 
         for (effect in effects) {
             indexEntity(
+                index,
                 "effect", effect.id,
                 title = effect.name,
                 score = 4,
@@ -134,21 +181,18 @@ class SearchIndex {
             )
         }
 
+        // Publish: readers see either the old frozen map or this new one.
+        published = index
         isBuilt = true
     }
 
     /**
-     * Point-in-time copy of the inverted index (word -> results), preserving
-     * the exact iteration order of the live map. Callers score against this
-     * snapshot instead of the live index, so scoring needs no lock and can
-     * never race a concurrent [rebuild] (the hazard the old in-lock,
-     * live-index scoring had).
+     * The current frozen word -> results map. No copy is taken: [rebuild]
+     * replaces the publication instead of mutating it, so handing out the map
+     * is safe and costs a lock and a field read.
      */
     internal fun snapshotIndex(): Map<String, List<SearchResult>> = lock.withLock {
-        if (!isBuilt) return@withLock emptyMap()
-        val snapshot = LinkedHashMap<String, List<SearchResult>>(index.size)
-        for ((word, results) in index) snapshot[word] = results.toList()
-        snapshot
+        if (!isBuilt) emptyMap() else published
     }
 
     /**
@@ -163,18 +207,21 @@ class SearchIndex {
 
 
     private fun indexEntity(
+        index: MutableMap<String, MutableList<SearchResult>>,
         type: String,
         id: String,
         title: String,
         score: Int = 5,
-        texts: List<String?>
+        texts: List<String?>,
     ) {
-        val fullText = texts.filterNotNull().joinToString(" ").lowercase()
-        val words = fullText.split(TOKEN_SEPARATOR)
-            .filter { it.length >= 2 }
-            .distinct()
-
-        val snippet = texts.drop(1).firstNotNullOfOrNull { it?.take(160) } ?: ""
+        var snippet = ""
+        for (i in 1 until texts.size) {
+            val text = texts[i]
+            if (text != null) {
+                snippet = text.take(160)
+                break
+            }
+        }
         val result = SearchResult(
             entityType = type,
             entityId = id,
@@ -183,8 +230,18 @@ class SearchIndex {
             score = score
         )
 
+        // LinkedHashSet keeps first-occurrence word order, which sets the
+        // snapshot's key order and with it the tie-break order of the scoring rule.
+        val words = LinkedHashSet<String>()
+        for (text in texts) {
+            if (text.isNullOrEmpty()) continue
+            val lower = text.lowercase()
+            SearchTokenizer.forEachToken(lower) { word ->
+                if (word.length >= 2) words.add(word)
+            }
+        }
         for (word in words) {
-            index.getOrPut(word) { mutableSetOf() }.add(result)
+            index.getOrPut(word) { ArrayList(1) }.add(result)
         }
     }
 }
@@ -219,9 +276,7 @@ internal fun scoreSearchSnapshot(
 ): List<SearchResult> {
     if (snapshot.isEmpty() || query.isBlank()) return emptyList()
 
-    val terms = query.lowercase()
-        .split(TOKEN_SEPARATOR)
-        .filter { it.length >= 2 }
+    val terms = SearchTokenizer.tokens(query.lowercase())
     if (terms.isEmpty()) return emptyList()
 
     if (terms.size == 1) {
