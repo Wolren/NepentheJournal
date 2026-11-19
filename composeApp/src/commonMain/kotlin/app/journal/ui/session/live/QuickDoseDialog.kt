@@ -14,6 +14,7 @@ import app.journal.data.IJournalRepository
 import app.journal.model.Dose
 import app.journal.model.Session
 import app.journal.model.Substance
+import app.journal.model.SubstanceSearch
 import app.journal.model.TimelineEvent
 import app.journal.model.TimelineEventType
 import app.journal.ui.components.*
@@ -58,7 +59,7 @@ internal fun QuickDoseDialog(
                             substances.find { it.id == selectedSubstanceId }?.name ?: ""
                         }).lowercase()
                         if (q.isBlank()) substances
-                        else substances.filter { it.name.lowercase().contains(q) }
+                        else SubstanceSearch.rank(substances, q)
                     }
                     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
                         OutlinedTextField(value = if (selectedSubstanceId.isNotBlank())

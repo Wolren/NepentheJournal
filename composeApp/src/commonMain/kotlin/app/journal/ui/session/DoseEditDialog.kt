@@ -25,6 +25,7 @@ import app.journal.model.CustomUnit
 import app.journal.model.Dose
 import app.journal.model.StomachFullness
 import app.journal.model.Substance
+import app.journal.model.SubstanceSearch
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 import kotlinx.coroutines.launch
@@ -116,11 +117,9 @@ fun DoseEditDialog(
     }
 
     val filtered = remember(substanceSearch, substances) {
+        // Ranked, so the exact compound comes before its analogs.
         if (substanceSearch.isBlank()) emptyList()
-        else substances.filter {
-            it.name.contains(substanceSearch, ignoreCase = true) ||
-                it.aliases.any { a -> a.contains(substanceSearch, ignoreCase = true) }
-        }
+        else SubstanceSearch.rank(substances, substanceSearch)
     }
 
     fun buildDose(): Dose? {

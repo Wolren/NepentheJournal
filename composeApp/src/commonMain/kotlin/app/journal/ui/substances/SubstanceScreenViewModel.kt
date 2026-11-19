@@ -2,6 +2,7 @@ package app.journal.ui.substances
 
 import app.journal.data.IJournalRepository
 import app.journal.model.Substance
+import app.journal.model.SubstanceSearch
 import app.journal.model.SubstanceTaxonomy
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +46,9 @@ class SubstanceScreenViewModel(
         val broads: Set<String>,
         val specificsByBroad: Map<String, List<String>>,
         /** Name, aliases and classes lowercased once, so a query scan allocates nothing. */
-        val haystack: String,
+        val nameLower: String,
+        val aliasesLower: List<String>,
+        val classesLower: List<String>,
     )
 
     private var annotatedSource: List<Substance>? = null
@@ -60,11 +63,9 @@ class SubstanceScreenViewModel(
                 substance = sub,
                 broads = broads,
                 specificsByBroad = broads.associateWith { broad -> vmSpecifics(sub, broad) },
-                haystack = buildString {
-                    append(sub.name)
-                    sub.aliases.forEach { append('\u0000').append(it) }
-                    sub.substanceClass.forEach { append('\u0000').append(it) }
-                }.lowercase(),
+                nameLower = sub.name.lowercase(),
+                aliasesLower = sub.aliases.map { it.lowercase() },
+                classesLower = sub.substanceClass.map { it.lowercase() },
             )
         }
         annotatedSource = list
@@ -132,9 +133,23 @@ class SubstanceScreenViewModel(
         }
 
         if (q.isNotBlank()) {
-            val lq = q.lowercase()
-            // One substring test on the prebuilt haystack replaces three lowercase scans per row.
-            result = result.filter { item -> lq in item.haystack }
+            // Ranked, not merely filtered: an exact name must beat the analogs
+            // that contain the same letters (LSD before 1B-LSD, 1P-LSD).
+            val lq = q.trim().lowercase()
+            result = result
+                .mapNotNull { item ->
+                    SubstanceSearch
+                        .scoreLower(lq, item.nameLower, item.aliasesLower, item.classesLower)
+                        ?.let { item to it }
+                }
+                .sortedWith(
+                    compareBy(
+                        { (_, rank) -> rank },
+                        { (item, _) -> item.substance.name.length },
+                        { (item, _) -> item.nameLower },
+                    )
+                )
+                .map { it.first }
         }
 
         result.map { it.substance }
