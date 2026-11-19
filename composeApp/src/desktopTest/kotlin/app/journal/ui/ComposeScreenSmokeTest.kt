@@ -11,9 +11,11 @@ import app.journal.ui.session.SessionListScreen
 import app.journal.ui.session.SessionListViewModel
 import app.journal.ui.settings.SettingsScreen
 import app.journal.ui.settings.detail.MedicationsSettingsContent
+import app.journal.ui.settings.detail.PreferencesCardContent
 import app.journal.ui.substances.EffectDetailScreen
 import app.journal.ui.substances.SubstanceScreen
 import app.journal.ui.substances.SubstanceScreenViewModel
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -276,6 +278,41 @@ class ComposeScreenSmokeTest {
                 onAllNodesWithText("Manage").fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
                 "SettingsScreen must render the theme manage action"
             )
+        }
+    }
+
+    @Test
+    fun preferencesCardRendersEveryControl() = runBlocking {
+        runComposeUiTest {
+            val repo = JournalRepository()
+            setContent {
+                MaterialTheme {
+                    Column { PreferencesCardContent(repo = repo) }
+                }
+            }
+            waitForIdle()
+
+            // One label per group plus one per switch: a group that silently
+            // stops rendering (or a switch that gets dropped) fails here.
+            val labels = listOf(
+                "Rating scale",
+                "Time display",
+                "Open on",
+                "Free-form autosave",
+                "Dashboard cards",
+                "Activity heatmap",
+                "Tolerance overview",
+                "Top substances",
+                "Sessions per week chart",
+                "Ask before deleting",
+                "Auto-backup on close",
+            )
+            for (label in labels) {
+                assertTrue(
+                    onAllNodesWithText(label).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty(),
+                    "the preferences card must render '$label'"
+                )
+            }
         }
     }
 
