@@ -166,6 +166,63 @@
       "type": "boolean",
       "description": "When true, shows a sessions-per-week trend chart on the dashboard.",
       "default": false
+    },
+    "startTab": {
+      "type": "string",
+      "enum": [
+        "DASHBOARD",
+        "SESSIONS",
+        "SUBSTANCES",
+        "SAFETY"
+      ],
+      "description": "Tab the app opens on. Absent means the dashboard, the behaviour that predates the setting.",
+      "default": "DASHBOARD"
+    },
+    "timeDisplayMode": {
+      "type": "string",
+      "enum": [
+        "RELATIVE",
+        "CLOCK",
+        "ELAPSED",
+        "DURATION"
+      ],
+      "description": "How session timestamps render in lists and timelines. Absent means relative times.",
+      "default": "RELATIVE"
+    },
+    "dashboardHeatmap": {
+      "type": "boolean",
+      "description": "When true, the dashboard shows the activity heatmap card.",
+      "default": true
+    },
+    "dashboardTolerance": {
+      "type": "boolean",
+      "description": "When true, the dashboard shows the tolerance overview card.",
+      "default": true
+    },
+    "dashboardTopSubstances": {
+      "type": "boolean",
+      "description": "When true, the dashboard shows the top substances chart.",
+      "default": true
+    },
+    "confirmDeletes": {
+      "type": "boolean",
+      "description": "When true, deleting a session or a timeline event asks for confirmation first.",
+      "default": true
+    },
+    "autosaveDelay": {
+      "type": "string",
+      "enum": [
+        "FAST",
+        "NORMAL",
+        "SLOW"
+      ],
+      "description": "Idle delay before the live session writes its free-form draft. FAST is 0.6 seconds, NORMAL 2 seconds, SLOW 5 seconds.",
+      "default": "FAST"
+    },
+    "autoBackupOnClose": {
+      "type": "boolean",
+      "description": "When true, closing the app writes a timestamped auto-backup next to the journal.",
+      "default": true
     }
   },
   "required": [

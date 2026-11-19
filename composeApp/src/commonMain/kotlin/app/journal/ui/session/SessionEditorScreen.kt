@@ -40,6 +40,7 @@ fun SessionEditorScreen(
     val isEditing = sessionToEdit != null
     val persons by repo.persons.collectAsState()
     val customUnits by repo.customUnits.collectAsState()
+    val confirmDeletes by repo.confirmDeletes.collectAsState()
 
     val title by viewModel.title.collectAsState()
     val startTime by viewModel.startTime.collectAsState()
@@ -161,7 +162,11 @@ fun SessionEditorScreen(
                 )
             }
             if (isEditing) {
-                IconButton(onClick = { showDeleteConfirm = true }) {
+                IconButton(onClick = {
+                    // The preference only ever removes friction: with it off, delete does not ask.
+                    if (confirmDeletes) showDeleteConfirm = true
+                    else { viewModel.deleteSession(); onBack() }
+                }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete",
                         tint = MaterialTheme.colorScheme.error)
                 }

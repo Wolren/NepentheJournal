@@ -75,6 +75,7 @@ fun SessionTimelineScreen(
 
     var showAddEventDialog by remember { mutableStateOf(false) }
     var deletingEvent by remember { mutableStateOf<TimelineEvent?>(null) }
+    val confirmDeletes by repo.confirmDeletes.collectAsState()
 
     if (session == null) {
         NotFoundBox("Session not found")
@@ -295,7 +296,10 @@ fun SessionTimelineScreen(
                 when (it) { is TimelineItem.Event -> it.event.id; is TimelineItem.PhaseHeader -> "phase_${it.label}" }
             }) { item ->
                 when (item) {
-                    is TimelineItem.Event -> EventCard(item.event, session.startTime, repo = repo, onDelete = { deletingEvent = it })
+                    is TimelineItem.Event -> EventCard(item.event, session.startTime, repo = repo, onDelete = { event ->
+                        if (confirmDeletes) deletingEvent = event
+                        else repo.deleteTimelineEvent(event.id)
+                    })
                     is TimelineItem.PhaseHeader -> {
                         Spacer(Modifier.height(6.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

@@ -62,6 +62,7 @@ import app.journal.data.JournalStore
 import app.journal.data.QuickLog
 import app.journal.data.QuickLogOutcome
 import app.journal.model.Session
+import app.journal.model.StartTab
 import app.journal.sync.createSyncEngine
 import app.journal.util.PendingQuickLog
 import app.journal.util.currentTimeMillis
@@ -109,6 +110,14 @@ enum class Screen(
     SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
+/** The opening-tab preference, resolved to this shell's tabs. */
+private fun StartTab.toScreen(): Screen = when (this) {
+    StartTab.DASHBOARD -> Screen.DASHBOARD
+    StartTab.SESSIONS -> Screen.SESSIONS
+    StartTab.SUBSTANCES -> Screen.SUBSTANCES
+    StartTab.SAFETY -> Screen.SAFER
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AppNavigation(
@@ -117,7 +126,8 @@ internal fun AppNavigation(
     themeConfig: ThemeConfig,
     colorScheme: ColorScheme,
 ) {
-    var selectedScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    // Opening tab is a preference; the value is loaded from disk before this screen composes.
+    var selectedScreen by remember { mutableStateOf(repo.startTab.value.toScreen()) }
     // Tab state (scroll offset, settings section) survives a switch without keeping the screen composed.
     val tabStateHolder = rememberSaveableStateHolder()
     // One instance per app run: the derived maps and the tolerance cache outlive every visit.
@@ -156,7 +166,7 @@ internal fun AppNavigation(
             quickLogStatus = null
         }
     }
-    var timeDisplayMode by remember { mutableStateOf(TimeDisplayMode.RELATIVE) }
+    val timeDisplayMode by repo.timeDisplayMode.collectAsState()
     var sessionPaneFraction by remember { mutableStateOf(0.42f) }
     val sessionListViewModel = remember { SessionListViewModel.create(repo) }
     val syncEngine = remember(repo) {
@@ -404,9 +414,11 @@ internal fun AppNavigation(
                                                         onCalendarClick = { showCalendar = true },
                                                         timeDisplayMode = timeDisplayMode,
                                                         onCycleTimeDisplay = {
-                                                            timeDisplayMode = TimeDisplayMode.entries[
-                                                                (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
-                                                            ]
+                                                            repo.setTimeDisplayMode(
+                                                                TimeDisplayMode.entries[
+                                                                    (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                                ]
+                                                            )
                                                         }
                                                     )
                                                 else -> Unit
@@ -486,9 +498,11 @@ internal fun AppNavigation(
                                                 onLiveSession = { liveSessionId = "__new__" },
                                                 timeDisplayMode = timeDisplayMode,
                                                 onCycleTimeDisplay = {
-                                                    timeDisplayMode = TimeDisplayMode.entries[
-                                                        (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
-                                                    ]
+                                                    repo.setTimeDisplayMode(
+                                                        TimeDisplayMode.entries[
+                                                            (timeDisplayMode.ordinal + 1) % TimeDisplayMode.entries.size
+                                                        ]
+                                                    )
                                                 }
                                             )
                                         }
@@ -646,7 +660,10 @@ private fun LiveSessionContent(
         return
     }
     if (session != null) {
-        LiveSessionScreen(repo = repo, session = session, onBack = onBack)
+        LiveSessionScreen(
+            repo = repo, session = session, onBack = onBack,
+            freeformSaveDelayMs = repo.autosaveDelay.value.delayMs,
+        )
         return
     }
     var liveCreateError by remember { mutableStateOf<String?>(null) }

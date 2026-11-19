@@ -14,6 +14,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.util.TimeDisplayMode
 import kotlinx.coroutines.flow.*
 import app.journal.util.PlatformLock
 
@@ -53,6 +54,30 @@ internal class JournalPreferences(
 
     private val _showSessionsTrendChart = MutableStateFlow(false)
     val showSessionsTrendChart: StateFlow<Boolean> = _showSessionsTrendChart.asStateFlow()
+
+    private val _startTab = MutableStateFlow(StartTab.DASHBOARD)
+    val startTab: StateFlow<StartTab> = _startTab.asStateFlow()
+
+    private val _timeDisplayMode = MutableStateFlow(TimeDisplayMode.RELATIVE)
+    val timeDisplayMode: StateFlow<TimeDisplayMode> = _timeDisplayMode.asStateFlow()
+
+    private val _dashboardHeatmap = MutableStateFlow(true)
+    val dashboardHeatmap: StateFlow<Boolean> = _dashboardHeatmap.asStateFlow()
+
+    private val _dashboardTolerance = MutableStateFlow(true)
+    val dashboardTolerance: StateFlow<Boolean> = _dashboardTolerance.asStateFlow()
+
+    private val _dashboardTopSubstances = MutableStateFlow(true)
+    val dashboardTopSubstances: StateFlow<Boolean> = _dashboardTopSubstances.asStateFlow()
+
+    private val _confirmDeletes = MutableStateFlow(true)
+    val confirmDeletes: StateFlow<Boolean> = _confirmDeletes.asStateFlow()
+
+    private val _autosaveDelay = MutableStateFlow(AutosaveDelay.FAST)
+    val autosaveDelay: StateFlow<AutosaveDelay> = _autosaveDelay.asStateFlow()
+
+    private val _autoBackupOnClose = MutableStateFlow(true)
+    val autoBackupOnClose: StateFlow<Boolean> = _autoBackupOnClose.asStateFlow()
 
     fun setRatingScaleMode(mode: RatingScaleMode) = lock.withLock {
         _ratingScaleMode.value = mode
@@ -95,6 +120,46 @@ internal class JournalPreferences(
 
     fun setShowSessionsTrendChart(enabled: Boolean) = lock.withLock {
         _showSessionsTrendChart.value = enabled
+        bumpMutationCount()
+    }
+
+    fun setStartTab(tab: StartTab) = lock.withLock {
+        _startTab.value = tab
+        bumpMutationCount()
+    }
+
+    fun setTimeDisplayMode(mode: TimeDisplayMode) = lock.withLock {
+        _timeDisplayMode.value = mode
+        bumpMutationCount()
+    }
+
+    fun setDashboardHeatmap(shown: Boolean) = lock.withLock {
+        _dashboardHeatmap.value = shown
+        bumpMutationCount()
+    }
+
+    fun setDashboardTolerance(shown: Boolean) = lock.withLock {
+        _dashboardTolerance.value = shown
+        bumpMutationCount()
+    }
+
+    fun setDashboardTopSubstances(shown: Boolean) = lock.withLock {
+        _dashboardTopSubstances.value = shown
+        bumpMutationCount()
+    }
+
+    fun setConfirmDeletes(enabled: Boolean) = lock.withLock {
+        _confirmDeletes.value = enabled
+        bumpMutationCount()
+    }
+
+    fun setAutosaveDelay(delay: AutosaveDelay) = lock.withLock {
+        _autosaveDelay.value = delay
+        bumpMutationCount()
+    }
+
+    fun setAutoBackupOnClose(enabled: Boolean) = lock.withLock {
+        _autoBackupOnClose.value = enabled
         bumpMutationCount()
     }
 

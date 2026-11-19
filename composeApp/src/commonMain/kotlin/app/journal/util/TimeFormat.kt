@@ -25,6 +25,7 @@ fun formatDateShort(date: LocalDate): String =
 
 fun formatDateShort(local: LocalDateTime): String = formatDateShort(local.date)
 
+@kotlinx.serialization.Serializable
 enum class TimeDisplayMode {
     /** Relative to now, e.g. "2h ago" */
     RELATIVE,

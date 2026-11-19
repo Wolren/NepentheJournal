@@ -54,7 +54,15 @@ object AppJson {
             obsidianAutoExport = repo.obsidianAutoExport.value,
             obsidianSubfolder = repo.obsidianSubfolder.value,
             obsidianFileOrganization = repo.obsidianFileOrganization.value,
-            showSessionsTrendChart = repo.showSessionsTrendChart.value
+            showSessionsTrendChart = repo.showSessionsTrendChart.value,
+            startTab = repo.startTab.value,
+            timeDisplayMode = repo.timeDisplayMode.value,
+            dashboardHeatmap = repo.dashboardHeatmap.value,
+            dashboardTolerance = repo.dashboardTolerance.value,
+            dashboardTopSubstances = repo.dashboardTopSubstances.value,
+            confirmDeletes = repo.confirmDeletes.value,
+            autosaveDelay = repo.autosaveDelay.value,
+            autoBackupOnClose = repo.autoBackupOnClose.value
         )
     }
 
@@ -101,5 +109,13 @@ object AppJson {
         repo.setObsidianSubfolder(snapshot.obsidianSubfolder)
         repo.setObsidianFileOrganization(snapshot.obsidianFileOrganization)
         repo.setShowSessionsTrendChart(snapshot.showSessionsTrendChart)
+        repo.setStartTab(snapshot.startTab)
+        repo.setTimeDisplayMode(snapshot.timeDisplayMode)
+        repo.setDashboardHeatmap(snapshot.dashboardHeatmap)
+        repo.setDashboardTolerance(snapshot.dashboardTolerance)
+        repo.setDashboardTopSubstances(snapshot.dashboardTopSubstances)
+        repo.setConfirmDeletes(snapshot.confirmDeletes)
+        repo.setAutosaveDelay(snapshot.autosaveDelay)
+        repo.setAutoBackupOnClose(snapshot.autoBackupOnClose)
     }
 }

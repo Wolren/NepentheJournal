@@ -72,6 +72,7 @@ fun LiveSessionScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var showEndConfirm by remember { mutableStateOf(false) }
     var deletingLiveEvent by remember { mutableStateOf<TimelineEvent?>(null) }
+    val confirmDeletes by repo.confirmDeletes.collectAsState()
     var editTitle by remember(live.id) { mutableStateOf(live.title.ifBlank { "Live Session" }) }
     var editSet by remember(live.id) { mutableStateOf(live.set ?: "") }
     var editSetting by remember(live.id) { mutableStateOf(live.setting ?: "") }
@@ -213,7 +214,10 @@ fun LiveSessionScreen(
             item { Text("Timeline", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) }
             items(mergedTimeline, key = { when (it) { is LiveTimelineItem.Event -> "evt:${it.event.id}"; is LiveTimelineItem.Dosage -> "dose:${it.dose.id}" } }) { item ->
                 when (item) {
-                    is LiveTimelineItem.Event -> LiveEventCard(item.event, session.startTime, repo = repo, onDelete = { deletingLiveEvent = it })
+                    is LiveTimelineItem.Event -> LiveEventCard(item.event, session.startTime, repo = repo, onDelete = { event ->
+                        if (confirmDeletes) deletingLiveEvent = event
+                        else repo.deleteTimelineEvent(event.id)
+                    })
                     is LiveTimelineItem.Dosage -> LiveDoseCard(item.dose, item.substance, session.startTime)
                 }
             }

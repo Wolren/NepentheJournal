@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.util.TimeDisplayMode
 import kotlinx.serialization.Serializable
 
 /**
@@ -44,7 +45,19 @@ data class JournalSnapshot(
     val obsidianAutoExport: Boolean = false,
     val obsidianSubfolder: String = "Nepenthe",
     val obsidianFileOrganization: String = "flat",
-    val showSessionsTrendChart: Boolean = false
+    val showSessionsTrendChart: Boolean = false,
+    /**
+     * Display and behaviour preferences (all new fields default to the
+     * behaviour that predates them, so an old file loads unchanged).
+     */
+    val startTab: StartTab = StartTab.DASHBOARD,
+    val timeDisplayMode: TimeDisplayMode = TimeDisplayMode.RELATIVE,
+    val dashboardHeatmap: Boolean = true,
+    val dashboardTolerance: Boolean = true,
+    val dashboardTopSubstances: Boolean = true,
+    val confirmDeletes: Boolean = true,
+    val autosaveDelay: AutosaveDelay = AutosaveDelay.FAST,
+    val autoBackupOnClose: Boolean = true
 ) {
     companion object {
         const val CURRENT_VERSION = 9

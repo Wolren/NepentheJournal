@@ -48,7 +48,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
         onDispose {
             // Backing up without saving would copy a file up to 2s stale and silently drop the last edits (audit S2).
             journalStore.save()
-            journalStore.triggerAutoBackup()
+            if (repo.autoBackupOnClose.value) journalStore.triggerAutoBackup()
         }
     }
 

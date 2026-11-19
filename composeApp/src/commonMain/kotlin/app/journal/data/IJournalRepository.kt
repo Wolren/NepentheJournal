@@ -1,6 +1,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.util.TimeDisplayMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -55,12 +56,41 @@ interface IJournalRepository {
 
     val showSessionsTrendChart: StateFlow<Boolean>
 
+    /** Tab the app opens on. */
+    val startTab: StateFlow<StartTab>
+
+    /** How session timestamps render in lists and timelines. */
+    val timeDisplayMode: StateFlow<TimeDisplayMode>
+
+    /** Dashboard card visibility, one flag per card the dashboard can hide. */
+    val dashboardHeatmap: StateFlow<Boolean>
+    val dashboardTolerance: StateFlow<Boolean>
+    val dashboardTopSubstances: StateFlow<Boolean>
+
+    /** When true, deletes ask for confirmation first. */
+    val confirmDeletes: StateFlow<Boolean>
+
+    /** Idle delay before the live session saves its free-form draft. */
+    val autosaveDelay: StateFlow<AutosaveDelay>
+
+    /** When true, closing the app also writes a timestamped auto-backup. */
+    val autoBackupOnClose: StateFlow<Boolean>
+
     fun setObsidianVaultPath(path: String)
     fun setObsidianAutoExport(enabled: Boolean)
     fun setObsidianSubfolder(folder: String)
     fun setObsidianFileOrganization(org: String)
 
     fun setShowSessionsTrendChart(enabled: Boolean)
+
+    fun setStartTab(tab: StartTab)
+    fun setTimeDisplayMode(mode: TimeDisplayMode)
+    fun setDashboardHeatmap(shown: Boolean)
+    fun setDashboardTolerance(shown: Boolean)
+    fun setDashboardTopSubstances(shown: Boolean)
+    fun setConfirmDeletes(enabled: Boolean)
+    fun setAutosaveDelay(delay: AutosaveDelay)
+    fun setAutoBackupOnClose(enabled: Boolean)
 
     val recentSessions: Flow<List<Session>>
     val totalSessionCount: Flow<Int>

@@ -46,6 +46,9 @@ fun DashboardScreen(
     val doses by repo.doses.collectAsState()
     val substances by repo.substances.collectAsState()
     val showTrendChart by repo.showSessionsTrendChart.collectAsState()
+    val showHeatmap by repo.dashboardHeatmap.collectAsState()
+    val showTolerance by repo.dashboardTolerance.collectAsState()
+    val showTopSubstances by repo.dashboardTopSubstances.collectAsState()
 
     val toleranceVersion by repo.toleranceVersion.collectAsState()
     val toleranceAll = remember(toleranceVersion) { viewModel.toleranceCalculator.calculate() }
@@ -117,7 +120,7 @@ fun DashboardScreen(
                 }
             }
 
-            if (sessions.isNotEmpty()) {
+            if (sessions.isNotEmpty() && showHeatmap) {
                 item {
                     AppCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -145,7 +148,7 @@ fun DashboardScreen(
             }
 
             val hasTrend = sessions.isNotEmpty() && showTrendChart
-            val hasTop = substanceSessionPairs.isNotEmpty()
+            val hasTop = showTopSubstances && substanceSessionPairs.isNotEmpty()
             if (hasTrend || hasTop) {
                 item {
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -172,7 +175,7 @@ fun DashboardScreen(
                 }
             }
 
-            if (toleranceList.isNotEmpty()) {
+            if (showTolerance && toleranceList.isNotEmpty()) {
                 item(key = "tolerance-overview") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(

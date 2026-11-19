@@ -16,6 +16,7 @@ package app.journal.data
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.serde.AppJson
+import app.journal.util.TimeDisplayMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -127,6 +128,14 @@ class JournalRepository internal constructor() : IJournalRepository {
     override val obsidianSubfolder: StateFlow<String> = prefs.obsidianSubfolder
     override val obsidianFileOrganization: StateFlow<String> = prefs.obsidianFileOrganization
     override val showSessionsTrendChart: StateFlow<Boolean> = prefs.showSessionsTrendChart
+    override val startTab: StateFlow<StartTab> = prefs.startTab
+    override val timeDisplayMode: StateFlow<TimeDisplayMode> = prefs.timeDisplayMode
+    override val dashboardHeatmap: StateFlow<Boolean> = prefs.dashboardHeatmap
+    override val dashboardTolerance: StateFlow<Boolean> = prefs.dashboardTolerance
+    override val dashboardTopSubstances: StateFlow<Boolean> = prefs.dashboardTopSubstances
+    override val confirmDeletes: StateFlow<Boolean> = prefs.confirmDeletes
+    override val autosaveDelay: StateFlow<AutosaveDelay> = prefs.autosaveDelay
+    override val autoBackupOnClose: StateFlow<Boolean> = prefs.autoBackupOnClose
 
     override val pendingConflictCount: Flow<Int> = syncBridge.pendingConflictCount
     override fun dosesForSubstance(substanceId: String): Flow<List<Dose>> = indices.dosesForSubstance(substanceId)
@@ -244,6 +253,15 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun setObsidianSubfolder(folder: String) = prefs.setObsidianSubfolder(folder)
     override fun setObsidianFileOrganization(org: String) = prefs.setObsidianFileOrganization(org)
     override fun setShowSessionsTrendChart(enabled: Boolean) = prefs.setShowSessionsTrendChart(enabled)
+
+    override fun setStartTab(tab: StartTab) = prefs.setStartTab(tab)
+    override fun setTimeDisplayMode(mode: TimeDisplayMode) = prefs.setTimeDisplayMode(mode)
+    override fun setDashboardHeatmap(shown: Boolean) = prefs.setDashboardHeatmap(shown)
+    override fun setDashboardTolerance(shown: Boolean) = prefs.setDashboardTolerance(shown)
+    override fun setDashboardTopSubstances(shown: Boolean) = prefs.setDashboardTopSubstances(shown)
+    override fun setConfirmDeletes(enabled: Boolean) = prefs.setConfirmDeletes(enabled)
+    override fun setAutosaveDelay(delay: AutosaveDelay) = prefs.setAutosaveDelay(delay)
+    override fun setAutoBackupOnClose(enabled: Boolean) = prefs.setAutoBackupOnClose(enabled)
 
 
     override fun upsertNote(note: Note) = mutations.upsertNote(note)
