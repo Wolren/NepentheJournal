@@ -274,8 +274,16 @@ jobs:
           # on the release itself instead of leaving it to the user to find out.
           TITLE="Nepenthe Journal $GITHUB_REF_NAME"
           if [ -z "${WINDOWS_SIGN_PFX_BASE64:-}" ]; then TITLE="$TITLE (unsigned)"; fi
+          # The release body is the curated changelog, not a dump of every commit.
+          if [[ "$GITHUB_REF_NAME" == *-alpha ]]; then
+            echo "This is an alpha build: the feature set and the on-disk format can still change. Keep a sealed backup of your journal." > release-notes.md
+            echo >> release-notes.md
+          else
+            : > release-notes.md
+          fi
+          cat .github/release-header.md CHANGELOG.md >> release-notes.md
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$TITLE" \
-            --generate-notes $PRERELEASE \
+            --notes-file release-notes.md $PRERELEASE \
             dist/*.msi dist/*.zip dist/*.deb dist/*.dmg dist/SHA256SUMS.txt
