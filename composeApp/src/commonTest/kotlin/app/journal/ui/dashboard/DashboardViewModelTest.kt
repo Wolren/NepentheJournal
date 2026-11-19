@@ -40,8 +40,14 @@ class DashboardViewModelTest {
     @Test
     fun `dated substances are computed once and match every dose`() = runBlocking {
         val viewModel = DashboardViewModel(makeRepo())
-        val first = viewModel.substancesByDate.first { it.isNotEmpty() }
-        val second = viewModel.substancesByDate.first { it.isNotEmpty() }
+        // The combine publishes once with the still-empty name map (dose ids as
+        // fallback names) and again when the substance names arrive. Wait for the
+        // settled map, or the identity check races that second emission.
+        val settled: (Map<kotlinx.datetime.LocalDate, List<String>>) -> Boolean = { byDate ->
+            byDate.values.any { names -> "LSD" in names }
+        }
+        val first = viewModel.substancesByDate.first(settled)
+        val second = viewModel.substancesByDate.first(settled)
         assertSame(first, second, "a re-subscribe must reuse the date map")
 
         val expectedDate = Instant.fromEpochMilliseconds(timestamp)
