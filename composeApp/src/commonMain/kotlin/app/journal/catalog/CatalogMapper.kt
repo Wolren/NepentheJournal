@@ -13,7 +13,6 @@ import app.journal.model.PdspData
 import app.journal.model.Substance
 import app.journal.model.WikipediaData
 import app.journal.serde.AppJson
-import app.journal.util.parallelMap
 import kotlinx.serialization.Serializable
 
 /**
@@ -50,8 +49,14 @@ internal object CatalogMapper {
         }.executeAsList().groupBy({ it.first }, { it.second to it.third })
         StartupClock.mark("catalog queries done")
 
-        // Row mapping is pure and per-row, so the lanes can decode payloads in parallel.
-        return parallelMap(rows) { raw ->
+        // Row mapping is pure and per-row, but it stays SEQUENTIAL: measured on the
+        // 9.4 MB payload of the shipped catalog, every threaded shape lost to one
+        // pass. 8-lane ForkJoin, an 8-thread chunked pool and the common-pool stream
+        // all ran 235-270 ms against 110-125 ms single-threaded (4 GB heap too, so
+        // it is not GC), and loadSubstances() fell from ~340 ms to ~120 ms. The
+        // decode allocates too densely to scale; do not re-parallelise it without
+        // re-measuring.
+        return rows.map { raw ->
             val substanceDoses = doses[raw.id].orEmpty()
             val substanceDurations = durations[raw.id].orEmpty()
             val substanceIdentifiers = identifiers[raw.id].orEmpty().toMap()
