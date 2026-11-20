@@ -222,7 +222,13 @@ android {
     }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            // R8 on release. proguard-rules.pro covers serialization, ktor, jmdns and BouncyCastle.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // zstd-jni's x86_64 .so is 4 KB aligned; Play needs 16 KB, and debug keeps every ABI.
             ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             if (hasUploadKeystore) signingConfig = signingConfigs.getByName("release")
