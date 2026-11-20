@@ -273,10 +273,9 @@ compose.desktop {
         mainClass = "app.journal.MainKt"
         // Empty assistive_technologies: a stale system-wide Java Access Bridge registration makes AWT abort startup (AWTError, no window).
         jvmArgs("-Djavax.accessibility.assistive_technologies=")
-        // AppCDS archive halves class loading; JDK 19+ only, ignored elsewhere so a launch never fails.
-        jvmArgs("-XX:+IgnoreUnrecognizedVMOptions")
-        jvmArgs("-XX:+AutoCreateSharedArchive")
-        jvmArgs("-XX:SharedArchiveFile=\$APPDIR/nepenthe.jsa")
+        // AppCDS was removed after measurement: with no archive yet in place AutoCreateSharedArchive
+        // stalled 16.3 s before the first frame (the archive only exists after a clean close), and
+        // it is invalidated by every update. Without it the first frame lands in ~1.5 s, every time.
         nativeDistributions {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
