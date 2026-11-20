@@ -91,9 +91,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val repo = JournalRepository.instance
-        activityScope.launch {
-            DataInitializer.ensureInitialized(repo, activityScope)
-        }
 
         AndroidFilePickerBridge.launchCreateDocument = { _, defaultName ->
             createDocumentLauncher.launch(defaultName)
@@ -107,7 +104,15 @@ class MainActivity : ComponentActivity() {
 
         PendingQuickLog.offer(intent?.dataString)
 
-        setContent { App() }
+        setContent {
+            // The bundled catalog build is seconds of SQLite and mapping work. Starting it one
+            // frame later keeps the first composition off a busy CPU and lets the splash paint.
+            LaunchedEffect(Unit) {
+                withFrameNanos { }
+                activityScope.launch { DataInitializer.ensureInitialized(repo, activityScope) }
+            }
+            App()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
