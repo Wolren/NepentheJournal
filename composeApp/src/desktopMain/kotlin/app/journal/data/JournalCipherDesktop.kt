@@ -26,18 +26,17 @@ private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
     val file = keyFile()
     val path = file.absolutePath
     cachedKey?.let { (cachedPath, key) -> if (cachedPath == path) return@withLock key }
-    val existing = if (file.exists()) file.readBytes() else null
-    val decoded = existing?.let(::decodeKeyBytes)
+    val existing = readKeyFile(file)
+    val decoded = existing?.let(::decodeStoredKey)
     if (decoded != null) {
-        if (isWindows() && existing.size == 32) {
-            // Legacy plain key: re-wrap it now that DPAPI is available.
-            persistKey(file, decoded)
-        }
         cachedKey = path to decoded
         return@withLock decoded
     }
-    if (existing != null && quarantineKeyFile(file) == null) {
-        throw IllegalStateException("Unreadable key file ${file.absolutePath} cannot be moved aside")
+    if (existing != null) {
+        // Not a key here: keep the bytes as evidence, mint this device's own key.
+        if (quarantineKeyFile(file) == null) {
+            throw IllegalStateException("Unreadable key file ${file.absolutePath} cannot be moved aside")
+        }
     }
     val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }
     persistKey(file, fresh)
@@ -48,16 +47,57 @@ private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
 private fun isWindows(): Boolean =
     System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
 
-/** Raw 32 bytes on POSIX, a DPAPI blob on Windows; null when neither decodes to a key. */
-private fun decodeKeyBytes(bytes: ByteArray): ByteArray? {
-    if (bytes.size == 32) return bytes
-    if (!isWindows()) return null
+/** Stored key bytes, or null when the file is absent or implausibly large. Read-only. */
+private fun readKeyFile(file: File): ByteArray? {
+    if (!file.isFile) return null
+    if (file.length() > MAX_KEY_FILE_BYTES) {
+        Log.withTag("JournalAtRest").w { "Refusing oversized key file (${file.length()} bytes)" }
+        return null
+    }
+    return runCatching { file.readBytes() }.getOrNull()
+}
+
+/**
+ * POSIX: 32 raw bytes. Windows: a DPAPI blob only. A raw 32-byte file on Windows is
+ * NOT a key by itself; [journalOpen] may adopt one after it decrypts the journal.
+ */
+private fun decodeStoredKey(bytes: ByteArray): ByteArray? {
+    if (!isWindows()) return bytes.takeIf { it.size == 32 }
     return runCatching {
         Crypt32Util.cryptUnprotectData(bytes)
     }.getOrNull()?.takeIf { it.size == 32 }
 }
 
-/** POSIX: the key sits in a directory no other local user can traverse; the file mode alone leaves a race. */
+/**
+ * A read must never create, replace or move key material: a sealed journal can only
+ * be opened by the key that sealed it, and a load that rotates the key orphans every
+ * sealed copy. The one write allowed here is wrapping a PROVEN legacy raw key under
+ * DPAPI (a migration, not a replacement).
+ */
+internal actual fun journalOpen(sealed: ByteArray): ByteArray {
+    val file = keyFile()
+    val path = file.absolutePath
+    cachedKey?.let { (cachedPath, key) -> if (cachedPath == path) return aesGcmOpen(sealed, key) }
+    val existing = readKeyFile(file)
+        ?: throw IllegalStateException("Sealed journal but no key file at $path; refusing to mint one")
+    decodeStoredKey(existing)?.let { key ->
+        cachedKey = path to key
+        return aesGcmOpen(sealed, key)
+    }
+    if (isWindows() && existing.size == 32) {
+        val opened = runCatching { aesGcmOpen(sealed, existing) }
+        if (opened.isSuccess) {
+            // Legacy raw key proven by the journal: wrap it so a copied folder stops carrying it.
+            runCatching { persistKey(file, existing) }
+                .onFailure { Log.withTag("JournalAtRest").w { "Cannot wrap the legacy key: ${it.message}" } }
+            cachedKey = path to existing
+            return opened.getOrThrow()
+        }
+    }
+    throw IllegalStateException("Journal key at $path cannot open the sealed journal; left in place")
+}
+
+/** POSIX: the key directory is owner-only; the file mode alone leaves a race. */
 private fun restrictDataDir(dir: File?): Boolean {
     if (dir == null || isWindows()) return true
     return runCatching {
@@ -105,4 +145,5 @@ internal fun quarantineKeyFile(file: File): File? {
 
 internal actual fun journalSeal(plain: ByteArray): ByteArray = aesGcmSeal(plain, loadOrCreateKey())
 
-internal actual fun journalOpen(sealed: ByteArray): ByteArray = aesGcmOpen(sealed, loadOrCreateKey())
+/** Sanity cap so a corrupt key file can never OOM the reader. */
+private const val MAX_KEY_FILE_BYTES = 4096L

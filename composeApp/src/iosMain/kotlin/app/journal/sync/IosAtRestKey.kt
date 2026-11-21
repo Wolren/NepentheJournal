@@ -52,9 +52,9 @@ import platform.posix.memcpy
  * the trust and identity stores with AES-256-GCM. The Keychain entry is
  * app namespaced by the OS, so no access group is needed.
  *
- * When the Keychain is unavailable (error -25291, and in unit-test bundles no
- * keychain exists) the key falls back to a 32-byte file inside the app
- * container, which has the same protection class as the desktop key file.
+ * Only a host with NO Keychain at all (unit-test bundles, errSecNotAvailable)
+ * uses the 32-byte container-file fallback. A missing entitlement fails closed:
+ * a container key would silently downgrade the protection class.
  */
 @OptIn(ExperimentalForeignApi::class)
 internal class IosAtRestKey(
@@ -63,8 +63,15 @@ internal class IosAtRestKey(
     private val fallbackFile: String? = null
 ) {
 
-    /** Raised when no Keychain exists at all, which is the only case that may fall back. */
-    private class KeychainUnavailable(message: String) : IllegalStateException(message)
+    /**
+     * Raised when the Keychain cannot serve the key. Only "no Keychain in this
+     * host" (test bundles) may fall back; a missing entitlement is a broken
+     * install, and a container-file key would silently downgrade protection.
+     */
+    private class KeychainUnavailable(
+        message: String,
+        val fallbackAllowed: Boolean,
+    ) : IllegalStateException(message)
 
     @kotlin.concurrent.Volatile
     private var cached: ByteArray? = null
@@ -82,6 +89,9 @@ internal class IosAtRestKey(
             cached = fresh
             return fresh
         } catch (e: KeychainUnavailable) {
+            if (!e.fallbackAllowed) {
+                throw IllegalStateException("Keychain entitlement missing for $service; refusing a container-file key", e)
+            }
             Log.withTag("IosAtRestKey").w { "${e.message}; using $fallbackFile" }
             return loadOrCreateFallback()
         }
@@ -92,7 +102,12 @@ internal class IosAtRestKey(
         return try {
             loadFromKeychain()?.also { cached = it }
         } catch (e: KeychainUnavailable) {
-            loadOrCreateFallback().also { cached = it }
+            if (!e.fallbackAllowed) {
+                Log.withTag("IosAtRestKey").e { "${e.message}; key unavailable" }
+                null
+            } else {
+                loadOrCreateFallback().also { cached = it }
+            }
         } catch (e: Exception) {
             Log.withTag("IosAtRestKey").w { "Keychain read failed: ${e.message}" }
             null
@@ -155,8 +170,10 @@ internal class IosAtRestKey(
                     }
                 }
                 errSecItemNotFound -> null
-                ERR_SEC_NOT_AVAILABLE, ERR_SEC_MISSING_ENTITLEMENT ->
-                    throw KeychainUnavailable("Keychain read failed with status $status")
+                ERR_SEC_NOT_AVAILABLE ->
+                    throw KeychainUnavailable("Keychain read failed with status $status", fallbackAllowed = true)
+                ERR_SEC_MISSING_ENTITLEMENT ->
+                    throw KeychainUnavailable("Keychain read failed with status $status", fallbackAllowed = false)
                 else -> throw IllegalStateException("Keychain read failed with status $status")
             }
         } finally {
@@ -187,8 +204,10 @@ internal class IosAtRestKey(
                 when (val status = SecItemAdd(addDict, null)) {
                     errSecSuccess -> Unit
                     errSecDuplicateItem -> updateKeychain(key)
-                    ERR_SEC_NOT_AVAILABLE, ERR_SEC_MISSING_ENTITLEMENT ->
-                        throw KeychainUnavailable("Keychain write failed with status $status")
+                    ERR_SEC_NOT_AVAILABLE ->
+                        throw KeychainUnavailable("Keychain write failed with status $status", fallbackAllowed = true)
+                    ERR_SEC_MISSING_ENTITLEMENT ->
+                        throw KeychainUnavailable("Keychain write failed with status $status", fallbackAllowed = false)
                     else -> throw IllegalStateException("Keychain write failed with status $status")
                 }
             } finally {

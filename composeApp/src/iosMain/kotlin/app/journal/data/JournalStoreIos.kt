@@ -310,14 +310,8 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 if (fileManager.fileExistsAtPath(backupPath())) {
                     fileManager.removeItemAtPath(backupPath(), null)
                 }
-                if (fullBackup) {
-                    if (!fileManager.moveItemAtPath(dataPath(), toPath = backupPath(), error = null)) {
-                        // Copy fallback keeps dataPath in place (also window-free).
-                        fileManager.copyItemAtPath(dataPath(), toPath = backupPath(), error = null)
-                    }
-                } else {
-                    fileManager.copyItemAtPath(dataPath(), toPath = backupPath(), error = null)
-                }
+                // COPY, never move: a move empties the live path until the temp rename below.
+                fileManager.copyItemAtPath(dataPath(), toPath = backupPath(), error = null)
             }
 
             if (!fileManager.moveItemAtPath(tempPath(), toPath = dataPath(), error = null)) {
