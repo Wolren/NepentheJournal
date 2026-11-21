@@ -273,7 +273,7 @@ fun SettingsScreen(
                     onManualTokenChange = { syncState = syncState.copy(manualToken = it) },
                     onContinuousSyncChange = { syncState = syncState.copy(continuousSync = it) },
                     onSyncExpanded = { syncState = syncState.copy(syncExpanded = !syncState.syncExpanded) },
-                    onLogLine = { logLines = listOf(it) + logLines },
+                    onLogLine = { logLines = appendSyncLog(logLines, it) },
                     onTrustedDevicesChange = { trustedDevices = it },
                     onIsSyncingChange = { syncState = syncState.copy(isSyncing = it) },
                     onIsStartingHostChange = { syncState = syncState.copy(isStartingHost = it) },
