@@ -52,8 +52,11 @@ private fun europeanTimestamp(text: String, tz: TimeZone): Long? {
     if (month !in 1..12 || day !in 1..31) return null
     val hour = match.groupValues[4].toIntOrNull() ?: 0
     val minute = match.groupValues[5].toIntOrNull() ?: 0
-    val local = LocalDateTime(match.groupValues[3].toInt(), Month.entries[month - 1], day, hour, minute)
-    return runCatching { local.toInstant(tz).toEpochMilliseconds() }.getOrNull()
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return runCatching {
+        LocalDateTime(match.groupValues[3].toInt(), Month.entries[month - 1], day, hour, minute)
+            .toInstant(tz).toEpochMilliseconds()
+    }.getOrNull()
 }
 
 private val EUROPEAN = Regex("^(\\d{1,2})[./](\\d{1,2})[./](\\d{4})(?:[ T](\\d{1,2}):(\\d{2}))?$")

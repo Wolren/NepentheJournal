@@ -194,7 +194,8 @@ fun DashboardScreen(
                         toleranceList.forEach { info -> ToleranceCard(info) }
                     }
                 }
-            } else {
+            }
+            if (sessions.isEmpty()) {
                 item {
                     Box(Modifier.fillMaxWidth().padding(vertical = 48.dp),
                         contentAlignment = Alignment.Center) {

@@ -182,9 +182,9 @@ object ObsidianNoteImporter {
      * Handles both Unix (\n) and Windows (\r\n) line endings.
      */
     internal fun extractCanonicalBlock(text: String): String? {
-        val startIdx = text.indexOf(BLOCK_OPEN)
-        if (startIdx < 0) return null
         val normalized = text.replace("\r\n", "\n")
+        val startIdx = normalized.indexOf(BLOCK_OPEN)
+        if (startIdx < 0) return null
         val contentStart = startIdx + BLOCK_OPEN.length
         val rest = normalized.substring(contentStart)
         val newlineIdx = rest.indexOf('\n')

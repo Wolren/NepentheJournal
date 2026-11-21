@@ -160,4 +160,14 @@ this is not json
         assertEquals(2, result.created)
         assertEquals(2, repo.sessions.value.size)
     }
+
+    @Test
+    fun canonicalBlockSurvivesCrlf() {
+        val block = canonicalBlock
+        val expected = block.substringAfter("```nepenthe\n").substringBefore("\n```")
+        val crlf = block.replace("\n", "\r\n")
+
+        assertEquals(expected, ObsidianNoteImporter.extractCanonicalBlock(block))
+        assertEquals(expected, ObsidianNoteImporter.extractCanonicalBlock(crlf))
+    }
 }

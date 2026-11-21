@@ -350,12 +350,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                     out.fd.sync()
                 }
             }
-            if (tmp.renameTo(to)) {
-                true
-            } else {
-                to.delete()
-                tmp.renameTo(to)
-            }
+            replaceFileAtomically(tmp, to)
         } catch (e: Exception) {
             Log.withTag("JournalStore").w { "Durable copy failed: ${e.message}" }
             false
