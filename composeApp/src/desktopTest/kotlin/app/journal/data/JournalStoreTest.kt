@@ -256,8 +256,8 @@ class JournalStoreTest {
         assertTrue(autoDir.isDirectory(), ".auto/ directory should exist")
         val files = autoDir.listFiles() ?: emptyArray()
         assertEquals(1, files.size, "Should have exactly one auto-backup file")
-        assertTrue(files[0].name.matches(Regex("""\d{8}_\d{6}\.json""")),
-            "Auto-backup file should match YYYYMMDD_HHmmss.json pattern: ${files[0].name}")
+        assertTrue(files[0].name.matches(Regex("""\d{8}_\d{6}(?:_\d{3})?\.json""")),
+            "Auto-backup file should match YYYYMMDD_HHmmss[_SSS].json pattern: ${files[0].name}")
         assertTrue(files[0].length() > 0, "Auto-backup should not be empty")
         assertTrue(files[0].readJournal().contains("AutoSave Test"),
             "Auto-backup content should contain saved session data")
@@ -366,7 +366,7 @@ class JournalStoreTest {
             ?: emptyList()
         assertEquals(10, remaining.size,
             "Should keep exactly 10 auto-backups after rotation")
-        assertTrue(remaining.first().name.matches(Regex("""\d{8}_\d{6}\.json""")),
+        assertTrue(remaining.first().name.matches(Regex("""\d{8}_\d{6}(?:_\d{3})?\.json""")),
             "Newest file should be the freshly created auto-backup: ${remaining.first().name}")
     }
 

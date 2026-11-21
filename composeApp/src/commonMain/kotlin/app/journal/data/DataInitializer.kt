@@ -50,6 +50,8 @@ object DataInitializer {
     private var initialized = false
     private var autoSaveJob: Job? = null
     private var libraryJob: Job? = null
+    private var journalStore: JournalStore? = null
+    private var journalStoreRepo: IJournalRepository? = null
 
     /** Application-lifetime scope: MainActivity cancels its own scope in onDestroy. */
     private val libraryScope = CoroutineScope(
@@ -95,6 +97,8 @@ object DataInitializer {
             autoSaveJob = null
             libraryJob?.cancel()
             libraryJob = null
+            journalStore = null
+            journalStoreRepo = null
         }
         phase("Loading journal")
         _libraryReadyFlow.value = false
@@ -127,6 +131,16 @@ object DataInitializer {
         libraryJob?.join()
     }
 
+    /** The one store that loaded the journal; the UI must share it to see load issues. */
+    fun storeFor(repo: IJournalRepository): JournalStore = guardLock.withLock {
+        val existing = journalStore
+        if (existing != null && journalStoreRepo === repo) return@withLock existing
+        JournalStore(repo as JournalRepository).also {
+            journalStore = it
+            journalStoreRepo = repo
+        }
+    }
+
     /**
      * Synchronous startup: user data, auto-save and crash leftovers, then
      * either an immediate library-ready signal or the queued background build.
@@ -134,7 +148,7 @@ object DataInitializer {
      * [initializedFlow] always opens the UI gate.
      */
     private fun startJournal(repo: IJournalRepository, scope: CoroutineScope?) {
-        val store = JournalStore(repo as JournalRepository)
+        val store = storeFor(repo)
         val startedAt = currentTimeMillis()
 
         // Step 1: Load user data from disk first (to check for old IDs)

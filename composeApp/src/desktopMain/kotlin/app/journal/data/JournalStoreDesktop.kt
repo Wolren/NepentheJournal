@@ -64,6 +64,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
 
         if (target.length() > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
+            quarantineUnreadable(RuntimeException("journal file exceeds 50 MB"))
             return@withLock
         }
         try {
@@ -84,6 +85,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             savedLibraryVersion = if (loaded.needsLibraryWrite) -1L else repo.libraryVersion.value
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to load journal data: ${e.message}" }
+            quarantineUnreadable(e)
         }
     }
 
@@ -100,6 +102,29 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         } catch (e: Exception) {
             Log.withTag("JournalStore").w { "Unreadable journal library: ${e.message}" }
             null
+        }
+    }
+
+    /** Renames the unreadable journal and its .bak so autosave cannot overwrite them. */
+    private fun quarantineUnreadable(cause: Exception) {
+        val stamp = System.currentTimeMillis()
+        val kept = mutableListOf<String>()
+        val dir = File(dataPath()).absoluteFile.parentFile
+        val candidates = listOf(
+            File(dataPath()) to "journal-data.json",
+            File(backupPath()) to "journal-data.json.bak",
+        )
+        for ((file, name) in candidates) {
+            if (!file.exists()) continue
+            val keptFile = File(dir, "$name.unreadable-$stamp")
+            val moved = file.renameTo(keptFile) || file.copyTo(keptFile, overwrite = true).exists()
+            if (moved) kept.add(keptFile.name)
+        }
+        lastLoadHadIssues = true
+        lastLoadIssueSummary = buildString {
+            append("This device can no longer decrypt the journal (${cause.message ?: cause::class.simpleName}). ")
+            if (kept.isEmpty()) append("No sealed copy could be set aside.")
+            else append("Sealed copies are kept as ${kept.joinToString()}.")
         }
     }
 
@@ -274,7 +299,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
             val autoDir = File(target.parentFile, ".auto")
             autoDir.mkdirs()
-            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+            val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS"))
             val backupFile = File(autoDir, "$timestamp.json")
             val text = AppJson.json.encodeToString(repo.fullSnapshot())
             writeSealed(backupFile, text)

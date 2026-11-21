@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.log.Log
 import app.journal.model.*
 import app.journal.serde.AppJson
+import app.journal.util.TimeDisplayMode
 import app.journal.util.currentTimeMillis
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
@@ -113,7 +114,16 @@ internal fun recoverSnapshot(text: String): JournalSnapshot {
         obsidianAutoExport = decodeBoolean(root, "obsidianAutoExport", false),
         obsidianSubfolder = decodeString(root, "obsidianSubfolder", "Nepenthe"),
         obsidianFileOrganization = decodeString(root, "obsidianFileOrganization", "flat"),
-        showSessionsTrendChart = decodeBoolean(root, "showSessionsTrendChart", false)
+        showSessionsTrendChart = decodeBoolean(root, "showSessionsTrendChart", false),
+        version = decodeInt(root, "version", JournalSnapshot.CURRENT_VERSION),
+        startTab = decodeEnum(root, "startTab", StartTab.serializer(), StartTab.DASHBOARD),
+        timeDisplayMode = decodeEnum(root, "timeDisplayMode", TimeDisplayMode.serializer(), TimeDisplayMode.RELATIVE),
+        dashboardHeatmap = decodeBoolean(root, "dashboardHeatmap", true),
+        dashboardTolerance = decodeBoolean(root, "dashboardTolerance", true),
+        dashboardTopSubstances = decodeBoolean(root, "dashboardTopSubstances", true),
+        confirmDeletes = decodeBoolean(root, "confirmDeletes", true),
+        autosaveDelay = decodeEnum(root, "autosaveDelay", AutosaveDelay.serializer(), AutosaveDelay.FAST),
+        autoBackupOnClose = decodeBoolean(root, "autoBackupOnClose", true)
     )
 }
 
@@ -142,3 +152,12 @@ private fun decodeNullableString(root: JsonObject, key: String): String? =
         val el = root[key] ?: return@runCatching null
         if (el is JsonNull) null else el.jsonPrimitive.content
     }.getOrNull()
+
+private fun decodeInt(root: JsonObject, key: String, default: Int): Int =
+    runCatching { root[key]?.jsonPrimitive?.int ?: default }.getOrDefault(default)
+
+private fun <T> decodeEnum(root: JsonObject, key: String, serializer: KSerializer<T>, default: T): T =
+    runCatching {
+        val element = root[key] ?: return@runCatching default
+        AppJson.json.decodeFromJsonElement(serializer, element)
+    }.getOrDefault(default)

@@ -4,14 +4,18 @@
 
 `macrobenchmark` holds two Macrobenchmark tests against the shipped app:
 
-- `ScrollBenchmark.flingSubstanceList` measures cold startup and frame timing while the
-  substance list flings five times. It is the longest scrolling surface in the app.
-- `JourneyBenchmark.tabJourney` measures frame timing across the three main tabs:
+- `ScrollBenchmark.flingSubstanceList` measures cold startup and the frame count while
+  the substance list flings five times. It is the longest scrolling surface in the app.
+- `JourneyBenchmark.tabJourney` measures the frame count across the three main tabs:
   dashboard, substances, settings. Each step waits for a screen marker, so broken
   navigation fails the benchmark.
 
 Both use `CompilationMode.Partial(BaselineProfileMode.Require)`. A missing baseline
 profile fails the run instead of silently measuring an unoptimized build.
+
+On the CI emulator the frame-duration series is unavailable because the emulator
+renders in software; the uploaded JSON carries the frame count and the startup
+timing. Frame timing needs a hardware-accelerated device.
 
 ## Local run
 

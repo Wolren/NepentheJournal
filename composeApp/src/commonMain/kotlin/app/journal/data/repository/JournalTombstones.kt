@@ -89,8 +89,7 @@ internal class JournalTombstones(
      * that object. Callers must hold [lock] (watermark reads take their
      * own lock; nesting order is always tombstone lock -> watermark lock).
      */
-    private fun mayPruneTombstone(deletedAt: Long, now: Long): Boolean {
-        val floor = PeerSyncWatermarks.watermarkFloor()
+    private fun mayPruneTombstone(deletedAt: Long, now: Long, floor: Long?): Boolean {
         return if (floor == null) {
             deletedAt < now - tombstoneRetentionFallbackMs
         } else {
@@ -100,12 +99,18 @@ internal class JournalTombstones(
 
     private fun recordTombstone(type: String, id: String) {
         pruneTombstonesLocked()
+        recordTombstoneNoPrune(type, id)
+    }
+
+    /** Cascade helper: the owning delete already pruned the map. */
+    private fun recordTombstoneNoPrune(type: String, id: String) {
         _tombstones[tombKey(type, id)] = currentTimeMillis()
     }
 
     private fun pruneTombstonesLocked() {
         val now = currentTimeMillis()
-        val stale = _tombstones.filterValues { mayPruneTombstone(it, now) }.keys.toList()
+        val floor = PeerSyncWatermarks.watermarkFloor()
+        val stale = _tombstones.filterValues { mayPruneTombstone(it, now, floor) }.keys.toList()
         for (key in stale) _tombstones.remove(key)
     }
 
@@ -142,8 +147,9 @@ internal class JournalTombstones(
     fun importTombstones(tombstones: Map<String, Long>) = lock.withLock {
         _tombstones.clear()
         val now = currentTimeMillis()
+        val floor = PeerSyncWatermarks.watermarkFloor()
         for ((key, deletedAt) in tombstones) {
-            if (!mayPruneTombstone(deletedAt, now)) _tombstones[key] = deletedAt
+            if (!mayPruneTombstone(deletedAt, now, floor)) _tombstones[key] = deletedAt
         }
     }
 
@@ -186,8 +192,9 @@ internal class JournalTombstones(
     internal fun mergeSnapshotTombstonesLocked(snapshot: JournalSnapshot) {
         pruneTombstonesLocked()
         val now = currentTimeMillis()
+        val floor = PeerSyncWatermarks.watermarkFloor()
         for ((key, deletedAt) in snapshot.tombstones) {
-            if (mayPruneTombstone(deletedAt, now)) continue
+            if (mayPruneTombstone(deletedAt, now, floor)) continue
             val current = _tombstones[key]
             if (current == null || deletedAt > current) _tombstones[key] = deletedAt
         }
@@ -204,7 +211,7 @@ internal class JournalTombstones(
         recordTombstone("session", id)
 
         val removedDoses = dosesStore.removeWhere { it.sessionId == id }
-        for (dose in removedDoses) recordTombstone("dose", dose.id)
+        for (dose in removedDoses) recordTombstoneNoPrune("dose", dose.id)
         val removedSubstances = removedDoses.map { it.substanceId }.toSet()
 
         indices._dosesBySession.remove(id)
@@ -212,9 +219,9 @@ internal class JournalTombstones(
         indices._eventsBySession.remove(id)
 
         val removedNotes = notesStore.removeWhere { it.sessionId == id }
-        for (note in removedNotes) recordTombstone("note", note.id)
+        for (note in removedNotes) recordTombstoneNoPrune("note", note.id)
         val removedEvents = timelineEventsStore.removeWhere { it.sessionId == id }
-        for (event in removedEvents) recordTombstone("timelineEvent", event.id)
+        for (event in removedEvents) recordTombstoneNoPrune("timelineEvent", event.id)
 
         for (subId in removedSubstances) {
             indices._sessionsPerSubstance[subId]?.remove(id)
@@ -251,11 +258,11 @@ internal class JournalTombstones(
     }
 
     internal fun deleteSubstanceLocked(id: String) {
-        substancesStore.remove(id)
+        if (substancesStore.remove(id) == null) return
         recordTombstone("substance", id)
 
         val removedUnits = customUnitsStore.removeWhere { it.substanceId == id }
-        for (unit in removedUnits) recordTombstone("customUnit", unit.id)
+        for (unit in removedUnits) recordTombstoneNoPrune("customUnit", unit.id)
         indices._customUnitsBySubstance.remove(id)
 
         effectsStore.forEachValue { effect ->
@@ -268,10 +275,10 @@ internal class JournalTombstones(
         val removedInteractions = interactionsStore.removeWhere {
             id in listOf(it.substanceAId, it.substanceBId)
         }
-        for (interaction in removedInteractions) recordTombstone("interaction", interaction.id)
+        for (interaction in removedInteractions) recordTombstoneNoPrune("interaction", interaction.id)
 
         val removedSubstanceDoses = dosesStore.removeWhere { it.substanceId == id }
-        for (dose in removedSubstanceDoses) recordTombstone("dose", dose.id)
+        for (dose in removedSubstanceDoses) recordTombstoneNoPrune("dose", dose.id)
         val affectedSessionIds = removedSubstanceDoses.map { it.sessionId }.toSet()
         for (sessionId in affectedSessionIds) {
             indices._dosesBySession[sessionId]?.removeAll { it.substanceId == id }

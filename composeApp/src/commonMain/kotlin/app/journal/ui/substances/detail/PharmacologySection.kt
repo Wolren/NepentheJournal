@@ -1012,7 +1012,8 @@ private fun AffinityLegend(trailing: String) {
     }
 }
 
-private fun formatAffinity(nm: Double): String = when {
+internal fun formatAffinity(nm: Double): String = when {
+    !nm.isFinite() || nm <= 0.0 -> "n/a"
     nm < 0.01 -> {
         var exp = 0
         var m = nm

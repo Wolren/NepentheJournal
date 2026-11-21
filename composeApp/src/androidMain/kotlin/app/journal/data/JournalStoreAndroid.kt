@@ -58,6 +58,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
 
         if (target.length() > 50_000_000) {
             Log.withTag("JournalStore").e { "Journal file too large (${target.length()} bytes), refusing to load" }
+            quarantineUnreadable(RuntimeException("journal file exceeds 50 MB"))
             return@withLock
         }
         try {

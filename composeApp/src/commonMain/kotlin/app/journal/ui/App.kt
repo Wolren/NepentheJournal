@@ -18,7 +18,6 @@ import androidx.compose.runtime.*
 import app.journal.data.DataInitializer
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalRepository
-import app.journal.data.JournalStore
 import app.journal.log.StartupClock
 import app.journal.ui.theme.LocalSpacing
 import app.journal.ui.theme.LocalThemeConfig
@@ -38,7 +37,7 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
     val ready by DataInitializer.initializedFlow.collectAsState()
     val phase by DataInitializer.phase.collectAsState()
 
-    val journalStore = remember(repo) { JournalStore(repo) }
+    val journalStore = remember(repo) { DataInitializer.storeFor(repo) }
 
     // Splash leaves the first frame to the window, so this mark is the composition, not the paint.
     LaunchedEffect(Unit) { StartupClock.mark("splash composed") }

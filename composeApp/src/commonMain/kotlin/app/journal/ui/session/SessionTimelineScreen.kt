@@ -215,8 +215,8 @@ fun SessionTimelineScreen(
                     SectionHeader("Phases")
                 }
             }
-            phaseRanges.forEach { phase ->
-                item(key = "phase_card_${phase.label}") {
+            phaseRanges.forEachIndexed { index, phase ->
+                item(key = "phase_card_$index") {
                     PhaseCard(phase = phase, startTime = session.startTime)
                     Spacer(Modifier.height(4.dp))
                 }
