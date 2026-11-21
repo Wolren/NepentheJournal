@@ -30,6 +30,33 @@ The Release workflow fails its version guard when these drift:
    installers, writes `SHA256SUMS.txt` and creates the GitHub Release with
    generated notes.
 
+## Signing the release checksums
+
+The installers are unsigned until a Windows and a macOS code-signing certificate
+exist. Until then the checksums carry the tamper evidence. The Release workflow
+signs `SHA256SUMS.txt` with a GPG key when the `RELEASE_SIGNING_KEY` secret is
+present, and publishes `SHA256SUMS.txt.asc` next to it.
+
+One time, on a trusted machine:
+
+```bash
+gpg --quick-generate-key "Nepenthe Journal releases <you@example>"
+gpg --armor --export <fingerprint> > release-key.asc
+gpg --armor --export-secret-keys <fingerprint> > release-key.secret.asc
+```
+
+Add the secret key as the `RELEASE_SIGNING_KEY` repository secret, its passphrase
+as `RELEASE_SIGNING_PASSPHRASE`, and commit the public `release-key.asc` so
+downloaders can import it from the repository.
+
+A download verifies with:
+
+```bash
+gpg --import release-key.asc
+gpg --verify SHA256SUMS.txt.asc SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt
+```
+
 ## Android baseline profile
 
 The generated profile in `composeApp/src/androidRelease/generated/baselineProfiles`
