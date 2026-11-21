@@ -69,6 +69,12 @@ class TlsIdentityManager(private val dataDir: String = platformSyncDataDir()) {
         }
     }
 
+    /** Key store for the host's TLS connector; the same PKCS12 the fingerprint comes from. */
+    fun keyStore(): KeyStore {
+        ensureIdentity()
+        return loadKeyStore()
+    }
+
     /**
      * A random stable device fingerprint that's unique per installation.
      * Generated and cached from the cert's SHA-256 hash.

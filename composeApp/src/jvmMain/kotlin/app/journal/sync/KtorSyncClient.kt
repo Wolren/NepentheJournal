@@ -50,11 +50,14 @@ class KtorSyncClient(
     private val deviceFingerprint: String? = null,
     private val deviceName: String = "Desktop (Windows)",
     private val sharedSecret: String? = null,
-    trustedFingerprint: String? = null,
+    private val trustedFingerprint: String? = null,
+    private val tlsPort: Int = 0,
     private val persistAfterApply: (() -> Unit)? = null
 ) {
     private val json = AppJson.json
     private val canSign: Boolean get() = sharedSecret != null
+    private val pinning = PinnedTrustManager(trustedFingerprint)
+    private var effectiveTlsPort: Int = tlsPort
 
     private val client: HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) { json(json) }
@@ -64,11 +67,45 @@ class KtorSyncClient(
             connectTimeoutMillis = 10_000
             socketTimeoutMillis = 15_000
         }
+        engine {
+            https {
+                trustManager = pinning
+            }
+        }
     }
 
-    /** "http://host:port" for every HTTP sync endpoint. */
+    /**
+     * "https://host:tlsPort" once a fingerprint is pinned and the host advertised a TLS
+     * port; "http://host:port" for the bootstrap HostInfo read and for HTTP-only hosts
+     * (iOS, or a host that predates the TLS phase).
+     */
     private fun endpoint(host: String, port: Int): String =
-        "${SyncEndpoints.URL_SCHEME}://$host:$port"
+        if (effectiveTlsPort > 0 && pinning.expectedFingerprint != null) {
+            "https://$host:$effectiveTlsPort"
+        } else {
+            "${SyncEndpoints.URL_SCHEME}://$host:$port"
+        }
+
+    /**
+     * Adopt a host's TLS advertisement. The fingerprint check runs before the pin is
+     * used, so a stored peer cannot silently switch certificates; the first HTTPS call
+     * then verifies the chain against [PinnedTrustManager].
+     */
+    private fun adoptHostInfo(info: HostInfo): Result<Unit> {
+        val expected = pinning.expectedFingerprint
+        if (expected != null && info.fingerprint.isNotBlank() &&
+            !expected.equals(info.fingerprint, ignoreCase = true)
+        ) {
+            return Result.failure(
+                javax.net.ssl.SSLException("Host fingerprint changed; re-pair required")
+            )
+        }
+        if (info.tlsPort > 0 && info.fingerprint.isNotBlank()) {
+            effectiveTlsPort = info.tlsPort
+            pinning.expectedFingerprint = info.fingerprint
+        }
+        return Result.success(Unit)
+    }
 
 
     suspend fun requestHostInfo(host: String, port: Int): Result<HostInfo> =
@@ -76,6 +113,7 @@ class KtorSyncClient(
             try {
                 val response = client.get("${endpoint(host, port)}${SyncEndpoints.PAIRING_START}")
                 val info = response.body<HostInfo>()
+                adoptHostInfo(info).getOrElse { return@withContext Result.failure(it) }
                 Result.success(info)
             } catch (e: Exception) {
                 Result.failure(e)

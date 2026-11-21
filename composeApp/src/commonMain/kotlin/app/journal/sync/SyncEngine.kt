@@ -53,7 +53,13 @@ data class TrustedDeviceInfo(
     val lastSeenAt: Long?
 )
 
-data class HostingInfo(val address: String, val port: Int, val fingerprint: String)
+data class HostingInfo(
+    val address: String,
+    val port: Int,
+    val fingerprint: String,
+    /** Pinned TLS port, or 0 when this platform hosts over plain HTTP only. */
+    val tlsPort: Int = 0,
+)
 
 data class SyncStatusSnapshot(
     val isHosting: Boolean,

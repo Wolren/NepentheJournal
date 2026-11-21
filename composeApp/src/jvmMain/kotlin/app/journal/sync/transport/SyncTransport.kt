@@ -281,6 +281,7 @@ class SyncTransport(
                     deviceName = deviceDisplayName,
                     sharedSecret = secret,
                     trustedFingerprint = existingPeer.fingerprint,
+                    tlsPort = existingPeer.tlsPort,
                     persistAfterApply = persistAfterApply
                 )
                 try {
@@ -451,6 +452,7 @@ class SyncTransport(
                 deviceName = deviceDisplayName,
                 sharedSecret = secret,
                 trustedFingerprint = existingPeer.fingerprint,
+                tlsPort = existingPeer.tlsPort,
                 persistAfterApply = persistAfterApply
                 )
 

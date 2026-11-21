@@ -152,6 +152,13 @@ row clock; otherwise the whole-row rule above stands. The session outcome note i
 written only when the incoming row stamped its outcome in its latest write and that
 outcome loses. Tombstone cutoffs still compare `updatedAt`.
 
+**Amendment 2026-11-21 (TLS):** JVM and Android hosts bind a pinned TLS connector on an
+ephemeral port advertised as `HostInfo.tlsPort`. Clients that trust the peer use HTTPS
+with the certificate fingerprint pinned; pairing bootstraps over the HTTP connector and
+stores the TLS port. The HTTP connector remains for iOS peers, whose host has no TLS
+certificate path yet. `docs/TLS-SYNC.md` records the downgrade window and the removal
+condition.
+
 **Pin:**
 
 1. ONE shared, pure merge function lives in commonMain (target file:

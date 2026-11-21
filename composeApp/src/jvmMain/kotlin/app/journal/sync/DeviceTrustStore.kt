@@ -39,7 +39,9 @@ class DeviceTrustStore(private val dataDir: String = platformSyncDataDir()) {
         val fingerprint: String,
         val sharedSecret: String,
         val pairedAt: Long,
-        val lastSeenAt: Long? = null
+        val lastSeenAt: Long? = null,
+        /** Pinned TLS port learned at pairing; 0 means the host speaks HTTP only. */
+        val tlsPort: Int = 0
     )
 
     @Serializable

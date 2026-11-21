@@ -68,22 +68,51 @@ class KtorSyncServer(
             this.router = router
 
             runInterruptible {
-                server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+                val keyStore = tlsIdentity.keyStore()
+                val alias = tlsIdentity.alias
+                val storePassword = tlsIdentity.password
+                server = embeddedServer(
+                    Netty,
+                    environment = applicationEnvironment { },
+                    configure = {
+                        connector {
+                            this.port = this@KtorSyncServer.port
+                            host = "0.0.0.0"
+                        }
+                        sslConnector(
+                            keyStore = keyStore,
+                            keyAlias = alias,
+                            // Netty zeroes the password array it receives; hand it copies so
+                            // the cached identity password survives a host restart.
+                            keyStorePassword = { storePassword.copyOf() },
+                            privateKeyPassword = { storePassword.copyOf() },
+                        ) {
+                            port = 0
+                            host = "0.0.0.0"
+                        }
+                    },
+                ) {
                     router.installRouting(this)
                 }
                 server!!.start(wait = false)
             }
-            // Report what Netty really bound: identical to the configured port in production, the ephemeral port when port == 0.
-            val resolved = try {
-                server!!.engine.resolvedConnectors().firstOrNull()?.port
+            // Report what Netty really bound: the HTTP port stays the discovery port, the
+            // TLS connector gets its own ephemeral port and is advertised in HostInfo.
+            val connectors = try {
+                server!!.engine.resolvedConnectors()
             } catch (e: Exception) {
-                Log.withTag("KtorSyncServer").w { "Could not resolve bound port (${e.message}); using configured $port" }
-                null
+                Log.withTag("KtorSyncServer").w { "Could not resolve bound ports (${e.message}); using configured $port" }
+                emptyList()
             }
-            boundPort = resolved ?: port
+            val resolvedHttp = connectors.firstOrNull { it !is io.ktor.server.engine.EngineSSLConnectorConfig }?.port
+            val resolvedTls = connectors.firstOrNull { it is io.ktor.server.engine.EngineSSLConnectorConfig }?.port ?: 0
+            boundPort = resolvedHttp ?: port
+            router.tlsPort = resolvedTls
             val lanIp = resolveLocalIpv4() ?: "127.0.0.1"
-            Log.withTag("KtorSyncServer").i { "Server started on $lanIp:$boundPort (fingerprint=$fp)" }
-            return HostingInfo(lanIp, boundPort!!, fp)
+            Log.withTag("KtorSyncServer").i {
+                "Server started on $lanIp:$boundPort (tls=$resolvedTls, fingerprint=$fp)"
+            }
+            return HostingInfo(lanIp, boundPort!!, fp, resolvedTls)
         } catch (e: Exception) {
             Log.withTag("KtorSyncServer").e(e) { "Server start failed: ${e.message}" }
             throw e

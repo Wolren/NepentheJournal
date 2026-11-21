@@ -40,7 +40,7 @@ internal class SyncPeerOps(
                 val client = KtorSyncClient(
                     repo = repo,
                     tlsIdentity = tlsIdentity,
-                    trustedFingerprint = null
+                    trustedFingerprint = peer.fingerprint
                 )
                 try {
                     val hostInfo = client.requestHostInfo(peer.host, peer.port)
@@ -75,7 +75,8 @@ internal class SyncPeerOps(
                             displayName = pr.hostDeviceName,
                             fingerprint = pr.hostFingerprint,
                             sharedSecret = pr.sharedSecret,
-                            pairedAt = System.currentTimeMillis()
+                            pairedAt = System.currentTimeMillis(),
+                            tlsPort = info.tlsPort
                         ))
                         appendDebug("pairWithPeer: stored trusted peer ${pr.hostDeviceName} (id=${pr.hostDeviceId})")
                         updateStatus()

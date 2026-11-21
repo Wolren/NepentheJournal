@@ -102,7 +102,14 @@ data class HostInfo(
      * sync skips every substance, effect and interaction with deviceOrigin
      * "system" instead of moving 7600 identical rows.
      */
-    val seedFingerprint: String? = null
+    val seedFingerprint: String? = null,
+    /**
+     * Port of the host's pinned TLS connector, or 0 when the host speaks plain HTTP
+     * (an iOS host, or a host that predates the TLS phase). The HTTP port stays up for
+     * those peers; a client with a trusted fingerprint uses this port and verifies the
+     * certificate against [fingerprint].
+     */
+    val tlsPort: Int = 0
 )
 
 /**

@@ -63,6 +63,10 @@ class SyncServerRouter(
 
     private val wsSessions = ConcurrentHashMap<String, MutableSet<DefaultWebSocketServerSession>>()
 
+    /** Pinned TLS port of this host, 0 until the engine binds its TLS connector. */
+    @Volatile
+    var tlsPort: Int = 0
+
     /** Per-connection WS sequence state: highest accepted seq plus a small reorder buffer. */
     private val wsSeqState = ConcurrentHashMap<String, WsSeqState>()
 
@@ -104,7 +108,8 @@ class SyncServerRouter(
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
-                        seedFingerprint = SyncLibrary.fingerprint()
+                        seedFingerprint = SyncLibrary.fingerprint(),
+                        tlsPort = this@SyncServerRouter.tlsPort
                     )),
                     ContentType.Application.Json
                 )
@@ -119,7 +124,8 @@ class SyncServerRouter(
                         protocolVersion = SYNC_PROTOCOL_VERSION,
                         wsSupported = true,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64,
-                        seedFingerprint = SyncLibrary.fingerprint()
+                        seedFingerprint = SyncLibrary.fingerprint(),
+                        tlsPort = this@SyncServerRouter.tlsPort
                     )),
                     ContentType.Application.Json
                 )
