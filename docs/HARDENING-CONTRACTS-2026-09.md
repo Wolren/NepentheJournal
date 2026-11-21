@@ -156,8 +156,9 @@ outcome loses. Tombstone cutoffs still compare `updatedAt`.
 ephemeral port advertised as `HostInfo.tlsPort`. Clients that trust the peer use HTTPS
 with the certificate fingerprint pinned; pairing bootstraps over the HTTP connector and
 stores the TLS port. The HTTP connector remains for iOS peers, whose host has no TLS
-certificate path yet. `docs/TLS-SYNC.md` records the downgrade window and the removal
-condition.
+certificate path yet. Scope decision (2026-11-21): the iOS client is covered; the iOS host
+stays HTTP because the Native server engine has no TLS connector. `docs/TLS-SYNC.md`
+records the downgrade window and the removal condition.
 
 **Pin:**
 

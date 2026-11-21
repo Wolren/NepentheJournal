@@ -1,8 +1,8 @@
 # Sync transport TLS
 
 Status: JVM and Android hosts serve a pinned TLS connector. The iOS client pins those
-hosts too. The iOS host itself still uses plain HTTP. The HTTP connector stays up for iOS
-hosts and for the first pairing bootstrap.
+hosts too. The iOS host itself still uses plain HTTP; that is the accepted scope for this
+release. The HTTP connector stays up for iOS hosts and for the first pairing bootstrap.
 
 ## What runs today
 
@@ -31,10 +31,12 @@ covers the URL choice and the fingerprint encoding on the simulator.
 
 The iOS host cannot use `sslConnector` (JVM-only API), and the Ktor CIO server engine on
 Kotlin/Native has no TLS connector. `HostInfo.tlsPort` therefore stays 0 on iOS, and the
-iOS transport continues to host over HTTP. The JVM host keeps the HTTP connector so an
-iOS host can still pair and sync. This is a downgrade window on the LAN: an active
-attacker can strip `tlsPort` from the HTTP `HostInfo`. The pairing token and ECDH secret
-remain the authenticity check until iOS host TLS lands.
+iOS transport continues to host over HTTP. **Scope decision (2026-11-21):** client-only
+iOS TLS is accepted for this release. The iOS host stays HTTP; a native TLS listener is
+future work. The JVM host keeps the HTTP connector so an iOS host can still pair and
+sync. This is a downgrade window on the LAN: an active attacker can strip `tlsPort` from
+the HTTP `HostInfo`. The pairing token and ECDH secret remain the authenticity check
+until iOS host TLS lands.
 
 ## Threat model and limits
 
@@ -45,8 +47,8 @@ remain the authenticity check until iOS host TLS lands.
   or unexpected value is the warning.
 - A trusted peer cannot silently change certificates: the stored fingerprint is checked
   before the first request, and the pinned trust manager checks every handshake.
-- Only the JVM/Android path is covered. Do not describe the feature as LAN-wide TLS until
-  the iOS path lands.
+- The iOS client path is covered. The iOS host and any JVM client talking to an iOS host
+  use HTTP. Do not describe the feature as LAN-wide TLS.
 
 ## Tests
 
@@ -57,7 +59,7 @@ remain the authenticity check until iOS host TLS lands.
 - `SyncTransportLifecycleTest` covers starting the host twice, which exposed the password
   zeroing defect in Netty.
 
-## Next
+## Future work
 
 - Add a Network.framework TLS listener to the iOS host so it can advertise a certificate
   and a real TLS port.
