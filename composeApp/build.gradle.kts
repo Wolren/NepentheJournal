@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.play.publisher)
     alias(libs.plugins.kover)
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 kotlin {
@@ -230,8 +231,15 @@ android {
                 "proguard-rules.pro",
             )
             // zstd-jni's x86_64 .so is 4 KB aligned; Play needs 16 KB, and debug keeps every ABI.
-            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
-            if (hasUploadKeystore) signingConfig = signingConfigs.getByName("release")
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+                // The baseline profile generator runs on this workstation's x86_64 emulator.
+                if (providers.gradleProperty("nepenthe.emulatorAbi").isPresent) abiFilters += "x86_64"
+            }
+            // Without the upload keystore a local release build is debug-signed so it can be
+            // installed for profiling; CI and Play still sign with the real key.
+            signingConfig = if (hasUploadKeystore) signingConfigs.getByName("release")
+            else signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -260,6 +268,7 @@ tasks.withType<Test>().configureEach {
 
 // Device-level smoke coverage for the Android runtime path that no unit test reaches.
 dependencies {
+    baselineProfile(project(":baselineprofile"))
     "androidTestImplementation"("androidx.compose.ui:ui-test-junit4:1.12.1")
     "androidTestImplementation"("androidx.test.ext:junit:1.2.1")
     "androidTestImplementation"("androidx.test:runner:1.6.2")

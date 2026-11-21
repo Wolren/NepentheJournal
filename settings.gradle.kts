@@ -11,3 +11,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "NepentheJournal"
 include(":composeApp")
+include(":baselineprofile")
