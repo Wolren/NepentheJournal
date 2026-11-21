@@ -36,7 +36,9 @@ private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
         cachedKey = path to decoded
         return@withLock decoded
     }
-    if (existing != null) quarantineKeyFile(file)
+    if (existing != null && quarantineKeyFile(file) == null) {
+        throw IllegalStateException("Unreadable key file ${file.absolutePath} cannot be moved aside")
+    }
     val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }
     persistKey(file, fresh)
     cachedKey = path to fresh
@@ -58,9 +60,7 @@ private fun decodeKeyBytes(bytes: ByteArray): ByteArray? {
 private fun persistKey(file: File, key: ByteArray) {
     file.parentFile?.mkdirs()
     restrictDataDir(file.parentFile)
-    val stored = if (isWindows()) {
-        runCatching { Crypt32Util.cryptProtectData(key) }.getOrDefault(key)
-    } else key
+    val stored = if (isWindows()) Crypt32Util.cryptProtectData(key) else key
     replaceDurably(file, stored)
     if (!isWindows()) {
         runCatching {

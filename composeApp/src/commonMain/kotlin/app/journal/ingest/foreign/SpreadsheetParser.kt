@@ -62,11 +62,32 @@ internal object SpreadsheetParser {
 
     /** "100 mg" -> (100.0, "mg"); "3,6 g" -> (3.6, "g"); "25" -> (25.0, null). */
     private fun parseAmount(raw: String?): Pair<Double, String?>? {
-        val text = raw?.trim()?.replace(',', '.')?.ifEmpty { null } ?: return null
+        val text = raw?.trim()?.ifEmpty { null } ?: return null
         text.toDoubleOrNull()?.let { return it to null }
         val match = AMOUNT.find(text) ?: return null
-        val amount = match.groupValues[1].toDoubleOrNull() ?: return null
+        val amount = parseNumber(match.groupValues[1]) ?: return null
         return amount to match.groupValues[2].ifBlank { null }
+    }
+
+    /** A three-digit tail after the last separator is a thousands group, not a decimal tail. */
+    private fun parseNumber(text: String): Double? {
+        val lastComma = text.lastIndexOf(',')
+        val lastDot = text.lastIndexOf('.')
+        return when {
+            lastComma < 0 && lastDot < 0 -> text.toDoubleOrNull()
+            lastComma >= 0 && lastDot >= 0 ->
+                if (lastComma > lastDot) text.replace(".", "").replace(',', '.').toDoubleOrNull()
+                else text.replace(",", "").toDoubleOrNull()
+            lastComma >= 0 -> {
+                val tail = text.length - lastComma - 1
+                if (tail == 3) text.replace(",", "").toDoubleOrNull()
+                else text.replace(',', '.').toDoubleOrNull()
+            }
+            else -> {
+                val tail = text.length - lastDot - 1
+                if (tail == 3) text.replace(".", "").toDoubleOrNull() else text.toDoubleOrNull()
+            }
+        }
     }
 
     private fun flag(raw: String?): Boolean =
@@ -129,7 +150,8 @@ internal object SpreadsheetParser {
                 quoted && ch == '"' && text.getOrNull(index + 1) == '"' -> {
                     field.append('"'); index++
                 }
-                ch == '"' -> quoted = !quoted
+                !quoted && ch == '"' && field.isEmpty() -> quoted = true
+                quoted && ch == '"' -> quoted = false
                 !quoted && ch == delimiter -> {
                     row.add(field.toString()); field.clear()
                 }
@@ -162,7 +184,7 @@ internal object SpreadsheetParser {
     private const val MAX_GROUPS = 5000
     private const val MAX_DOSES_PER_GROUP = 500
 
-    private val AMOUNT = Regex("^([0-9]+(?:[.,][0-9]+)?)\\s*([^0-9\\s].*)$")
+    private val AMOUNT = Regex("^([0-9]+(?:[.,][0-9]+)*)\\s*([^0-9\\s].*)$")
 
     private val ID_LIKE = Regex("^[A-Za-z]{1,10}[:-][A-Za-z0-9:._-]+$")
 

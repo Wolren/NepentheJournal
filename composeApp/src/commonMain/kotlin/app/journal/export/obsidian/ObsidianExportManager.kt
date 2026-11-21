@@ -82,10 +82,10 @@ object ObsidianExportManager {
             return ObsidianImportResult(errors = listOf("Vault path is not valid: ${config.vaultPath}"))
         }
 
-        // H1: Verify resolved directory stays within vault after normalization
+        // A path prefix is not containment: /vault2 is not under /vault.
         val vaultNorm = ObsidianVaultOps.normalizePath(config.vaultPath)
         val dirNorm = ObsidianVaultOps.normalizePath(dir)
-        if (!dirNorm.startsWith(vaultNorm.trimEnd('/').trimEnd('\\'))) {
+        if (!isInsideVault(config.vaultPath, dir)) {
             return ObsidianImportResult(errors = listOf(
                 "Resolved import directory is outside the vault: $dirNorm not under $vaultNorm"
             ))
@@ -131,12 +131,10 @@ object ObsidianExportManager {
             "$baseDir/$yearDir/$monthDir"
         } else baseDir
 
-        // H1: Normalize and verify resolved path stays within vault directory
-        val vaultNorm = ObsidianVaultOps.normalizePath(config.vaultPath)
-        val dirNorm = ObsidianVaultOps.normalizePath(dir)
-        if (!dirNorm.startsWith(vaultNorm.trimEnd('/').trimEnd('\\'))) {
+        // A path prefix is not containment: /vault2 is not under /vault.
+        if (!isInsideVault(config.vaultPath, dir)) {
             throw Exception(
-                "Resolved export directory is outside vault: $dirNorm not under $vaultNorm"
+                "Resolved export directory is outside vault: $dir not under ${config.vaultPath}"
             )
         }
 
@@ -144,5 +142,11 @@ object ObsidianExportManager {
         val filePath = "$dir/${note.fileName}"
         ObsidianVaultOps.writeFile(filePath, note.content)
         return filePath
+    }
+
+    private fun isInsideVault(vaultPath: String, candidate: String): Boolean {
+        val root = ObsidianVaultOps.normalizePath(vaultPath).trimEnd('/', '\\')
+        val path = ObsidianVaultOps.normalizePath(candidate)
+        return path == root || path.startsWith("$root/") || path.startsWith("$root\\")
     }
 }

@@ -165,4 +165,18 @@ class ObsidianExportManagerTest {
         val path = ObsidianExportManager.exportSession(repo, "s:blank", config())
         assertNotNull(path)
     }
+
+    @Test
+    fun exportRejectsASiblingDirectoryWithTheSamePrefix() {
+        val repo = JournalRepository()
+        populateRepo(repo)
+        val vault = File(testDir, "vault").apply { mkdirs() }
+
+        val result = ObsidianExportManager.exportAllSessions(
+            repo,
+            config(vaultPath = vault.absolutePath, subfolder = "../vault2")
+        )
+
+        assertTrue(result.errors.any { it.contains("outside") }, "errors: ${result.errors}")
+    }
 }
