@@ -33,6 +33,8 @@ data class SyncBatch(
 @Serializable
 data class SyncResponse(
     val success: Boolean,
+    /** Device id of the host that built this response; names conflict notes on the puller. */
+    val senderDeviceId: String = "",
     val error: String? = null,
     val sessions: List<Session> = emptyList(),
     val doses: List<Dose> = emptyList(),

@@ -156,6 +156,11 @@ internal class JournalTombstones(
      * legacy unconditional "cutoff == 0 deletes everything" rule is gone).
      * Returns true if anything was deleted. Callers must hold [lock].
      */
+    /** Delete timestamp for [type] and [id], or null when the row was never deleted. */
+    internal fun deletedAtOf(type: String, id: String): Long? = lock.withLock {
+        _tombstones[tombKey(type, id)]
+    }
+
     internal fun applyTombstonesLocked(deleted: DeletedIds, cutoff: Long): Boolean {
         var changed = false
         fun <T> applyIds(ids: List<String>, get: (String) -> T?, updatedAt: (T) -> Long, delete: (String) -> Unit) {

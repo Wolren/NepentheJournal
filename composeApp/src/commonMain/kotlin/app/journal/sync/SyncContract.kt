@@ -209,8 +209,14 @@ fun applySyncResponse(
         }
     }
     val clean = filtered.response
+    // Sessions go through the same outcome merge as a server push; doses and the rest
+    // stay on the timestamp filter below.
+    val remoteDeviceId = clean.senderDeviceId.takeIf { it.isNotBlank() } ?: "peer"
+    if (clean.sessions.isNotEmpty()) {
+        mergeSessionConflict(repo, clean.sessions, clean.deletedSessionIds, remoteDeviceId)
+    }
     repo.applyBatch(
-        sessions = clean.sessions,
+        sessions = emptyList(),
         doses = clean.doses,
         substances = clean.substances,
         effects = clean.effects,

@@ -58,6 +58,10 @@ fun mergeSessionConflict(
     var conflicts = 0
     sessions.forEach { session ->
         if (session.id in deletedIds) return@forEach
+        // A delete that is newer than this edit outranks it, so a peer that never saw the
+        // delete cannot bring the session back.
+        val deletedAt = repo.tombstoneDeletedAt("session", session.id)
+        if (deletedAt != null && session.updatedAt <= deletedAt) return@forEach
         val existing = repo.getSession(session.id)
         if (existing != null && existing.updatedAt > session.updatedAt) {
             repo.upsertNote(Note(

@@ -143,6 +143,7 @@ internal class SyncServerHandlers(
         }
         val response = SyncResponse(
         success = true,
+        senderDeviceId = LocalDeviceId.current(),
         sessions = page(repo.sessions.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
         doses = page(repo.doses.value, SyncLimits.MAX_ITEMS_DEFAULT, { it.id }, { it.updatedAt }),
         substances = page(repo.substances.value, SyncLimits.MAX_SUBSTANCES, { it.id }, { it.updatedAt }) { it.deviceOrigin == "system" },

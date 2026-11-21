@@ -264,6 +264,9 @@ interface IJournalRepository {
     fun rebuildSearchIndex()
     fun deletedIdsSince(since: Long): DeletedIds
     fun exportTombstones(): Map<String, Long>
+
+    /** Delete timestamp for [type] and [id], or null when the row was never deleted here. */
+    fun tombstoneDeletedAt(type: String, id: String): Long?
     fun importTombstones(tombstones: Map<String, Long>)
 
     /**

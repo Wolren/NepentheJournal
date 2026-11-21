@@ -361,6 +361,8 @@ class JournalRepository internal constructor() : IJournalRepository {
     }
     override fun deletedIdsSince(since: Long): DeletedIds = tombstones.deletedIdsSince(since)
     override fun exportTombstones(): Map<String, Long> = tombstones.exportTombstones()
+
+    override fun tombstoneDeletedAt(type: String, id: String): Long? = tombstones.deletedAtOf(type, id)
     override fun importTombstones(tombstones: Map<String, Long>) = this.tombstones.importTombstones(tombstones)
 
     companion object {

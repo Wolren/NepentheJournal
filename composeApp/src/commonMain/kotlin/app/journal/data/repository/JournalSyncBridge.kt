@@ -83,23 +83,31 @@ internal class JournalSyncBridge(
         deletedCustomUnitIds: List<String>,
         tombstoneCutoff: Long
     ) = lock.withLock {
+        // A delete is an operation with a timestamp: it outranks any write that came before
+        // it, so a peer that never saw the delete cannot resurrect the row.
+        fun <T> alive(list: List<T>, type: String, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
+            if (!lastWriterWins) list
+            else list.filter { incoming ->
+                val deletedAt = tombstones.deletedAtOf(type, id(incoming))
+                deletedAt == null || updatedAt(incoming) > deletedAt
+            }
         fun <T> newer(list: List<T>, get: (String) -> T?, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
             if (!lastWriterWins) list
             else list.filter { incoming ->
                 val existing = get(id(incoming))
                 existing == null || updatedAt(incoming) >= updatedAt(existing)
             }
-        val sessionsToPut = newer(sessions, sessionsStore::get, { it.id }, { it.updatedAt })
-        val dosesToPut = newer(doses, dosesStore::get, { it.id }, { it.updatedAt })
-        val substancesToPut = newer(substances, substancesStore::get, { it.id }, { it.updatedAt })
-        val effectsToPut = newer(effects, effectsStore::get, { it.id }, { it.updatedAt })
-        val interactionsToPut = newer(interactions, interactionsStore::get, { it.id }, { it.updatedAt })
-        val timelineEventsToPut = newer(timelineEvents, timelineEventsStore::get, { it.id }, { it.updatedAt })
-        val customUnitsToPut = newer(customUnits, customUnitsStore::get, { it.id }, { it.updatedAt })
+        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt })
+        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt })
+        val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt })
+        val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt })
+        val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt })
+        val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt })
+        val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt })
         // An identical body older than the stored one is dropped so updatedAt can't regress
         val notesToPut: List<Note> =
             if (!lastWriterWins) notes
-            else notes.mapNotNull { incoming ->
+            else alive(notes, "note", { it.id }, { it.updatedAt }).mapNotNull { incoming ->
                 val existing = notesStore.get(incoming.id) ?: return@mapNotNull incoming
                 val merged = mergeNoteConflictLocked(existing, incoming, incoming.deviceOrigin)
                 if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
