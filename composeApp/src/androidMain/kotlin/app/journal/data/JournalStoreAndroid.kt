@@ -8,7 +8,6 @@ import kotlinx.serialization.json.*
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.IOException
 
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
 
@@ -227,27 +226,9 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 copyDurably(target, backup)
             }
 
-            if (!tmp.renameTo(target)) {
-                Log.withTag("JournalStore").w { "Atomic rename failed (target may be locked), falling back to direct write with retry" }
-                // Retry up to 3 times total (initial + 2) with 100ms delay between attempts
-                var success = false
-                for (attempt in 1..3) {
-                    try {
-                        if (attempt > 1) {
-                            Thread.sleep(100L)
-                        }
-                        writeSealed(target, text)
-                        success = true
-                        break
-                    } catch (e: IOException) {
-                        Log.withTag("JournalStore").w { "Direct write attempt $attempt failed: ${e.message}" }
-                    }
-                }
-                if (success) {
-                    tmp.delete() // stale temp from the failed rename must not linger
-                } else {
-                    Log.withTag("JournalStore").e { "Failed to write journal data after 3 attempts" }
-                }
+            if (!replaceFileAtomically(tmp, target)) {
+                tmp.delete()
+                return@withLock
             }
 
             if (libraryDirty) savedLibraryVersion = libraryVersion
@@ -270,9 +251,9 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             if (fullBackup && library.exists()) {
                 copyDurably(library, File(libraryBackupPath()))
             }
-            if (!tmp.renameTo(library)) {
-                writeSealed(library, text)
+            if (!replaceFileAtomically(tmp, library)) {
                 tmp.delete()
+                return false
             }
             true
         } catch (e: Exception) {
