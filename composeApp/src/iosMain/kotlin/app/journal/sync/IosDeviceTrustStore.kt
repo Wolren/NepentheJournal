@@ -46,7 +46,9 @@ class IosDeviceTrustStore(private val dataDir: String) {
         val fingerprint: String,
         val sharedSecret: String,
         val pairedAt: Long,
-        val lastSeenAt: Long? = null
+        val lastSeenAt: Long? = null,
+        /** Host's pinned TLS port from HostInfo; 0 for an HTTP-only host. */
+        val tlsPort: Int = 0
     )
 
     @Serializable

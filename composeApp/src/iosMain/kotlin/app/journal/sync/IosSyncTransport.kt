@@ -224,11 +224,17 @@ class IosSyncTransport(
         if (peerDeviceId == null) {
             return Result.failure(Exception("Unknown peer device: pairing required"))
         }
-        val secretStr = trustStore.getSharedSecret(peerDeviceId)
+        val stored = trustStore.getPeerById(peerDeviceId)
             ?: return Result.failure(Exception("Not paired"))
+        val secretStr = stored.sharedSecret
         val secret = secretStr.encodeToByteArray()
         val aesKey = aesEncryptionKey(secretStr)
-        val client = HttpClient(Darwin)
+        val tlsPort = stored.tlsPort
+        if (tlsPort > 0 && stored.fingerprint.isBlank()) {
+            return Result.failure(Exception("TLS identity missing for ${peer.displayName}; re-pair required"))
+        }
+        val baseUrl = syncBaseUrl(peer.host, peer.port, tlsPort)
+        val client = if (tlsPort > 0) pinnedDarwinClient(stored.fingerprint) else HttpClient(Darwin)
         return try {
             // It's written to lastSyncAt only after every push slice and every pull page has succeeded (audit C2).
             val cycleStart = currentTimeMillis()
@@ -244,7 +250,7 @@ class IosSyncTransport(
                     val time = currentTimeMillis()
                     val nonce = generateNonce()
                     val auth = buildAuthHeader(deviceId, bodyStr, secret, time, nonce)
-                    val pushResponse = client.post("http://${peer.host}:${peer.port}${SyncEndpoints.SYNC_PUSH}") {
+                    val pushResponse = client.post("$baseUrl${SyncEndpoints.SYNC_PUSH}") {
                         contentType(ContentType.Application.Json)
                         header(SyncAuth.DEVICE_ID_HEADER, deviceId)
                         header(SyncAuth.AUTH_HEADER, auth)
@@ -283,7 +289,7 @@ class IosSyncTransport(
             var pullPages = 0
             var pullComplete = false
             while (pullPages < 200) {
-                val pullResp = fetchPullPage(client, peer, deviceId, secret, aesKey, pullCursor, pullCursorId)
+                val pullResp = fetchPullPage(client, baseUrl, deviceId, secret, aesKey, pullCursor, pullCursorId)
                 if (pullResp == null) {
                     val msg = "Pull response missing, undecodable, or rejected by host"
                     _status.update { it.copy(lastError = msg) }
@@ -337,7 +343,7 @@ class IosSyncTransport(
 
     private suspend fun fetchPullPage(
         client: HttpClient,
-        peer: DiscoveredPeer,
+        baseUrl: String,
         deviceId: String,
         secret: ByteArray,
         aesKey: ByteArray,
@@ -348,7 +354,7 @@ class IosSyncTransport(
         val idParam = if (cursorId.isEmpty()) "" else "&sinceId=${cursorId.encodeURLParameter()}"
         val target = "${SyncEndpoints.SYNC_PULL}?since=$cursor$idParam"
         val auth = buildAuthHeader(deviceId, target, secret, currentTimeMillis(), generateNonce())
-        val pullResponse = client.get("http://${peer.host}:${peer.port}$target") {
+        val pullResponse = client.get("$baseUrl$target") {
             header(SyncAuth.DEVICE_ID_HEADER, deviceId)
             header(SyncAuth.AUTH_HEADER, auth)
         }
@@ -408,9 +414,19 @@ class IosSyncTransport(
         val pairingClient = HttpClient(Darwin)
         // EPHEMERAL client keypair: generated below, discarded in finally so it can't outlive a single pairing attempt.
         var ephemeral: IosEcdhEphemeral? = null
+        var tlsClient: HttpClient? = null
         try {
             val infoResp = pairingClient.get("http://$host:$port${SyncEndpoints.PAIRING_START}")
             val info = json.decodeFromString<HostInfo>(infoResp.bodyAsText())
+            val tlsPort = info.tlsPort
+            val hostFingerprint = info.fingerprint
+            val useTls = tlsPort > 0 && hostFingerprint.isNotBlank()
+            val baseUrl = syncBaseUrl(host, port, if (useTls) tlsPort else 0)
+            val apiClient = if (useTls) {
+                pinnedDarwinClient(hostFingerprint).also { tlsClient = it }
+            } else {
+                pairingClient
+            }
 
             // Contract section g: the host must advertise its static P-256 key.
             val hostEcdhB64 = info.ecdhPublicKeyB64
@@ -430,7 +446,7 @@ class IosSyncTransport(
                 ?: return Result.failure(Exception("Could not export the ECDH public key"))
 
             val tokenStr = token ?: return Result.failure(Exception("Pairing token required"))
-            val verifyResp = pairingClient.post("http://$host:$port${SyncEndpoints.PAIRING_VERIFY}") {
+            val verifyResp = apiClient.post("$baseUrl${SyncEndpoints.PAIRING_VERIFY}") {
                 contentType(ContentType.Application.Json)
                 setBody(json.encodeToString(PairingVerifyRequest(
                     token = tokenStr,
@@ -442,6 +458,10 @@ class IosSyncTransport(
             }
             val result = json.decodeFromString<PairingResultResponse>(verifyResp.bodyAsText())
             if (!result.success) return Result.failure(Exception(result.error ?: "Pairing failed"))
+            val hostFp = result.hostFingerprint ?: info.fingerprint
+            if (useTls && !hostFp.equals(hostFingerprint, ignoreCase = true)) {
+                return Result.failure(Exception("Host fingerprint changed during pairing"))
+            }
 
             // The legacy sharedSecret and encSecretB64 fields are never read.
             val sealedSecret = result.ecdhSecretB64
@@ -461,13 +481,18 @@ class IosSyncTransport(
                 IosDeviceTrustStore.IosTrustedPeer(
                     deviceId = hostId,
                     displayName = result.hostDeviceName ?: info.deviceName,
-                    fingerprint = result.hostFingerprint ?: info.fingerprint,
+                    fingerprint = hostFp,
                     sharedSecret = sharedSecret,
-                    pairedAt = currentTimeMillis()
+                    pairedAt = currentTimeMillis(),
+                    tlsPort = if (useTls) tlsPort else 0
                 )
             )
 
-            val hostProven = verifyHostIdentity(host, port, deviceId, sharedSecret)
+            val hostProven = verifyHostIdentity(
+                host, port, deviceId, sharedSecret,
+                if (useTls) tlsPort else 0,
+                if (useTls) hostFp else null
+            )
             if (!hostProven) {
                 trustStore.revokeDevice(hostId)
                 return Result.failure(Exception("Host identity challenge failed"))
@@ -478,12 +503,13 @@ class IosSyncTransport(
                 displayName = result.hostDeviceName ?: info.deviceName,
                 host = host, port = port,
                 isTrusted = true,
-                fingerprint = result.hostFingerprint
+                fingerprint = hostFp
             ))
         } catch (e: Exception) {
             return Result.failure(e)
         } finally {
             ephemeral?.close()
+            tlsClient?.close()
             pairingClient.close()
         }
     }
@@ -493,11 +519,20 @@ class IosSyncTransport(
      * Sends a fresh random challenge to /auth/verify and checks the HMAC
      * response, same contract as the JVM client verifyHostIdentity.
      */
-    suspend fun verifyHostIdentity(host: String, port: Int, callerDeviceId: String, secret: String): Boolean {
-        val client = HttpClient(Darwin)
+    suspend fun verifyHostIdentity(
+        host: String,
+        port: Int,
+        callerDeviceId: String,
+        secret: String,
+        tlsPort: Int = 0,
+        fingerprint: String? = null,
+    ): Boolean {
+        if (tlsPort > 0 && fingerprint.isNullOrBlank()) return false
+        val client = if (tlsPort > 0) pinnedDarwinClient(fingerprint!!) else HttpClient(Darwin)
+        val baseUrl = syncBaseUrl(host, port, tlsPort)
         return try {
             val challenge = generateNonce()
-            val resp = client.get("http://$host:$port/auth/verify?deviceId=$callerDeviceId&challenge=$challenge")
+            val resp = client.get("$baseUrl${SyncEndpoints.AUTH_VERIFY}?deviceId=$callerDeviceId&challenge=$challenge")
             if (resp.status != HttpStatusCode.OK) return false
             val data = json.decodeFromString<HostChallengeResponse>(resp.bodyAsText())
             if (data.signature.isBlank()) return false

@@ -1,7 +1,8 @@
 # Sync transport TLS
 
-Status: JVM and Android hosts serve a pinned TLS connector. iOS still uses plain HTTP.
-The HTTP connector stays up for iOS peers and for the first pairing bootstrap.
+Status: JVM and Android hosts serve a pinned TLS connector. The iOS client pins those
+hosts too. The iOS host itself still uses plain HTTP. The HTTP connector stays up for iOS
+hosts and for the first pairing bootstrap.
 
 ## What runs today
 
@@ -22,12 +23,18 @@ The HTTP connector stays up for iOS peers and for the first pairing bootstrap.
 
 ## iOS
 
-The iOS host cannot use `sslConnector` (JVM-only API), and `PlatformSyncIos` has no
-self-signed certificate generation. `HostInfo.tlsPort` therefore stays 0 on iOS, and the
-iOS transport continues over HTTP. The JVM host keeps the HTTP connector so an iOS host
-or client can still pair and sync. This is a downgrade window on the LAN: an active
+The iOS client reads `HostInfo.tlsPort`, pins the fingerprint with the Ktor Darwin
+challenge handler, and stores the port with the trusted peer. Pairing verifies the
+certificate on its first HTTPS request; sync and the host challenge use the stored pin.
+[IosTlsPinningTest](../composeApp/src/iosTest/kotlin/app/journal/sync/IosTlsPinningTest.kt)
+covers the URL choice and the fingerprint encoding on the simulator.
+
+The iOS host cannot use `sslConnector` (JVM-only API), and the Ktor CIO server engine on
+Kotlin/Native has no TLS connector. `HostInfo.tlsPort` therefore stays 0 on iOS, and the
+iOS transport continues to host over HTTP. The JVM host keeps the HTTP connector so an
+iOS host can still pair and sync. This is a downgrade window on the LAN: an active
 attacker can strip `tlsPort` from the HTTP `HostInfo`. The pairing token and ECDH secret
-remain the authenticity check until iOS TLS lands.
+remain the authenticity check until iOS host TLS lands.
 
 ## Threat model and limits
 
@@ -45,12 +52,14 @@ remain the authenticity check until iOS TLS lands.
 
 - `TlsSyncIntegrationTest` covers the advertised TLS port, a pinned request, a wrong pin,
   the HTTP-to-TLS bootstrap, and a full pairing plus push over TLS.
+- `IosTlsPinningTest` covers the iOS URL choice and fingerprint encoding, and runs in the
+  `iosSimulatorArm64Test` job.
 - `SyncTransportLifecycleTest` covers starting the host twice, which exposed the password
   zeroing defect in Netty.
 
 ## Next
 
-- Add iOS client pinning in `IosSyncTransport` (Darwin challenge handler) and an iOS
-  certificate path for hosting.
+- Add a Network.framework TLS listener to the iOS host so it can advertise a certificate
+  and a real TLS port.
 - When every supported platform speaks TLS, remove the HTTP connector or restrict it to
   the pairing bootstrap, and make `tlsPort` mandatory in `HostInfo`.
