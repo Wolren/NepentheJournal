@@ -57,6 +57,7 @@ private fun decodeKeyBytes(bytes: ByteArray): ByteArray? {
 
 private fun persistKey(file: File, key: ByteArray) {
     file.parentFile?.mkdirs()
+    restrictDataDir(file.parentFile)
     val stored = if (isWindows()) {
         runCatching { Crypt32Util.cryptProtectData(key) }.getOrDefault(key)
     } else key
@@ -69,6 +70,21 @@ private fun persistKey(file: File, key: ByteArray) {
             )
         }.onFailure { Log.withTag("JournalAtRest").w { "Cannot restrict key file: ${it.message}" } }
     }
+}
+
+/** POSIX: the key sits in a directory no other local user can traverse; the file mode alone leaves a race. */
+private fun restrictDataDir(dir: File?) {
+    if (dir == null || isWindows()) return
+    runCatching {
+        Files.setPosixFilePermissions(
+            dir.toPath(),
+            setOf(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE,
+            ),
+        )
+    }.onFailure { Log.withTag("JournalAtRest").w { "Cannot restrict data directory: ${it.message}" } }
 }
 
 /**
