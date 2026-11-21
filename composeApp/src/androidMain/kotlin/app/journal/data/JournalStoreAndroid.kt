@@ -6,6 +6,8 @@ import app.journal.serde.AppJson
 import app.journal.util.PlatformLock
 import kotlinx.serialization.json.*
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 
 actual class JournalStore actual constructor(private val repo: IJournalRepository) {
@@ -214,7 +216,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            tmp.writeBytes(JournalAtRest.seal(text))
+            writeSealed(tmp, text)
             if (!tmp.exists()) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tmp.absolutePath}" }
                 return@withLock
@@ -222,7 +224,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
 
             if (target.exists()) {
                 // Always refresh .bak: it is the recovery copy, and 53 KB is cheap.
-                target.copyTo(backup, overwrite = true)
+                copyDurably(target, backup)
             }
 
             if (!tmp.renameTo(target)) {
@@ -234,7 +236,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                         if (attempt > 1) {
                             Thread.sleep(100L)
                         }
-                        target.writeBytes(JournalAtRest.seal(text))
+                        writeSealed(target, text)
                         success = true
                         break
                     } catch (e: IOException) {
@@ -264,12 +266,12 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         val library = File(libraryPath())
         val tmp = File(libraryPath() + ".tmp")
         return try {
-            tmp.writeBytes(JournalAtRest.seal(text))
+            writeSealed(tmp, text)
             if (fullBackup && library.exists()) {
-                library.copyTo(File(libraryBackupPath()), overwrite = true)
+                copyDurably(library, File(libraryBackupPath()))
             }
             if (!tmp.renameTo(library)) {
-                library.writeBytes(JournalAtRest.seal(text))
+                writeSealed(library, text)
                 tmp.delete()
             }
             true
@@ -292,10 +294,10 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
                 return@withLock false
             }
-            backup.copyTo(target, overwrite = true)
+            copyDurably(backup, target)
             val libraryBackup = File(libraryBackupPath())
             if (libraryBackup.exists()) {
-                libraryBackup.copyTo(File(libraryPath()), overwrite = true)
+                copyDurably(libraryBackup, File(libraryPath()))
             }
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
             repo.clearAll()
@@ -324,7 +326,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
             val backupFile = File(autoDir, "$timestamp.json")
             val text = AppJson.json.encodeToString(repo.fullSnapshot())
-            backupFile.writeBytes(JournalAtRest.seal(text))
+            writeSealed(backupFile, text)
             Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
 
             // Rotate auto-backups: keep only the 10 most recent (desktop/iOS parity; triggerAutoBackup runs on every close so the directory was unbounded).
@@ -344,6 +346,37 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             }
         } catch (e: Exception) {
             Log.withTag("JournalStore").e(e) { "Failed to create auto-backup: ${e.message}" }
+        }
+    }
+
+    /** Writes [text] sealed and flushed, so the rename that follows is the only atomic step. */
+    private fun writeSealed(file: File, text: String) {
+        val sealed = JournalAtRest.seal(text)
+        FileOutputStream(file).use { out ->
+            out.write(sealed)
+            out.fd.sync()
+        }
+    }
+
+    /** Copies [from] over [to] through a temp file, so a crash cannot leave a torn backup. */
+    private fun copyDurably(from: File, to: File): Boolean {
+        return try {
+            val tmp = File(to.absoluteFile.parentFile, "${to.name}.tmp")
+            FileInputStream(from).use { input ->
+                FileOutputStream(tmp).use { out ->
+                    input.copyTo(out)
+                    out.fd.sync()
+                }
+            }
+            if (tmp.renameTo(to)) {
+                true
+            } else {
+                to.delete()
+                tmp.renameTo(to)
+            }
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").w { "Durable copy failed: ${e.message}" }
+            false
         }
     }
 }

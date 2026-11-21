@@ -6,6 +6,8 @@ import app.journal.serde.AppJson
 import app.journal.util.PlatformLock
 import kotlinx.serialization.json.*
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -192,7 +194,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 return@withLock
             }
 
-            tmp.writeBytes(JournalAtRest.seal(text))
+            writeSealed(tmp, text)
             if (!tmp.exists()) {
                 Log.withTag("JournalStore").e { "Failed to write temp file: ${tmp.absolutePath}" }
                 return@withLock
@@ -210,34 +212,18 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                         }
                     }
                     // Copy current file to .bak.1 (newest versioned backup)
-                    target.copyTo(File(versionedBackupPath(1)), overwrite = true)
+                    copyDurably(target, File(versionedBackupPath(1)))
                 }
                 // Always refresh .bak: it is the recovery copy, and 53 KB is cheap.
-                target.copyTo(backup, overwrite = true)
+                copyDurably(target, backup)
             }
 
-            // File.renameTo cannot replace an existing target on Windows, so every save fell back to a non-atomic write.
+            // Never write the target in place: a kill mid-write leaves a sealed file that
+            // fails with an AEAD tag mismatch. The rename retries; on failure the old journal stays.
             if (!replaceWithMove(tmp, target)) {
-                Log.withTag("JournalStore").w { "Atomic rename failed (target may be locked), falling back to direct write with retry" }
-                // Retry up to 3 times total (initial + 2) with 100ms delay between attempts
-                var success = false
-                for (attempt in 1..3) {
-                    try {
-                        if (attempt > 1) {
-                            Thread.sleep(100L)
-                        }
-                        target.writeBytes(JournalAtRest.seal(text))
-                        success = true
-                        break
-                    } catch (e: IOException) {
-                        Log.withTag("JournalStore").w { "Direct write attempt $attempt failed: ${e.message}" }
-                    }
-                }
-                if (success) {
-                    tmp.delete() // stale temp from the failed rename must not linger
-                } else {
-                    Log.withTag("JournalStore").e { "Failed to write journal data after 3 attempts" }
-                }
+                Log.withTag("JournalStore").e { "Atomic rename failed; previous journal kept, save dropped" }
+                tmp.delete()
+                return@withLock
             }
 
             if (libraryDirty) savedLibraryVersion = libraryVersion
@@ -257,13 +243,14 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         val tmp = File(libraryPath() + ".tmp")
         return try {
             library.parentFile?.mkdirs()
-            tmp.writeBytes(JournalAtRest.seal(text))
+            writeSealed(tmp, text)
             if (fullBackup && library.exists()) {
-                library.copyTo(File(libraryBackupPath()), overwrite = true)
+                copyDurably(library, File(libraryBackupPath()))
             }
             if (!replaceWithMove(tmp, library)) {
-                library.writeBytes(JournalAtRest.seal(text))
+                Log.withTag("JournalStore").e { "Atomic rename failed for the library; previous file kept" }
                 tmp.delete()
+                return false
             }
             true
         } catch (e: Exception) {
@@ -290,7 +277,7 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
             val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
             val backupFile = File(autoDir, "$timestamp.json")
             val text = AppJson.json.encodeToString(repo.fullSnapshot())
-            backupFile.writeBytes(JournalAtRest.seal(text))
+            writeSealed(backupFile, text)
             Log.withTag("JournalStore").i { "Auto-backup created: ${backupFile.absolutePath}" }
 
             // Rotate auto-backups: keep only the 10 most recent
@@ -325,10 +312,10 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                 Log.withTag("JournalStore").w { "Cannot restore from backup: no .bak file exists" }
                 return@withLock false
             }
-            backup.copyTo(target, overwrite = true)
+            copyDurably(backup, target)
             val libraryBackup = File(libraryBackupPath())
             if (libraryBackup.exists()) {
-                libraryBackup.copyTo(File(libraryPath()), overwrite = true)
+                copyDurably(libraryBackup, File(libraryPath()))
             }
             Log.withTag("JournalStore").i { "Restored journal from .bak backup" }
             repo.clearAll()
@@ -340,25 +327,58 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
         }
     }
 
-    /** Moves [from] over [to], replacing an existing target; ATOMIC_MOVE where the filesystem allows it. */
-    private fun replaceWithMove(from: File, to: File): Boolean {
+    /** Writes [text] sealed and flushed, so the rename that follows is the only atomic step. */
+    private fun writeSealed(file: File, text: String) {
+        val sealed = JournalAtRest.seal(text)
+        FileOutputStream(file).use { out ->
+            out.write(sealed)
+            out.fd.sync()
+        }
+    }
+
+    /** Copies [from] over [to] through a temp file, so a crash cannot leave a torn backup. */
+    private fun copyDurably(from: File, to: File): Boolean {
         return try {
-            java.nio.file.Files.move(
-                from.toPath(), to.toPath(),
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE
-            )
-            true
-        } catch (_: Exception) {
+            val tmp = File(to.absoluteFile.parentFile, "${to.name}.tmp")
+            FileInputStream(from).use { input ->
+                FileOutputStream(tmp).use { out ->
+                    input.copyTo(out)
+                    out.fd.sync()
+                }
+            }
+            replaceWithMove(tmp, to)
+        } catch (e: Exception) {
+            Log.withTag("JournalStore").w { "Durable copy failed: ${e.message}" }
+            false
+        }
+    }
+
+    /**
+     * Moves [from] over [to], replacing an existing target; ATOMIC_MOVE where the filesystem
+     * allows it. Retries because a scanner or a reader can hold the target for a moment.
+     */
+    private fun replaceWithMove(from: File, to: File): Boolean {
+        for (attempt in 1..4) {
             try {
                 java.nio.file.Files.move(
                     from.toPath(), to.toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE
                 )
-                true
+                return true
             } catch (_: Exception) {
-                false
+                try {
+                    java.nio.file.Files.move(
+                        from.toPath(), to.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    )
+                    return true
+                } catch (_: Exception) {
+                    if (attempt == 4) return false
+                    Thread.sleep(100L)
+                }
             }
         }
+        return false
     }
 }

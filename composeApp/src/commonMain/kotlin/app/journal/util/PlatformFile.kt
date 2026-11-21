@@ -6,6 +6,11 @@ package app.journal.util
  * Android actual uses ContentResolver for content:// URIs.
  */
 expect object PlatformFile {
+    /**
+     * Writes [content] to [path]. A plain path is replaced atomically: a crash
+     * leaves the old file or the new one, never a truncated file. A content://
+     * URI is written in place, because the provider owns that file.
+     */
     fun writeText(path: String, content: String)
     fun readText(path: String): String
     fun writeBytes(path: String, content: ByteArray)

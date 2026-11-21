@@ -5,8 +5,17 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import app.journal.NepentheApp
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 actual object PlatformFile {
+    /** Keeps a reader from seeing the file mid-replace, or the replacer racing it. */
+    private val ioLock = ReentrantReadWriteLock()
+
     actual fun writeText(path: String, content: String) {
         if (path.startsWith("content://")) {
             val uri = Uri.parse(path)
@@ -14,7 +23,7 @@ actual object PlatformFile {
                 os.write(content.toByteArray(Charsets.UTF_8))
             } ?: throw IllegalStateException("Cannot open output stream for $path")
         } else {
-            File(path).writeText(content)
+            ioLock.write { writeAtomically(path, content.toByteArray(Charsets.UTF_8)) }
         }
     }
 
@@ -25,7 +34,7 @@ actual object PlatformFile {
                 return `is`.bufferedReader(Charsets.UTF_8).readText()
             } ?: throw IllegalStateException("Cannot open input stream for $path")
         } else {
-            return File(path).readText()
+            return ioLock.read { File(path).readText() }
         }
     }
 
@@ -36,7 +45,7 @@ actual object PlatformFile {
                 os.write(content)
             } ?: throw IllegalStateException("Cannot open output stream for $path")
         } else {
-            File(path).writeBytes(content)
+            ioLock.write { writeAtomically(path, content) }
         }
     }
 
@@ -47,7 +56,7 @@ actual object PlatformFile {
                 return input.readBytes()
             } ?: throw IllegalStateException("Cannot open input stream for $path")
         }
-        return File(path).readBytes()
+        return ioLock.read { File(path).readBytes() }
     }
 
     actual fun size(path: String): Long {
@@ -100,6 +109,29 @@ actual object PlatformFile {
             !file.exists() || file.delete()
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /**
+     * Writes beside the target, flushes the bytes, then renames over it, so a
+     * crash leaves the old file or the new one and never a half-written file.
+     */
+    private fun writeAtomically(path: String, bytes: ByteArray) {
+        val target = File(path)
+        val dir = target.absoluteFile.parentFile
+        dir?.mkdirs()
+        val tmp = File(dir, "${target.name}.tmp")
+        FileOutputStream(tmp).use { out ->
+            out.write(bytes)
+            out.fd.sync()
+        }
+        try {
+            Files.move(
+                tmp.toPath(), target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+            )
+        } catch (_: Exception) {
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
     }
 }

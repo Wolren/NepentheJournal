@@ -2,6 +2,7 @@ package app.journal.data
 
 import app.journal.log.Log
 import app.journal.util.PlatformLock
+import app.journal.util.replaceDurably
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -30,9 +31,10 @@ private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
         cachedKey = path to existing
         return@withLock existing
     }
+    if (existing != null) quarantineKeyFile(file)
     val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }
     file.parentFile?.mkdirs()
-    file.writeBytes(fresh)
+    replaceDurably(file, fresh)
     runCatching {
         Files.setPosixFilePermissions(
             file.toPath(),
@@ -41,6 +43,20 @@ private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
     }.onFailure { Log.withTag("JournalAtRest").w { "Cannot restrict key file: ${it.message}" } }
     cachedKey = path to fresh
     fresh
+}
+
+/**
+ * Moves a key file that is not 32 bytes aside instead of overwriting it: the
+ * bytes are useless for decryption, but they are the only evidence of what the
+ * journal was sealed with.
+ */
+internal fun quarantineKeyFile(file: File): File? {
+    val target = File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}")
+    val moved = runCatching { file.renameTo(target) }.getOrDefault(false)
+    Log.withTag("JournalAtRest").e {
+        "Key file had ${file.length()} bytes; kept as ${if (moved) target.name else "unmoved original"}"
+    }
+    return if (moved) target else null
 }
 
 internal actual fun journalSeal(plain: ByteArray): ByteArray = aesGcmSeal(plain, loadOrCreateKey())

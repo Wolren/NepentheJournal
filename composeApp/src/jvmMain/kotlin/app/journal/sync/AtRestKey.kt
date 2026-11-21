@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.log.Log
+import app.journal.util.replaceDurably
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -49,7 +50,7 @@ class AtRestKey(private val dataDir: String) {
         SecureRandom().nextBytes(bytes)
         keyFile.parentFile.mkdirs()
         try {
-            keyFile.writeBytes(bytes)
+            replaceDurably(keyFile, bytes)
         } catch (e: Exception) {
             throw IllegalStateException("Cannot write at-rest key file: ${e.message}", e)
         }
