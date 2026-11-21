@@ -239,12 +239,13 @@ actual class JournalStore actual constructor(private val repo: IJournalRepositor
                     // Copy current file to .bak.1 (newest versioned backup)
                     copyDurably(target, File(versionedBackupPath(1)))
                 }
-                // Always refresh .bak: it is the recovery copy, and 53 KB is cheap.
-                copyDurably(target, backup)
+                // A light save only recreates a missing recovery copy; full saves refresh it.
+                if (fullBackup || !backup.exists()) {
+                    copyDurably(target, backup)
+                }
             }
 
-            // Never write the target in place: a kill mid-write leaves a sealed file that
-            // fails with an AEAD tag mismatch. The rename retries; on failure the old journal stays.
+            // Never write in place: a torn write leaves a sealed file that fails the tag check.
             if (!replaceWithMove(tmp, target)) {
                 Log.withTag("JournalStore").e { "Atomic rename failed; previous journal kept, save dropped" }
                 tmp.delete()
