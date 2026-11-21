@@ -6,6 +6,7 @@ import app.journal.model.MedicationPreset
 import app.journal.serde.AppJson
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
 import kotlin.test.*
 
@@ -106,7 +107,7 @@ class MedicationPersistenceTest {
              "sessions":[{"id":"broken"}]}
         """.trimIndent()
 
-        val recovered = recoverSnapshot(text)
+        val recovered = recoverSnapshot(Json.parseToJsonElement(text))
 
         assertEquals(1, recovered.medications.size)
         assertTrue(recovered.sessions.isEmpty())

@@ -165,7 +165,7 @@ class SnapshotSchemaTest {
 
         assertFails { AppJson.json.decodeFromString<JournalSnapshot>(corrupted) }
 
-        val recovered = recoverSnapshot(corrupted)
+        val recovered = recoverSnapshot(Json.parseToJsonElement(corrupted))
 
         assertEquals(1, recovered.sessions.size)
         assertEquals("Kept Session", recovered.sessions.first().title)

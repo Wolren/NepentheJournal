@@ -37,13 +37,16 @@ internal data class SnapshotDecodeResult(
  * the recovered snapshot with [SnapshotDecodeResult.parseError] set.
  */
 internal fun decodeSnapshotWithRecovery(text: String): SnapshotDecodeResult {
-    val decoded = runCatching { AppJson.json.decodeFromString<JournalSnapshot>(text) }
+    val element = runCatching { Json.parseToJsonElement(text) }.getOrElse {
+        return SnapshotDecodeResult(JournalSnapshot(savedAt = currentTimeMillis()), it.message)
+    }
+    val decoded = runCatching { AppJson.json.decodeFromJsonElement<JournalSnapshot>(element) }
     val failure = decoded.exceptionOrNull()
     if (failure != null) {
         Log.withTag("JournalStore").w {
             "Journal data failed full parse, attempting per-list recovery: ${failure.message}"
         }
-        return SnapshotDecodeResult(recoverSnapshot(text), failure.message)
+        return SnapshotDecodeResult(recoverSnapshot(element), failure.message)
     }
     return SnapshotDecodeResult(decoded.getOrThrow(), null)
 }
@@ -62,10 +65,9 @@ internal fun decodeSnapshot(text: String): Result<JournalSnapshot> =
  * whole file. Tombstones, persons, and prefs are recovered the same way so a
  * partial load never silently wipes them.
  */
-internal fun recoverSnapshot(text: String): JournalSnapshot {
-    val root: JsonObject =
-        runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()
-            ?: return JournalSnapshot(savedAt = currentTimeMillis())
+internal fun recoverSnapshot(element: JsonElement): JournalSnapshot {
+    val root: JsonObject = element as? JsonObject
+        ?: return JournalSnapshot(savedAt = currentTimeMillis())
     val tombstones: Map<String, Long> = runCatching {
         root["tombstones"]?.jsonObject?.entries?.mapNotNull { (k, v) ->
             runCatching { k to v.jsonPrimitive.long }.getOrNull()
