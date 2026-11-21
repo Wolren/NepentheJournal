@@ -105,17 +105,26 @@ internal object FieldRegisters {
                 if (field in identityFields) continue
                 val existingValue = existingJson.getValue(field)
                 val incomingValue = incomingJson[field] ?: existingValue
-                val existingStamp = validStamp(existing.fieldClocks[field]) ?: existingRow
-                val incomingStamp = validStamp(incoming.fieldClocks[field]) ?: incomingRow
+                val existingExplicit = validStamp(existing.fieldClocks[field])
+                val incomingExplicit = validStamp(incoming.fieldClocks[field])
+                val existingStamp = existingExplicit ?: existingRow
+                val incomingStamp = incomingExplicit ?: incomingRow
                 val takeIncoming = beats(
                     incomingStamp, incoming.deviceOrigin, incomingValue.toString(),
                     existingStamp, existing.deviceOrigin, existingValue.toString(),
                 )
                 put(field, if (takeIncoming) incomingValue else existingValue)
-                fieldStamps[field] = if (takeIncoming) incomingStamp else existingStamp
+                // Keep a missing entry missing when both sides fell back to the row
+                // clock: adding it would make merge(x, x) differ from x.
+                if (existingExplicit != null || incomingExplicit != null) {
+                    fieldStamps[field] = if (takeIncoming) incomingStamp else existingStamp
+                }
             }
             put("id", JsonPrimitive(existing.id))
-            val incomingRowWins = rowBeats(incomingRow, incoming.deviceOrigin, existingRow, existing.deviceOrigin)
+            val incomingRowWins = rowBeats(
+                incomingRow, incoming.deviceOrigin, incoming.createdAt,
+                existingRow, existing.deviceOrigin, existing.createdAt,
+            )
             // createdAt follows the row winner: both peers compute the same winner, so
             // the value converges without relying on a follow-up push to propagate it.
             put("createdAt", JsonPrimitive(if (incomingRowWins) incoming.createdAt else existing.createdAt))
@@ -136,13 +145,16 @@ internal object FieldRegisters {
     private fun rowBeats(
         incomingStamp: String,
         incomingDevice: String,
+        incomingCreatedAt: Long,
         existingStamp: String,
         existingDevice: String,
+        existingCreatedAt: Long,
     ): Boolean {
         val incoming = Hlc.parseOrNull(incomingStamp)
         val existing = Hlc.parseOrNull(existingStamp)
         if (incoming != null && existing != null && incoming != existing) return incoming > existing
-        return incomingDevice > existingDevice
+        if (incomingDevice != existingDevice) return incomingDevice > existingDevice
+        return incomingCreatedAt > existingCreatedAt
     }
 
     private fun beats(
