@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.log.Log
 import app.journal.util.PlatformLock
 import app.journal.util.replaceDurably
+import com.sun.jna.platform.win32.Crypt32Util
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -18,31 +19,56 @@ private fun keyFile(): File {
 }
 
 /**
- * 32-byte key beside the journal, readable only by the owning user (POSIX 0600).
- * Windows has no POSIX mode here: the file inherits the profile ACL, which the
- * platform restricts to the user.
+ * 32-byte key beside the journal. Windows wraps it with DPAPI, so a copied folder does
+ * not carry a usable key; POSIX systems keep the raw bytes readable by the owner only.
  */
 private fun loadOrCreateKey(): ByteArray = keyLock.withLock {
     val file = keyFile()
     val path = file.absolutePath
     cachedKey?.let { (cachedPath, key) -> if (cachedPath == path) return@withLock key }
     val existing = if (file.exists()) file.readBytes() else null
-    if (existing != null && existing.size == 32) {
-        cachedKey = path to existing
-        return@withLock existing
+    val decoded = existing?.let(::decodeKeyBytes)
+    if (decoded != null) {
+        if (isWindows() && existing.size == 32) {
+            // Legacy plain key: re-wrap it now that DPAPI is available.
+            persistKey(file, decoded)
+        }
+        cachedKey = path to decoded
+        return@withLock decoded
     }
     if (existing != null) quarantineKeyFile(file)
     val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }
-    file.parentFile?.mkdirs()
-    replaceDurably(file, fresh)
-    runCatching {
-        Files.setPosixFilePermissions(
-            file.toPath(),
-            setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
-        )
-    }.onFailure { Log.withTag("JournalAtRest").w { "Cannot restrict key file: ${it.message}" } }
+    persistKey(file, fresh)
     cachedKey = path to fresh
     fresh
+}
+
+private fun isWindows(): Boolean =
+    System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
+
+/** Raw 32 bytes on POSIX, a DPAPI blob on Windows; null when neither decodes to a key. */
+private fun decodeKeyBytes(bytes: ByteArray): ByteArray? {
+    if (bytes.size == 32) return bytes
+    if (!isWindows()) return null
+    return runCatching {
+        Crypt32Util.cryptUnprotectData(bytes)
+    }.getOrNull()?.takeIf { it.size == 32 }
+}
+
+private fun persistKey(file: File, key: ByteArray) {
+    file.parentFile?.mkdirs()
+    val stored = if (isWindows()) {
+        runCatching { Crypt32Util.cryptProtectData(key) }.getOrDefault(key)
+    } else key
+    replaceDurably(file, stored)
+    if (!isWindows()) {
+        runCatching {
+            Files.setPosixFilePermissions(
+                file.toPath(),
+                setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+            )
+        }.onFailure { Log.withTag("JournalAtRest").w { "Cannot restrict key file: ${it.message}" } }
+    }
 }
 
 /**
