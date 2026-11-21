@@ -30,6 +30,20 @@ The Release workflow fails its version guard when these drift:
    installers, writes `SHA256SUMS.txt` and creates the GitHub Release with
    generated notes.
 
+## Android baseline profile
+
+The generated profile in `composeApp/src/androidRelease/generated/baselineProfiles`
+ships inside the release APK (`assets/dexopt/baseline.prof`). Regenerate it when the
+startup path changes, with a connected device or emulator:
+
+```bash
+./gradlew :composeApp:generateReleaseBaselineProfile -Pnepenthe.emulatorAbi=true
+```
+
+Commit the regenerated `baseline-prof.txt` and `startup-prof.txt`. The `emulatorAbi`
+property adds x86_64 to the release ABI list so the generator can install on a
+workstation emulator; shipped builds stay arm-only.
+
 ## Build notes
 
 - **Windows MSI**: jpackage comes from the Gradle JVM (JDK 17, corretto on
