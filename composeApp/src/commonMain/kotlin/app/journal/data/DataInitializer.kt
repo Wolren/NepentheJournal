@@ -1,5 +1,6 @@
 package app.journal.data
 
+import app.journal.catalog.CatalogMapper
 import app.journal.catalog.CatalogSource
 import app.journal.ingest.DoseWikiIngestor
 import app.journal.ingest.DosewikiTaxonomy
@@ -203,13 +204,14 @@ object DataInitializer {
             libraryBuildHook?.invoke()
 
             var catalogApplied = false
+            var payloadDeferred = false
             val catalogFingerprint = CatalogSource.bundledFingerprint()
             val seedLoaded = if (catalogFingerprint != null) {
                 phase("Loading substance catalog")
                 val userSubstances = repo.substances.value.filter { it.deviceOrigin != "system" }
                 val catalog = withContext(Dispatchers.Default) {
                     runCatching {
-                        val substances = CatalogSource.loadSubstances()
+                        val substances = CatalogSource.loadSubstances(withPayload = false)
                         StartupClock.mark("catalog substances")
                         val effects = CatalogSource.loadEffects()
                         StartupClock.mark("catalog effects")
@@ -231,6 +233,7 @@ object DataInitializer {
                     // A user edit to a reference row outranks the bundled version.
                     if (userSubstances.isNotEmpty()) repo.applyBatch(substances = userSubstances)
                     catalogApplied = true
+                    payloadDeferred = true
                     true
                 } else {
                     Log.withTag("DataInit").w { "Catalog unusable, falling back to the JSON seed" }
@@ -290,6 +293,27 @@ object DataInitializer {
             phase("Library ready")
             logStartup(repo, startedAt, loadMs, libraryMs = currentTimeMillis() - buildStartedAt)
             _libraryReadyFlow.value = true
+
+            // The pharmacology blocks feed the substance detail screen only. Decoding them
+            // before the gate held the lists shut for another second on a phone.
+            if (payloadDeferred) {
+                runCatching {
+                    // The window is still composing right after the gate; give it the CPU first.
+                    delay(500)
+                    phase("Decoding pharmacology")
+                    val updates = withContext(Dispatchers.Default) {
+                        CatalogMapper.loadPayloadUpdates(repo.substances.value)
+                    }
+                    if (updates.isNotEmpty()) {
+                        repo.applyBatch(substances = updates)
+                        store.save(fullBackup = false)
+                    }
+                    StartupClock.mark("catalog payloads")
+                    Log.withTag("DataInit").i { "Decoded payload blocks for ${updates.size} substances" }
+                }.onFailure { e ->
+                    Log.withTag("DataInit").e(e) { "Payload decode failed; substance details stay bare" }
+                }
+            }
         } catch (e: CancellationException) {
             // reset() cancelled the build: a new launch rebuilds it, so the gate stays closed.
             phase("Library build cancelled")

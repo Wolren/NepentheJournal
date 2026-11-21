@@ -259,6 +259,7 @@ tasks.withType<Test>().configureEach {
     val testHome = layout.buildDirectory.dir("test-home/$name").get().asFile
     testHome.mkdirs()
     systemProperty("user.home", testHome.absolutePath)
+    providers.gradleProperty("nepenthe.bench").orNull?.let { systemProperty("nepenthe.bench", it) }
     // The reference catalog is a build artifact; catalog tests read the copy the builder produced.
     rootProject.file("build/substance-db/substances.sqlite").takeIf { it.exists() }?.let {
         systemProperty("nepenthe.catalog", it.absolutePath)

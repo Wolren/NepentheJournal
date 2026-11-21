@@ -21,13 +21,24 @@ import kotlinx.serialization.Serializable
  */
 internal object CatalogMapper {
 
-    fun loadSubstances(now: Long, sourceVersion: String): List<Substance> {
+    /**
+     * @param withPayload false skips the payload column entirely: the rows come back with
+     * null pharmacology blocks, which [loadPayloadUpdates] fills in after the gate opens.
+     */
+    fun loadSubstances(now: Long, sourceVersion: String, withPayload: Boolean = true): List<Substance> {
         val queries = SubstanceCatalog.database.catalogQueries
         StartupClock.mark("catalog driver ready")
-        val rows = queries.selectAllSubstances {
-                id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
-            RawSubstance(id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
-        }.executeAsList()
+        val rows = if (withPayload) {
+            queries.selectAllSubstances {
+                    id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, _, _, payload ->
+                RawSubstance(id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, payload)
+            }.executeAsList()
+        } else {
+            queries.selectAllSubstancesCore {
+                    id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax ->
+                RawSubstance(id, oldId, name, summary, cid, pwikiId, addiction, halfLife, tmax, null)
+            }.executeAsList()
+        }
         StartupClock.mark("catalog substance rows ${rows.size}")
 
         val aliases = queries.selectAllAliases { substanceId, alias -> substanceId to alias }
@@ -98,6 +109,33 @@ internal object CatalogMapper {
                 sourceVersion = sourceVersion,
             )
         }
+    }
+
+    /**
+     * Fills the pharmacology blocks that [loadSubstances] skipped. Reference rows only:
+     * a user-edited substance keeps what the user wrote.
+     */
+    fun loadPayloadUpdates(current: List<Substance>): List<Substance> {
+        val byId = current.associateBy { it.id }
+        if (byId.isEmpty()) return emptyList()
+        val rows = SubstanceCatalog.database.catalogQueries.selectAllPayloads { id, payload ->
+            id to payload
+        }.executeAsList()
+        val updates = ArrayList<Substance>(rows.size)
+        for ((id, raw) in rows) {
+            val substance = byId[id] ?: continue
+            if (substance.deviceOrigin != "system") continue
+            val payload = decodePayload(raw) ?: continue
+            updates += substance.copy(
+                chemicalProperties = payload.chemicalProperties,
+                chemblData = payload.chemblData,
+                iupharData = payload.iupharData,
+                pdspData = payload.pdspData,
+                bindingdbData = payload.bindingdbData,
+                wikipediaData = payload.wikipediaData,
+            )
+        }
+        return updates
     }
 
     /** Reference effects keyed exactly as the old ingest keyed them, so ids stay stable. */

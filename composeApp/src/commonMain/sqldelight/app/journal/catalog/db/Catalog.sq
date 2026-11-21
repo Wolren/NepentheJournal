@@ -155,6 +155,13 @@ ORDER BY s.name;
 selectAllSubstances:
 SELECT * FROM substance ORDER BY id;
 
+selectAllSubstancesCore:
+SELECT id, old_id, name, summary, cid, pwiki_id, addiction_potential, half_life_minutes, tmax_minutes
+FROM substance ORDER BY id;
+
+selectAllPayloads:
+SELECT id, payload_json FROM substance ORDER BY id;
+
 selectAllAliases:
 SELECT substance_id, alias FROM substance_alias ORDER BY substance_id, alias;
 

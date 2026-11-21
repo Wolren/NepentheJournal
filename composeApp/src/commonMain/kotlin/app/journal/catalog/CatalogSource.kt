@@ -49,8 +49,8 @@ object CatalogSource {
         }.getOrNull()
     }
 
-    fun loadSubstances(): List<Substance> =
-        CatalogMapper.loadSubstances(currentTimeMillis(), SOURCE_VERSION)
+    fun loadSubstances(withPayload: Boolean = true): List<Substance> =
+        CatalogMapper.loadSubstances(currentTimeMillis(), SOURCE_VERSION, withPayload)
 
     fun loadEffects(): List<Effect> = CatalogMapper.loadEffects(currentTimeMillis())
 

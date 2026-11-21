@@ -60,6 +60,16 @@ class DataInitializerTest {
     }
 
     @Test
+    fun payloadBlocksLandAfterTheLibraryGateOpens() = withTempHome {
+        val repo = JournalRepository()
+        ensureInitialized(repo)
+
+        val withPayload = repo.substances.value.count { it.chemicalProperties != null || it.chemblData != null }
+        assertTrue(withPayload > 0,
+            "the deferred payload pass must fill pharmacology blocks once the build settles")
+    }
+
+    @Test
     fun seedLoadsOnceAndSecondEnsureIsNoop() = withTempHome { _ ->
         val repo = JournalRepository()
 
