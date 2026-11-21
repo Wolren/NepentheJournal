@@ -1,4 +1,5 @@
 /*
+
  * Nepenthe Journal - GPLv3
  * Copyright (C) 2026 Wolren
  *
@@ -12,6 +13,8 @@
  */
 
 package app.journal.data
+
+import app.journal.data.repository.EntityOrder
 
 import app.journal.model.*
 import kotlinx.coroutines.flow.*
@@ -91,19 +94,28 @@ internal class JournalSyncBridge(
                 val deletedAt = tombstones.deletedAtOf(type, id(incoming))
                 deletedAt == null || updatedAt(incoming) > deletedAt
             }
-        fun <T> newer(list: List<T>, get: (String) -> T?, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
+        fun <T> newer(
+            list: List<T>,
+            get: (String) -> T?,
+            id: (T) -> String,
+            updatedAt: (T) -> Long,
+            device: (T) -> String,
+        ): List<T> =
             if (!lastWriterWins) list
             else list.filter { incoming ->
-                val existing = get(id(incoming))
-                existing == null || updatedAt(incoming) >= updatedAt(existing)
+                val existing = get(id(incoming)) ?: return@filter true
+                EntityOrder.incomingWins(
+                    updatedAt(incoming), device(incoming),
+                    updatedAt(existing), device(existing),
+                )
             }
-        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt })
-        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt })
-        val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt })
-        val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt })
-        val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt })
-        val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt })
-        val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt })
+        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
         // An identical body older than the stored one is dropped so updatedAt can't regress
         val notesToPut: List<Note> =
             if (!lastWriterWins) notes
@@ -112,8 +124,8 @@ internal class JournalSyncBridge(
                 val merged = mergeNoteConflictLocked(existing, incoming, incoming.deviceOrigin)
                 if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
             }
-        val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt })
-        val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt })
+        val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
         val anyIndexedPut = bulkPutLocked(
             sessions = sessionsToPut,
             substances = substancesToPut,
@@ -248,7 +260,10 @@ internal class JournalSyncBridge(
                 .distinctBy { it.body }
             return incoming.copy(conflictSiblings = siblings)
         }
-        val incomingWins = incoming.updatedAt >= existing.updatedAt
+        val incomingWins = EntityOrder.incomingWins(
+            incoming.updatedAt, incoming.deviceOrigin,
+            existing.updatedAt, existing.deviceOrigin,
+        )
         val winner = if (incomingWins) incoming else existing
         val loser = if (incomingWins) existing else incoming
         if (winner.conflictSiblings.any { it.body == loser.body }) return winner

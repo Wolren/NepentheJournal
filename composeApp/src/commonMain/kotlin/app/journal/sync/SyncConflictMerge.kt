@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
+import app.journal.data.repository.EntityOrder
 import app.journal.model.Note
 import app.journal.model.Session
 
@@ -63,7 +64,11 @@ fun mergeSessionConflict(
         val deletedAt = repo.tombstoneDeletedAt("session", session.id)
         if (deletedAt != null && session.updatedAt <= deletedAt) return@forEach
         val existing = repo.getSession(session.id)
-        if (existing != null && existing.updatedAt > session.updatedAt) {
+        val incomingWins = existing != null && EntityOrder.incomingWins(
+            session.updatedAt, session.deviceOrigin,
+            existing.updatedAt, existing.deviceOrigin,
+        )
+        if (existing != null && !incomingWins) {
             repo.upsertNote(Note(
                 id = "conflict:${session.id}:$remoteDeviceId",
                 sessionId = session.id,

@@ -19,7 +19,7 @@ Known limits that remain:
 
 - Edits to different fields of the same entity are not merged; the later timestamp replaces the whole row.
 - Timestamps are wall-clock milliseconds. Validation bounds them to after 2000-01-01 and at most one day in the future, so a fast clock still wins inside that window.
-- Equal timestamps go to whichever side applies last.
+- Equal timestamps break by device origin since phase 1: both peers pick the same record, and the losing side records a conflict note.
 - Conflict notes are local annotations; their body is labelled from the writing device's perspective and replicates afterwards.
 
 ## Target model
