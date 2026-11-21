@@ -5,6 +5,7 @@ import app.journal.data.JournalRepository
 import app.journal.data.IJournalRepository
 import app.journal.model.*
 import app.journal.export.ExportImport
+import app.journal.sync.SyncLimits
 import app.journal.util.currentTimeMillis
 
 /**
@@ -133,47 +134,50 @@ object ObsidianNoteImporter {
     }
 
     /**
-     * Replace all child entities (doses, notes, timeline events) for a session
-     * with the ones from the canonical block.
+     * Replace the session's children from the canonical block. Children whose
+     * id the block still carries are rewritten in place: deleting and recreating
+     * them would record a tombstone for a row that exists again one line later.
      */
     private fun replaceChildren(
         repo: IJournalRepository,
         sessionId: String,
         block: ObsidianCanonicalBlock
     ) {
-        repo.dosesForSession(sessionId).forEach { repo.deleteDose(it.id) }
-        repo.notesForSession(sessionId).forEach { repo.deleteNote(it.id) }
-        repo.eventsForSession(sessionId).forEach { repo.deleteTimelineEvent(it.id) }
+        val doseIds = block.doses.map { it.id }.toSet()
+        val noteIds = block.notes.map { it.id }.toSet()
+        val eventIds = block.timelineEvents.map { it.id }.toSet()
+        repo.dosesForSession(sessionId).filter { it.id !in doseIds }.forEach { repo.deleteDose(it.id) }
+        repo.notesForSession(sessionId).filter { it.id !in noteIds }.forEach { repo.deleteNote(it.id) }
+        repo.eventsForSession(sessionId).filter { it.id !in eventIds }.forEach { repo.deleteTimelineEvent(it.id) }
 
-        for (dose in block.doses) {
-            val importedDose = dose.copy(
-                sessionId = sessionId,
-                createdAt = if (dose.createdAt == 0L) currentTimeMillis() else dose.createdAt,
-                updatedAt = currentTimeMillis(),
-                deviceOrigin = "obsidian-import"
-            )
-            repo.upsertDose(importedDose)
-        }
-
-        for (note in block.notes) {
-            val importedNote = note.copy(
-                sessionId = sessionId,
-                createdAt = if (note.createdAt == 0L) currentTimeMillis() else note.createdAt,
-                updatedAt = currentTimeMillis(),
-                deviceOrigin = "obsidian-import"
-            )
-            repo.upsertNote(importedNote)
-        }
-
-        for (event in block.timelineEvents) {
-            val importedEvent = event.copy(
-                sessionId = sessionId,
-                createdAt = if (event.createdAt == 0L) currentTimeMillis() else event.createdAt,
-                updatedAt = currentTimeMillis(),
-                deviceOrigin = "obsidian-import"
-            )
-            repo.upsertTimelineEvent(importedEvent)
-        }
+        val now = currentTimeMillis()
+        repo.applyBatch(
+            doses = block.doses.map { dose ->
+                dose.copy(
+                    sessionId = sessionId,
+                    createdAt = if (dose.createdAt == 0L) now else dose.createdAt,
+                    updatedAt = now,
+                    deviceOrigin = "obsidian-import"
+                )
+            },
+            notes = block.notes.map { note ->
+                note.copy(
+                    sessionId = sessionId,
+                    createdAt = if (note.createdAt == 0L) now else note.createdAt,
+                    updatedAt = now,
+                    deviceOrigin = "obsidian-import"
+                )
+            },
+            timelineEvents = block.timelineEvents.map { event ->
+                event.copy(
+                    sessionId = sessionId,
+                    createdAt = if (event.createdAt == 0L) now else event.createdAt,
+                    updatedAt = now,
+                    deviceOrigin = "obsidian-import"
+                )
+            },
+            lastWriterWins = false,
+        )
     }
 
     /**
@@ -228,8 +232,47 @@ object ObsidianNoteImporter {
             errors.add("too many timeline events: ${block.timelineEvents.size} > $MAX_TIMELINE_EVENTS_PER_SESSION")
         }
 
+        // Hand-edited blocks get the same value checks as a synced row, before any write.
+        block.doses.forEach { dose ->
+            if (!isValidId(dose.id)) errors.add("invalid dose ID '${dose.id}'")
+            if (!dose.amount.isFinite() || dose.amount < 0.0 || dose.amount > SyncLimits.MAX_DOSE_AMOUNT) {
+                errors.add("dose ${dose.id} has an invalid amount ${dose.amount}")
+            }
+            if (dose.unit.length > SyncLimits.MAX_UNIT_LEN) errors.add("dose ${dose.id} unit too long")
+            if (dose.routeOfAdministration.length > SyncLimits.MAX_ROA_LEN) errors.add("dose ${dose.id} ROA too long")
+            if (dose.substanceId.isBlank() || dose.substanceId.length > SyncLimits.MAX_ID_LEN) {
+                errors.add("dose ${dose.id} has an invalid substance id")
+            }
+            childTime("dose ${dose.id} createdAt", dose.createdAt, maxTimestamp)?.let(errors::add)
+            childTime("dose ${dose.id} updatedAt", dose.updatedAt, maxTimestamp)?.let(errors::add)
+            if (dose.timestamp !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+                errors.add("dose ${dose.id} timestamp out of valid range")
+            }
+        }
+        block.notes.forEach { note ->
+            if (!isValidId(note.id)) errors.add("invalid note ID '${note.id}'")
+            if (note.body.length > SyncLimits.MAX_FIELD_LEN) errors.add("note ${note.id} body too long")
+            if ((note.title?.length ?: 0) > SyncLimits.MAX_TITLE_LEN) errors.add("note ${note.id} title too long")
+            childTime("note ${note.id} createdAt", note.createdAt, maxTimestamp)?.let(errors::add)
+            childTime("note ${note.id} updatedAt", note.updatedAt, maxTimestamp)?.let(errors::add)
+        }
+        block.timelineEvents.forEach { event ->
+            if (!isValidId(event.id)) errors.add("invalid timeline event ID '${event.id}'")
+            if (event.label.length > SyncLimits.MAX_LABEL_LEN) errors.add("event ${event.id} label too long")
+            if ((event.body?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) errors.add("event ${event.id} body too long")
+            if (event.timestamp !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+                errors.add("event ${event.id} timestamp out of valid range")
+            }
+            childTime("event ${event.id} createdAt", event.createdAt, maxTimestamp)?.let(errors::add)
+            childTime("event ${event.id} updatedAt", event.updatedAt, maxTimestamp)?.let(errors::add)
+        }
+
         return errors
     }
+
+    /** Child timestamps may be absent (0) because the import fills them with the import time. */
+    private fun childTime(label: String, ts: Long, maxTimestamp: Long): String? =
+        if (ts != 0L && ts !in MIN_VALID_TIMESTAMP..maxTimestamp) "$label out of valid range" else null
 
     private fun isValidId(id: String): Boolean {
         return id.isNotBlank() && id.none { c ->

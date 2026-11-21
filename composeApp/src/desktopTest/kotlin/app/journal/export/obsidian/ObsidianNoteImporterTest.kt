@@ -170,4 +170,71 @@ this is not json
         assertEquals(expected, ObsidianNoteImporter.extractCanonicalBlock(block))
         assertEquals(expected, ObsidianNoteImporter.extractCanonicalBlock(crlf))
     }
+
+    @Test
+    fun importRejectsADoseWithANegativeAmount() {
+        val repo = JournalRepository()
+        writeMdFile("Nepenthe", "negative-dose.md", canonicalBlock.replace("\"amount\":100.0", "\"amount\":-5.0"))
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertTrue(result.errors.isNotEmpty(), "a negative dose amount must be rejected, got $result")
+        assertTrue(repo.sessions.value.isEmpty(), "nothing may be written for a rejected block")
+        assertTrue(repo.doses.value.isEmpty())
+    }
+
+    @Test
+    fun importRejectsAnOverLongDoseUnit() {
+        val repo = JournalRepository()
+        val longUnit = "u".repeat(200)
+        writeMdFile("Nepenthe", "long-unit.md", canonicalBlock.replace("\"unit\":\"ug\"", "\"unit\":\"$longUnit\""))
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertTrue(result.errors.isNotEmpty(), "an over-long unit must be rejected, got $result")
+        assertTrue(repo.sessions.value.isEmpty())
+        assertTrue(repo.doses.value.isEmpty())
+    }
+
+    @Test
+    fun importRejectsAFutureDoseTimestamp() {
+        val repo = JournalRepository()
+        val future = System.currentTimeMillis() + 30L * 86_400_000L
+        writeMdFile(
+            "Nepenthe",
+            "future-dose.md",
+            canonicalBlock.replace("\"timestamp\":1720800000000", "\"timestamp\":$future"),
+        )
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertTrue(result.errors.isNotEmpty(), "a future dose timestamp must be rejected, got $result")
+        assertTrue(repo.doses.value.isEmpty())
+    }
+
+    @Test
+    fun reimportingANoteDoesNotTombstoneTheChildrenItRewrites() {
+        val repo = JournalRepository()
+        repo.upsertSubstance(Substance(
+            id = "sub:1", name = "LSD", createdAt = 0L, updatedAt = 0L,
+            deviceOrigin = "test", substanceClass = listOf("Classical Psychedelic"),
+            cachedAt = 0L, sourceVersion = "test"
+        ))
+        writeMdFile("Nepenthe", "session-1.md", canonicalBlock)
+        val vaultDir = "${testDir.absolutePath}/Nepenthe"
+        ObsidianNoteImporter.importFromVault(repo, vaultDir)
+        assertEquals(1, repo.doses.value.size)
+
+        val second = ObsidianNoteImporter.importFromVault(repo, vaultDir)
+
+        assertEquals(1, second.updated, "the second pass updates the same session: $second")
+        assertEquals(1, repo.doses.value.size, "the dose must be rewritten in place")
+        val childTombstones = repo.exportTombstones().keys.filter {
+            it.startsWith("dose:") || it.startsWith("note:") || it.startsWith("timelineEvent:")
+        }
+        assertTrue(
+            childTombstones.isEmpty(),
+            "a rewrite must not record deletes for ids it immediately re-creates: $childTombstones",
+        )
+    }
 }
