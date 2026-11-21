@@ -151,4 +151,38 @@ class KtorSyncClientDrainTest {
         assertFalse(r.complete, "a rejected page must not be counted as delivered")
         assertFalse(r.lastPage.success, "the caller sees the rejected page")
     }
+
+    @Test
+    fun `out of range nextSince holds the drain instead of fetching past the bound`() = runBlocking {
+        val first = page(truncated = true, nextSince = tied + 400L * 86_400_000L, nextSinceId = "int:1")
+        val fetched = mutableListOf<Pair<Long, String>>()
+
+        val r = client.drainPullPages(
+            first = first, firstSince = 0L, firstSinceId = "", pageLimit = 10,
+            fetchPage = { ts, id -> fetched += ts to id; Result.success(page(truncated = false)) },
+            applyPage = { _, _ -> }
+        )
+
+        assertFalse(r.complete, "a peer cursor outside the entity window must not advance the drain")
+        assertTrue(fetched.isEmpty(), "no fetch may be issued beyond the host's accepted since bound")
+    }
+
+    @Test
+    fun `over-long nextSinceId holds the drain`() = runBlocking {
+        val first = page(
+            truncated = true,
+            nextSince = tied,
+            nextSinceId = "x".repeat(SyncLimits.MAX_ID_LEN + 1)
+        )
+        var fetches = 0
+
+        val r = client.drainPullPages(
+            first = first, firstSince = 0L, firstSinceId = "", pageLimit = 10,
+            fetchPage = { _, _ -> fetches++; Result.success(page(truncated = false)) },
+            applyPage = { _, _ -> }
+        )
+
+        assertFalse(r.complete, "an over-long id half is a malformed cursor, not progress")
+        assertEquals(0, fetches)
+    }
 }

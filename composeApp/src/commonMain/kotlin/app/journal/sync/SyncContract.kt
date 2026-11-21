@@ -213,8 +213,7 @@ fun applySyncResponse(
         }
     }
     val clean = filtered.response
-    // Sessions go through the same outcome merge as a server push; doses and the rest
-    // stay on the timestamp filter below.
+    // Sessions use the server-push outcome merge; the rest use the timestamp filter.
     val remoteDeviceId = clean.senderDeviceId.takeIf { it.isNotBlank() } ?: "peer"
     if (clean.sessions.isNotEmpty()) {
         mergeSessionConflict(repo, clean.sessions, clean.deletedSessionIds, remoteDeviceId)
@@ -276,14 +275,35 @@ fun isAfterPullCursor(updatedAt: Long, id: String, since: Long, sinceId: String)
     }
 
 /**
+ * Guard for a peer-supplied pull cursor before it is persisted or sent back.
+ *
+ * The cursor becomes the next pull's `since`, so a value outside the shared
+ * entity-time window is not stale data, it is a permanent stall: every later
+ * request asks beyond the host's accepted bound and the host rejects it. The
+ * id half is shape-checked against the same cap as every other wire id. Zero
+ * means "no cursor yet" and is always legal.
+ */
+fun isUsablePullCursor(ts: Long, id: String = ""): Boolean {
+    if (id.length > SyncLimits.MAX_ID_LEN) return false
+    if (ts == 0L) return id.isEmpty()
+    return EntityTimePolicy.isReasonableEntityTime(ts)
+}
+
+/**
  * Highest updatedAt across every entity list in a sync response.
  * Used to advance pull cursors. Tombstones carry no wire timestamps, so
  * they never move the cursor on their own (their deletion timestamps live
  * only in the sender tombstone journal).
+ *
+ * Stamps outside the shared entity-time window are ignored: the apply guard
+ * drops such rows, so letting one set the fallback cursor would advance past
+ * data that was never stored and stall every later pull beyond the host bound.
  */
 fun SyncResponse.maxUpdatedAt(): Long {
     var max = 0L
-    fun consider(ts: Long) { if (ts > max) max = ts }
+    fun consider(ts: Long) {
+        if (ts > max && EntityTimePolicy.isReasonableEntityTime(ts)) max = ts
+    }
     sessions.forEach { consider(it.updatedAt) }
     doses.forEach { consider(it.updatedAt) }
     substances.forEach { consider(it.updatedAt) }

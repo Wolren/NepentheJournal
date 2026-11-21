@@ -83,4 +83,38 @@ class SyncCursorRulesTest {
         assertEquals(1_000L, cursorAfterCycle(1_000L, 5_000L, emptyList(), drainComplete = true))
         assertEquals(1_000L, cursorAfterCycle(1_000L, 5_000L, emptyList(), drainComplete = false))
     }
+
+    @Test
+    fun `a peer cursor outside the entity-time window is not persisted`() {
+        assertFalse(isUsablePullCursor(tied + 400L * 86_400_000L, ""),
+            "a far-future nextSince would make every later pull ask beyond the host's bound")
+        assertFalse(isUsablePullCursor(tied, "x".repeat(SyncLimits.MAX_ID_LEN + 1)),
+            "an over-long sinceId half has no legal use")
+        assertTrue(isUsablePullCursor(tied, "int:50"))
+        assertTrue(isUsablePullCursor(0L, ""), "zero is the initial cursor, not a stall")
+    }
+
+    @Test
+    fun `maxUpdatedAt ignores stamps outside the entity-time window`() {
+        val now = System.currentTimeMillis()
+        val future = SyncResponse(
+            success = true,
+            sessions = listOf(
+                app.journal.model.Session(
+                    id = "s:future", createdAt = now, updatedAt = now + 400L * 86_400_000L,
+                    deviceOrigin = "t", title = "t", startTime = now,
+                )
+            )
+        )
+        assertEquals(0L, future.maxUpdatedAt(),
+            "a dropped out-of-window row must not move the fallback cursor")
+        val mixed = SyncResponse(
+            success = true,
+            sessions = future.sessions + app.journal.model.Session(
+                id = "s:ok", createdAt = now, updatedAt = now,
+                deviceOrigin = "t", title = "t", startTime = now,
+            )
+        )
+        assertEquals(now, mixed.maxUpdatedAt())
+    }
 }

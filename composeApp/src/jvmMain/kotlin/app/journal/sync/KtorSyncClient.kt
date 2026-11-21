@@ -273,6 +273,13 @@ class KtorSyncClient(
             val hasNextSince = page.nextSince > 0L
             val nextTs = if (hasNextSince) page.nextSince else page.maxUpdatedAt()
             val nextId = if (hasNextSince) page.nextSinceId else ""
+            if (!isUsablePullCursor(nextTs, nextId)) {
+                // An out-of-window peer cursor would poison every later pull; hold it.
+                Log.withTag("SyncClient").w {
+                    "peer pull cursor out of bounds (since=$nextTs, idLen=${nextId.length}); stopping INCOMPLETE"
+                }
+                return PullDrainResult(page, complete = false)
+            }
             val progressed = nextTs > cursorTs || (nextTs == cursorTs && nextId > cursorId)
             if (!progressed) {
                 // Stalls when a pre-nextSinceId host splits a tie group at the cursor value (it can't express progress inside one).

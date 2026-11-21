@@ -258,78 +258,41 @@ internal class SyncContinuousSession(
         }
     }
 
-    private fun isReasonableTimestamp(ts: Long): Boolean =
-        EntityTimePolicy.isReasonableEntityTime(ts)
-
     /**
-     * Apply a WsDelta with per-entity data validation.
-     * Skips entities with blank IDs, unreasonable timestamps, or (for doses) non-finite/negative amounts.
-     * Returns the count of skipped invalid items.
+     * Apply a WsDelta through the host's own rule set ([planWsDeltaApply]):
+     * per-entity violations drop that row, envelope violations drop the frame.
+     * Returns the count of items the guard refused.
      */
     private fun validateAndApplyDelta(delta: WsDelta): Int {
-        var skipped = 0
-
-        val sessions = delta.sessions.filter { s ->
-            val ok = s.id.isNotBlank() && isReasonableTimestamp(s.createdAt) && isReasonableTimestamp(s.updatedAt)
-            if (!ok) skipped++; ok
+        val plan = planWsDeltaApply(delta)
+        if (plan.rejected != null) {
+            Log.withTag("SyncTransport").w { "WS delta rejected by apply guard: ${plan.rejected}" }
+            return plan.delta.sessions.size + plan.delta.doses.size + plan.delta.substances.size +
+                plan.delta.effects.size + plan.delta.interactions.size + plan.delta.notes.size +
+                plan.delta.timelineEvents.size + plan.delta.customUnits.size
         }
-        val doses = delta.doses.filter { d ->
-            val ok = d.id.isNotBlank() && isReasonableTimestamp(d.createdAt) && isReasonableTimestamp(d.updatedAt)
-                    && d.amount.isFinite() && d.amount >= 0.0
-            if (!ok) skipped++; ok
-        }
-        val substances = delta.substances.filter { s ->
-            val ok = s.id.isNotBlank() && isReasonableTimestamp(s.createdAt) && isReasonableTimestamp(s.updatedAt)
-            if (!ok) skipped++; ok
-        }
-        val effects = delta.effects.filter { e ->
-            val ok = e.id.isNotBlank() && isReasonableTimestamp(e.createdAt) && isReasonableTimestamp(e.updatedAt)
-            if (!ok) skipped++; ok
-        }
-        val interactions = delta.interactions.filter { i ->
-            val ok = i.id.isNotBlank() && isReasonableTimestamp(i.createdAt) && isReasonableTimestamp(i.updatedAt)
-            if (!ok) skipped++; ok
-        }
-        val notes = delta.notes.filter { n ->
-            val ok = n.id.isNotBlank() && isReasonableTimestamp(n.createdAt) && isReasonableTimestamp(n.updatedAt)
-            if (!ok) skipped++; ok
-        }
-        val timelineEvents = delta.timelineEvents.filter { t ->
-            val ok = t.id.isNotBlank() && isReasonableTimestamp(t.createdAt) && isReasonableTimestamp(t.updatedAt)
-            if (!ok) skipped++; ok
-        }
-        val customUnits = delta.customUnits.filter { u ->
-            val ok = u.id.isNotBlank() && isReasonableTimestamp(u.createdAt) && isReasonableTimestamp(u.updatedAt)
-            if (!ok) skipped++; ok
-        }
-
-        if (skipped > 0) {
-            Log.withTag("SyncTransport").w { "Data validation: skipped $skipped invalid items in WS delta" }
-        }
-
-        fun ids(ids: List<String>): List<String> {
-            val ok = ids.filter { id -> id.isNotBlank() && id.length <= 128 }
-            skipped += ids.size - ok.size
-            return ok
+        val clean = plan.delta
+        if (plan.skippedEntities > 0) {
+            Log.withTag("SyncTransport").w { "Data validation: skipped ${plan.skippedEntities} invalid items in WS delta" }
         }
         repo.applyBatch(
-            sessions = sessions, doses = doses, substances = substances,
-            effects = effects, interactions = interactions, notes = notes,
-            timelineEvents = timelineEvents, customUnits = customUnits,
+            sessions = clean.sessions, doses = clean.doses, substances = clean.substances,
+            effects = clean.effects, interactions = clean.interactions, notes = clean.notes,
+            timelineEvents = clean.timelineEvents, customUnits = clean.customUnits,
             lastWriterWins = true,
-            deletedSessionIds = ids(delta.deletedSessionIds),
-            deletedDoseIds = ids(delta.deletedDoseIds),
-            deletedNoteIds = ids(delta.deletedNoteIds),
-            deletedSubstanceIds = ids(delta.deletedSubstanceIds),
-            deletedEffectIds = ids(delta.deletedEffectIds),
-            deletedInteractionIds = ids(delta.deletedInteractionIds),
-            deletedTimelineEventIds = ids(delta.deletedTimelineEventIds),
-            deletedCustomUnitIds = ids(delta.deletedCustomUnitIds),
+            deletedSessionIds = clean.deletedSessionIds,
+            deletedDoseIds = clean.deletedDoseIds,
+            deletedNoteIds = clean.deletedNoteIds,
+            deletedSubstanceIds = clean.deletedSubstanceIds,
+            deletedEffectIds = clean.deletedEffectIds,
+            deletedInteractionIds = clean.deletedInteractionIds,
+            deletedTimelineEventIds = clean.deletedTimelineEventIds,
+            deletedCustomUnitIds = clean.deletedCustomUnitIds,
             tombstoneCutoff = delta.since
         )
         // Durability: persist what we just applied (audit D1).
         persistAfterApply?.invoke()
-        return skipped
+        return plan.skippedEntities
     }
 
 

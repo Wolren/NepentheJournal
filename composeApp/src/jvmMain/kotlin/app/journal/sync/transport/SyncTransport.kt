@@ -323,8 +323,13 @@ class SyncTransport(
                     if (push.drainComplete) {
                         val page = push.finalResponse
                         val pullTs = page.nextSince.takeIf { it > 0L } ?: page.maxUpdatedAt()
-                        lastPullTime = pullTs
-                        lastPullId = page.nextSinceId
+                        if (isUsablePullCursor(pullTs, page.nextSinceId)) {
+                            lastPullTime = pullTs
+                            lastPullId = page.nextSinceId
+                        } else {
+                            // Persisted cursor: an unusable peer value would stall every later pull.
+                            appendDebug("Pull cursor held: peer reported an unusable position ($pullTs)")
+                        }
                     }
                     if (!push.drainComplete) {
                         appendDebug("Pull drain incomplete — sync cursor held at $since, resuming next cycle")

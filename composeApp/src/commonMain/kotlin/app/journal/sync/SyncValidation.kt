@@ -54,18 +54,7 @@ fun validateSyncBatch(batch: SyncBatch): String? {
  * parameter (contract section b).
  */
 fun validateWsDelta(delta: WsDelta): String? {
-    if (delta.since < 0 || delta.since > currentTimeMillis() + EntityTimePolicy.FUTURE_MARGIN_MS) {
-        return "Invalid since"
-    }
-    countCapError(delta.sessions.size, delta.doses.size, delta.substances.size,
-        delta.effects.size, delta.interactions.size, delta.notes.size,
-        delta.timelineEvents.size, delta.customUnits.size)?.let { return it }
-    validateDeletedIds(
-        delta.deletedSessionIds, delta.deletedDoseIds, delta.deletedSubstanceIds,
-        delta.deletedEffectIds, delta.deletedInteractionIds, delta.deletedNoteIds,
-        delta.deletedTimelineEventIds, delta.deletedCustomUnitIds
-    )?.let { return it }
-
+    envelopeError(delta)?.let { return it }
     validateSessions(delta.sessions)?.let { return it }
     validateDoses(delta.doses)?.let { return it }
     validateNotes(delta.notes)?.let { return it }
@@ -75,6 +64,77 @@ fun validateWsDelta(delta: WsDelta): String? {
     validateEffects(delta.effects)?.let { return it }
     validateCustomUnits(delta.customUnits)?.let { return it }
     return null
+}
+
+/**
+ * Whole-frame rules shared by the host and the client: the cursor bounds,
+ * per-type count caps, and deleted-id shape. A frame that fails here is a
+ * protocol violation, so no part of it may be applied.
+ */
+private fun envelopeError(delta: WsDelta): String? {
+    if (delta.since < 0 || delta.since > currentTimeMillis() + EntityTimePolicy.FUTURE_MARGIN_MS) {
+        return "Invalid since"
+    }
+    countCapError(delta.sessions.size, delta.doses.size, delta.substances.size,
+        delta.effects.size, delta.interactions.size, delta.notes.size,
+        delta.timelineEvents.size, delta.customUnits.size)?.let { return it }
+    return validateDeletedIds(
+        delta.deletedSessionIds, delta.deletedDoseIds, delta.deletedSubstanceIds,
+        delta.deletedEffectIds, delta.deletedInteractionIds, delta.deletedNoteIds,
+        delta.deletedTimelineEventIds, delta.deletedCustomUnitIds
+    )
+}
+
+
+/**
+ * Result of applying the host's WS rule set on the client side.
+ * [rejected] is non-null when the whole frame must be dropped; otherwise
+ * [delta] carries only the items the host would also accept.
+ */
+data class WsDeltaApplyPlan(
+    val delta: WsDelta,
+    val skippedEntities: Int = 0,
+    val rejected: String? = null
+)
+
+/**
+ * Client-side counterpart of [validateWsDelta]. The host rejects a frame that
+ * breaks a whole-payload rule and rejects any frame containing an invalid
+ * entity; the client must not apply a private subset of those checks. This
+ * plan keeps the host's per-entity rules (drop one bad row, keep the frame)
+ * and the host's envelope rules (drop the frame), so the two sides accept
+ * exactly the same data.
+ */
+fun planWsDeltaApply(delta: WsDelta): WsDeltaApplyPlan {
+    envelopeError(delta)?.let { return WsDeltaApplyPlan(delta, rejected = it) }
+    var skipped = 0
+    fun <T> keep(items: List<T>, check: (T) -> String?): List<T> = items.filter { item ->
+        val error = check(item)
+        if (error != null) skipped++
+        error == null
+    }
+    fun keepIds(ids: List<String>): List<String> = ids.filter { id ->
+        id.isNotBlank() && id.length <= SyncLimits.MAX_ID_LEN
+    }
+    val clean = delta.copy(
+        sessions = keep(delta.sessions) { validateSession(it) },
+        doses = keep(delta.doses) { validateDose(it) },
+        substances = keep(delta.substances) { validateSubstance(it) },
+        effects = keep(delta.effects) { validateEffect(it) },
+        interactions = keep(delta.interactions) { validateInteraction(it) },
+        notes = keep(delta.notes) { validateNote(it) },
+        timelineEvents = keep(delta.timelineEvents) { validateTimelineEvent(it) },
+        customUnits = keep(delta.customUnits) { validateCustomUnit(it) },
+        deletedSessionIds = keepIds(delta.deletedSessionIds),
+        deletedDoseIds = keepIds(delta.deletedDoseIds),
+        deletedNoteIds = keepIds(delta.deletedNoteIds),
+        deletedSubstanceIds = keepIds(delta.deletedSubstanceIds),
+        deletedEffectIds = keepIds(delta.deletedEffectIds),
+        deletedInteractionIds = keepIds(delta.deletedInteractionIds),
+        deletedTimelineEventIds = keepIds(delta.deletedTimelineEventIds),
+        deletedCustomUnitIds = keepIds(delta.deletedCustomUnitIds)
+    )
+    return WsDeltaApplyPlan(clean, skippedEntities = skipped)
 }
 
 

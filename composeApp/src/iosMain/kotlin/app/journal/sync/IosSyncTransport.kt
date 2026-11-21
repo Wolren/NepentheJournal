@@ -310,6 +310,13 @@ class IosSyncTransport(
                 val nextTs = if (hasNextSince) pullResp.nextSince
                     else maxOf(pullResp.maxUpdatedAt(), pullCursor)
                 val nextId = if (hasNextSince) pullResp.nextSinceId else ""
+                if (!isUsablePullCursor(nextTs, nextId)) {
+                    // Out-of-window peer cursor: sending it back would stall every later pull.
+                    val msg = "Peer pull cursor out of bounds (since=$nextTs); holding sync cursor"
+                    Log.withTag("IosSync").w { msg }
+                    _status.update { it.copy(lastError = msg) }
+                    return Result.failure(Exception(msg))
+                }
                 val progressed = nextTs > pullCursor || (nextTs == pullCursor && nextId > pullCursorId)
                 if (!progressed) {
                     val msg = "Pull cursor stalled at $pullCursor/$pullCursorId; holding sync cursor"
