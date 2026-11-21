@@ -83,6 +83,7 @@ object ForeignJournalImporter {
         val maxTimestamp = now + ExportImport.TIMESTAMP_FUTURE_MARGIN_MS
         val sessions = ArrayList<Session>()
         val doses = ArrayList<Dose>()
+        val sessionOccurrences = mutableMapOf<String, Int>()
         var duplicates = 0
 
         for (experience in journal.experiences) {
@@ -121,7 +122,11 @@ object ForeignJournalImporter {
             val title = (experience.title ?: index.titleOf(kept.map { it.substanceId }))
                 .ifBlank { "Imported session" }
                 .take(ExportImport.MAX_IMPORT_TITLE_LEN)
-            val sessionId = sessionId(format, start, title)
+            val baseId = sessionId(format, start, title)
+            // Two experiences with the same start and title are distinct sessions, not one twice.
+            val occurrence = (sessionOccurrences[baseId] ?: 0) + 1
+            sessionOccurrences[baseId] = occurrence
+            val sessionId = if (occurrence == 1) baseId else "$baseId:$occurrence"
             if (repo.getSession(sessionId) == null) {
                 sessions.add(
                     Session(

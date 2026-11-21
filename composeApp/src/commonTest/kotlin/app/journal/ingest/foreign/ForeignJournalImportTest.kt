@@ -258,6 +258,27 @@ class ForeignJournalImportTest {
         assertEquals("mg", RouteNames.unit(""))
     }
 
+    @Test
+    fun twoExperiencesWithTheSameStartAndTitleAreDistinctSessions() {
+        val json = """
+            {
+              "experiences": [
+                {"title": "Same", "creationDate": 1, "sortDate": $NOW, "ingestions": [
+                  {"substanceName": "Ketamine", "time": $NOW, "administrationRoute": "INSUFFLATED", "dose": 10.0, "units": "mg"}
+                ]},
+                {"title": "Same", "creationDate": 2, "sortDate": $NOW, "ingestions": [
+                  {"substanceName": "Ketamine", "time": $NOW, "administrationRoute": "INSUFFLATED", "dose": 20.0, "units": "mg"}
+                ]}
+              ]
+            }
+        """.trimIndent()
+        val (result, repo) = import(json, repoWith("Ketamine"))
+
+        assertEquals(2, result.sessions)
+        assertEquals(2, repo.sessions.value.size)
+        assertEquals(2, repo.doses.value.map { it.sessionId }.distinct().size)
+    }
+
     private companion object {
         const val NOW = 1_800_000_000_000L
     }
