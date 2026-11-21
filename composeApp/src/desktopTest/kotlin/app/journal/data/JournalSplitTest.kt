@@ -117,4 +117,21 @@ class JournalSplitTest {
         )
         assertEquals(1, library.substances.size, "the save must write the library file")
     }
+
+    @Test
+    fun anIntactLibraryFileDoesNotForceARewrite() = withTempHome { _ ->
+        val library = JournalSplit.libraryText(
+            JournalSnapshot(savedAt = 0L, substances = listOf(substance()))
+        )
+        val user = JournalSplit.userText(
+            JournalSnapshot(savedAt = 0L, sessions = listOf(session("first")))
+        )
+
+        val merged = JournalSplit.merge(user, library)
+
+        assertFalse(
+            merged.needsLibraryWrite,
+            "an intact library file must not be rewritten on every launch"
+        )
+    }
 }

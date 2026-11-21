@@ -31,13 +31,13 @@ internal object JournalSplit {
         // A bundled catalog owns the reference rows; user-created rows survive from either file.
         if (CatalogSource.bundledFingerprint() != null) {
             val library = libraryText?.let { text ->
-                decodeSnapshotWithRecovery(text).snapshot
+                decodeSnapshotWithRecovery(text)
             }
             fun <T : VaultDocument> keepUser(rows: List<T>): List<T> =
                 rows.filter { it.deviceOrigin != "system" }
-            val substances = keepUser(userSnapshot.substances + library?.substances.orEmpty())
-            val interactions = keepUser(userSnapshot.interactions + library?.interactions.orEmpty())
-            val effects = keepUser(userSnapshot.effects + library?.effects.orEmpty())
+            val substances = keepUser(userSnapshot.substances + library?.snapshot?.substances.orEmpty())
+            val interactions = keepUser(userSnapshot.interactions + library?.snapshot?.interactions.orEmpty())
+            val effects = keepUser(userSnapshot.effects + library?.snapshot?.effects.orEmpty())
             return Loaded(
                 snapshot = userSnapshot.copy(
                     substances = substances.distinctBy { it.id },
@@ -45,10 +45,9 @@ internal object JournalSplit {
                     effects = effects.distinctBy { it.id },
                 ),
                 userParseError = user.parseError,
-                libraryParseError = null,
-                // Rows rescued from a legacy file must reach the library file on the next save.
-                needsLibraryWrite = substances.isNotEmpty() ||
-                    interactions.isNotEmpty() || effects.isNotEmpty(),
+                libraryParseError = library?.parseError,
+                // The intact library file already holds these rows; rewriting it every launch wastes a full write.
+                needsLibraryWrite = library == null || library.parseError != null,
             )
         }
         if (libraryText == null) {
