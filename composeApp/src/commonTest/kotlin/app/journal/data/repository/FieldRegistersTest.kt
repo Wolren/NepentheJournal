@@ -6,6 +6,7 @@ import app.journal.model.Note
 import app.journal.model.Session
 import app.journal.sync.mergeSessionConflict
 import app.journal.util.Hlc
+import app.journal.util.currentTimeMillis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -156,7 +157,7 @@ class FieldRegistersTest {
     @Test
     fun aNoteBodyConflictKeepsTheLoserAsSibling() {
         val repo = JournalRepository()
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         repo.upsertNote(Note(
             id = "n:1", createdAt = now, updatedAt = now, deviceOrigin = "local",
             sessionId = "s:1", title = "Local title", body = "local body",

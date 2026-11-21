@@ -3,6 +3,7 @@ package app.journal.sync
 import app.journal.data.JournalRepository
 import app.journal.model.Note
 import app.journal.model.Session
+import app.journal.util.currentTimeMillis
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -43,7 +44,7 @@ class SyncConflictResolutionTest {
     @Test
     fun aStalePushDoesNotResurrectADeletedSession() {
         val repo = JournalRepository()
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         repo.upsertSession(session("s:1", now - 60_000, outcome = "old text"))
         repo.deleteSession("s:1")
         assertNull(repo.getSession("s:1"), "the delete must take the session out")
@@ -57,7 +58,7 @@ class SyncConflictResolutionTest {
     @Test
     fun anEditNewerThanTheDeleteIsKept() {
         val repo = JournalRepository()
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         repo.upsertSession(session("s:2", now - 60_000, outcome = "deleted soon"))
         repo.deleteSession("s:2")
 
@@ -72,7 +73,7 @@ class SyncConflictResolutionTest {
     @Test
     fun anOlderRemoteSessionKeepsTheLocalTextAndRaisesAConflictNote() {
         val repo = JournalRepository()
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         repo.upsertSession(session("s:3", now - 30_000, outcome = "local outcome", title = "Local title"))
 
         applySyncResponse(
@@ -98,7 +99,7 @@ class SyncConflictResolutionTest {
     @Test
     fun applyingTheSameResponseTwiceChangesNothing() {
         val repo = JournalRepository()
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         val incoming = response(
             sessions = (0 until 3).map { i -> session("s:idempotent:$i", now - 1_000 - i, outcome = "o$i") },
             notes = listOf(

@@ -2,6 +2,7 @@ package app.journal.data.repository
 
 import app.journal.data.JournalRepository
 import app.journal.model.Session
+import app.journal.util.currentTimeMillis
 import app.journal.sync.SyncResponse
 import app.journal.sync.applySyncResponse
 import kotlin.test.Test
@@ -61,7 +62,7 @@ class EntityOrderTest {
 
     @Test
     fun twoPeersWithEqualClocksConvergeOnOneRecord() {
-        val now = System.currentTimeMillis() - 60_000
+        val now = currentTimeMillis() - 60_000
         val clock = "$now:0"
         val fromA = session("s:tie", now, "a", "from a", clock)
         val fromB = session("s:tie", now, "b", "from b", clock)

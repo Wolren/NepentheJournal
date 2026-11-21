@@ -3,6 +3,7 @@ package app.journal.data
 import app.journal.model.Session
 import app.journal.sync.mergeSessionConflict
 import app.journal.util.Hlc
+import app.journal.util.currentTimeMillis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -54,7 +55,7 @@ class ClockStampTest {
     @Test
     fun aDeadlineInTheFutureLiftsTheStamp() {
         val repo = JournalRepository()
-        val deadline = System.currentTimeMillis() + 5_000L
+        val deadline = currentTimeMillis() + 5_000L
         repo.upsertSession(session("s:future", updatedAt = deadline))
         val stamp = Hlc.parseOrNull(repo.getSession("s:future")!!.clock)!!
         assertTrue(stamp.physicalMs >= deadline, "the clock must not trail the row's own updatedAt")
@@ -98,7 +99,7 @@ class ClockStampTest {
     @Test
     fun aLocalWriteAfterObservingAPeerClockIsCausallyLater() {
         val repo = JournalRepository()
-        val remote = Hlc.of(System.currentTimeMillis() + 60_000L, 5L)
+        val remote = Hlc.of(currentTimeMillis() + 60_000L, 5L)
         repo.applyRemoteSession(session("s:remote", clock = remote.encoded))
 
         repo.upsertSession(session("s:local"))
