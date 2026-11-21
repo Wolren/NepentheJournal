@@ -55,6 +55,17 @@ class SyncTransport(
             if (value != null) cursorStore.write(value)
         }
 
+    /** The pull half, separate from the push cursor so a WsAck cannot skip rows the pull never saw. */
+    private var lastPullTime: Long?
+        get() = cursorStore.readPull()?.first
+        private set(value) {
+            if (value != null) cursorStore.writePull(value, lastPullId)
+        }
+
+    private var lastPullId: String
+        get() = cursorStore.readPull()?.second ?: ""
+        private set(value) { cursorStore.writePull(lastPullTime ?: 0L, value) }
+
     private var activePeers = Collections.synchronizedList(mutableListOf<ConnectedPeer>())
     private var tokenRefreshJob: Job? = null
 
@@ -296,7 +307,9 @@ class SyncTransport(
                     val exchange = client.pushChanges(
                         host = peer.host, port = peer.port,
                         deviceId = deviceId, deviceName = deviceDisplayName, since = since,
-                        skipBundled = skipBundled
+                        skipBundled = skipBundled,
+                        pullSince = lastPullTime ?: 0L,
+                        pullSinceId = lastPullId
                     )
                     if (exchange.isFailure) {
                         val error = exchange.exceptionOrNull()
@@ -307,6 +320,12 @@ class SyncTransport(
 
                     val push = exchange.getOrThrow()
                     lastSyncTime = cursorAfterCycle(since, push.cycleStart, push.acks, push.drainComplete)
+                    if (push.drainComplete) {
+                        val page = push.finalResponse
+                        val pullTs = page.nextSince.takeIf { it > 0L } ?: page.maxUpdatedAt()
+                        lastPullTime = pullTs
+                        lastPullId = page.nextSinceId
+                    }
                     if (!push.drainComplete) {
                         appendDebug("Pull drain incomplete — sync cursor held at $since, resuming next cycle")
                     }

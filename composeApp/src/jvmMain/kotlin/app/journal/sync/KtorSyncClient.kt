@@ -369,7 +369,9 @@ class KtorSyncClient(
         host: String, port: Int,
         deviceId: String, deviceName: String,
         since: Long,
-        skipBundled: Boolean = false
+        skipBundled: Boolean = false,
+        pullSince: Long = since,
+        pullSinceId: String = ""
     ): Result<ChunkedPushResult> = withContext(Dispatchers.IO) {
         if (!canSign) return@withContext Result.failure(Exception("Not paired"))
 
@@ -444,7 +446,7 @@ class KtorSyncClient(
         }
 
         try {
-            val drain = applyAndDrain(host, port, acks.last(), since)
+            val drain = applyAndDrain(host, port, acks.last(), pullSince, pullSinceId)
             if (!drain.lastPage.success) {
                 return@withContext Result.failure(Exception(drain.lastPage.error ?: "Push failed"))
             }

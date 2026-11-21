@@ -13,8 +13,11 @@ import java.io.File
 internal class SyncCursorStore(private val dataDir: String) {
 
     private val file = File(dataDir, "sync-cursor.txt")
+    private val pullFile = File(dataDir, "sync-pull-cursor.txt")
     private var loaded = false
     private var cached: Long? = null
+    private var pullLoaded = false
+    private var cachedPull: Pair<Long, String>? = null
 
     @Synchronized
     fun read(): Long? {
@@ -36,6 +39,31 @@ internal class SyncCursorStore(private val dataDir: String) {
             file.writeText(cursor.toString())
         }.onFailure {
             Log.withTag("SyncCursor").w { "Failed to persist sync cursor: ${it.message}" }
+        }
+    }
+
+    /** The pull half of the cursor: the composite (updatedAt, id) cut after the last complete drain. */
+    @Synchronized
+    fun readPull(): Pair<Long, String>? {
+        if (!pullLoaded) {
+            pullLoaded = true
+            cachedPull = runCatching {
+                val lines = pullFile.takeIf { it.isFile }?.readLines().orEmpty()
+                if (lines.size >= 2) lines[0].trim().toLongOrNull()?.let { it to lines[1] } else null
+            }.getOrNull()
+        }
+        return cachedPull
+    }
+
+    @Synchronized
+    fun writePull(cursor: Long, id: String) {
+        pullLoaded = true
+        cachedPull = cursor to id
+        runCatching {
+            pullFile.parentFile?.mkdirs()
+            pullFile.writeText("$cursor\n$id")
+        }.onFailure {
+            Log.withTag("SyncCursor").w { "Failed to persist pull cursor: ${it.message}" }
         }
     }
 }
