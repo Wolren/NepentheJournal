@@ -257,4 +257,25 @@ class ObsidianNoteRendererTest {
         assertEquals("cid:5761", parsed.doses[0].substanceId)
         assertEquals(100.0, parsed.doses[0].amount)
     }
+
+    @Test
+    fun longTitlesProduceAFilenameThatFitsAFilesystemEntry() {
+        val longTitle = "A deliberately long session title with words ".repeat(20) + "é".repeat(200)
+        val first = renderSessionToObsidianNote(
+            session = sampleSession().copy(title = longTitle),
+            doses = emptyList(), notes = emptyList(), timelineEvents = emptyList(),
+            substanceNameResolver = substanceResolver,
+        )
+        val second = renderSessionToObsidianNote(
+            session = sampleSession().copy(id = "s:other-session", title = longTitle),
+            doses = emptyList(), notes = emptyList(), timelineEvents = emptyList(),
+            substanceNameResolver = substanceResolver,
+        )
+
+        val bytes = first.fileName.encodeToByteArray().size
+        assertTrue(bytes <= 200, "a filename must fit one filesystem entry, was $bytes bytes")
+        assertTrue(first.fileName.endsWith(".md"))
+        assertTrue(first.fileName.contains("test-123"), "the session id must stay in the name")
+        assertNotEquals(first.fileName, second.fileName, "two sessions must not collide")
+    }
 }

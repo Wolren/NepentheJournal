@@ -50,21 +50,12 @@ class SessionListViewModel(
         sessions, filterSubstanceIds, showFavoritesOnly,
         consumerFilter, searchQuery.debounce { if (it.isEmpty()) 0L else 250L }
     ) { all: List<Session>, subIds: Set<String>, favsOnly: Boolean, consumer: String?, query: String ->
-        val q = if (query.isNotBlank()) query.lowercase() else null
+        val q = query.ifBlank { null }
 
         val matchingSessionIds = if (subIds.isEmpty()) null
             else repo.sessionIdsForSubstances(subIds)
 
-        all
-            .filter { s ->
-                if (matchingSessionIds != null && s.id !in matchingSessionIds) return@filter false
-                if (favsOnly && !s.isFavorite) return@filter false
-                if (consumer != null && s.consumerName != consumer) return@filter false
-                if (q != null) {
-                    s.title.lowercase().contains(q) ||
-                    s.intention?.lowercase()?.contains(q) == true
-                } else true
-            }
+        filterSessions(all, matchingSessionIds, favsOnly, consumer, q)
             .sortedByDescending { it.startTime }
     }
 
@@ -86,5 +77,29 @@ class SessionListViewModel(
     companion object {
         fun create(repo: IJournalRepository): SessionListViewModel =
             SessionListViewModel(repo)
+    }
+}
+
+/**
+ * The list filter as a pure function. With no filter active the input list is
+ * returned UNCHANGED (same instance): the screen re-collects on every unrelated
+ * mutation, and a copy of every session per emission was pure waste.
+ */
+internal fun filterSessions(
+    all: List<Session>,
+    matchingIds: Set<String>?,
+    favsOnly: Boolean,
+    consumer: String?,
+    q: String?,
+): List<Session> {
+    if (matchingIds == null && !favsOnly && consumer == null && q == null) return all
+    val needle = q?.lowercase()
+    return all.filter { s ->
+        if (matchingIds != null && s.id !in matchingIds) return@filter false
+        if (favsOnly && !s.isFavorite) return@filter false
+        if (consumer != null && s.consumerName != consumer) return@filter false
+        if (needle != null) {
+            s.title.lowercase().contains(needle) || s.intention?.lowercase()?.contains(needle) == true
+        } else true
     }
 }

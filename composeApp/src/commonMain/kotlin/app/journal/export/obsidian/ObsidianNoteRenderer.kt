@@ -64,15 +64,7 @@ fun renderSessionToObsidianNote(
 
     val titleText = session.title.ifBlank { "Untitled" }
     val slug = slugify(titleText)
-    val fileName = buildString {
-        append(dateStr)
-        append('-')
-        append(timeStr.replace(':', '-'))
-        if (slug.isNotEmpty()) append("-${slug}")
-        append('-')
-        append(sanitizeIdForFilename(session.id))
-        append(".md")
-    }
+    val fileName = obsidianFileName(dateStr, timeStr.replace(':', '-'), slug, session.id)
 
     val substances: Set<String> = doses.mapNotNull { dose ->
         substanceNameResolver(dose.substanceId)
@@ -261,6 +253,28 @@ internal fun sanitizeIdForFilename(id: String): String {
     return id.filter { it.isLetterOrDigit() || it == '-' || it == '_' }
         .take(16)
         .ifEmpty { "session" }
+}
+
+/** One filesystem entry is 255 bytes on every target; keep room for the vault's foldering. */
+private const val MAX_FILENAME_BYTES = 180
+
+/**
+ * Date-time-slug-id name, capped by UTF-8 bytes: a 500-character title used to
+ * build a 1330-byte name that no filesystem accepts, so the export failed for
+ * exactly the longest sessions. The id suffix keeps two long titles distinct.
+ */
+internal fun obsidianFileName(dateStr: String, timeStr: String, slug: String, sessionId: String): String {
+    val fixed = "$dateStr-$timeStr-${sanitizeIdForFilename(sessionId)}.md"
+    val budget = MAX_FILENAME_BYTES - fixed.encodeToByteArray().size - 1
+    val cappedSlug = truncateToUtf8Bytes(slug, budget)
+    return if (cappedSlug.isEmpty()) fixed else "$dateStr-$timeStr-$cappedSlug-${sanitizeIdForFilename(sessionId)}.md"
+}
+
+private fun truncateToUtf8Bytes(value: String, maxBytes: Int): String {
+    if (maxBytes <= 0 || value.isEmpty()) return ""
+    var out = value
+    while (out.isNotEmpty() && out.encodeToByteArray().size > maxBytes) out = out.dropLast(1)
+    return out
 }
 
 /** Pad a positive integer to 2 digits. */
