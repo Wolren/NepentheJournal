@@ -3,7 +3,9 @@ package app.journal.serde
 import app.journal.data.IJournalRepository
 import app.journal.data.JournalSnapshot
 import app.journal.log.Log
+import app.journal.model.ClockStamped
 import app.journal.model.RatingScaleMode
+import app.journal.util.Hlc
 import app.journal.util.currentTimeMillis
 import kotlinx.serialization.json.Json
 
@@ -66,14 +68,21 @@ object AppJson {
         )
     }
 
+    /**
+     * Load a snapshot into [repo].
+     *
+     * Version 10 added the hybrid logical clock; any blank clock column is filled with
+     * "<updatedAt>:0", which keeps the old updatedAt order on that row until the next
+     * local write takes a fresh stamp. This runs for every version, including a future
+     * file and a recovered salvage, where a row can arrive with the field absent.
+     */
     fun apply(repo: IJournalRepository, snapshot: JournalSnapshot) {
         when (val version = snapshot.version) {
-            JournalSnapshot.CURRENT_VERSION -> {
-            }
+            JournalSnapshot.CURRENT_VERSION -> Unit
             in 1 until JournalSnapshot.CURRENT_VERSION -> {
                 Log.withTag("JournalStore").w {
                     "JournalSnapshot version $version is older than app version " +
-                        "${JournalSnapshot.CURRENT_VERSION}; loading as-is (identity migration, no field migrations defined yet)"
+                        "${JournalSnapshot.CURRENT_VERSION}; deriving clock stamps from updatedAt"
                 }
             }
             else -> {
@@ -84,38 +93,59 @@ object AppJson {
                 }
             }
         }
+        val data = snapshot.withDerivedClocks()
         repo.applyBatch(
-            sessions = snapshot.sessions,
-            substances = snapshot.substances,
-            doses = snapshot.doses,
-            notes = snapshot.notes,
-            timelineEvents = snapshot.timelineEvents,
-            interactions = snapshot.interactions,
-            effects = snapshot.effects,
-            customUnits = snapshot.customUnits,
-            persons = snapshot.persons,
-            medications = snapshot.medications
+            sessions = data.sessions,
+            substances = data.substances,
+            doses = data.doses,
+            notes = data.notes,
+            timelineEvents = data.timelineEvents,
+            interactions = data.interactions,
+            effects = data.effects,
+            customUnits = data.customUnits,
+            persons = data.persons,
+            medications = data.medications
         )
-        repo.importTombstones(snapshot.tombstones)
+        repo.importTombstones(data.tombstones)
         repo.setRatingScaleMode(
-            snapshot.ratingScaleMode
-                ?: if (snapshot.useShulginRating) RatingScaleMode.SHULGIN else RatingScaleMode.OFF,
+            data.ratingScaleMode
+                ?: if (data.useShulginRating) RatingScaleMode.SHULGIN else RatingScaleMode.OFF,
         )
-        repo.setSubstanceColors(snapshot.useSubstanceColors)
-        repo.setWelcomeCompleted(snapshot.welcomeCompleted)
-        repo.setSeedFingerprint(snapshot.seedFingerprint)
-        repo.setObsidianVaultPath(snapshot.obsidianVaultPath)
-        repo.setObsidianAutoExport(snapshot.obsidianAutoExport)
-        repo.setObsidianSubfolder(snapshot.obsidianSubfolder)
-        repo.setObsidianFileOrganization(snapshot.obsidianFileOrganization)
-        repo.setShowSessionsTrendChart(snapshot.showSessionsTrendChart)
-        repo.setStartTab(snapshot.startTab)
-        repo.setTimeDisplayMode(snapshot.timeDisplayMode)
-        repo.setDashboardHeatmap(snapshot.dashboardHeatmap)
-        repo.setDashboardTolerance(snapshot.dashboardTolerance)
-        repo.setDashboardTopSubstances(snapshot.dashboardTopSubstances)
-        repo.setConfirmDeletes(snapshot.confirmDeletes)
-        repo.setAutosaveDelay(snapshot.autosaveDelay)
-        repo.setAutoBackupOnClose(snapshot.autoBackupOnClose)
+        repo.setSubstanceColors(data.useSubstanceColors)
+        repo.setWelcomeCompleted(data.welcomeCompleted)
+        repo.setSeedFingerprint(data.seedFingerprint)
+        repo.setObsidianVaultPath(data.obsidianVaultPath)
+        repo.setObsidianAutoExport(data.obsidianAutoExport)
+        repo.setObsidianSubfolder(data.obsidianSubfolder)
+        repo.setObsidianFileOrganization(data.obsidianFileOrganization)
+        repo.setShowSessionsTrendChart(data.showSessionsTrendChart)
+        repo.setStartTab(data.startTab)
+        repo.setTimeDisplayMode(data.timeDisplayMode)
+        repo.setDashboardHeatmap(data.dashboardHeatmap)
+        repo.setDashboardTolerance(data.dashboardTolerance)
+        repo.setDashboardTopSubstances(data.dashboardTopSubstances)
+        repo.setConfirmDeletes(data.confirmDeletes)
+        repo.setAutosaveDelay(data.autosaveDelay)
+        repo.setAutoBackupOnClose(data.autoBackupOnClose)
     }
 }
+
+/**
+ * Fill any blank clock column. A pre-v10 snapshot has none; a recovered salvage or a
+ * future file can also arrive with the field absent. Stamped rows are left untouched.
+ */
+private fun JournalSnapshot.withDerivedClocks(): JournalSnapshot = copy(
+    sessions = sessions.deriveClocks { row, clock -> row.copy(clock = clock) },
+    doses = doses.deriveClocks { row, clock -> row.copy(clock = clock) },
+    notes = notes.deriveClocks { row, clock -> row.copy(clock = clock) },
+    substances = substances.deriveClocks { row, clock -> row.copy(clock = clock) },
+    effects = effects.deriveClocks { row, clock -> row.copy(clock = clock) },
+    interactions = interactions.deriveClocks { row, clock -> row.copy(clock = clock) },
+    timelineEvents = timelineEvents.deriveClocks { row, clock -> row.copy(clock = clock) },
+    customUnits = customUnits.deriveClocks { row, clock -> row.copy(clock = clock) },
+)
+
+private fun <T : ClockStamped> List<T>.deriveClocks(copy: (T, String) -> T): List<T> =
+    map { row ->
+        if (row.clock.isNotBlank()) row else copy(row, Hlc.of(row.updatedAt).encoded)
+    }

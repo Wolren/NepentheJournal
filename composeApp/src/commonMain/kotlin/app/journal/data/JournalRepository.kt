@@ -14,6 +14,7 @@
 package app.journal.data
 
 import app.journal.log.Log
+import app.journal.data.repository.EntityClocks
 import app.journal.model.*
 import app.journal.serde.AppJson
 import app.journal.util.TimeDisplayMode
@@ -86,6 +87,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     override val totalSubstanceCount: Flow<Int> = substances.map { it.size }
 
     private val lock = PlatformLock()
+    private val clocks = EntityClocks()
 
     // ---- Focused components: same lock, shared store instances (wave2 split)
     private val searchEngine = JournalSearch(
@@ -104,7 +106,7 @@ class JournalRepository internal constructor() : IJournalRepository {
         bumpLibraryVersion = { bumpLibraryVersion() },
     )
     private val mutations = JournalMutations(
-        lock, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
+        lock, clocks, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
         effectsStore, customUnitsStore, personsStore, medicationsStore, indices,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
@@ -112,7 +114,7 @@ class JournalRepository internal constructor() : IJournalRepository {
     )
     private val frames = JournalExportFrames(lock, sessionsStore, dosesStore, substancesStore, indices)
     private val syncBridge = JournalSyncBridge(
-        lock, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
+        lock, clocks, sessionsStore, dosesStore, substancesStore, notesStore, timelineEventsStore, interactionsStore,
         effectsStore, customUnitsStore, personsStore, medicationsStore, indices, tombstones,
         markSearchIndexDirtyLocked = { searchEngine.markSearchIndexDirtyLocked() },
         bumpToleranceVersion = { bumpToleranceVersion() }, bumpMutationCount = { bumpMutationCount() },
@@ -195,6 +197,8 @@ class JournalRepository internal constructor() : IJournalRepository {
 
 
     override fun upsertSession(session: Session) = mutations.upsertSession(session)
+
+    override fun applyRemoteSession(session: Session) = mutations.applyRemoteSession(session)
 
     override fun getSession(id: String): Session? = lock.withLock { sessionsStore.get(id) }
 

@@ -18,6 +18,8 @@ data class Dose(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val sessionId: String,
     val substanceId: String,
     val routeOfAdministration: String,
@@ -30,4 +32,4 @@ data class Dose(
     val estimatedDoseStandardDeviation: Double? = null,
     val customUnitId: String? = null,
     val stomachFullness: StomachFullness? = null
-) : VaultDocument
+) : ClockStamped

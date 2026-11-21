@@ -48,6 +48,8 @@ data class Session(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val title: String,
     val startTime: Long,
     val endTime: Long? = null,
@@ -69,4 +71,4 @@ data class Session(
     val tags: List<String> = emptyList(),
     val pausedMs: Long = 0L,
     val pausedAt: Long? = null
-) : VaultDocument
+) : ClockStamped

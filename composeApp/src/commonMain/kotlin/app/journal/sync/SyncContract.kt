@@ -34,8 +34,12 @@ import kotlinx.serialization.encodeToString
  * a lastWarning status line, never lastError and never a hard reject): warn
  * vs reject was not pinned by the contract, and SYNC-JVM chose warn so an
  * older peer keeps working while the user is told to upgrade.
+ *
+ * v3 added the hybrid logical clock (entity `clock`). v2 peers interoperate:
+ * they ignore the field, and a pair where only one side carries a stamp is
+ * ordered by updatedAt.
  */
-const val SYNC_PROTOCOL_VERSION = 2
+const val SYNC_PROTOCOL_VERSION = 3
 
 object SyncEndpoints {
     /**

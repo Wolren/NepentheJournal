@@ -15,9 +15,11 @@ data class CustomUnit(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val substanceId: String,
     val name: String,
     val description: String? = null,
     /** When true, uses estimated dose display (e.g. "~2 puffs") */
     val isEstimate: Boolean = false
-) : VaultDocument
+) : ClockStamped

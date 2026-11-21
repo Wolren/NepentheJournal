@@ -12,7 +12,7 @@ import kotlin.test.*
 
 /**
  * Golden-file and contract tests for the shared snapshot layer:
- * schemas/journal-snapshot-v9.json (schema version + field coverage),
+ * schemas/journal-snapshot-v10.json (schema version + field coverage),
  * recoverSnapshot field preservation, and the AppJson.apply version dispatch.
  */
 class SnapshotSchemaTest {
@@ -20,11 +20,11 @@ class SnapshotSchemaTest {
     private fun findSchema(): File {
         var dir: File? = File(System.getProperty("user.dir") ?: ".").absoluteFile
         while (dir != null) {
-            val candidate = File(dir, "schemas/journal-snapshot-v9.json")
+            val candidate = File(dir, "schemas/journal-snapshot-v10.json")
             if (candidate.exists()) return candidate
             dir = dir.parentFile
         }
-        fail("schemas/journal-snapshot-v9.json not found above ${System.getProperty("user.dir")}")
+        fail("schemas/journal-snapshot-v10.json not found above ${System.getProperty("user.dir")}")
     }
 
     private fun schemaJson(): kotlinx.serialization.json.JsonElement =
@@ -48,7 +48,7 @@ class SnapshotSchemaTest {
         val declared = properties["version"]!!.jsonObject["const"]!!.jsonPrimitive.content.toInt()
         assertEquals(
             JournalSnapshot.CURRENT_VERSION, declared,
-            "schemas/journal-snapshot-v9.json must declare the same version the code writes"
+            "schemas/journal-snapshot-v10.json must declare the same version the code writes"
         )
     }
 
@@ -220,6 +220,40 @@ class SnapshotSchemaTest {
         )
         AppJson.apply(repo, snap)
         assertEquals(1, repo.sessions.value.size, "identity arm must still apply the data")
+        assertEquals("1:0", repo.sessions.value.first().clock, "a pre-v10 row derives its clock from updatedAt")
+    }
+
+    @Test
+    fun olderVersionDerivesClocksForEverySyncedEntity() {
+        val (source, _) = sourceSnapshotAndCorruptedText()
+        val repo = JournalRepository()
+
+        AppJson.apply(repo, source.copy(version = 9))
+
+        assertEquals("2:0", repo.sessions.value.single().clock)
+        assertEquals("2:0", repo.doses.value.single().clock)
+        assertEquals("2:0", repo.notes.value.single().clock)
+        assertEquals("2:0", repo.substances.value.single().clock)
+        assertEquals("2:0", repo.effects.value.single().clock)
+        assertEquals("2:0", repo.interactions.value.single().clock)
+        assertEquals("2:0", repo.timelineEvents.value.single().clock)
+        assertEquals("2:0", repo.customUnits.value.single().clock)
+    }
+
+    @Test
+    fun currentVersionKeepsStoredClocksOnLoad() {
+        val repo = JournalRepository()
+        val snap = JournalSnapshot(
+            savedAt = 1L,
+            sessions = listOf(Session(
+                id = "s:v10", createdAt = 1700000000000L, updatedAt = 1700000000000L,
+                deviceOrigin = "test", clock = "1700000000500:7",
+                title = "Stamped", startTime = 1700000000000L
+            ))
+        )
+        AppJson.apply(repo, snap)
+        assertEquals("1700000000500:7", repo.sessions.value.first().clock,
+            "a v10 clock column must survive the load unchanged")
     }
 
     @Test

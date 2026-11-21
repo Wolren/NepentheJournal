@@ -10,9 +10,11 @@ data class Effect(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val name: String,
     val url: String? = null,
     val description: String? = null,
     val category: String? = null,
     val substanceIds: List<String> = emptyList()
-) : VaultDocument
+) : ClockStamped

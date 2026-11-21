@@ -121,6 +121,40 @@ class SyncValidatorsTest {
     }
 
     @Test
+    fun aValidClockStampPasses() {
+        val stamped = session("s:1").copy(clock = "$now:0")
+        assertNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(stamped))))
+    }
+
+    @Test
+    fun aBlankClockStampPassesForOldPeers() {
+        val unstamped = session("s:1").copy(clock = "")
+        assertNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(unstamped))))
+    }
+
+    @Test
+    fun aMalformedClockStampIsRejected() {
+        val bad = session("s:1").copy(clock = "later:please")
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(bad))))
+    }
+
+    @Test
+    fun aClockStampOutsideTheTimestampWindowIsRejected() {
+        val tooOld = session("s:1").copy(clock = "100:0")
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(tooOld))))
+
+        val tooFarAhead = session("s:1").copy(
+            clock = "${System.currentTimeMillis() + EntityTimePolicy.FUTURE_MARGIN_MS + 1_000L}:0"
+        )
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(tooFarAhead))))
+    }
+
+    @Test
     fun doseAmountNegativeRejected() {
         assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(dose("d:1", "s:1").copy(amount = -1.0)))))

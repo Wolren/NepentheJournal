@@ -120,6 +120,13 @@ interface IJournalRepository {
     fun applySnapshot(snapshot: JournalSnapshot)
 
     fun upsertSession(session: Session)
+
+    /**
+     * Apply a session received from a sync peer. The incoming clock stamp is kept
+     * unchanged (restamping would break convergence) and the local HLC advances past
+     * it. Local edits must use [upsertSession], which always takes a fresh stamp.
+     */
+    fun applyRemoteSession(session: Session)
     fun getSession(id: String): Session?
     fun toggleFavorite(sessionId: String)
     fun deleteSession(id: String)

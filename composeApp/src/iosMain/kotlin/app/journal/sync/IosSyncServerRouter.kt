@@ -63,7 +63,7 @@ class IosSyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2,
+                        protocolVersion = 3,
                         wsSupported = false,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),
@@ -77,7 +77,7 @@ class IosSyncServerRouter(
                         deviceId = deviceId,
                         deviceName = deviceName,
                         fingerprint = fingerprint,
-                        protocolVersion = 2,
+                        protocolVersion = 3,
                         wsSupported = false,
                         ecdhPublicKeyB64 = ecdhIdentity.publicKeyB64()
                     )),

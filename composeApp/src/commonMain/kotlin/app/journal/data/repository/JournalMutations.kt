@@ -14,6 +14,7 @@
 package app.journal.data
 
 import app.journal.model.*
+import app.journal.data.repository.EntityClocks
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 
@@ -25,6 +26,7 @@ import app.journal.util.currentTimeMillis
  */
 internal class JournalMutations(
     private val lock: PlatformLock,
+    private val clocks: EntityClocks,
     private val sessionsStore: EntityStore<Session>,
     private val dosesStore: EntityStore<Dose>,
     private val substancesStore: EntityStore<Substance>,
@@ -59,6 +61,19 @@ internal class JournalMutations(
     }
 
     fun upsertSession(session: Session) = lock.withLock {
+        putSessionLocked(session.copy(clock = clocks.next(session.updatedAt)))
+    }
+
+    /**
+     * Sync-apply entry for a session received from a peer: the incoming stamp is
+     * kept, never restamped, or the two peers would keep overwriting each other.
+     */
+    fun applyRemoteSession(session: Session) = lock.withLock {
+        clocks.observe(session.clock)
+        putSessionLocked(session)
+    }
+
+    private fun putSessionLocked(session: Session) {
         val oldSession = sessionsStore.put(session)
         if (oldSession != null) indices.removeSessionFromIndices(oldSession)
         indices.addSessionToIndices(session)
@@ -69,7 +84,11 @@ internal class JournalMutations(
     fun toggleFavorite(sessionId: String) = lock.withLock {
         val session = sessionsStore.get(sessionId) ?: return@withLock
         val oldSession = sessionsStore.put(
-            session.copy(isFavorite = !session.isFavorite, updatedAt = currentTimeMillis()),
+            session.copy(
+                isFavorite = !session.isFavorite,
+                updatedAt = currentTimeMillis(),
+                clock = clocks.next(),
+            ),
         )
         if (oldSession != null) indices.removeSessionFromIndices(oldSession)
         indices.addSessionToIndices(sessionsStore.get(sessionId)!!)
@@ -78,19 +97,20 @@ internal class JournalMutations(
     }
 
     fun upsertDose(dose: Dose) = lock.withLock {
-        val prev = dosesStore.put(dose)
+        val stamped = dose.copy(clock = clocks.next(dose.updatedAt))
+        val prev = dosesStore.put(stamped)
 
         if (prev != null) {
             indices.removeDoseFromIndicesLocked(prev)
             indices.rebuildSubstanceDoseStats(prev.substanceId)
-            if (dose.substanceId != prev.substanceId) {
-                indices.rebuildSubstanceDoseStats(dose.substanceId)
+            if (stamped.substanceId != prev.substanceId) {
+                indices.rebuildSubstanceDoseStats(stamped.substanceId)
             }
         } else {
-            indices.updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
+            indices.updateDoseStatsForSubstance(stamped.substanceId, stamped.sessionId, stamped.timestamp)
         }
-        indices._dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
-        indices._sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+        indices._dosesBySession.getOrPut(stamped.sessionId) { mutableListOf() }.add(stamped)
+        indices._sessionsPerSubstance.getOrPut(stamped.substanceId) { mutableSetOf() }.add(stamped.sessionId)
 
         bumpToleranceVersion()
         bumpMutationCount()
@@ -98,7 +118,7 @@ internal class JournalMutations(
     }
 
     fun upsertSubstance(substance: Substance) = lock.withLock {
-        substancesStore.put(substance)
+        substancesStore.put(substance.copy(clock = clocks.next(substance.updatedAt)))
         bumpToleranceVersion()
         bumpMutationCount()
         bumpLibraryVersion()
@@ -106,23 +126,24 @@ internal class JournalMutations(
     }
 
     fun upsertInteraction(interaction: Interaction) = lock.withLock {
-        interactionsStore.put(interaction)
+        interactionsStore.put(interaction.copy(clock = clocks.next(interaction.updatedAt)))
         bumpMutationCount()
         bumpLibraryVersion()
         markSearchIndexDirtyLocked()
     }
 
     fun upsertEffect(effect: Effect) = lock.withLock {
-        val prev = effectsStore.put(effect)
+        val stamped = effect.copy(clock = clocks.next(effect.updatedAt))
+        val prev = effectsStore.put(stamped)
         if (prev != null) {
             for (subId in prev.substanceIds) {
-                indices._effectsBySubstance[subId]?.removeAll { it.id == effect.id }
+                indices._effectsBySubstance[subId]?.removeAll { it.id == stamped.id }
                 if (indices._effectsBySubstance[subId]?.isEmpty() == true)
                     indices._effectsBySubstance.remove(subId)
             }
         }
-        for (subId in effect.substanceIds) {
-            indices._effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
+        for (subId in stamped.substanceIds) {
+            indices._effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(stamped)
         }
         bumpMutationCount()
         bumpLibraryVersion()
@@ -130,38 +151,45 @@ internal class JournalMutations(
     }
 
     fun upsertCustomUnit(unit: CustomUnit) = lock.withLock {
-        val prev = customUnitsStore.put(unit)
+        val stamped = unit.copy(clock = clocks.next(unit.updatedAt))
+        val prev = customUnitsStore.put(stamped)
         if (prev != null) {
-            indices._customUnitsBySubstance[prev.substanceId]?.removeAll { it.id == unit.id }
+            indices._customUnitsBySubstance[prev.substanceId]?.removeAll { it.id == stamped.id }
             if (indices._customUnitsBySubstance[prev.substanceId]?.isEmpty() == true &&
-                prev.substanceId != unit.substanceId)
+                prev.substanceId != stamped.substanceId)
                 indices._customUnitsBySubstance.remove(prev.substanceId)
         }
-        indices._customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
+        indices._customUnitsBySubstance.getOrPut(stamped.substanceId) { mutableListOf() }.add(stamped)
         bumpMutationCount()
         markSearchIndexDirtyLocked()
     }
 
     fun upsertNote(note: Note) = lock.withLock {
-        val prev = notesStore.put(note)
+        // A replayed conflict note arrives with identical content and a new updatedAt
+        // only by stamping; skipping the no-op keeps conflict replay byte-identical.
+        val stored = notesStore.get(note.id)
+        if (stored != null && note.copy(clock = stored.clock) == stored) return@withLock
+        val stamped = note.copy(clock = clocks.next(note.updatedAt))
+        val prev = notesStore.put(stamped)
         val prevSessionId = prev?.sessionId
         if (prevSessionId != null) {
-            indices._notesBySession[prevSessionId]?.removeAll { it.id == note.id }
+            indices._notesBySession[prevSessionId]?.removeAll { it.id == stamped.id }
         }
-        note.sessionId?.let { sessionId ->
-            indices._notesBySession.getOrPut(sessionId) { mutableListOf() }.add(note)
+        stamped.sessionId?.let { sessionId ->
+            indices._notesBySession.getOrPut(sessionId) { mutableListOf() }.add(stamped)
         }
         bumpMutationCount()
         markSearchIndexDirtyLocked()
     }
 
     fun upsertTimelineEvent(event: TimelineEvent) = lock.withLock {
-        val prev = timelineEventsStore.put(event)
+        val stamped = event.copy(clock = clocks.next(event.updatedAt))
+        val prev = timelineEventsStore.put(stamped)
         val prevSessionId = prev?.sessionId
         if (prevSessionId != null) {
-            indices._eventsBySession[prevSessionId]?.removeAll { it.id == event.id }
+            indices._eventsBySession[prevSessionId]?.removeAll { it.id == stamped.id }
         }
-        indices._eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
+        indices._eventsBySession.getOrPut(stamped.sessionId) { mutableListOf() }.add(stamped)
         bumpMutationCount()
         markSearchIndexDirtyLocked()
     }
@@ -189,10 +217,12 @@ internal class JournalMutations(
         timelineEvents: List<TimelineEvent>
     ) = lock.withLock {
         val reparentedDoses = doses.map {
-            if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+            val reparented = if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+            reparented.copy(clock = clocks.next(reparented.updatedAt))
         }
         val reparentedEvents = timelineEvents.map {
-            if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+            val reparented = if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
+            reparented.copy(clock = clocks.next(reparented.updatedAt))
         }
         if (reparentedDoses.isEmpty() && reparentedEvents.isEmpty()) return@withLock
         dosesStore.putAll(reparentedDoses)

@@ -193,6 +193,8 @@ data class Substance(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String = "system",
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val pwikiId: String? = null,
     val dosewikiSlug: String? = null,
     val name: String,
@@ -228,4 +230,4 @@ data class Substance(
     val sources: List<String> = emptyList(),
     val cachedAt: Long,
     val sourceVersion: String,
-) : VaultDocument
+) : ClockStamped

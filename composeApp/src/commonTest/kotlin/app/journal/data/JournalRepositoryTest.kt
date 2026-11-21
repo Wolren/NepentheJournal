@@ -739,10 +739,16 @@ class JournalRepositoryTest {
         val toleranceBefore = batch.toleranceVersion.value
         batch.upsertSessionChildren("s:1", doses, events)
 
-        assertEquals(perItem.doses.value, batch.doses.value, "same stored doses")
-        assertEquals(perItem.timelineEvents.value, batch.timelineEvents.value, "same stored events")
-        assertEquals(perItem.dosesForSession("s:1"), batch.dosesForSession("s:1"))
-        assertEquals(perItem.eventsForSession("s:1"), batch.eventsForSession("s:1"))
+        // Clock stamps are per write, so the two paths land on different ticks by
+        // design; every other field must match.
+        assertEquals(perItem.doses.value.map { it.copy(clock = "") },
+            batch.doses.value.map { it.copy(clock = "") }, "same stored doses")
+        assertEquals(perItem.timelineEvents.value.map { it.copy(clock = "") },
+            batch.timelineEvents.value.map { it.copy(clock = "") }, "same stored events")
+        assertEquals(perItem.dosesForSession("s:1").map { it.copy(clock = "") },
+            batch.dosesForSession("s:1").map { it.copy(clock = "") })
+        assertEquals(perItem.eventsForSession("s:1").map { it.copy(clock = "") },
+            batch.eventsForSession("s:1").map { it.copy(clock = "") })
         assertEquals(perItem.sessionIdsForSubstance("sub:1").toSet(), batch.sessionIdsForSubstance("sub:1").toSet())
         assertEquals(perItem.sessionIdsForSubstance("sub:2").toSet(), batch.sessionIdsForSubstance("sub:2").toSet())
         assertEquals(perItem.substanceDoseStats, batch.substanceDoseStats,

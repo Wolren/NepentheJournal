@@ -22,8 +22,9 @@ import app.journal.model.Session
  *
  * Semantics (frozen from the JVM copy):
  *  - a session listed in [deletedIds] is skipped entirely;
- *  - when a LOCAL copy exists and is STRICTLY newer than the incoming
- *    session, the incoming session is NOT applied; a conflict note is
+ *  - when a LOCAL copy exists and the incoming session loses the order (clock
+ *    first when both carry one, updatedAt otherwise; see EntityOrder), the
+ *    incoming session is NOT applied; a conflict note is
  *    upserted with id `conflict:<sessionId>:<remoteDeviceId>`, title
  *    `Sync conflict: <title>`, body `Remote: <incoming.outcome>` +
  *    `\n\nLocal: <existing.outcome>` (both outcomes preserved), and
@@ -64,10 +65,7 @@ fun mergeSessionConflict(
         val deletedAt = repo.tombstoneDeletedAt("session", session.id)
         if (deletedAt != null && session.updatedAt <= deletedAt) return@forEach
         val existing = repo.getSession(session.id)
-        val incomingWins = existing != null && EntityOrder.incomingWins(
-            session.updatedAt, session.deviceOrigin,
-            existing.updatedAt, existing.deviceOrigin,
-        )
+        val incomingWins = existing != null && EntityOrder.incomingWins(session, existing)
         if (existing != null && !incomingWins) {
             repo.upsertNote(Note(
                 id = "conflict:${session.id}:$remoteDeviceId",
@@ -79,7 +77,9 @@ fun mergeSessionConflict(
                 deviceOrigin = "sync:$remoteDeviceId"
             ))
             conflicts++
-        } else repo.upsertSession(session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" }))
+        } else repo.applyRemoteSession(
+            session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" })
+        )
     }
     return conflicts
 }

@@ -22,9 +22,11 @@ data class Note(
     override val createdAt: Long,
     override val updatedAt: Long,
     override val deviceOrigin: String,
+    /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
+    override val clock: String = "",
     val sessionId: String? = null,
     val doseId: String? = null,
     val title: String? = null,
     val body: String,
     val conflictSiblings: List<ConflictSibling> = emptyList()
-) : VaultDocument
+) : ClockStamped

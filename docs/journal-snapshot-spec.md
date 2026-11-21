@@ -34,12 +34,13 @@ The format is designed to be:
 | 7       | Added persons, tombstones, `ratingScaleMode`, `welcomeCompleted` and `seedFingerprint`. Version 6 was skipped; no schema file ships for it. |
 | 8       | Added `medications`: device-local standing medications for the interaction check. |
 | 9       | Added `Session.freeform`: free-form markdown writing for the session body, exported verbatim to Obsidian. |
+| 10      | Added `clock` (hybrid logical clock stamp) to every synced entity: `Session`, `Dose`, `Note`, `Substance`, `Effect`, `Interaction`, `TimelineEvent`, `CustomUnit`. Loading an older file derives `<updatedAt>:0` for every row, so ordering is unchanged until the row is rewritten. |
 
 **Migration policy:**
 - The app loads any version >= 1 with `ignoreUnknownKeys = true`.
-- On write, the app always writes `CURRENT_VERSION` (currently 9).
+- On write, the app always writes `CURRENT_VERSION` (currently 10).
 - Fields unknown to the running build are ignored on load and are not written back. Do not run an older build against a newer journal.
-- There is no automated data migration between versions - each version adds fields that are optional (`null` or `default` values are acceptable).
+- Version 10 additionally derives `clock` from `updatedAt` at load (`AppJson.apply`).
 
 ---
 

@@ -1,6 +1,7 @@
 package app.journal.sync
 
 import app.journal.model.*
+import app.journal.util.Hlc
 import app.journal.util.currentTimeMillis
 
 /**
@@ -190,10 +191,23 @@ private fun badName(name: String, what: String): String? =
 private fun badTime(ts: Long, what: String): String? =
     if (!EntityTimePolicy.isReasonableEntityTime(ts)) "$what out of range" else null
 
+/**
+ * A clock stamp is optional (blank on pre-v10 rows), but when present it must parse
+ * and sit inside the same window as updatedAt. HLC receive steps adopt the remote
+ * physical time, so an unbounded stamp would pin the local clock far into the future.
+ */
+private fun badClock(clock: String): String? {
+    if (clock.isEmpty()) return null
+    val hlc = Hlc.parseOrNull(clock) ?: return "Invalid clock stamp"
+    if (!EntityTimePolicy.isReasonableEntityTime(hlc.physicalMs)) return "Clock stamp out of range"
+    return null
+}
+
 internal fun validateSession(s: Session): String? {
     badId(s.id, "session ID")?.let { return it }
     badTime(s.createdAt, "Session createdAt")?.let { return it }
     badTime(s.updatedAt, "Session updatedAt")?.let { return it }
+    badClock(s.clock)?.let { return it }
     badTime(s.startTime, "Session startTime")?.let { return it }
     if (s.endTime != null) badTime(s.endTime, "Session endTime")?.let { return it }
     if (s.title.length > SyncLimits.MAX_TITLE_LEN) return "Session title too long"
@@ -213,6 +227,7 @@ internal fun validateDose(d: Dose): String? {
     badId(d.id, "dose ID")?.let { return it }
     badTime(d.createdAt, "Dose createdAt")?.let { return it }
     badTime(d.updatedAt, "Dose updatedAt")?.let { return it }
+    badClock(d.clock)?.let { return it }
     badTime(d.timestamp, "Dose timestamp")?.let { return it }
     badId(d.sessionId, "dose sessionId")?.let { return it }
     badId(d.substanceId, "dose substanceId")?.let { return it }
@@ -228,6 +243,7 @@ internal fun validateNote(n: Note): String? {
     badId(n.id, "note ID")?.let { return it }
     badTime(n.createdAt, "Note createdAt")?.let { return it }
     badTime(n.updatedAt, "Note updatedAt")?.let { return it }
+    badClock(n.clock)?.let { return it }
     if (n.body.length > SyncLimits.MAX_FIELD_LEN) return "Note body too long"
     if ((n.title?.length ?: 0) > SyncLimits.MAX_TITLE_LEN) return "Note title too long"
     return null
@@ -237,6 +253,7 @@ internal fun validateSubstance(s: Substance): String? {
     badId(s.id, "substance ID")?.let { return it }
     badTime(s.createdAt, "Substance createdAt")?.let { return it }
     badTime(s.updatedAt, "Substance updatedAt")?.let { return it }
+    badClock(s.clock)?.let { return it }
     badName(s.name, "substance name")?.let { return it }
     if (s.aliases.size > SyncLimits.MAX_SUBSTANCE_ALIASES) return "Too many substance aliases"
     if (s.aliases.any { it.length > SyncLimits.MAX_NAME_LEN }) return "Substance alias too long"
@@ -249,6 +266,7 @@ internal fun validateInteraction(i: Interaction): String? {
     badId(i.id, "interaction ID")?.let { return it }
     badTime(i.createdAt, "Interaction createdAt")?.let { return it }
     badTime(i.updatedAt, "Interaction updatedAt")?.let { return it }
+    badClock(i.clock)?.let { return it }
     badId(i.substanceAId, "interaction substanceAId")?.let { return it }
     badId(i.substanceBId, "interaction substanceBId")?.let { return it }
     if (i.riskLevel.name !in knownRisk) return "Invalid interaction risk"
@@ -262,6 +280,7 @@ internal fun validateTimelineEvent(t: TimelineEvent): String? {
     badId(t.id, "event ID")?.let { return it }
     badTime(t.createdAt, "Event createdAt")?.let { return it }
     badTime(t.updatedAt, "Event updatedAt")?.let { return it }
+    badClock(t.clock)?.let { return it }
     badTime(t.timestamp, "Event timestamp")?.let { return it }
     if (t.label.length > SyncLimits.MAX_LABEL_LEN) return "TimelineEvent label too long"
     if ((t.body?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) return "TimelineEvent body too long"
@@ -272,6 +291,7 @@ internal fun validateEffect(e: Effect): String? {
     badId(e.id, "effect ID")?.let { return it }
     badTime(e.createdAt, "Effect createdAt")?.let { return it }
     badTime(e.updatedAt, "Effect updatedAt")?.let { return it }
+    badClock(e.clock)?.let { return it }
     badName(e.name, "effect name")?.let { return it }
     if (e.substanceIds.size > SyncLimits.MAX_EFFECT_SUBSTANCE_IDS) return "Too many effect substance IDs"
     if (e.substanceIds.any { id -> id.isBlank() || id.length > SyncLimits.MAX_ID_LEN }) return "Invalid effect substanceId"
@@ -282,6 +302,7 @@ internal fun validateCustomUnit(u: CustomUnit): String? {
     badId(u.id, "unit ID")?.let { return it }
     badTime(u.createdAt, "Unit createdAt")?.let { return it }
     badTime(u.updatedAt, "Unit updatedAt")?.let { return it }
+    badClock(u.clock)?.let { return it }
     if (u.name.isBlank() || u.name.length > SyncLimits.MAX_UNIT_NAME_LEN) return "Invalid unit name"
     badId(u.substanceId, "unit substanceId")?.let { return it }
     return null

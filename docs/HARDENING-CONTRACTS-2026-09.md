@@ -138,6 +138,13 @@ peer's high-water mark passes".
 
 ## c. Conflict merge (shared function, losing body preserved)
 
+**Amendment 2026-11-21 (phase 2):** the pins below were written for wall-clock
+`updatedAt`. Snapshot v10 adds a hybrid logical clock (`clock`) to every synced
+entity. When BOTH copies carry a non-blank stamp, `(physicalMs, counter)` decides
+before `updatedAt`, and `deviceOrigin` breaks an exact tie. When either side is
+blank (a pre-v10 peer), `updatedAt` still decides. Tombstone cutoffs (section b)
+still compare `updatedAt`; phase 3 gives tombstones their own clock.
+
 **Pin:**
 
 1. ONE shared, pure merge function lives in commonMain (target file:
@@ -282,6 +289,10 @@ cut is always resumed with its `nextSinceId` half.
 - `MIN_ENTITY_TIMESTAMP = 946684800000L` (2000-01-01T00:00:00Z)
 - `FUTURE_MARGIN_MS = 86_400_000L` (1 day)
 - `isReasonableEntityTime(ts, now = currentTimeMillis())`
+
+The phase 2 `clock` stamp is bounded by the same window: sync validation rejects a
+stamp whose `physicalMs` falls outside it, because the HLC receive step adopts remote
+physical time.
 
 The former iOS 2-year margin (`IosSyncValidators.TIMESTAMP_FUTURE_MARGIN_MS`)
 is ELIMINATED; the file that declared it was deleted in Phase 0a, and the

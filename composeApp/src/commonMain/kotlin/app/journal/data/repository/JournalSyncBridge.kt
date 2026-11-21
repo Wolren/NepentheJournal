@@ -14,6 +14,7 @@
 
 package app.journal.data
 
+import app.journal.data.repository.EntityClocks
 import app.journal.data.repository.EntityOrder
 
 import app.journal.model.*
@@ -28,6 +29,7 @@ import app.journal.util.PlatformLock
  */
 internal class JournalSyncBridge(
     private val lock: PlatformLock,
+    private val clocks: EntityClocks,
     private val sessionsStore: EntityStore<Session>,
     private val dosesStore: EntityStore<Dose>,
     private val substancesStore: EntityStore<Substance>,
@@ -99,33 +101,45 @@ internal class JournalSyncBridge(
             get: (String) -> T?,
             id: (T) -> String,
             updatedAt: (T) -> Long,
+            clock: (T) -> String,
             device: (T) -> String,
         ): List<T> =
             if (!lastWriterWins) list
             else list.filter { incoming ->
                 val existing = get(id(incoming)) ?: return@filter true
                 EntityOrder.incomingWins(
-                    updatedAt(incoming), device(incoming),
-                    updatedAt(existing), device(existing),
+                    updatedAt(incoming), clock(incoming), device(incoming),
+                    updatedAt(existing), clock(existing), device(existing),
                 )
             }
-        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        // An identical body older than the stored one is dropped so updatedAt can't regress
+        // Receive step: every accepted stamp advances the local clock, so the next
+        // local write is causally later than anything a peer taught us.
+        sessions.forEach { clocks.observe(it.clock) }
+        doses.forEach { clocks.observe(it.clock) }
+        substances.forEach { clocks.observe(it.clock) }
+        notes.forEach { clocks.observe(it.clock) }
+        timelineEvents.forEach { clocks.observe(it.clock) }
+        interactions.forEach { clocks.observe(it.clock) }
+        effects.forEach { clocks.observe(it.clock) }
+        customUnits.forEach { clocks.observe(it.clock) }
+        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        // A no-op merge is skipped; a clock-winning row is never dropped for an older
+        // updatedAt, because the clock is the order once both sides carry one.
         val notesToPut: List<Note> =
             if (!lastWriterWins) notes
             else alive(notes, "note", { it.id }, { it.updatedAt }).mapNotNull { incoming ->
                 val existing = notesStore.get(incoming.id) ?: return@mapNotNull incoming
                 val merged = mergeNoteConflictLocked(existing, incoming, incoming.deviceOrigin)
-                if (merged == existing || merged.updatedAt < existing.updatedAt) null else merged
+                if (merged == existing) null else merged
             }
-        val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
-        val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt }, { it.deviceOrigin })
+        val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
+        val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
         val anyIndexedPut = bulkPutLocked(
             sessions = sessionsToPut,
             substances = substancesToPut,
@@ -176,6 +190,14 @@ internal class JournalSyncBridge(
      * importTombstones.
      */
     fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
+        snapshot.sessions.forEach { clocks.observe(it.clock) }
+        snapshot.doses.forEach { clocks.observe(it.clock) }
+        snapshot.substances.forEach { clocks.observe(it.clock) }
+        snapshot.notes.forEach { clocks.observe(it.clock) }
+        snapshot.timelineEvents.forEach { clocks.observe(it.clock) }
+        snapshot.interactions.forEach { clocks.observe(it.clock) }
+        snapshot.effects.forEach { clocks.observe(it.clock) }
+        snapshot.customUnits.forEach { clocks.observe(it.clock) }
         tombstones.mergeSnapshotTombstonesLocked(snapshot)
         val changed = bulkPutLocked(
             sessions = snapshot.sessions,
@@ -243,9 +265,11 @@ internal class JournalSyncBridge(
      * The ONE conflict merge for every note apply path (contract c,
      * HARDENING-CONTRACTS-2026-09 section c): the losing body is NEVER destroyed.
      *
-     * - Bodies equal: incoming wins, carrying the union of both conflictSiblings
-     *   (deduplicated by body, so replays stay idempotent).
-     * - Bodies differ: the higher updatedAt wins (tie: incoming) and the LOSING
+     * - Bodies equal: the higher-ordered note wins, carrying the union of both
+     *   `conflictSiblings` (deduplicated by body). An older identical copy therefore
+     *   never rolls `updatedAt` back, and replays stay idempotent.
+     * - Bodies differ: the higher clock stamp wins when both notes carry one,
+     *   otherwise the higher updatedAt (tie: incoming). The LOSING
      *   note's full body is preserved as
      *   ConflictSibling(body = loser.body, deviceOrigin = remoteDeviceId,
      *   updatedAt = loser.updatedAt). The winner keeps its own updatedAt, so the
@@ -258,12 +282,10 @@ internal class JournalSyncBridge(
         if (existing.body == incoming.body) {
             val siblings = (existing.conflictSiblings + incoming.conflictSiblings)
                 .distinctBy { it.body }
-            return incoming.copy(conflictSiblings = siblings)
+            val winner = if (EntityOrder.incomingWins(incoming, existing)) incoming else existing
+            return winner.copy(conflictSiblings = siblings)
         }
-        val incomingWins = EntityOrder.incomingWins(
-            incoming.updatedAt, incoming.deviceOrigin,
-            existing.updatedAt, existing.deviceOrigin,
-        )
+        val incomingWins = EntityOrder.incomingWins(incoming, existing)
         val winner = if (incomingWins) incoming else existing
         val loser = if (incomingWins) existing else incoming
         if (winner.conflictSiblings.any { it.body == loser.body }) return winner
@@ -275,6 +297,7 @@ internal class JournalSyncBridge(
 
     fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = lock.withLock {
         val sessionId = note.sessionId ?: return@withLock null
+        clocks.observe(note.clock)
         val existing = notesStore.get(note.id)
         val resolved = if (existing == null) note else mergeNoteConflictLocked(existing, note, remoteDeviceId)
         notesStore.put(resolved)
