@@ -22,6 +22,9 @@ fun main(args: Array<String>) {
 
     val repo = JournalRepository()
     val store = JournalStore(repo)
+    // Continue the journal the previous round left; without this load each child starts empty
+    // and a later kill can leave fewer sessions than the baseline.
+    store.load()
     val confirm = File(home, ".nepenthe/fuzz-confirmed.txt").apply { parentFile?.mkdirs() }
     val random = Random(seed)
     var n = repo.sessions.value.size
