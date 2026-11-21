@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import app.journal.model.rules.ActiveInteractionResult
 import app.journal.data.IJournalRepository
 import app.journal.ui.LocalJournalRepository
+import app.journal.ui.SystemBackHandler
 import app.journal.model.*
 import app.journal.ui.components.InteractionWarnings
 import app.journal.ui.components.*
@@ -84,6 +85,9 @@ fun SessionEditorScreen(
     fun handleBack() {
         if (hasUnsavedChanges) showDiscardDialog = true else exitEditor()
     }
+
+    // The system back must take the same guard as the top bar, not close the editor directly.
+    SystemBackHandler { handleBack() }
 
     if (showDiscardDialog) {
         AlertDialog(

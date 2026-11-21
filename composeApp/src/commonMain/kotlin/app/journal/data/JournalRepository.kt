@@ -19,6 +19,7 @@ import app.journal.model.*
 import app.journal.serde.AppJson
 import app.journal.util.TimeDisplayMode
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -296,11 +297,12 @@ class JournalRepository internal constructor() : IJournalRepository {
     override fun exportSessionBundles(): List<SessionBundle> = frames.exportSessionBundles()
 
 
+    @OptIn(FlowPreview::class)
     override fun autoSave(scope: CoroutineScope, save: () -> Unit): Job {
         return scope.launch {
             mutationCount
                 .drop(1)
-                .debounce(2000)
+                .debounce { autosaveDelay.value.delayMs }
                 .collect {
                     // A sync drain persists once itself; a page-by-page autosave would encode the journal per page.
                     if (autosaveSuppressed) {

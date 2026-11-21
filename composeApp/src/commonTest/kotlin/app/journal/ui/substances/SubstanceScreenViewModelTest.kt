@@ -2,6 +2,7 @@ package app.journal.ui.substances
 
 import app.journal.data.JournalRepository
 import app.journal.model.CuratedSection
+import app.journal.model.Dose
 import app.journal.model.IupharData
 import app.journal.model.IupharInteraction
 import app.journal.model.Substance
@@ -286,5 +287,29 @@ class SubstanceScreenViewModelTest {
         assertTrue(vm.broadOptions.first().none { it.id == "dysdelic" })
         vm.selectBroad("opioids")
         assertEquals("Buprenorphine", vm.results.first().single().name)
+    }
+
+    @Test
+    fun `substanceDoseStats follow new doses`() = runBlocking {
+        val repo = makeRepo()
+        val vm = SubstanceScreenViewModel(repo)
+        assertTrue(vm.substanceDoseStats.isEmpty())
+
+        repo.upsertDose(
+            Dose(
+                id = "dose:1",
+                sessionId = "session:1",
+                substanceId = "cid:1",
+                routeOfAdministration = "Oral",
+                amount = 100.0,
+                unit = "ug",
+                timestamp = 1000L,
+                createdAt = 1000L,
+                updatedAt = 1000L,
+                deviceOrigin = "test"
+            )
+        )
+
+        assertEquals(1 to 1000L, vm.substanceDoseStats["cid:1"])
     }
 }

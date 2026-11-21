@@ -55,7 +55,8 @@ fun SubstanceScreen(
     val specificOptions by viewModel.specificOptions.collectAsState(initial = emptyList())
     val themeManager = remember { ThemeManager.instance }
     val isDark = themeManager.isDarkTheme()
-    val substanceDoseStats = remember(results) { viewModel.substanceDoseStats }
+    val doses by repo.doses.collectAsState()
+    val substanceDoseStats = remember(results, doses) { viewModel.substanceDoseStats }
 
     val query by viewModel.query.collectAsState()
     val activeBroad by viewModel.activeBroad.collectAsState()

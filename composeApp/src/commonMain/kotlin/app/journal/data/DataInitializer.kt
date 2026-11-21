@@ -160,7 +160,7 @@ object DataInitializer {
         if (scope != null) {
             // Quiet-period saves skip the backup rotation; close and explicit saves rotate.
             autoSaveJob = repo.autoSave(scope) { store.save(fullBackup = false) }
-            Log.withTag("DataInit").i { "Auto-save enabled (debounce 2000ms)" }
+            Log.withTag("DataInit").i { "Auto-save enabled (debounce per preference)" }
         }
 
         purgeResumeMarkers(repo, store)

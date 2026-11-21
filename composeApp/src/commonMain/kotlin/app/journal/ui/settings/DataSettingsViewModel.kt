@@ -325,7 +325,8 @@ class DataSettingsViewModel(
             try {
                 val store = JournalStore(repo as JournalRepository)
                 store.save()
-                dataStatus.value = "Backup saved to ${store.dataPath()}"
+                store.triggerAutoBackup()
+                dataStatus.value = "Backup created in the .auto folder"
             } catch (e: Exception) {
                 dataStatus.value = userMessage("Data", "Backup failed", e)
             }
