@@ -78,6 +78,25 @@ fun main() {
             java.io.File(appDataDir).mkdirs()
         } catch (_: Exception) { /* initLogging still adds the console writer */ }
     }
+    // Hold an OS lock before logging or the repository: a second instance must never
+    // race the journal writers. The hook keeps the lock reachable and releases it on exit.
+    val instanceLock = appDataDir?.let { dir -> SingleInstanceLock.acquire(java.io.File(dir)) }
+    if (appDataDir != null && instanceLock == null) {
+        runCatching {
+            javax.swing.JOptionPane.showMessageDialog(
+                null,
+                "Nepenthe Journal is already running.",
+                "Nepenthe Journal",
+                javax.swing.JOptionPane.INFORMATION_MESSAGE,
+            )
+        }.onFailure {
+            System.err.println("Nepenthe Journal is already running.")
+        }
+        return
+    }
+    if (instanceLock != null) {
+        Runtime.getRuntime().addShutdownHook(Thread { instanceLock.close() })
+    }
     initLogging(appDataDir)
     StartupClock.mark("logging ready")
 
