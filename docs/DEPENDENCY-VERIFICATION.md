@@ -7,8 +7,8 @@ Gradle dependency verification runs in **lenient** mode. The checksum file is
 `org.gradle.dependency.verification=lenient`.
 
 The file records SHA-256 checksums for every artifact resolved by the desktop test
-classpath, including plugins and AndroidX modules that resolution touched. Gradle
-re-checks every listed artifact on every build.
+classpath and the Macrobenchmark compile classpath, including plugins, AndroidX modules
+and the Windows aapt2 tool. Gradle re-checks every listed artifact on every build.
 
 Lenient means an artifact that is missing from the file logs a warning and the build
 continues. Strict would fail instead.
@@ -32,7 +32,10 @@ dependencies this workstation actually compiles and runs.
 After a deliberate dependency change, run:
 
 ```powershell
-.\gradlew.bat --write-verification-metadata sha256 :composeApp:desktopTest
+.\gradlew.bat --write-verification-metadata sha256 `
+  :composeApp:desktopTest `
+  :macrobenchmark:compileBenchmarkReleaseKotlin `
+  -Pnepenthe.emulatorAbi=x86_64
 ```
 
 Review the diff in `gradle/verification-metadata.xml` and commit it with the dependency

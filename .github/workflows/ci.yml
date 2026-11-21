@@ -253,6 +253,50 @@ jobs:
           path: composeApp/build/reports/androidTests/connected/**
           retention-days: 7
 
+  # Emulator numbers are noisy; this job guards the flows and keeps the profile fresh.
+  android-macrobenchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
+        with:
+          cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Generate the baseline profile and run the benchmarks
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            ./gradlew :baselineprofile:collectNonMinifiedReleaseBaselineProfile -Pnepenthe.emulatorAbi=x86_64 --no-daemon
+            ./gradlew :macrobenchmark:connectedBenchmarkReleaseAndroidTest -Pnepenthe.emulatorAbi=x86_64 --no-daemon
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-macrobenchmark
+          path: |
+            macrobenchmark/build/outputs/connected_android_test_additional_output/**
+            macrobenchmark/build/outputs/androidTest-results/**
+          retention-days: 7
+
   # This job runs the iOS tests (iosSimulatorArm64Test) rather than only linking them.
   ios-build:
     runs-on: macos-15
