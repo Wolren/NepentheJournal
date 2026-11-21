@@ -25,7 +25,7 @@ jobs:
     name: Verify version consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: versionName, packageVersion and About card must agree
         run: |
           set -euo pipefail
@@ -53,12 +53,12 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: corretto
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: true
       - name: Build MSI
@@ -80,7 +80,7 @@ jobs:
           $msi = (Get-ChildItem composeApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
           ./scripts/test-windows-installer.ps1 -Msi $msi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-msi
           path: composeApp/build/compose/binaries/main/msi/*.msi
@@ -94,12 +94,12 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: corretto
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: true
       - name: Build the app image
@@ -135,7 +135,7 @@ jobs:
           $zip = (Get-ChildItem dist/*.zip | Select-Object -First 1).FullName
           ./scripts/test-windows-portable.ps1 -Zip $zip
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-windows-zip
           path: dist/*.zip
@@ -146,19 +146,19 @@ jobs:
     needs: verify-version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: corretto
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: true
       - name: Ensure fakeroot (required by the jpackage DEB bundler)
         run: command -v fakeroot || (sudo apt-get update -q && sudo apt-get install -y fakeroot)
       - name: Build DEB
         run: ./gradlew :composeApp:packageDeb --no-daemon
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-deb
           path: composeApp/build/compose/binaries/main/deb/*.deb
@@ -185,12 +185,12 @@ jobs:
       MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
       MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6
         with:
           distribution: corretto
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: true
 
@@ -237,7 +237,7 @@ jobs:
           xcrun stapler validate "$DMG"
           spctl --assess --type open --context context:primary-signature -v "$DMG"
           echo "DMG is signed, notarized and stapled: $DMG"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-dmg-${{ matrix.arch }}
           path: composeApp/build/compose/binaries/main/dmg/*.dmg
@@ -252,8 +252,8 @@ jobs:
       contents: write
     steps:
       # The release body is built from the changelog, so the job needs the tree.
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           merge-multiple: true
           path: dist
