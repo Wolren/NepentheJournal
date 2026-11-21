@@ -156,7 +156,7 @@ internal class JournalSyncBridge(
             }
         val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
         val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
-        val changedGroups = bulkPutLocked(
+        val put = bulkPutLocked(
             sessions = sessionsToPut,
             substances = substancesToPut,
             doses = dosesToPut,
@@ -175,12 +175,12 @@ internal class JournalSyncBridge(
             ),
             tombstoneCutoff
         )
-        if (changedGroups.isNotEmpty()) {
+        if (put.groups.isNotEmpty()) {
             // Rebuild only the families this apply fed; delete helpers update their own entries.
-            indices.rebuildGroups(changedGroups)
-            markSearchIndexDirtyLocked()
+            indices.rebuildGroups(put.groups)
         }
-        if (tombstonesChanged) markSearchIndexDirtyLocked()
+        // Substances and interactions back no index family, yet both are searchable.
+        if (put.wroteSearchable || tombstonesChanged) markSearchIndexDirtyLocked()
         if (dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty()) {
             bumpToleranceVersion()
         }
@@ -216,7 +216,7 @@ internal class JournalSyncBridge(
         snapshot.effects.forEach { clocks.observe(it.clock) }
         snapshot.customUnits.forEach { clocks.observe(it.clock) }
         tombstones.mergeSnapshotTombstonesLocked(snapshot)
-        val changed = bulkPutLocked(
+        val put = bulkPutLocked(
             sessions = snapshot.sessions,
             substances = snapshot.substances,
             doses = snapshot.doses,
@@ -228,7 +228,7 @@ internal class JournalSyncBridge(
             persons = snapshot.persons,
             medications = snapshot.medications,
         )
-        if (changed.isNotEmpty()) {
+        if (put.wroteSearchable) {
             indices.rebuildAllIndices()
             markSearchIndexDirtyLocked()
         }
@@ -239,12 +239,13 @@ internal class JournalSyncBridge(
 
     /**
      * Shared putAll pass used by [applyBatch] and [applySnapshot]: one StateFlow
-     * emission per store, no per-entity index work. Returns the index families
-     * that need rebuilding for the entity types written; an empty set means no
-     * index can have changed. Persons are device-local and back no index, so
-     * they never contribute. Tombstone policy stays with each caller:
-     * applyBatch applies peer deletes under a cutoff, applySnapshot merges them.
-     * Callers must hold [lock].
+     * emission per store, no per-entity index work. [BulkPutResult.groups] names
+     * the index families that need rebuilding for the entity types written; an
+     * empty set means no query index can have changed. [BulkPutResult.wroteSearchable]
+     * also covers substances and interactions, which back no family but are
+     * searchable. Persons are device-local and never contribute. Tombstone policy
+     * stays with each caller: applyBatch applies peer deletes under a cutoff,
+     * applySnapshot merges them. Callers must hold [lock].
      */
     private fun bulkPutLocked(
         sessions: List<Session>,
@@ -257,11 +258,13 @@ internal class JournalSyncBridge(
         customUnits: List<CustomUnit>,
         persons: List<Person>,
         medications: List<Medication>,
-    ): Set<IndexGroup> {
+    ): BulkPutResult {
         val groups = mutableSetOf<IndexGroup>()
+        var wroteSearchable = false
         fun <T> put(store: EntityStore<T>, items: List<T>, group: IndexGroup?) {
             if (items.isEmpty()) return
             store.putAll(items)
+            wroteSearchable = true
             if (group != null) groups += group
         }
         put(sessionsStore, sessions, IndexGroup.SESSIONS_BY_DATE)
@@ -275,8 +278,10 @@ internal class JournalSyncBridge(
         put(customUnitsStore, customUnits, IndexGroup.CUSTOM_UNITS)
         if (persons.isNotEmpty()) personsStore.putAll(persons)
         if (medications.isNotEmpty()) medicationsStore.putAll(medications)
-        return groups
+        return BulkPutResult(groups, wroteSearchable)
     }
+
+    private data class BulkPutResult(val groups: Set<IndexGroup>, val wroteSearchable: Boolean)
 
 
     /**
