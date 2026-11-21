@@ -63,4 +63,7 @@ A state-based CRDT: per-field LWW registers ordered by a hybrid logical clock, p
 | 3 | per-field registers for sessions, doses, notes; snapshot version 11 | done |
 | 4 | text CRDT or field-level sibling retention | open question |
 
-Verification for phases 2 and 3: property tests for the four semilattice laws over random states, a small TLA+ spec of merge and tombstones model-checked with TLC, and the existing crash fuzz for persistence.
+Verification for phases 2 and 3: `MergeLawPropertyTest` pins idempotence, commutativity,
+associativity and convergence over random clocked rows, and
+[`docs/tla/SyncMerge.tla`](tla/SyncMerge.tla) model-checks the tombstone rule and fair
+convergence with TLC. The existing crash fuzz covers persistence.
