@@ -11,6 +11,7 @@ import app.journal.model.ShulginRating
 import app.journal.model.TimelineEvent
 import app.journal.model.rules.ActiveInteractionCheck
 import app.journal.model.rules.ActiveInteractionResult
+import app.journal.sync.SyncLimits
 import app.journal.util.currentTimeMillis
 import app.journal.util.platformDeviceOrigin
 import kotlinx.coroutines.CoroutineScope
@@ -158,7 +159,7 @@ class SessionEditorViewModel(
         val useShulgin = repo.ratingScaleMode.value == RatingScaleMode.SHULGIN
         val session = Session(
             id = sessionId,
-            title = title.value.ifBlank { "Untitled Session" },
+            title = title.value.trim().take(SyncLimits.MAX_TITLE_LEN).ifBlank { "Untitled Session" },
             startTime = startTime.value,
             endTime = endTime.value?.let { if (it > 1000L && it != startTime.value) it else null },
             consumerName = consumerName.value.ifBlank { null },

@@ -189,4 +189,15 @@ class SessionEditingE2ETest {
             assertTrue(repo.dosesForSession(session.id).isEmpty())
         }
     }
+
+    @Test
+    fun overLongTitleIsCappedBeforeSave() {
+        val repo = JournalRepository()
+        val viewModel = SessionEditorViewModel(repo, null)
+        viewModel.title.value = "x".repeat(501)
+
+        viewModel.save()
+
+        assertEquals(500, repo.sessions.value.single().title.length)
+    }
 }

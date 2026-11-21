@@ -409,7 +409,6 @@ class KtorSyncClient(
             val bodyText = json.encodeToString(slice)
             // Encrypt body with AES-256-GCM, then base64-encode for transport
             val encryptedBody = base64Encode(encryptBody(bodyText, aesKey))
-            val authHeader = authenticateRequest(deviceId, encryptedBody)
             // The host persists once per cycle and skips the unused pull page on interim slices.
             val pushPhase = if (index == slices.lastIndex) {
                 SyncEndpoints.PUSH_PHASE_FINAL
@@ -418,6 +417,8 @@ class KtorSyncClient(
             }
 
             val sliceResult = retryWithBackoff {
+                // A retried attempt must sign with a fresh nonce: the server records every received one.
+                val authHeader = authenticateRequest(deviceId, encryptedBody)
                 val httpResponse = client.post("${endpoint(host, port)}${SyncEndpoints.SYNC_PUSH}") {
                     contentType(ContentType.Application.Json)
                     header(SyncAuthenticator.DEVICE_ID_HEADER, deviceId)
