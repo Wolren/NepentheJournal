@@ -24,9 +24,11 @@ data class Note(
     override val deviceOrigin: String,
     /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
     override val clock: String = "",
+    /** Per-field clock stamps; a missing field falls back to [clock]. Snapshot version 11. */
+    override val fieldClocks: Map<String, String> = emptyMap(),
     val sessionId: String? = null,
     val doseId: String? = null,
     val title: String? = null,
     val body: String,
     val conflictSiblings: List<ConflictSibling> = emptyList()
-) : ClockStamped
+) : FieldVersioned

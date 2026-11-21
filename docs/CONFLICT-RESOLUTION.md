@@ -1,50 +1,56 @@
 # Conflict resolution: current rules and the target model
 
-Status: phases 1 and 2 landed. Phase 3 is planned, not built.
+Status: phases 1, 2 and 3 landed. The phase 4 text decision is open.
 
 ## What runs today
 
-Timestamp last-writer-wins on whole entities, with two branches that keep the losing text.
-Since phase 2 the order is a hybrid logical clock when both copies carry one, so a write
-that happened later wins even when the two clocks disagree by milliseconds.
+Sessions, doses and notes merge field by field, ordered by a hybrid logical clock. The
+rest of the synced entities keep whole-row last-writer-wins. Deletes keep the phase 1 rule.
 
 | Entity | Rule |
 |---|---|
-| Sessions, doses, substances, effects, interactions, timeline events, custom units | when both copies carry a non-blank `clock`, `(physicalMs, counter)` decides first and `deviceOrigin` breaks an exact tie; otherwise incoming is accepted when `updatedAt(incoming) >= updatedAt(existing)` |
-| Sessions, both directions since phase 1 | local copy blocks the incoming edit and writes `conflict:<sessionId>:<device>` with both outcomes |
-| Notes | higher clock (higher `updatedAt` when either side is blank) wins, tie goes to incoming, the loser body becomes a `ConflictSibling` |
+| Sessions, doses, notes | per-field LWW registers: a local write stamps only the fields whose value changed; a merge picks each field by its stamp |
+| Sessions, outcome text | a conflict note is written only when the incoming row stamped its outcome in its latest write and that outcome loses; the note keeps both outcomes |
+| Notes, body text | the losing body is kept as a `ConflictSibling`; title, links and the other fields merge independently |
+| Substances, effects, interactions, timeline events, custom units | whole-row rule: clock first when both copies carry one, `updatedAt` otherwise, device origin breaks a tie |
+| Any pair with a pre-v10 row | whole-row `updatedAt` fallback, so an old peer keeps working |
 | Deletes | a tombstone outranks any write with `updatedAt <= deletedAt`; a newer write is a later operation and wins |
 
 Phase 1 removed two holes: a push older than a local delete can no longer resurrect the
-row, and the pull path now runs the same session merge as the push path
-(`SyncResponse.senderDeviceId` names the conflict note).
+row, and the pull path runs the same session merge as the push path.
 
 Phase 2 added the hybrid logical clock from Kulkarni et al., 2014 to the eight synced
 entities. Every local repository write takes a fresh `clock`; every sync apply keeps the
 peer stamp and advances the local generator past it. Snapshot version 10 derives
-`<updatedAt>:0` for rows loaded from older files, so their relative order does not change
-until each row is rewritten. The wire protocol is v3.
+`<updatedAt>:0` for rows loaded from older files.
+
+Phase 3 added per-field registers to sessions, doses and notes (`fieldClocks`, snapshot
+version 11). Two peers that edit different fields of one row now keep both edits. A local
+write diffs the serialized row against the stored row and moves only the changed fields'
+stamps; unchanged fields keep theirs. The merge is a deterministic join: stamp first,
+device origin on a tie, the encoded value on a full tie. The wire protocol stays v3; the
+map is an additive field that older peers ignore.
 
 Known limits that remain:
 
-- Edits to different fields of the same entity are not merged; the later write replaces the whole row.
-- Deletes still compare wall-clock `updatedAt`; a clocked edit whose `updatedAt` is older than
-  the delete loses even when its clock is newer. Phase 3 gives tombstones their own clock.
-- A pair where only one side carries a clock is ordered by `updatedAt`. That relation is not
-  transitive across a mix of stamped and unstamped rows, so the merge laws hold per pair, not
-  over arbitrary triples, until every row carries a stamp.
-- Clock physical time is bounded to the same window as `updatedAt` (after 2000-01-01, at most
-  one day ahead). Validation drops a peer stamp outside it, so a hostile value cannot pin the
-  local clock for years.
-- Conflict notes are local annotations; their body is labelled from the writing device's
-  perspective and replicates afterwards.
+- Two edits to the SAME field still resolve by clock; the loser is discarded. Session
+  outcome text is the exception: it lands in a conflict note. Dose notes and note titles
+  have no sibling store.
+- Per-field registers cover sessions, doses and notes only. Substances, effects,
+  interactions, timeline events and custom units merge whole.
+- A pair where either side has a blank row clock keeps the whole-row `updatedAt` rule.
+  Field merging needs both sides stamped, which every row gets on its next write.
+- Deletes still compare wall-clock `updatedAt`; a clocked edit whose `updatedAt` is older
+  than the delete loses even when its clock is newer. Phase 3 does not change tombstones.
+- Clock physical time is bounded to the same window as `updatedAt` (after 2000-01-01, at
+  most one day ahead). Validation drops a peer stamp outside it.
 
 ## Target model
 
 A state-based CRDT: per-field LWW registers ordered by a hybrid logical clock, plus OR-Set tombstones. The merge is a join on a semilattice, so strong eventual consistency follows from four testable properties: idempotence, commutativity, associativity, convergence under random interleavings.
 
 1. Hybrid logical clock `(physicalMs, counter, nodeId)` replaces the wall clock. Monotonic, causal, bounded skew. The node id is the entity's `deviceOrigin`, applied as the tiebreak. Snapshot version 10 derives a clock from existing `updatedAt`.
-2. Per-field registers on sessions, doses and notes: concurrent edits to different fields merge, concurrent edits to one field resolve by clock.
+2. Per-field registers on sessions, doses and notes (done in phase 3): concurrent edits to different fields merge, concurrent edits to one field resolve by clock.
 3. OR-Set tombstones carry their own clock and outrank older writes permanently.
 4. Text: either keep both bodies (field-level siblings) or adopt an RGA text engine such as Automerge or Yrs. That decision is separate and expensive.
 
@@ -54,7 +60,7 @@ A state-based CRDT: per-field LWW registers ordered by a hybrid logical clock, p
 |---|---|---|
 | 1 | tombstone outranks older writes; symmetric session merge on pull | done |
 | 2 | hybrid logical clock in the entity timestamp; snapshot version 10 and wire protocol v3 | done |
-| 3 | per-field registers for sessions, doses, notes | planned |
+| 3 | per-field registers for sessions, doses, notes; snapshot version 11 | done |
 | 4 | text CRDT or field-level sibling retention | open question |
 
 Verification for phases 2 and 3: property tests for the four semilattice laws over random states, a small TLA+ spec of merge and tombstones model-checked with TLC, and the existing crash fuzz for persistence.

@@ -1,7 +1,7 @@
 package app.journal.sync
 
 import app.journal.data.IJournalRepository
-import app.journal.data.repository.EntityOrder
+import app.journal.data.repository.FieldRegisters
 import app.journal.model.Note
 import app.journal.model.Session
 
@@ -11,45 +11,27 @@ import app.journal.model.Session
  * former platform copies (JVM SyncServerHandlers.applySessionsWithConflict
  * and the inline loop in iOS IosSyncServerRouter.applySyncBatch).
  *
- * The function takes the repository plus the batch context (the pushed
- * sessions, the batch's delete ids, and the authenticated sender device
- * id). The contract sketched a per-entry pure
- * `mergeSessionConflict(existing, incoming, deviceOrigin)`, but this branch
- * both READS local state and WRITES a conflict note, which is not a pure
- * per-entry merge; the pure note merge lives in the data layer as
- * IJournalRepository.upsertNoteWithConflict. The behavior below is the JVM
- * copy verbatim, so JVM output is byte-identical to before the extraction.
+ * Phase 3 made this a per-field merge: a session edit no longer replaces the whole
+ * row. [FieldRegisters.merge] joins both copies field by field, so a title edit on
+ * one peer and an outcome edit on the other both survive. A pair that includes a
+ * pre-v10 row (blank clock) keeps the whole-row updatedAt rule.
  *
- * Semantics (frozen from the JVM copy):
+ * Semantics:
  *  - a session listed in [deletedIds] is skipped entirely;
- *  - when a LOCAL copy exists and the incoming session loses the order (clock
- *    first when both carry one, updatedAt otherwise; see EntityOrder), the
- *    incoming session is NOT applied; a conflict note is
- *    upserted with id `conflict:<sessionId>:<remoteDeviceId>`, title
- *    `Sync conflict: <title>`, body `Remote: <incoming.outcome>` +
- *    `\n\nLocal: <existing.outcome>` (both outcomes preserved), and
- *    createdAt/updatedAt set to the newer of the two timestamps;
- *  - otherwise the incoming session wins (last writer wins) and is stored
- *    with deviceOrigin filled from `sync:<remoteDeviceId>` when blank, so
- *    provenance is never ambiguous;
- *  - the conflict note always carries deviceOrigin `sync:<remoteDeviceId>`
- *    (the pushing device), and its deterministic id makes re-applying the
- *    same batch idempotent: a replay overwrites the note with identical
- *    content and the returned count does not grow.
+ *  - a tombstone at least as new as the incoming session skips it (phase 1 rule);
+ *  - the merged session is stored only when it differs from the local copy;
+ *  - an outcome CONFLICT note (id `conflict:<sessionId>:<remoteDeviceId>`,
+ *    title `Sync conflict: <title>`, body `Remote: <incoming.outcome>` +
+ *    `\n\nLocal: <existing.outcome>`) is written only when the incoming outcome
+ *    loses AND the incoming row stamped its outcome in its latest write. A stale
+ *    outcome copied along with an unrelated title edit therefore stays silent;
+ *  - the note's deterministic id makes re-applying the same batch idempotent.
  *
  * Device-name truncation stays at the two host call sites: both hosts do
  * `batch.copy(deviceName = batch.deviceName.take(200))` before applying
- * (contract c item 4). Sessions and notes never embed deviceName; the
- * truncated name only shapes each host's own connection banner, so moving
- * it here would be dead code rather than shared behavior.
+ * (contract c item 4).
  *
- * iOS drift that this extraction reconciled (both copies diffed first; the
- * JVM copy won): the iOS inline loop discarded the conflict COUNT (it
- * returned Unit) and had a `tagged.deviceName` truncation whose result it
- * never read. Both hosts now receive the Int count; iOS still has no
- * push-connection banner, which is unchanged iOS behavior.
- *
- * @return the number of incoming sessions resolved as conflicts.
+ * @return the number of incoming sessions resolved as outcome conflicts.
  */
 fun mergeSessionConflict(
     repo: IJournalRepository,
@@ -65,8 +47,27 @@ fun mergeSessionConflict(
         val deletedAt = repo.tombstoneDeletedAt("session", session.id)
         if (deletedAt != null && session.updatedAt <= deletedAt) return@forEach
         val existing = repo.getSession(session.id)
-        val incomingWins = existing != null && EntityOrder.incomingWins(session, existing)
-        if (existing != null && !incomingWins) {
+        if (existing == null) {
+            repo.applyRemoteSession(
+                session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" })
+            )
+            return@forEach
+        }
+        val merged = FieldRegisters.merge(existing, session, Session.serializer())
+        if (merged != existing) {
+            repo.applyRemoteSession(
+                merged.copy(deviceOrigin = merged.deviceOrigin.ifBlank { "sync:$remoteDeviceId" })
+            )
+        }
+        // Only a row that wrote its outcome in the latest write can conflict on it.
+        // A pre-v10 row has no field clocks, so its row stamp stands in and the old
+        // whole-row rule applies.
+        val incomingWroteOutcome =
+            FieldRegisters.fieldStamp(session, "outcome") == FieldRegisters.rowStamp(session)
+        val outcomeLost = incomingWroteOutcome &&
+            session.outcome != existing.outcome &&
+            !FieldRegisters.fieldWins(session, existing, "outcome", Session.serializer())
+        if (outcomeLost) {
             repo.upsertNote(Note(
                 id = "conflict:${session.id}:$remoteDeviceId",
                 sessionId = session.id,
@@ -77,9 +78,7 @@ fun mergeSessionConflict(
                 deviceOrigin = "sync:$remoteDeviceId"
             ))
             conflicts++
-        } else repo.applyRemoteSession(
-            session.copy(deviceOrigin = session.deviceOrigin.ifBlank { "sync:$remoteDeviceId" })
-        )
+        }
     }
     return conflicts
 }

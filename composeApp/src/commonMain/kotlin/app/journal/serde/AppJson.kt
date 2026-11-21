@@ -73,8 +73,10 @@ object AppJson {
      *
      * Version 10 added the hybrid logical clock; any blank clock column is filled with
      * "<updatedAt>:0", which keeps the old updatedAt order on that row until the next
-     * local write takes a fresh stamp. This runs for every version, including a future
-     * file and a recovered salvage, where a row can arrive with the field absent.
+     * local write takes a fresh stamp. Version 11 adds the per-field clock map on
+     * sessions, doses and notes; a file from an older version loads with it empty and
+     * the merge falls back to the row clock. This runs for every version, including a
+     * future file and a recovered salvage, where a row can arrive with the field absent.
      */
     fun apply(repo: IJournalRepository, snapshot: JournalSnapshot) {
         when (val version = snapshot.version) {

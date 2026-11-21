@@ -496,8 +496,10 @@ class SyncContentFidelityE2ETest {
             "fixture: the note arrives on the client")
 
         val stamp = t.nextCursorStamp()
-        t.hostRepo.upsertNote(note("n:one", "s:one", "host-edit", stamp + 50))
-        t.clientRepo.upsertNote(note("n:one", "s:one", "client-edit", stamp + 100))
+        // Large future gaps keep the two writes in different HLC physical ticks. A few
+        // milliseconds apart can share one tick, where the node-local counter decides.
+        t.hostRepo.upsertNote(note("n:one", "s:one", "host-edit", stamp + 30_000L))
+        t.clientRepo.upsertNote(note("n:one", "s:one", "client-edit", stamp + 60_000L))
 
         t.trustedCycle()
 

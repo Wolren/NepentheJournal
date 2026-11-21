@@ -155,6 +155,39 @@ class SyncValidatorsTest {
     }
 
     @Test
+    fun aValidFieldClockMapPasses() {
+        val stamped = session("s:1").copy(fieldClocks = mapOf("title" to "$now:0", "outcome" to "$now:1"))
+        assertNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(stamped))))
+    }
+
+    @Test
+    fun aMalformedFieldClockIsRejected() {
+        val bad = session("s:1").copy(fieldClocks = mapOf("title" to "soon"))
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(bad))))
+    }
+
+    @Test
+    fun aFieldClockOutsideTheWindowIsRejected() {
+        val tooFarAhead = session("s:1").copy(
+            fieldClocks = mapOf(
+                "title" to "${System.currentTimeMillis() + EntityTimePolicy.FUTURE_MARGIN_MS + 1_000L}:0"
+            )
+        )
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(tooFarAhead))))
+    }
+
+    @Test
+    fun tooManyFieldClocksRejected() {
+        val clocks = (1..SyncLimits.MAX_FIELD_CLOCKS + 1).associate { "field$it" to "$now:0" }
+        val flooded = session("s:1").copy(fieldClocks = clocks)
+        assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
+            sessions = listOf(flooded))))
+    }
+
+    @Test
     fun doseAmountNegativeRejected() {
         assertNotNull(validateSyncBatch(SyncBatch(deviceId = "d", deviceName = "n", since = 0L,
             doses = listOf(dose("d:1", "s:1").copy(amount = -1.0)))))

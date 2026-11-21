@@ -15,6 +15,7 @@ package app.journal.data
 
 import app.journal.model.*
 import app.journal.data.repository.EntityClocks
+import app.journal.data.repository.FieldRegisters
 import app.journal.util.PlatformLock
 import app.journal.util.currentTimeMillis
 
@@ -61,7 +62,14 @@ internal class JournalMutations(
     }
 
     fun upsertSession(session: Session) = lock.withLock {
-        putSessionLocked(session.copy(clock = clocks.next(session.updatedAt)))
+        val stored = sessionsStore.get(session.id)
+        val clock = clocks.next(session.updatedAt)
+        putSessionLocked(
+            session.copy(
+                clock = clock,
+                fieldClocks = FieldRegisters.stamp(stored, session, Session.serializer(), clock),
+            ),
+        )
     }
 
     /**
@@ -70,6 +78,7 @@ internal class JournalMutations(
      */
     fun applyRemoteSession(session: Session) = lock.withLock {
         clocks.observe(session.clock)
+        session.fieldClocks.values.forEach { clocks.observe(it) }
         putSessionLocked(session)
     }
 
@@ -83,21 +92,26 @@ internal class JournalMutations(
 
     fun toggleFavorite(sessionId: String) = lock.withLock {
         val session = sessionsStore.get(sessionId) ?: return@withLock
-        val oldSession = sessionsStore.put(
-            session.copy(
-                isFavorite = !session.isFavorite,
-                updatedAt = currentTimeMillis(),
-                clock = clocks.next(),
-            ),
+        val updated = session.copy(isFavorite = !session.isFavorite, updatedAt = currentTimeMillis())
+        val clock = clocks.next()
+        val stamped = updated.copy(
+            clock = clock,
+            fieldClocks = FieldRegisters.stamp(session, updated, Session.serializer(), clock),
         )
+        val oldSession = sessionsStore.put(stamped)
         if (oldSession != null) indices.removeSessionFromIndices(oldSession)
-        indices.addSessionToIndices(sessionsStore.get(sessionId)!!)
+        indices.addSessionToIndices(stamped)
         bumpMutationCount()
         markSearchIndexDirtyLocked()
     }
 
     fun upsertDose(dose: Dose) = lock.withLock {
-        val stamped = dose.copy(clock = clocks.next(dose.updatedAt))
+        val stored = dosesStore.get(dose.id)
+        val clock = clocks.next(dose.updatedAt)
+        val stamped = dose.copy(
+            clock = clock,
+            fieldClocks = FieldRegisters.stamp(stored, dose, Dose.serializer(), clock),
+        )
         val prev = dosesStore.put(stamped)
 
         if (prev != null) {
@@ -168,8 +182,14 @@ internal class JournalMutations(
         // A replayed conflict note arrives with identical content and a new updatedAt
         // only by stamping; skipping the no-op keeps conflict replay byte-identical.
         val stored = notesStore.get(note.id)
-        if (stored != null && note.copy(clock = stored.clock) == stored) return@withLock
-        val stamped = note.copy(clock = clocks.next(note.updatedAt))
+        if (stored != null && note.copy(clock = stored.clock, fieldClocks = stored.fieldClocks) == stored) {
+            return@withLock
+        }
+        val clock = clocks.next(note.updatedAt)
+        val stamped = note.copy(
+            clock = clock,
+            fieldClocks = FieldRegisters.stamp(stored, note, Note.serializer(), clock),
+        )
         val prev = notesStore.put(stamped)
         val prevSessionId = prev?.sessionId
         if (prevSessionId != null) {
@@ -218,7 +238,13 @@ internal class JournalMutations(
     ) = lock.withLock {
         val reparentedDoses = doses.map {
             val reparented = if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)
-            reparented.copy(clock = clocks.next(reparented.updatedAt))
+            val clock = clocks.next(reparented.updatedAt)
+            reparented.copy(
+                clock = clock,
+                fieldClocks = FieldRegisters.stamp(
+                    dosesStore.get(reparented.id), reparented, Dose.serializer(), clock,
+                ),
+            )
         }
         val reparentedEvents = timelineEvents.map {
             val reparented = if (it.sessionId == sessionId) it else it.copy(sessionId = sessionId)

@@ -506,7 +506,8 @@ class JournalRepositoryTest {
         assertEquals(1, resolved.conflictSiblings.size)
         // The remote note is newer (200 > 100)
         assertEquals("local version", resolved.conflictSiblings.first().body)
-        assertEquals("remote", resolved.conflictSiblings.first().deviceOrigin)
+        assertEquals("local", resolved.conflictSiblings.first().deviceOrigin,
+            "the sibling names the device that wrote the losing body")
         assertEquals(100L, resolved.conflictSiblings.first().updatedAt)
         assertEquals("remote version", resolved.body)
     }
@@ -741,12 +742,12 @@ class JournalRepositoryTest {
 
         // Clock stamps are per write, so the two paths land on different ticks by
         // design; every other field must match.
-        assertEquals(perItem.doses.value.map { it.copy(clock = "") },
-            batch.doses.value.map { it.copy(clock = "") }, "same stored doses")
+        assertEquals(perItem.doses.value.map { it.copy(clock = "", fieldClocks = emptyMap()) },
+            batch.doses.value.map { it.copy(clock = "", fieldClocks = emptyMap()) }, "same stored doses")
         assertEquals(perItem.timelineEvents.value.map { it.copy(clock = "") },
             batch.timelineEvents.value.map { it.copy(clock = "") }, "same stored events")
-        assertEquals(perItem.dosesForSession("s:1").map { it.copy(clock = "") },
-            batch.dosesForSession("s:1").map { it.copy(clock = "") })
+        assertEquals(perItem.dosesForSession("s:1").map { it.copy(clock = "", fieldClocks = emptyMap()) },
+            batch.dosesForSession("s:1").map { it.copy(clock = "", fieldClocks = emptyMap()) })
         assertEquals(perItem.eventsForSession("s:1").map { it.copy(clock = "") },
             batch.eventsForSession("s:1").map { it.copy(clock = "") })
         assertEquals(perItem.sessionIdsForSubstance("sub:1").toSet(), batch.sessionIdsForSubstance("sub:1").toSet())

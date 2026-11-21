@@ -36,6 +36,9 @@ object SyncLimits {
     const val MAX_INTERACTION_SOURCE_LEN = 500
     const val MAX_EFFECT_SUBSTANCE_IDS = 500
 
+    /** Upper bound on a per-field clock map; a session serializes about 25 fields. */
+    const val MAX_FIELD_CLOCKS = 64
+
     const val MAX_DOSE_AMOUNT = 1_000_000
     const val MIN_SESSION_RATING = 1
     const val MAX_SESSION_RATING = 10

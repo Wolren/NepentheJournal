@@ -50,6 +50,8 @@ data class Session(
     override val deviceOrigin: String,
     /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
     override val clock: String = "",
+    /** Per-field clock stamps; a missing field falls back to [clock]. Snapshot version 11. */
+    override val fieldClocks: Map<String, String> = emptyMap(),
     val title: String,
     val startTime: Long,
     val endTime: Long? = null,
@@ -71,4 +73,4 @@ data class Session(
     val tags: List<String> = emptyList(),
     val pausedMs: Long = 0L,
     val pausedAt: Long? = null
-) : ClockStamped
+) : FieldVersioned

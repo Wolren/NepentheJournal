@@ -9,7 +9,8 @@ JSON Schema (draft 2020-12) definitions for `JournalSnapshot` persisted files.
 | `journal-snapshot-v7.json` | Historical schema version 7. Kept as the golden shape of v7-era files (persons, tombstones, prefs, no medications). |
 | `journal-snapshot-v8.json` | Historical schema version 8. Kept as the golden shape of v8-era files (adds the device-local `medications` list, no session `freeform`). |
 | `journal-snapshot-v9.json` | Historical schema version 9. Kept as the golden shape of v9-era files (session `freeform`, no `clock`). |
-| `journal-snapshot-v10.json` | **Current.** Adds the hybrid logical clock (`clock`) to every synced entity over v9. `version.const` must equal `JournalSnapshot.CURRENT_VERSION` (`data/JournalStore.kt`), and every `$defs/<Entity>` property set must mirror that entity's serializer fields exactly. Both rules are asserted by `desktopTest/data/SnapshotSchemaTest.kt`, so edit this file in the same change as any `JournalSnapshot`/model field add or remove. |
+| `journal-snapshot-v10.json` | Historical schema version 10. Kept as the golden shape of v10-era files (row `clock`, no `fieldClocks`). |
+| `journal-snapshot-v11.json` | **Current.** Adds the per-field clock map (`fieldClocks`) to sessions, doses and notes over v10. `version.const` must equal `JournalSnapshot.CURRENT_VERSION` (`data/JournalStore.kt`), and every `$defs/<Entity>` property set must mirror that entity's serializer fields exactly. Both rules are asserted by `desktopTest/data/SnapshotSchemaTest.kt`, so edit this file in the same change as any `JournalSnapshot`/model field add or remove. |
 
 Do not add a `journal-snapshot-v6.json` retroactively: the numbering gap is
 historical fact, and a fabricated v6 golden would contradict files that

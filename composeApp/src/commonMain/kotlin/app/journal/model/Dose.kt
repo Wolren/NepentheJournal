@@ -20,6 +20,8 @@ data class Dose(
     override val deviceOrigin: String,
     /** Hybrid logical clock stamp; blank on rows written before snapshot version 10. */
     override val clock: String = "",
+    /** Per-field clock stamps; a missing field falls back to [clock]. Snapshot version 11. */
+    override val fieldClocks: Map<String, String> = emptyMap(),
     val sessionId: String,
     val substanceId: String,
     val routeOfAdministration: String,
@@ -32,4 +34,4 @@ data class Dose(
     val estimatedDoseStandardDeviation: Double? = null,
     val customUnitId: String? = null,
     val stomachFullness: StomachFullness? = null
-) : ClockStamped
+) : FieldVersioned

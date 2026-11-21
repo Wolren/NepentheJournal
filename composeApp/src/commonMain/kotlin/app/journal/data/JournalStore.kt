@@ -60,7 +60,7 @@ data class JournalSnapshot(
     val autoBackupOnClose: Boolean = true
 ) {
     companion object {
-        const val CURRENT_VERSION = 10
+        const val CURRENT_VERSION = 11
     }
 }
 

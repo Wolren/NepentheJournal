@@ -16,9 +16,11 @@ package app.journal.data
 
 import app.journal.data.repository.EntityClocks
 import app.journal.data.repository.EntityOrder
+import app.journal.data.repository.FieldRegisters
 
 import app.journal.model.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.KSerializer
 import app.journal.util.PlatformLock
 
 
@@ -112,18 +114,35 @@ internal class JournalSyncBridge(
                     updatedAt(existing), clock(existing), device(existing),
                 )
             }
+        fun <T : FieldVersioned> fieldMerge(
+            list: List<T>,
+            get: (String) -> T?,
+            serializer: KSerializer<T>,
+        ): List<T> = list.mapNotNull { incoming ->
+            val existing = get(incoming.id) ?: return@mapNotNull incoming
+            val merged = FieldRegisters.merge(existing, incoming, serializer)
+            if (merged == existing) null else merged
+        }
+        fun observe(clock: String, fieldClocks: Map<String, String> = emptyMap()) {
+            clocks.observe(clock)
+            fieldClocks.values.forEach(clocks::observe)
+        }
         // Receive step: every accepted stamp advances the local clock, so the next
         // local write is causally later than anything a peer taught us.
-        sessions.forEach { clocks.observe(it.clock) }
-        doses.forEach { clocks.observe(it.clock) }
+        sessions.forEach { observe(it.clock, it.fieldClocks) }
+        doses.forEach { observe(it.clock, it.fieldClocks) }
         substances.forEach { clocks.observe(it.clock) }
-        notes.forEach { clocks.observe(it.clock) }
+        notes.forEach { observe(it.clock, it.fieldClocks) }
         timelineEvents.forEach { clocks.observe(it.clock) }
         interactions.forEach { clocks.observe(it.clock) }
         effects.forEach { clocks.observe(it.clock) }
         customUnits.forEach { clocks.observe(it.clock) }
-        val sessionsToPut = newer(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
-        val dosesToPut = newer(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
+        val sessionsToPut =
+            if (!lastWriterWins) sessions
+            else fieldMerge(alive(sessions, "session", { it.id }, { it.updatedAt }), sessionsStore::get, Session.serializer())
+        val dosesToPut =
+            if (!lastWriterWins) doses
+            else fieldMerge(alive(doses, "dose", { it.id }, { it.updatedAt }), dosesStore::get, Dose.serializer())
         val substancesToPut = newer(alive(substances, "substance", { it.id }, { it.updatedAt }), substancesStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
         val effectsToPut = newer(alive(effects, "effect", { it.id }, { it.updatedAt }), effectsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
         val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
@@ -190,10 +209,10 @@ internal class JournalSyncBridge(
      * importTombstones.
      */
     fun applySnapshot(snapshot: JournalSnapshot) = lock.withLock {
-        snapshot.sessions.forEach { clocks.observe(it.clock) }
-        snapshot.doses.forEach { clocks.observe(it.clock) }
+        snapshot.sessions.forEach { clocks.observe(it.clock); it.fieldClocks.values.forEach(clocks::observe) }
+        snapshot.doses.forEach { clocks.observe(it.clock); it.fieldClocks.values.forEach(clocks::observe) }
         snapshot.substances.forEach { clocks.observe(it.clock) }
-        snapshot.notes.forEach { clocks.observe(it.clock) }
+        snapshot.notes.forEach { clocks.observe(it.clock); it.fieldClocks.values.forEach(clocks::observe) }
         snapshot.timelineEvents.forEach { clocks.observe(it.clock) }
         snapshot.interactions.forEach { clocks.observe(it.clock) }
         snapshot.effects.forEach { clocks.observe(it.clock) }
@@ -262,44 +281,45 @@ internal class JournalSyncBridge(
 
 
     /**
-     * The ONE conflict merge for every note apply path (contract c,
-     * HARDENING-CONTRACTS-2026-09 section c): the losing body is NEVER destroyed.
+     * The ONE conflict merge for every note apply path (contract c): the losing body
+     * is NEVER destroyed. Field registers merge title, sessionId, doseId and the rest
+     * independently; `body` keeps the loser as a ConflictSibling.
      *
-     * - Bodies equal: the higher-ordered note wins, carrying the union of both
-     *   `conflictSiblings` (deduplicated by body). An older identical copy therefore
-     *   never rolls `updatedAt` back, and replays stay idempotent.
-     * - Bodies differ: the higher clock stamp wins when both notes carry one,
-     *   otherwise the higher updatedAt (tie: incoming). The LOSING
-     *   note's full body is preserved as
-     *   ConflictSibling(body = loser.body, deviceOrigin = remoteDeviceId,
-     *   updatedAt = loser.updatedAt). The winner keeps its own updatedAt, so the
-     *   merge never inflates timestamps and LWW stays stable across peers.
+     * The sibling carries the loser's device (remoteDeviceId when the incoming note
+     * loses) and the loser's updatedAt. The winner keeps its own updatedAt, so the
+     * merge is idempotent and both peers choose the same body.
      *
      * Used by [upsertNoteWithConflict] and the sync branch of [applyBatch].
      * Callers must hold [lock].
      */
     private fun mergeNoteConflictLocked(existing: Note, incoming: Note, remoteDeviceId: String): Note {
-        if (existing.body == incoming.body) {
-            val siblings = (existing.conflictSiblings + incoming.conflictSiblings)
-                .distinctBy { it.body }
-            val winner = if (EntityOrder.incomingWins(incoming, existing)) incoming else existing
-            return winner.copy(conflictSiblings = siblings)
-        }
-        val incomingWins = EntityOrder.incomingWins(incoming, existing)
-        val winner = if (incomingWins) incoming else existing
-        val loser = if (incomingWins) existing else incoming
-        if (winner.conflictSiblings.any { it.body == loser.body }) return winner
-        return winner.copy(
-            conflictSiblings = winner.conflictSiblings +
-                ConflictSibling(loser.body, remoteDeviceId, loser.updatedAt),
+        val merged = FieldRegisters.merge(existing, incoming, Note.serializer())
+        val incomingWinsBody = FieldRegisters.fieldWins(incoming, existing, "body", Note.serializer())
+        val winnerBody = if (incomingWinsBody) incoming.body else existing.body
+        val loserBody = if (incomingWinsBody) existing.body else incoming.body
+        val loserDevice = if (incomingWinsBody) existing.deviceOrigin else remoteDeviceId
+        val loserUpdatedAt = if (incomingWinsBody) existing.updatedAt else incoming.updatedAt
+        val siblings = (existing.conflictSiblings + incoming.conflictSiblings)
+            .distinctBy { it.body }
+        val withLoser =
+            if (winnerBody == loserBody || siblings.any { it.body == loserBody }) siblings
+            else siblings + ConflictSibling(loserBody, loserDevice, loserUpdatedAt)
+        // The union must beat either input's siblings field on the next merge, or the
+        // peer that wins the row order could overwrite the conflict record with [].
+        val fieldClocks = merged.fieldClocks + ("conflictSiblings" to FieldRegisters.rowStamp(merged))
+        return merged.copy(
+            conflictSiblings = withLoser.filter { it.body != winnerBody },
+            fieldClocks = fieldClocks,
         )
     }
 
     fun upsertNoteWithConflict(note: Note, remoteDeviceId: String): Note? = lock.withLock {
         val sessionId = note.sessionId ?: return@withLock null
         clocks.observe(note.clock)
+        note.fieldClocks.values.forEach(clocks::observe)
         val existing = notesStore.get(note.id)
         val resolved = if (existing == null) note else mergeNoteConflictLocked(existing, note, remoteDeviceId)
+        if (resolved == existing) return@withLock existing
         notesStore.put(resolved)
         existing?.sessionId?.let { oldSessionId ->
             indices._notesBySession[oldSessionId]?.removeAll { n -> n.id == note.id }

@@ -35,12 +35,14 @@ The format is designed to be:
 | 8       | Added `medications`: device-local standing medications for the interaction check. |
 | 9       | Added `Session.freeform`: free-form markdown writing for the session body, exported verbatim to Obsidian. |
 | 10      | Added `clock` (hybrid logical clock stamp) to every synced entity: `Session`, `Dose`, `Note`, `Substance`, `Effect`, `Interaction`, `TimelineEvent`, `CustomUnit`. Loading an older file derives `<updatedAt>:0` for every row, so ordering is unchanged until the row is rewritten. |
+| 11      | Added `fieldClocks` (per-field clock stamps) to `Session`, `Dose` and `Note`. A missing field falls back to the row clock. Loading an older file leaves the map empty; the next local write fills it. |
 
 **Migration policy:**
 - The app loads any version >= 1 with `ignoreUnknownKeys = true`.
-- On write, the app always writes `CURRENT_VERSION` (currently 10).
+- On write, the app always writes `CURRENT_VERSION` (currently 11).
 - Fields unknown to the running build are ignored on load and are not written back. Do not run an older build against a newer journal.
 - Version 10 additionally derives `clock` from `updatedAt` at load (`AppJson.apply`).
+- Version 11 leaves `fieldClocks` empty for an older file; field merging then falls back to the row clock until the row is rewritten.
 
 ---
 

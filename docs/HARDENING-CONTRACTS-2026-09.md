@@ -145,6 +145,13 @@ before `updatedAt`, and `deviceOrigin` breaks an exact tie. When either side is
 blank (a pre-v10 peer), `updatedAt` still decides. Tombstone cutoffs (section b)
 still compare `updatedAt`; phase 3 gives tombstones their own clock.
 
+**Amendment 2026-11-21 (phase 3):** sessions, doses and notes merge per field
+(`fieldClocks`, snapshot v11). The note pins below still govern the body: the losing
+body stays as a `ConflictSibling`. Field merging engages only when BOTH rows carry a
+row clock; otherwise the whole-row rule above stands. The session outcome note is
+written only when the incoming row stamped its outcome in its latest write and that
+outcome loses. Tombstone cutoffs still compare `updatedAt`.
+
 **Pin:**
 
 1. ONE shared, pure merge function lives in commonMain (target file:

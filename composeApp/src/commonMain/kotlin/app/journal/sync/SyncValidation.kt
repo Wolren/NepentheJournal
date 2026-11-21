@@ -203,11 +203,24 @@ private fun badClock(clock: String): String? {
     return null
 }
 
+/** Per-field stamps follow the same shape and window rules as the row clock. */
+private fun badFieldClocks(clocks: Map<String, String>): String? {
+    if (clocks.isEmpty()) return null
+    if (clocks.size > SyncLimits.MAX_FIELD_CLOCKS) return "Too many field clocks"
+    for ((field, stamp) in clocks) {
+        if (field.isBlank() || field.length > SyncLimits.MAX_NAME_LEN) return "Invalid field clock key"
+        val hlc = Hlc.parseOrNull(stamp) ?: return "Invalid field clock stamp"
+        if (!EntityTimePolicy.isReasonableEntityTime(hlc.physicalMs)) return "Field clock stamp out of range"
+    }
+    return null
+}
+
 internal fun validateSession(s: Session): String? {
     badId(s.id, "session ID")?.let { return it }
     badTime(s.createdAt, "Session createdAt")?.let { return it }
     badTime(s.updatedAt, "Session updatedAt")?.let { return it }
     badClock(s.clock)?.let { return it }
+    badFieldClocks(s.fieldClocks)?.let { return it }
     badTime(s.startTime, "Session startTime")?.let { return it }
     if (s.endTime != null) badTime(s.endTime, "Session endTime")?.let { return it }
     if (s.title.length > SyncLimits.MAX_TITLE_LEN) return "Session title too long"
@@ -228,6 +241,7 @@ internal fun validateDose(d: Dose): String? {
     badTime(d.createdAt, "Dose createdAt")?.let { return it }
     badTime(d.updatedAt, "Dose updatedAt")?.let { return it }
     badClock(d.clock)?.let { return it }
+    badFieldClocks(d.fieldClocks)?.let { return it }
     badTime(d.timestamp, "Dose timestamp")?.let { return it }
     badId(d.sessionId, "dose sessionId")?.let { return it }
     badId(d.substanceId, "dose substanceId")?.let { return it }
@@ -244,6 +258,7 @@ internal fun validateNote(n: Note): String? {
     badTime(n.createdAt, "Note createdAt")?.let { return it }
     badTime(n.updatedAt, "Note updatedAt")?.let { return it }
     badClock(n.clock)?.let { return it }
+    badFieldClocks(n.fieldClocks)?.let { return it }
     if (n.body.length > SyncLimits.MAX_FIELD_LEN) return "Note body too long"
     if ((n.title?.length ?: 0) > SyncLimits.MAX_TITLE_LEN) return "Note title too long"
     return null
