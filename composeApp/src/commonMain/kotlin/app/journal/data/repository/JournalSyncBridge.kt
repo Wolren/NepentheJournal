@@ -90,8 +90,7 @@ internal class JournalSyncBridge(
         deletedCustomUnitIds: List<String>,
         tombstoneCutoff: Long
     ) = lock.withLock {
-        // A delete is an operation with a timestamp: it outranks any write that came before
-        // it, so a peer that never saw the delete cannot resurrect the row.
+        // A delete outranks any earlier write, so a peer that missed it cannot resurrect the row.
         fun <T> alive(list: List<T>, type: String, id: (T) -> String, updatedAt: (T) -> Long): List<T> =
             if (!lastWriterWins) list
             else list.filter { incoming ->
@@ -127,8 +126,7 @@ internal class JournalSyncBridge(
             clocks.observe(clock)
             fieldClocks.values.forEach(clocks::observe)
         }
-        // Receive step: every accepted stamp advances the local clock, so the next
-        // local write is causally later than anything a peer taught us.
+        // Receive step: every accepted stamp advances the local clock past the peer.
         sessions.forEach { observe(it.clock, it.fieldClocks) }
         doses.forEach { observe(it.clock, it.fieldClocks) }
         substances.forEach { clocks.observe(it.clock) }
@@ -148,8 +146,7 @@ internal class JournalSyncBridge(
         val interactionsToPut = newer(alive(interactions, "interaction", { it.id }, { it.updatedAt }), interactionsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
         val timelineEventsToPut = newer(alive(timelineEvents, "timelineEvent", { it.id }, { it.updatedAt }), timelineEventsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
         val customUnitsToPut = newer(alive(customUnits, "customUnit", { it.id }, { it.updatedAt }), customUnitsStore::get, { it.id }, { it.updatedAt }, { it.clock }, { it.deviceOrigin })
-        // A no-op merge is skipped; a clock-winning row is never dropped for an older
-        // updatedAt, because the clock is the order once both sides carry one.
+        // A no-op merge is skipped; the clock decides order once both sides carry one.
         val notesToPut: List<Note> =
             if (!lastWriterWins) notes
             else alive(notes, "note", { it.id }, { it.updatedAt }).mapNotNull { incoming ->
@@ -159,7 +156,7 @@ internal class JournalSyncBridge(
             }
         val personsToPut = newer(persons, personsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
         val medicationsToPut = newer(medications, medicationsStore::get, { it.id }, { it.updatedAt }, { "" }, { it.deviceOrigin })
-        val anyIndexedPut = bulkPutLocked(
+        val changedGroups = bulkPutLocked(
             sessions = sessionsToPut,
             substances = substancesToPut,
             doses = dosesToPut,
@@ -178,11 +175,12 @@ internal class JournalSyncBridge(
             ),
             tombstoneCutoff
         )
-        if (anyIndexedPut || tombstonesChanged) {
-            // Set under the same lock as the rest of the bridge (callers hold [lock]); O(1), never a rebuild by itself.
-            indices.rebuildAllIndices()
+        if (changedGroups.isNotEmpty()) {
+            // Rebuild only the families this apply fed; delete helpers update their own entries.
+            indices.rebuildGroups(changedGroups)
             markSearchIndexDirtyLocked()
         }
+        if (tombstonesChanged) markSearchIndexDirtyLocked()
         if (dosesToPut.isNotEmpty() || substancesToPut.isNotEmpty()) {
             bumpToleranceVersion()
         }
@@ -230,7 +228,7 @@ internal class JournalSyncBridge(
             persons = snapshot.persons,
             medications = snapshot.medications,
         )
-        if (changed) {
+        if (changed.isNotEmpty()) {
             indices.rebuildAllIndices()
             markSearchIndexDirtyLocked()
         }
@@ -241,11 +239,11 @@ internal class JournalSyncBridge(
 
     /**
      * Shared putAll pass used by [applyBatch] and [applySnapshot]: one StateFlow
-     * emission per store, no per-entity index work. Returns true when any entity
-     * that backs a query index was written; callers must run [rebuildAllIndices]
-     * when it returns true. Persons are device-local and back no index, so they
-     * never flip the result. Tombstone policy stays with each caller: applyBatch
-     * applies peer deletes under a cutoff, applySnapshot merges them.
+     * emission per store, no per-entity index work. Returns the index families
+     * that need rebuilding for the entity types written; an empty set means no
+     * index can have changed. Persons are device-local and back no index, so
+     * they never contribute. Tombstone policy stays with each caller:
+     * applyBatch applies peer deletes under a cutoff, applySnapshot merges them.
      * Callers must hold [lock].
      */
     private fun bulkPutLocked(
@@ -259,24 +257,25 @@ internal class JournalSyncBridge(
         customUnits: List<CustomUnit>,
         persons: List<Person>,
         medications: List<Medication>,
-    ): Boolean {
-        var indexedChanged = false
-        fun <T> put(store: EntityStore<T>, items: List<T>) {
+    ): Set<IndexGroup> {
+        val groups = mutableSetOf<IndexGroup>()
+        fun <T> put(store: EntityStore<T>, items: List<T>, group: IndexGroup?) {
             if (items.isEmpty()) return
             store.putAll(items)
-            indexedChanged = true
+            if (group != null) groups += group
         }
-        put(sessionsStore, sessions)
-        put(substancesStore, substances)
-        put(dosesStore, doses)
-        put(notesStore, notes)
-        put(timelineEventsStore, timelineEvents)
-        put(interactionsStore, interactions)
-        put(effectsStore, effects)
-        put(customUnitsStore, customUnits)
+        put(sessionsStore, sessions, IndexGroup.SESSIONS_BY_DATE)
+        // Substances, effects and interactions back no index family of their own.
+        put(substancesStore, substances, null)
+        put(dosesStore, doses, IndexGroup.DOSES)
+        put(notesStore, notes, IndexGroup.NOTES)
+        put(timelineEventsStore, timelineEvents, IndexGroup.EVENTS)
+        put(interactionsStore, interactions, null)
+        put(effectsStore, effects, IndexGroup.EFFECTS)
+        put(customUnitsStore, customUnits, IndexGroup.CUSTOM_UNITS)
         if (persons.isNotEmpty()) personsStore.putAll(persons)
         if (medications.isNotEmpty()) medicationsStore.putAll(medications)
-        return indexedChanged
+        return groups
     }
 
 
@@ -304,8 +303,7 @@ internal class JournalSyncBridge(
         val withLoser =
             if (winnerBody == loserBody || siblings.any { it.body == loserBody }) siblings
             else siblings + ConflictSibling(loserBody, loserDevice, loserUpdatedAt)
-        // The union must beat either input's siblings field on the next merge, or the
-        // peer that wins the row order could overwrite the conflict record with [].
+        // The union must beat either input's siblings field, or a later merge erases it.
         val fieldClocks = merged.fieldClocks + ("conflictSiblings" to FieldRegisters.rowStamp(merged))
         return merged.copy(
             conflictSiblings = withLoser.filter { it.body != winnerBody },

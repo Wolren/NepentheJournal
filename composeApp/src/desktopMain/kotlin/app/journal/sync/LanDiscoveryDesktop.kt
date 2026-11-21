@@ -15,6 +15,8 @@ import javax.jmdns.ServiceListener
 actual class LanDiscovery {
     private var jmdns: JmDNS? = null
     private val serviceType = "_nepenthe._tcp.local."
+    // Removed events carry the service name only; the peer list is keyed by device id.
+    private val deviceIdByService = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     actual fun startDiscovery(): Flow<LanDiscoveryEvent> = callbackFlow {
         val mdns = JmDNS.create()
@@ -26,7 +28,8 @@ actual class LanDiscovery {
             }
 
             override fun serviceRemoved(event: ServiceEvent) {
-                trySend(LanDiscoveryEvent.PeerLost(event.name))
+                val deviceId = deviceIdByService.remove(event.name) ?: event.name
+                trySend(LanDiscoveryEvent.PeerLost(deviceId))
             }
 
             override fun serviceResolved(event: ServiceEvent) {
@@ -35,6 +38,7 @@ actual class LanDiscovery {
                 val port = info.port
                 val deviceId = info.getPropertyString("deviceId")
                 val fingerprint = info.getPropertyString("fingerprint")
+                if (deviceId != null) deviceIdByService[event.name] = deviceId
                 trySend(
                     LanDiscoveryEvent.PeerFound(
                         DiscoveredPeer(

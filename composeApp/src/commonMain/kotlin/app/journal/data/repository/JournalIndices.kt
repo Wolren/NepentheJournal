@@ -23,6 +23,14 @@ import app.journal.util.PlatformLock
 
 
 /**
+ * The independent query-index families. A bulk apply rebuilds only the
+ * families whose source entity type changed, never every index for every
+ * delta: each family derives from ONE store, so an unrelated family cannot
+ * change when that store did not.
+ */
+internal enum class IndexGroup { SESSIONS_BY_DATE, DOSES, NOTES, EVENTS, EFFECTS, CUSTOM_UNITS }
+
+/**
  * The nine incremental query indices plus their maintenance and read helpers,
  * split out of JournalRepository in the wave2 structural refactor. All
  * mutation helpers assume the caller holds the facade lock.
@@ -88,39 +96,69 @@ internal class JournalIndices(
         if (_sessionsByDate[date]?.isEmpty() == true) _sessionsByDate.remove(date)
     }
 
-    internal fun rebuildAllIndices() {
-        _sessionsByDate.clear()
-        _sessionsPerSubstance.clear()
-        _effectsBySubstance.clear()
-        _customUnitsBySubstance.clear()
-        _substanceDoseStats.clear()
-        _doseStatsSessionIds.clear()
-        _dosesBySession.clear()
-        _notesBySession.clear()
-        _eventsBySession.clear()
-        sessionsStore.forEachValue { addSessionToIndices(it) }
-        dosesStore.forEachValue { dose ->
-            _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
-            _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
-            updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
-        }
-        notesStore.forEachValue { note ->
-            if (note.sessionId != null) {
-                _notesBySession.getOrPut(note.sessionId) { mutableListOf() }.add(note)
+    /** Per-group rebuild tally; a scoped bulk apply must not touch unrelated groups. */
+    private val rebuildCounts = mutableMapOf<IndexGroup, Int>()
+
+    internal fun rebuildCount(group: IndexGroup): Int = lock.withLock { rebuildCounts[group] ?: 0 }
+
+    /** Rebuild every index family. Full loads and snapshot applies only. */
+    internal fun rebuildAllIndices() = rebuildGroups(IndexGroup.values().toSet())
+
+    /**
+     * Rebuild only [groups]. Each family reads its own store, so a group that
+     * is absent keeps its entries and costs nothing. Callers must hold [lock].
+     */
+    internal fun rebuildGroups(groups: Set<IndexGroup>) {
+        if (groups.isEmpty()) return
+        for (group in groups) {
+            rebuildCounts[group] = (rebuildCounts[group] ?: 0) + 1
+            when (group) {
+                IndexGroup.SESSIONS_BY_DATE -> {
+                    _sessionsByDate.clear()
+                    sessionsStore.forEachValue { addSessionToIndices(it) }
+                }
+                IndexGroup.DOSES -> {
+                    _sessionsPerSubstance.clear()
+                    _substanceDoseStats.clear()
+                    _doseStatsSessionIds.clear()
+                    _dosesBySession.clear()
+                    dosesStore.forEachValue { dose ->
+                        _sessionsPerSubstance.getOrPut(dose.substanceId) { mutableSetOf() }.add(dose.sessionId)
+                        _dosesBySession.getOrPut(dose.sessionId) { mutableListOf() }.add(dose)
+                        updateDoseStatsForSubstance(dose.substanceId, dose.sessionId, dose.timestamp)
+                    }
+                }
+                IndexGroup.NOTES -> {
+                    _notesBySession.clear()
+                    notesStore.forEachValue { note ->
+                        if (note.sessionId != null) {
+                            _notesBySession.getOrPut(note.sessionId) { mutableListOf() }.add(note)
+                        }
+                    }
+                }
+                IndexGroup.EVENTS -> {
+                    _eventsBySession.clear()
+                    timelineEventsStore.forEachValue { event ->
+                        if (event.sessionId != null) {
+                            _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
+                        }
+                    }
+                }
+                IndexGroup.EFFECTS -> {
+                    _effectsBySubstance.clear()
+                    effectsStore.forEachValue { effect ->
+                        for (subId in effect.substanceIds) {
+                            _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
+                        }
+                    }
+                }
+                IndexGroup.CUSTOM_UNITS -> {
+                    _customUnitsBySubstance.clear()
+                    customUnitsStore.forEachValue { unit ->
+                        _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
+                    }
+                }
             }
-        }
-        timelineEventsStore.forEachValue { event ->
-            if (event.sessionId != null) {
-                _eventsBySession.getOrPut(event.sessionId) { mutableListOf() }.add(event)
-            }
-        }
-        effectsStore.forEachValue { effect ->
-            for (subId in effect.substanceIds) {
-                _effectsBySubstance.getOrPut(subId) { mutableListOf() }.add(effect)
-            }
-        }
-        customUnitsStore.forEachValue { unit ->
-            _customUnitsBySubstance.getOrPut(unit.substanceId) { mutableListOf() }.add(unit)
         }
         markSearchIndexDirtyLocked()
     }

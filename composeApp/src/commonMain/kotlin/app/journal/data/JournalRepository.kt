@@ -182,6 +182,9 @@ class JournalRepository internal constructor() : IJournalRepository {
 
     override fun applySnapshot(snapshot: JournalSnapshot) = syncBridge.applySnapshot(snapshot)
 
+    /** Test seam for the scoped-rebuild regression: how often one index family was rebuilt. */
+    internal fun indexRebuildCount(group: IndexGroup): Int = indices.rebuildCount(group)
+
 
     override fun upsertPerson(person: Person) = mutations.upsertPerson(person)
 
