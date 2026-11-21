@@ -7,7 +7,11 @@ import app.journal.model.Session
 import app.journal.model.Substance
 import kotlin.test.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 
 class SessionListViewModelTest {
 
@@ -208,5 +212,22 @@ class SessionListViewModelTest {
         vm.clearFilters()
         val filtered = vm.filteredSessions.first()
         assertEquals(4, filtered.size)
+    }
+
+    @Test
+    fun `search is debounced before the list filters`() = runTest {
+        val vm = SessionListViewModel(makeRepo(), backgroundScope)
+        val seen = mutableListOf<List<Session>>()
+        val job = backgroundScope.launch { vm.filteredSessions.collect { seen.add(it) } }
+        runCurrent()
+        assertEquals(4, seen.last().size)
+
+        vm.searchQuery.value = "lsd"
+        advanceTimeBy(249)
+        assertEquals(4, seen.last().size, "the list must not filter before the debounce elapses")
+        advanceTimeBy(2)
+        assertEquals(1, seen.last().size, "the list must filter after the debounce elapses")
+
+        job.cancel()
     }
 }

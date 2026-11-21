@@ -426,7 +426,13 @@ fun SubstanceScreen(
             }
         }
 
-        DesktopScrollbar(if (mode == LibraryMode.SUBSTANCES) scrollState else effectsScrollState)
+        var activeScrollState = scrollState
+        when (mode) {
+            LibraryMode.SUBSTANCES -> activeScrollState = scrollState
+            LibraryMode.EFFECTS -> activeScrollState = effectsScrollState
+            LibraryMode.EQUIVALENCE -> activeScrollState = equivalenceScrollState
+        }
+        DesktopScrollbar(activeScrollState)
     }
 }
 

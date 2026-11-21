@@ -5,8 +5,10 @@ import app.journal.model.Dose
 import app.journal.model.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
+import kotlin.time.Duration.Companion.milliseconds
 
 data class SubstanceFilterItem(val id: String, val name: String)
 
@@ -43,9 +45,10 @@ class SessionListViewModel(
         list.mapNotNull { it.consumerName }.distinct().sorted()
     }
 
+    @OptIn(FlowPreview::class)
     val filteredSessions = combine(
         sessions, filterSubstanceIds, showFavoritesOnly,
-        consumerFilter, searchQuery
+        consumerFilter, searchQuery.debounce { if (it.isEmpty()) 0L else 250L }
     ) { all: List<Session>, subIds: Set<String>, favsOnly: Boolean, consumer: String?, query: String ->
         val q = if (query.isNotBlank()) query.lowercase() else null
 
