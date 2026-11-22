@@ -1,5 +1,6 @@
 package app.journal.sync
 
+import app.journal.util.currentTimeMillis
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -96,7 +97,7 @@ class SyncCursorRulesTest {
 
     @Test
     fun `maxUpdatedAt ignores stamps outside the entity-time window`() {
-        val now = System.currentTimeMillis()
+        val now = currentTimeMillis()
         val future = SyncResponse(
             success = true,
             sessions = listOf(
