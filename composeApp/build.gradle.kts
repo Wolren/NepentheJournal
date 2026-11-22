@@ -64,6 +64,7 @@ kotlin {
         val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
         val androidMain = getByName("androidMain") {
