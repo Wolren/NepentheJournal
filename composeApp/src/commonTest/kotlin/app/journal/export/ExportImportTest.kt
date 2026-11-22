@@ -235,6 +235,42 @@ class ExportImportTest {
     }
 
     @Test
+    fun fullJournalImportRejectsUnboundedReferenceTables() {
+        val ts = 1_700_000_000_000L
+        val base = AppJson.json.decodeFromString<JournalSnapshot>(
+            ExportImport.exportFullJournal(JournalRepository())
+        )
+
+        val substances = List(ExportImport.MAX_IMPORT_SUBSTANCES + 1) { i ->
+            Substance(
+                id = "sub:$i", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+                name = "Substance $i", cachedAt = 0L, sourceVersion = "test",
+            )
+        }
+        val substanceTarget = JournalRepository()
+        val substanceResult = ExportImport.importFullJournal(
+            substanceTarget,
+            AppJson.json.encodeToString(base.copy(substances = substances)),
+        )
+        assertNotNull(substanceResult.error, "an oversized substance list must be refused")
+        assertTrue(substanceTarget.substances.value.isEmpty(), "nothing may be applied")
+
+        val interactions = List(ExportImport.MAX_IMPORT_INTERACTIONS + 1) { i ->
+            Interaction(
+                id = "i:$i", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+                substanceAId = "sub:a", substanceBId = "sub:b", riskLevel = InteractionRisk.LOW,
+            )
+        }
+        val interactionTarget = JournalRepository()
+        val interactionResult = ExportImport.importFullJournal(
+            interactionTarget,
+            AppJson.json.encodeToString(base.copy(interactions = interactions)),
+        )
+        assertNotNull(interactionResult.error, "an oversized interaction list must be refused")
+        assertTrue(interactionTarget.interactions.value.isEmpty(), "nothing may be applied")
+    }
+
+    @Test
     fun fullJournalImportAcceptsAUtf8Bom() {        val source = JournalRepository()
         source.upsertSession(sampleSession("s:bom"))
         val json = ExportImport.exportFullJournal(source)

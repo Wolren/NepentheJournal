@@ -34,6 +34,10 @@ object ExportImport {
     /** A real medication list is short; the cap bounds import-driven UI and pair cost. */
     const val MAX_IMPORT_MEDICATIONS = 200
 
+    /** Reference tables are imported wholesale; a real library stays far below these. */
+    const val MAX_IMPORT_SUBSTANCES = 20_000
+    const val MAX_IMPORT_INTERACTIONS = 20_000
+
     const val MAX_IMPORT_FIELD_LEN = 65536
     const val MAX_IMPORT_TITLE_LEN = 500
     const val MAX_IMPORT_LABEL_LEN = 200
@@ -222,6 +226,16 @@ object ExportImport {
         if (snapshot.medications.size > MAX_IMPORT_MEDICATIONS) {
             return FullJournalImportResult(
                 error = "Too many medications in backup (max $MAX_IMPORT_MEDICATIONS)"
+            )
+        }
+        if (snapshot.substances.size > MAX_IMPORT_SUBSTANCES) {
+            return FullJournalImportResult(
+                error = "Too many substances in backup (max $MAX_IMPORT_SUBSTANCES)"
+            )
+        }
+        if (snapshot.interactions.size > MAX_IMPORT_INTERACTIONS) {
+            return FullJournalImportResult(
+                error = "Too many interactions in backup (max $MAX_IMPORT_INTERACTIONS)"
             )
         }
 
