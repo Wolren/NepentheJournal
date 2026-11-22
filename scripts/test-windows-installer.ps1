@@ -11,7 +11,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Msi,
     [string]$InstallDir = '',
     [string]$ProductName = 'Nepenthe Journal',
-    [int]$LaunchSeconds = 25
+    [int]$LaunchSeconds = 25,
+    [string]$ExpectedVersion = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +79,13 @@ if (-not (Test-Path $Msi)) { throw "MSI not found: $Msi" }
 $Msi = (Resolve-Path $Msi).Path
 Write-Output "MSI: $Msi"
 
+# jpackage names the file <name>-<version>.msi; the ARP entry must carry that same version.
+if (-not $ExpectedVersion) {
+    if ($Msi -match '-([0-9]+(?:\.[0-9]+)*)\.msi$') { $ExpectedVersion = $Matches[1] }
+    else { throw "Cannot derive the expected version from $Msi; pass -ExpectedVersion" }
+}
+Write-Output "expected version: $ExpectedVersion"
+
 try {
     Write-Output "=== install ==="
     $installExit = Run-Msi "/i `"$Msi`" /qn /norestart /l*v `"$installLog`""
@@ -112,7 +120,7 @@ try {
             Fail "no uninstall entry named $ProductName"
         } else {
             Write-Output "ok DisplayVersion=$($arp.DisplayVersion) Publisher=$($arp.Publisher)"
-            if ($arp.DisplayVersion -ne '0.1.0') { Fail "DisplayVersion is $($arp.DisplayVersion), expected 0.1.0" }
+            if ($arp.DisplayVersion -ne $ExpectedVersion) { Fail "DisplayVersion is $($arp.DisplayVersion), expected $ExpectedVersion" }
             if ($arp.Publisher -ne 'Wolren') { Fail "Publisher is $($arp.Publisher), expected Wolren" }
         }
 
