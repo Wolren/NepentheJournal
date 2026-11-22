@@ -1,6 +1,7 @@
 package app.journal.ui.theme
 
 import app.journal.util.PlatformFile
+import app.journal.util.stripUtf8Bom
 import kotlinx.serialization.json.Json
 
 /** Persists the theme so a restart keeps the chosen palette and typography. */
@@ -9,12 +10,9 @@ object ThemeStore {
 
     private fun path(): String = "${PlatformFile.dataDir()}/theme.json"
 
-    /** Windows editors prepend a UTF-8 BOM; it is not part of the JSON document. */
-    private fun stripBom(text: String): String = text.removePrefix("\uFEFF")
-
     fun load(): ThemeConfig? = try {
         if (PlatformFile.size(path()) < 0) null
-        else json.decodeFromString(ThemeConfig.serializer(), stripBom(PlatformFile.readText(path())))
+        else json.decodeFromString(ThemeConfig.serializer(), stripUtf8Bom(PlatformFile.readText(path())))
     } catch (_: Exception) {
         null
     }
@@ -30,7 +28,7 @@ object ThemeStore {
     fun encode(config: ThemeConfig): String = json.encodeToString(ThemeConfig.serializer(), config)
 
     fun decode(text: String): ThemeConfig? = try {
-        json.decodeFromString(ThemeConfig.serializer(), text.removePrefix("\uFEFF"))
+        json.decodeFromString(ThemeConfig.serializer(), stripUtf8Bom(text))
     } catch (_: Exception) {
         null
     }
@@ -38,7 +36,7 @@ object ThemeStore {
     fun loadPresets(): List<ThemePreset> = try {
         val file = "${PlatformFile.dataDir()}/theme-presets.json"
         if (PlatformFile.size(file) < 0) emptyList()
-        else json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ThemePreset.serializer()), stripBom(PlatformFile.readText(file)))
+        else json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ThemePreset.serializer()), stripUtf8Bom(PlatformFile.readText(file)))
     } catch (_: Exception) {
         emptyList()
     }

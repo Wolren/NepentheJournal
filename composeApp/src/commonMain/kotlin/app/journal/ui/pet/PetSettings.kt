@@ -59,7 +59,10 @@ object PetStore {
 
     fun load(): PetSettings = try {
         if (PlatformFile.size(path()) < 0) PetSettings()
-        else json.decodeFromString(PetSettings.serializer(), PlatformFile.readText(path()))
+        else json.decodeFromString(
+            PetSettings.serializer(),
+            app.journal.util.stripUtf8Bom(PlatformFile.readText(path())),
+        )
     } catch (_: Exception) {
         PetSettings()
     }

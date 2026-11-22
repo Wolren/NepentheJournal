@@ -79,7 +79,10 @@ object KeybindStore {
 
     fun load(): KeybindSettings = try {
         if (PlatformFile.size(path()) < 0) KeybindSettings()
-        else json.decodeFromString(KeybindSettings.serializer(), PlatformFile.readText(path()))
+        else json.decodeFromString(
+            KeybindSettings.serializer(),
+            app.journal.util.stripUtf8Bom(PlatformFile.readText(path())),
+        )
     } catch (_: Exception) {
         KeybindSettings()
     }

@@ -10,6 +10,7 @@ import app.journal.model.Session
 import app.journal.serde.AppJson
 import app.journal.sync.EntityTimePolicy
 import app.journal.util.currentTimeMillis
+import app.journal.util.stripUtf8Bom
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 
@@ -125,16 +126,13 @@ object ExportImport {
     fun importSessions(repo: IJournalRepository, content: String): Int =
         importSessionsDetailed(repo, content).count
 
-    /** Notepad and Excel save UTF-8 with a BOM; the foreign importers strip it, so these do too. */
-    private fun stripBom(content: String): String = content.removePrefix("\uFEFF")
-
     /**
      * [importSessions] with a clear result: every rejection path (size cap,
      * parse failure, version mismatch, session cap) returns a user-facing
      * error instead of a bare 0 that is indistinguishable from "0 valid".
      */
     fun importSessionsDetailed(repo: IJournalRepository, content: String): ImportResult {
-        val text = stripBom(content)
+        val text = stripUtf8Bom(content)
         if (text.length > MAX_IMPORT_BYTES) {
             return ImportResult(0, "Import file too large (max 50 MB)")
         }
@@ -197,7 +195,7 @@ object ExportImport {
      * records are dropped, and the list is capped by [MAX_IMPORT_MEDICATIONS].
      */
     fun importFullJournal(repo: IJournalRepository, content: String): FullJournalImportResult {
-        val text = stripBom(content)
+        val text = stripUtf8Bom(content)
         if (text.length > MAX_IMPORT_BYTES) {
             return FullJournalImportResult(error = "Backup file too large (max 50 MB)")
         }
