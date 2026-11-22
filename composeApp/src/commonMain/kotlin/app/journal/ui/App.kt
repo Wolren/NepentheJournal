@@ -45,6 +45,8 @@ fun App(repo: IJournalRepository = JournalRepository.instance) {
 
     DisposableEffect(Unit) {
         onDispose {
+            // A debounced theme write must land before the process exits.
+            themeManager.flushPendingSave()
             // Backing up without saving would copy a file up to 2s stale and silently drop the last edits (audit S2).
             journalStore.save()
             if (repo.autoBackupOnClose.value) journalStore.triggerAutoBackup()

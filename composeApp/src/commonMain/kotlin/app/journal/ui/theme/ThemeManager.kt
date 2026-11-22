@@ -33,6 +33,11 @@ class ThemeManager private constructor() {
         saveCoalescer.request(newConfig)
     }
 
+    /** Write a still-pending theme change now, so a quick quit does not lose the last drag. */
+    internal fun flushPendingSave() {
+        saveCoalescer.flush()
+    }
+
     /** Loads the saved theme once at startup; tests keep the in-memory default. */
     fun restore() {
         val saved = ThemeStore.load() ?: return

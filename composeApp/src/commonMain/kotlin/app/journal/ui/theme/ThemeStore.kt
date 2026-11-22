@@ -9,9 +9,12 @@ object ThemeStore {
 
     private fun path(): String = "${PlatformFile.dataDir()}/theme.json"
 
+    /** Windows editors prepend a UTF-8 BOM; it is not part of the JSON document. */
+    private fun stripBom(text: String): String = text.removePrefix("\uFEFF")
+
     fun load(): ThemeConfig? = try {
         if (PlatformFile.size(path()) < 0) null
-        else json.decodeFromString(ThemeConfig.serializer(), PlatformFile.readText(path()))
+        else json.decodeFromString(ThemeConfig.serializer(), stripBom(PlatformFile.readText(path())))
     } catch (_: Exception) {
         null
     }
@@ -27,7 +30,7 @@ object ThemeStore {
     fun encode(config: ThemeConfig): String = json.encodeToString(ThemeConfig.serializer(), config)
 
     fun decode(text: String): ThemeConfig? = try {
-        json.decodeFromString(ThemeConfig.serializer(), text)
+        json.decodeFromString(ThemeConfig.serializer(), text.removePrefix("\uFEFF"))
     } catch (_: Exception) {
         null
     }
@@ -35,7 +38,7 @@ object ThemeStore {
     fun loadPresets(): List<ThemePreset> = try {
         val file = "${PlatformFile.dataDir()}/theme-presets.json"
         if (PlatformFile.size(file) < 0) emptyList()
-        else json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ThemePreset.serializer()), PlatformFile.readText(file))
+        else json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(ThemePreset.serializer()), stripBom(PlatformFile.readText(file)))
     } catch (_: Exception) {
         emptyList()
     }
