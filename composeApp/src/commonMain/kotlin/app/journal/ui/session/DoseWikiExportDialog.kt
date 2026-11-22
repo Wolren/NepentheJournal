@@ -11,6 +11,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +48,16 @@ fun DoseWikiExportDialog(
     onStatus: (String) -> Unit
 ) {
     val session = remember(sessionId) { repo.getSession(sessionId) }
-    if (session == null) { onDismiss(); return }
+    if (session == null) {
+        LaunchedEffect(Unit) { onDismiss() }
+        return
+    }
     val person = remember(session) { session.personId?.let { repo.getPerson(it) } }
     val doses = remember(sessionId) { repo.dosesForSession(sessionId) }
     val notes = remember(sessionId) { repo.notesForSession(sessionId) }
     val events = remember(sessionId) { repo.eventsForSession(sessionId) }
-    val substancesById = remember {
-        repo.substances.value.associateBy { it.id }
-    }
+    // The library can finish loading while the dialog is open; a one-shot read would block export.
+    val substancesById by repo.substancesById.collectAsState(initial = emptyMap())
 
     var email by remember { mutableStateOf(person?.contactEmail ?: "") }
 
@@ -70,7 +74,7 @@ fun DoseWikiExportDialog(
         ageConfirmed = false
     )
 
-    val check = remember(email) { preview().check() }
+    val check = remember(email, substancesById) { preview().check() }
     val contentErrors = check.errors.filter {
         it != DoseWikiTripReport.ERR_CONSENT && it != DoseWikiTripReport.ERR_AGE
     }
