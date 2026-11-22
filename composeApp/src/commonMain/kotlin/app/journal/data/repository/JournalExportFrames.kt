@@ -36,7 +36,7 @@ internal class JournalExportFrames(
         val subNameCache = substancesStore.all.associate { it.id to it.name }
         sessionsStore.all.map { session ->
             val sessionDoses = indices._dosesBySession[session.id]?.toList() ?: emptyList()
-            val subNames = sessionDoses.mapNotNull { subNameCache[it.substanceId] }.distinct()
+            val subNames = sessionDoses.map { subNameCache[it.substanceId] ?: "unknown" }.distinct()
             val dt = Instant.fromEpochMilliseconds(session.startTime)
                 .toLocalDateTime(TimeZone.currentSystemDefault())
             val endDt = session.endTime?.let {

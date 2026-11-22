@@ -105,7 +105,7 @@ object ObsidianExportManager {
         config: ObsidianExportConfig
     ): String? {
         val doses = repo.dosesForSession(session.id)
-        val notes = repo.notes.value.filter { it.sessionId == session.id }
+        val notes = repo.notesForSession(session.id)
         val events = repo.eventsForSession(session.id)
 
         val substanceNameResolver: (String) -> String? = { substanceId ->

@@ -72,8 +72,21 @@ class CsvExporterTest {
     }
 
     @Test
-    fun exportSessionsCsvEmptyRepo() {
+    fun sessionsCsvNamesADanglingSubstanceAsUnknown() {
         val repo = JournalRepository()
+        repo.upsertSession(sampleSession("s:1"))
+        repo.upsertDose(sampleDose("d:1", "s:1", "sub:missing"))
+
+        val sessions = CsvExporter.exportSessionsCsv(repo).trimEnd().split("\n")
+        val row = sessions[1].split(",")
+        assertEquals("unknown", row[15],
+            "the sessions row must name a dangling dose the same way the dose row does")
+        assertTrue(CsvExporter.exportDosesCsv(repo).contains("unknown"),
+            "the dose row already falls back to unknown")
+    }
+
+    @Test
+    fun exportSessionsCsvEmptyRepo() {        val repo = JournalRepository()
         val csv = CsvExporter.exportSessionsCsv(repo)
         val lines = csv.trimEnd().split("\n")
 
