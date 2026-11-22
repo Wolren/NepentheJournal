@@ -6,6 +6,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,10 +24,13 @@ class ThemeManager private constructor() {
     private var cachedDarkScheme: ColorScheme? = null
     private var cachedLightScheme: ColorScheme? = null
 
+    private val saveScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val saveCoalescer = ThemeSaveCoalescer({ cfg -> ThemeStore.save(cfg) }, saveScope)
+
     fun update(newConfig: ThemeConfig) {
         _config.value = newConfig
         cachedConfigHash = 0
-        ThemeStore.save(newConfig)
+        saveCoalescer.request(newConfig)
     }
 
     /** Loads the saved theme once at startup; tests keep the in-memory default. */
