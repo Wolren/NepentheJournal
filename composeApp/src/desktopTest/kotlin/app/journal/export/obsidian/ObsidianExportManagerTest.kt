@@ -179,4 +179,34 @@ class ObsidianExportManagerTest {
 
         assertTrue(result.errors.any { it.contains("outside") }, "errors: ${result.errors}")
     }
+
+    @Test
+    fun exportDoesNotOverwriteAHandWrittenNoteThatOwnsTheFileName() {
+        val repo = JournalRepository()
+        populateRepo(repo)
+        val first = ObsidianExportManager.exportSession(repo, "s:1", config())
+        assertNotNull(first)
+        val foreign = "# My own notes\n\nI wrote this by hand.\n"
+        File(first).writeText(foreign)
+
+        val second = ObsidianExportManager.exportSession(repo, "s:1", config())
+
+        assertNotNull(second)
+        assertNotEquals(first, second, "a hand-written note must keep its path")
+        assertEquals(foreign, File(first).readText(), "the hand-written note must stay intact")
+        assertTrue(File(second).readText().contains("```nepenthe"),
+            "the export must land in a new file that carries the canonical block")
+    }
+
+    @Test
+    fun exportReusesThePathOfItsOwnNote() {
+        val repo = JournalRepository()
+        populateRepo(repo)
+
+        val first = ObsidianExportManager.exportSession(repo, "s:1", config())
+        val second = ObsidianExportManager.exportSession(repo, "s:1", config())
+
+        assertNotNull(first)
+        assertEquals(first, second, "a re-export must update the app's own note, not duplicate it")
+    }
 }

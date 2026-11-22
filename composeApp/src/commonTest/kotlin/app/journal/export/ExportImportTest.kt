@@ -189,4 +189,30 @@ class ExportImportTest {
         assertEquals(1, target.sessions.value.size)
         assertEquals("My Blend", target.substances.value.first { it.id == "dw:mine" }.name)
     }
+
+    @Test
+    fun fullJournalImportAcceptsAUtf8Bom() {
+        val source = JournalRepository()
+        source.upsertSession(sampleSession("s:bom"))
+        val json = ExportImport.exportFullJournal(source)
+
+        val target = JournalRepository()
+        val result = ExportImport.importFullJournal(target, "\uFEFF$json")
+
+        assertNull(result.error, "a UTF-8 BOM must not make a valid backup unreadable: ${result.error}")
+        assertEquals(1, target.sessions.value.size)
+    }
+
+    @Test
+    fun sessionBundleImportAcceptsAUtf8Bom() {
+        val source = JournalRepository()
+        source.upsertSession(sampleSession("s:bom2"))
+        val json = ExportImport.exportSessions(source)
+
+        val target = JournalRepository()
+        val count = ExportImport.importSessions(target, "\uFEFF$json")
+
+        assertEquals(1, count, "a UTF-8 BOM must not make a valid session bundle unreadable")
+        assertEquals("s:bom2", target.sessions.value.first().id)
+    }
 }

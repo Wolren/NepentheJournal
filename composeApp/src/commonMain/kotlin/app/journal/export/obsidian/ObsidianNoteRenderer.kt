@@ -149,7 +149,8 @@ fun renderSessionToObsidianNote(
             appendLine("| ---- | --------- | ----- | ------ | ------- | ----- |")
             for (dose in doses.sortedBy { it.timestamp }) {
                 val doseTime = formatTime(dose.timestamp)
-                val subName = substanceNameResolver(dose.substanceId) ?: dose.substanceId
+                val subName = substanceNameResolver(dose.substanceId)?.takeIf { it.isNotBlank() }
+                    ?: "Unknown substance (${dose.substanceId})"
                 val subLink = "[[${subName.replace("[", "").replace("]", "")}]]"
                 val amt = formatAmount(dose.amount, dose.unit)
                 val stomach = dose.stomachFullness?.label ?: "\u2014"
@@ -316,5 +317,6 @@ internal fun formatDurationHours(start: Long, end: Long): Double {
 
 internal fun formatAmount(amount: Double, unit: String): String {
     val amtStr = if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
-    return "$amtStr $unit"
+    val trimmedUnit = unit.trim()
+    return if (trimmedUnit.isEmpty()) amtStr else "$amtStr $trimmedUnit"
 }

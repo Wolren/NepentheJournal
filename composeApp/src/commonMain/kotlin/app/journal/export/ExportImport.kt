@@ -125,17 +125,21 @@ object ExportImport {
     fun importSessions(repo: IJournalRepository, content: String): Int =
         importSessionsDetailed(repo, content).count
 
+    /** Notepad and Excel save UTF-8 with a BOM; the foreign importers strip it, so these do too. */
+    private fun stripBom(content: String): String = content.removePrefix("\uFEFF")
+
     /**
      * [importSessions] with a clear result: every rejection path (size cap,
      * parse failure, version mismatch, session cap) returns a user-facing
      * error instead of a bare 0 that is indistinguishable from "0 valid".
      */
     fun importSessionsDetailed(repo: IJournalRepository, content: String): ImportResult {
-        if (content.length > MAX_IMPORT_BYTES) {
+        val text = stripBom(content)
+        if (text.length > MAX_IMPORT_BYTES) {
             return ImportResult(0, "Import file too large (max 50 MB)")
         }
         val bundle = try {
-            json.decodeFromString<SessionExportBundle>(content)
+            json.decodeFromString<SessionExportBundle>(text)
         } catch (e: Exception) {
             return ImportResult(0, "Not a valid session export file")
         }
@@ -193,11 +197,12 @@ object ExportImport {
      * records are dropped, and the list is capped by [MAX_IMPORT_MEDICATIONS].
      */
     fun importFullJournal(repo: IJournalRepository, content: String): FullJournalImportResult {
-        if (content.length > MAX_IMPORT_BYTES) {
+        val text = stripBom(content)
+        if (text.length > MAX_IMPORT_BYTES) {
             return FullJournalImportResult(error = "Backup file too large (max 50 MB)")
         }
         val snapshot = try {
-            json.decodeFromString<JournalSnapshot>(content)
+            json.decodeFromString<JournalSnapshot>(text)
         } catch (e: Exception) {
             return FullJournalImportResult(error = "Not a valid full-journal backup file")
         }

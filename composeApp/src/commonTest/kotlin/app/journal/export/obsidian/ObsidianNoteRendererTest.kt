@@ -278,4 +278,36 @@ class ObsidianNoteRendererTest {
         assertTrue(first.fileName.contains("test-123"), "the session id must stay in the name")
         assertNotEquals(first.fileName, second.fileName, "two sessions must not collide")
     }
+
+    @Test
+    fun aDoseWithABlankUnitCarriesNoTrailingSpace() {
+        assertEquals("100", formatAmount(100.0, ""), "a blank unit must not leave a trailing space")
+        assertEquals("100", formatAmount(100.0, "  "), "a whitespace unit counts as blank")
+        assertEquals("100 ug", formatAmount(100.0, "ug"))
+    }
+
+    @Test
+    fun aDoseForAMissingSubstanceRendersAReadablePlaceholder() {
+        val note = renderSessionToObsidianNote(
+            session = sampleSession(),
+            doses = listOf(
+                Dose(
+                    id = "d:dangling", createdAt = 1000L, updatedAt = 1000L,
+                    deviceOrigin = "test", sessionId = "s:test-123",
+                    substanceId = "sub:deleted", routeOfAdministration = "Oral",
+                    amount = 20.0, unit = "mg", timestamp = 1720728000000L,
+                )
+            ),
+            notes = emptyList(), timelineEvents = emptyList(),
+            substanceNameResolver = { null },
+        )
+        assertFalse(
+            note.content.contains("[[sub:deleted]]"),
+            "an internal id must not be rendered as a substance wikilink",
+        )
+        assertTrue(
+            note.content.contains("Unknown substance"),
+            "a dangling dose needs a readable placeholder, got:\n${note.content.take(1_500)}",
+        )
+    }
 }

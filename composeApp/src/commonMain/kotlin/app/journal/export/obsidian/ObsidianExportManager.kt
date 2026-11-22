@@ -139,9 +139,32 @@ object ObsidianExportManager {
         }
 
         ObsidianVaultOps.ensureDir(dir)
-        val filePath = "$dir/${note.fileName}"
+        val filePath = "$dir/${chooseNoteFileName(dir, note.fileName)}"
         ObsidianVaultOps.writeFile(filePath, note.content)
         return filePath
+    }
+
+    /**
+     * The vault is the user's space: overwrite only a note that carries our
+     * canonical block. A hand-written note that happens to own the name keeps
+     * it, and the export lands on a numbered sibling instead.
+     */
+    private fun chooseNoteFileName(dir: String, fileName: String): String {
+        val existing = runCatching { ObsidianVaultOps.listMdFiles(dir) }.getOrDefault(emptyList())
+        fun baseName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
+        val names = existing.map(::baseName).toSet()
+        if (fileName !in names) return fileName
+        val target = existing.firstOrNull { baseName(it) == fileName }
+        val isOurs = target?.let { path ->
+            runCatching { ObsidianVaultOps.readFile(path) }.getOrNull()?.contains(BLOCK_OPEN) == true
+        } ?: false
+        if (isOurs) return fileName
+        val stem = fileName.removeSuffix(".md")
+        for (suffix in 2..999) {
+            val candidate = "$stem ($suffix).md"
+            if (candidate !in names) return candidate
+        }
+        throw IllegalStateException("No free note name beside $fileName")
     }
 
     private fun isInsideVault(vaultPath: String, candidate: String): Boolean {
