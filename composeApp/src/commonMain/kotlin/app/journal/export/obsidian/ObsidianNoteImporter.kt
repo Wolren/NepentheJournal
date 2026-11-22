@@ -83,7 +83,7 @@ object ObsidianNoteImporter {
 
             try {
                 val session = block.session
-                val matched = findMatchingSession(repo, session.startTime, session.title)
+                val matched = findMatchingSession(repo, session)
 
                 if (matched != null) {
                     val updatedSession = session.copy(
@@ -120,16 +120,15 @@ object ObsidianNoteImporter {
     }
 
     /**
-     * Find an existing session matching (startTime, title).
-     * Used instead of fragile internal IDs so the user can rename notes in Obsidian.
+     * Find the session a block belongs to. The exported block carries the
+     * session id, so an exact id wins even when another session shares the
+     * same start time and title. The (startTime, title) match stays for notes
+     * whose session was re-created with a new id.
      */
-    private fun findMatchingSession(
-        repo: IJournalRepository,
-        startTime: Long,
-        title: String
-    ): Session? {
+    private fun findMatchingSession(repo: IJournalRepository, session: Session): Session? {
+        repo.getSession(session.id)?.let { return it }
         return repo.sessions.value.find { s ->
-            s.startTime == startTime && s.title == title
+            s.startTime == session.startTime && s.title == session.title
         }
     }
 
@@ -220,6 +219,27 @@ object ObsidianNoteImporter {
         }
         if (session.endTime != null && session.endTime !in MIN_VALID_TIMESTAMP..maxTimestamp) {
             errors.add("endTime ${session.endTime} out of valid range")
+        }
+        if (session.title.length > SyncLimits.MAX_TITLE_LEN) {
+            errors.add("session title too long (${session.title.length})")
+        }
+        val fields = listOf(
+            "set" to session.set,
+            "setting" to session.setting,
+            "intention" to session.intention,
+            "outcome" to session.outcome,
+            "notes" to session.notes,
+            "freeform" to session.freeform,
+        )
+        fields.forEach { (name, value) ->
+            if ((value?.length ?: 0) > SyncLimits.MAX_FIELD_LEN) {
+                errors.add("session $name too long (${value?.length})")
+            }
+        }
+        if (session.rating != null &&
+            (session.rating < SyncLimits.MIN_SESSION_RATING || session.rating > SyncLimits.MAX_SESSION_RATING)
+        ) {
+            errors.add("session rating ${session.rating} out of range")
         }
 
         if (block.doses.size > MAX_DOSES_PER_SESSION) {

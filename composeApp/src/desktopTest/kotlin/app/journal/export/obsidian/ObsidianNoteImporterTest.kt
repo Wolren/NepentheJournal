@@ -237,4 +237,66 @@ this is not json
             "a rewrite must not record deletes for ids it immediately re-creates: $childTombstones",
         )
     }
+
+    @Test
+    fun importUsesTheBlockSessionIdToPickBetweenIdenticalSessions() {
+        val repo = JournalRepository()
+        repo.upsertSession(Session(
+            id = "s:first", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Deep Dive", startTime = 1720800000000L, outcome = "first outcome",
+        ))
+        repo.upsertSession(Session(
+            id = "s:second", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+            title = "Deep Dive", startTime = 1720800000000L, outcome = "second outcome",
+        ))
+        val now = System.currentTimeMillis()
+        val block = """
+```nepenthe
+{"session":{"id":"s:second","docType":"session","createdAt":$now,"updatedAt":$now,"deviceOrigin":"obsidian-import","title":"Deep Dive","startTime":1720800000000,"outcome":"from vault"},"doses":[],"notes":[],"timelineEvents":[],"exportedAt":$now,"version":1}
+```
+""".trimIndent()
+        writeMdFile("Nepenthe", "second.md", block)
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertEquals(1, result.updated, "the note must update the session its block names: $result")
+        assertEquals("from vault", repo.getSession("s:second")?.outcome)
+        assertEquals("first outcome", repo.getSession("s:first")?.outcome,
+            "a same-time same-title sibling must keep its own content")
+    }
+
+    @Test
+    fun importRejectsAnOverLongSessionTitle() {
+        val repo = JournalRepository()
+        val longTitle = "T".repeat(501)
+        writeMdFile(
+            "Nepenthe",
+            "long-title.md",
+            canonicalBlock.replace("\"title\":\"Deep Dive\"", "\"title\":\"$longTitle\""),
+        )
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertTrue(result.errors.isNotEmpty(), "an over-long session title must be rejected, got $result")
+        assertTrue(repo.sessions.value.isEmpty())
+    }
+
+    @Test
+    fun importRejectsAnOverLongSessionField() {
+        val repo = JournalRepository()
+        val longIntention = "i".repeat(70_000)
+        writeMdFile(
+            "Nepenthe",
+            "long-field.md",
+            canonicalBlock.replace(
+                "\"startTime\":1720800000000",
+                "\"startTime\":1720800000000,\"intention\":\"$longIntention\"",
+            ),
+        )
+
+        val result = ObsidianNoteImporter.importFromVault(repo, "${testDir.absolutePath}/Nepenthe")
+
+        assertTrue(result.errors.isNotEmpty(), "an over-long session field must be rejected, got $result")
+        assertTrue(repo.sessions.value.isEmpty())
+    }
 }

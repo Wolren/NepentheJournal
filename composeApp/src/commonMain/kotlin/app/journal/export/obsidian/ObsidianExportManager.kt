@@ -151,20 +151,11 @@ object ObsidianExportManager {
      */
     private fun chooseNoteFileName(dir: String, fileName: String): String {
         val existing = runCatching { ObsidianVaultOps.listMdFiles(dir) }.getOrDefault(emptyList())
-        fun baseName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
-        val names = existing.map(::baseName).toSet()
-        if (fileName !in names) return fileName
-        val target = existing.firstOrNull { baseName(it) == fileName }
-        val isOurs = target?.let { path ->
-            runCatching { ObsidianVaultOps.readFile(path) }.getOrNull()?.contains(BLOCK_OPEN) == true
-        } ?: false
-        if (isOurs) return fileName
-        val stem = fileName.removeSuffix(".md")
-        for (suffix in 2..999) {
-            val candidate = "$stem ($suffix).md"
-            if (candidate !in names) return candidate
-        }
-        throw IllegalStateException("No free note name beside $fileName")
+        return chooseNoteFileName(
+            fileName = fileName,
+            existingPaths = existing,
+            readContent = { path -> runCatching { ObsidianVaultOps.readFile(path) }.getOrNull() },
+        )
     }
 
     private fun isInsideVault(vaultPath: String, candidate: String): Boolean {
@@ -172,4 +163,29 @@ object ObsidianExportManager {
         val path = ObsidianVaultOps.normalizePath(candidate)
         return path == root || path.startsWith("$root/") || path.startsWith("$root\\")
     }
+}
+
+/**
+ * Name choice for one exported note. [readContent] returns the current text of
+ * an existing file, or null when it cannot be read. Names compare
+ * case-insensitively because a case-only variant is the same file on Windows
+ * and macOS. An own note keeps its existing spelling so it is not forked.
+ */
+internal fun chooseNoteFileName(
+    fileName: String,
+    existingPaths: List<String>,
+    readContent: (String) -> String?,
+): String {
+    fun baseName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
+    val target = existingPaths.firstOrNull { baseName(it).equals(fileName, ignoreCase = true) }
+        ?: return fileName
+    val isOurs = readContent(target)?.contains(BLOCK_OPEN) == true
+    if (isOurs) return baseName(target)
+    val takenLowercase = existingPaths.map { baseName(it).lowercase() }.toSet()
+    val stem = fileName.removeSuffix(".md")
+    for (suffix in 2..999) {
+        val candidate = "$stem ($suffix).md"
+        if (candidate.lowercase() !in takenLowercase) return candidate
+    }
+    throw IllegalStateException("No free note name beside $fileName")
 }
