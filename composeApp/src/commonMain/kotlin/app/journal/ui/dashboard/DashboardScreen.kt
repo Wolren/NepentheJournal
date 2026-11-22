@@ -51,7 +51,17 @@ fun DashboardScreen(
     val showTopSubstances by repo.dashboardTopSubstances.collectAsState()
 
     val toleranceVersion by repo.toleranceVersion.collectAsState()
-    val toleranceAll = remember(toleranceVersion) { viewModel.toleranceCalculator.calculate() }
+    // Tolerance thresholds are day boundaries; a minute tick keeps the displayed level honest.
+    var toleranceMinute by remember { mutableStateOf(currentTimeMillis() / 60_000L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L)
+            toleranceMinute = currentTimeMillis() / 60_000L
+        }
+    }
+    val toleranceAll = remember(toleranceVersion, toleranceMinute) {
+        viewModel.toleranceCalculator.calculate(now = toleranceMinute * 60_000L)
+    }
     val toleranceList = remember(toleranceAll) {
         val nonNone = toleranceAll.filter { it.level != ToleranceLevel.NONE }
         val noneCapped = toleranceAll.filter { it.level == ToleranceLevel.NONE }.take(5)

@@ -47,6 +47,8 @@ fun toleranceLevelFor(daysSinceLastDose: Double, dosesLast30Days: Int): Toleranc
 class ToleranceCalculator(private val repo: IJournalRepository) {
 
     private var cachedVersion: Int = -1
+    private var cachedNowBucket: Long = Long.MIN_VALUE
+    private var cachedUntil: Long = Long.MIN_VALUE
     private var cachedResult: List<ToleranceInfo> = emptyList()
     private var hasCached: Boolean = false
 
@@ -58,16 +60,22 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
      * @param until Optional upper bound: doses after this timestamp are ignored,
      *            so callers can reconstruct what tolerance looked like at a past
      *            moment instead of mixing in doses that hadn't happened yet.
+     *            The reconstruction moment is [until] when it is in the past.
      */
     fun calculate(now: Long = currentTimeMillis(), until: Long = Long.MAX_VALUE): List<ToleranceInfo> {
         val currentVersion = repo.toleranceVersion.value
-        if (currentVersion == cachedVersion && hasCached) {
+        val nowBucket = now / MINUTE_MS
+        if (currentVersion == cachedVersion && hasCached &&
+            nowBucket == cachedNowBucket && until == cachedUntil
+        ) {
             return cachedResult
         }
 
         val dayMs = 86400000L
+        // A past bound is the reconstruction moment, not the live clock.
+        val reference = if (until < now) until else now
 
-        val cutoff = now - 45L * dayMs
+        val cutoff = reference - 45L * dayMs
         val recentDoses = repo.doses.value.filter { it.timestamp > cutoff && it.timestamp <= until }
 
         val dosesBySubstance = recentDoses.groupBy { it.substanceId }
@@ -77,11 +85,11 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
             val sorted = doses.sortedByDescending { it.timestamp }
             val mostRecent = sorted.first()
 
-            val elapsedMs = now - mostRecent.timestamp
+            val elapsedMs = reference - mostRecent.timestamp
             val daysSince = elapsedMs / (dayMs.toDouble())
             val hoursSince = elapsedMs / 3600000L
 
-            val dosesLast30Days = sorted.count { now - it.timestamp < 30L * dayMs }
+            val dosesLast30Days = sorted.count { reference - it.timestamp < 30L * dayMs }
 
             val level = toleranceLevelFor(daysSince, dosesLast30Days)
 
@@ -101,12 +109,17 @@ class ToleranceCalculator(private val repo: IJournalRepository) {
         }.sortedBy { it.daysSinceLastDose }
 
         cachedVersion = currentVersion
+        cachedNowBucket = nowBucket
+        cachedUntil = until
         cachedResult = result
         hasCached = true
         return result
     }
 
     companion object {
+        /** The cache refreshes at most once per minute, so a clock tick is not cached forever. */
+        private const val MINUTE_MS = 60_000L
+
         /**
          * Convenience for one-shot calculations (tests, quick lookups).
          * Prefer creating an instance and keeping it alive when caching matters.

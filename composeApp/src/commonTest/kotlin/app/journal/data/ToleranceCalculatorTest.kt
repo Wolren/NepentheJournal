@@ -183,4 +183,55 @@ class ToleranceCalculatorTest {
         assertEquals(ToleranceLevel.NONE, info.level)
         assertEquals(0, info.totalDosesLast30Days)
     }
+
+    @Test
+    fun aNewReferenceInstantIsNotServedFromTheCache() {
+        val now = 1_700_000_000_000L
+        val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - (6.9 * dayMs).toLong()))
+        val calculator = ToleranceCalculator(repo)
+
+        val first = calculator.calculate(now = now).single()
+        assertEquals(ToleranceLevel.MEDIUM, first.level)
+
+        val later = calculator.calculate(now = now + 6 * 3_600_000L).single()
+        assertEquals(
+            ToleranceLevel.LOW,
+            later.level,
+            "the level must follow the reference instant, not the cached result",
+        )
+    }
+
+    @Test
+    fun aDifferentUntilIsNotServedFromTheCache() {
+        val now = 1_700_000_000_000L
+        val repo = makeRepoWithDoses("sub:1", "LSD", listOf(now - 10 * dayMs, now - dayMs))
+        val calculator = ToleranceCalculator(repo)
+
+        val all = calculator.calculate(now = now, until = now).single()
+        assertEquals(now - dayMs, all.lastDoseTimestamp)
+
+        val past = calculator.calculate(now = now, until = now - 5 * dayMs).single()
+        assertEquals(
+            now - 10 * dayMs,
+            past.lastDoseTimestamp,
+            "a past window must not reuse the newer result",
+        )
+        assertEquals(1, past.totalDosesLast30Days)
+    }
+
+    @Test
+    fun untilReconstructsElapsedFromTheReconstructionMoment() {
+        val now = 1_700_000_000_000L
+        val doseTs = now - 10 * dayMs
+        val repo = makeRepoWithDoses("sub:1", "LSD", listOf(doseTs))
+        val calculator = ToleranceCalculator(repo)
+
+        val past = calculator.calculate(now = now, until = doseTs + 3_600_000L).single()
+
+        assertTrue(
+            past.daysSinceLastDose < 1.0,
+            "elapsed must be measured to the reconstruction moment, got ${past.daysSinceLastDose}",
+        )
+        assertEquals(ToleranceLevel.MEDIUM, past.level)
+    }
 }
