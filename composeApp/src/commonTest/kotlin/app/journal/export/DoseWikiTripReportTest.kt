@@ -77,8 +77,7 @@ private fun events() = listOf(
 class DoseWikiTripReportTest {
 
     @Test
-    fun aDanglingDoseIsWarnedAboutAndNotSerialized() {
-        val dangling = doses().map { it.copy(substanceId = "sub:missing") }
+    fun aDanglingDoseIsWarnedAboutAndNotSerialized() {        val dangling = doses().map { it.copy(substanceId = "sub:missing") }
         val report = buildDoseWikiReport(
             session(), person(), dangling, substances(),
             publishConsent = true, ageConfirmed = true
@@ -97,7 +96,36 @@ class DoseWikiTripReportTest {
     }
 
     @Test
-    fun buildsPhaseSplitReportFromPerson() {        val report = buildDoseWikiReport(
+    fun anEventWithABlankLabelUsesItsBodyAlone() {
+        val start = session().startTime
+        val blankLabels = listOf(
+            TimelineEvent(
+                id = "e:onset", createdAt = TS, updatedAt = TS, deviceOrigin = "test",
+                sessionId = "s:1", timestamp = start + 30 * 60_000, eventType = TimelineEventType.ONSET,
+                label = "   ", body = "Warm wave",
+            ),
+            TimelineEvent(
+                id = "e:check", createdAt = TS, updatedAt = TS, deviceOrigin = "test",
+                sessionId = "s:1", timestamp = start + 10 * 60_000, eventType = TimelineEventType.SAFETY_CHECK,
+                label = "", body = "Sitter check",
+            ),
+        )
+
+        val report = buildDoseWikiReport(
+            session(), person(), doses(), substances(), events = blankLabels,
+            publishConsent = true, ageConfirmed = true
+        )
+
+        assertEquals("Warm wave", report.report.onset.single().description,
+            "a blank label must not leave a leading separator")
+        val introduction = report.report.introduction.orEmpty()
+        assertTrue(introduction.contains("Sitter check"), "introduction: $introduction")
+        assertFalse(introduction.contains(": :"), "no double separator, got: $introduction")
+    }
+
+    @Test
+    fun buildsPhaseSplitReportFromPerson() {
+        val report = buildDoseWikiReport(
             session(), person(), doses(), substances(), events = events(),
             publishConsent = true, ageConfirmed = true
         )

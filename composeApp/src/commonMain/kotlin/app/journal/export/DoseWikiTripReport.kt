@@ -130,9 +130,19 @@ fun elapsedLabel(startTime: Long, timestamp: Long): String {
     return "T+$hours:$mins"
 }
 
+/** "label: body" with either side optional, so a blank side leaves no separator. */
+private fun eventText(label: String?, body: String?): String {
+    val cleanLabel = label?.trim().orEmpty()
+    val cleanBody = body?.trim().orEmpty()
+    return when {
+        cleanLabel.isEmpty() -> cleanBody
+        cleanBody.isEmpty() -> cleanLabel
+        else -> "$cleanLabel: $cleanBody"
+    }
+}
+
 private fun entryOf(event: TimelineEvent, startTime: Long): TripReportEntry {
-    val description = if (event.body.isNullOrBlank()) event.label
-    else "${event.label}: ${event.body.trim()}"
+    val description = eventText(event.label, event.body)
     return TripReportEntry(time = elapsedLabel(startTime, event.timestamp), description = description)
 }
 
@@ -198,8 +208,7 @@ fun buildDoseWikiReport(
     sortedEvents
         .filter { it.eventType !in ONSET_TYPES && it.eventType !in PEAK_TYPES && it.eventType !in OFFSET_TYPES }
         .forEach { event ->
-            val text = if (event.body.isNullOrBlank()) event.label.trim()
-            else "${event.label.trim()}: ${event.body.trim()}"
+            val text = eventText(event.label, event.body)
             if (text.isNotEmpty()) {
                 introParagraphs.add("${elapsedLabel(session.startTime, event.timestamp)}: $text")
             }
