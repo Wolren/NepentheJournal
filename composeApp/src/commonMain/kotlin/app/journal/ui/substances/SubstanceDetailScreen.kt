@@ -353,7 +353,7 @@ fun SubstanceDetailScreen(
         item { EffectsSection(repo = repo, substance = substance, onEffectClick = onEffectClick) }
 
         if (relatedInteractions.isNotEmpty()) {
-            item { InteractionsSection(repo = repo, interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
+            item { InteractionsSection(substancesById = substancesById, interactions = relatedInteractions, substanceId = substanceId, onOpenSubstance = onOpenSubstance) }
         }
 
         item { OpenFdaInteractionCard(repo = repo, substanceId = substanceId, substanceName = substance.name) }

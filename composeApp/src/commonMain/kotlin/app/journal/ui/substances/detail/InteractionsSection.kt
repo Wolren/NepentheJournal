@@ -13,20 +13,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.model.rules.InteractionDedupe
-import app.journal.data.IJournalRepository
 import app.journal.model.Interaction
 import app.journal.model.InteractionRisk
+import app.journal.model.Substance
 import app.journal.ui.components.AppCard
 
 @Composable
 internal fun InteractionsSection(
-    repo: IJournalRepository,
+    substancesById: Map<String, Substance>,
     interactions: List<Interaction>,
     substanceId: String,
     onOpenSubstance: (String) -> Unit = {},
 ) {
-    val shown = remember(interactions) {
-        InteractionDedupe.dedupe(interactions) { interactionSubstanceName(repo, it) }
+    val shown = remember(interactions, substancesById) {
+        InteractionDedupe.dedupe(interactions) { interactionSubstanceName(substancesById, it) }
     }
     val dangerous = shown.filter { it.riskLevel == InteractionRisk.DANGEROUS }
     val unsafe = shown.filter { it.riskLevel == InteractionRisk.UNSAFE }
@@ -44,19 +44,19 @@ internal fun InteractionsSection(
             Spacer(Modifier.height(8.dp))
 
             if (dangerous.isNotEmpty()) {
-                InteractionSubgroup("Dangerous", dangerous, substanceId, repo,
+                InteractionSubgroup("Dangerous", dangerous, substanceId, substancesById,
                     MaterialTheme.colorScheme.error,
                     Icons.Default.Dangerous, onOpenSubstance)
             }
             if (unsafe.isNotEmpty()) {
                 if (dangerous.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                InteractionSubgroup("Unsafe", unsafe, substanceId, repo,
+                InteractionSubgroup("Unsafe", unsafe, substanceId, substancesById,
                     MaterialTheme.colorScheme.tertiary,
                     Icons.Default.Warning, onOpenSubstance)
             }
             if (uncertain.isNotEmpty()) {
                 if (dangerous.isNotEmpty() || unsafe.isNotEmpty()) Spacer(Modifier.height(6.dp))
-                InteractionSubgroup("Uncertain", uncertain, substanceId, repo,
+                InteractionSubgroup("Uncertain", uncertain, substanceId, substancesById,
                     MaterialTheme.colorScheme.onSurfaceVariant,
                     Icons.Default.Info, onOpenSubstance)
             }
@@ -64,7 +64,7 @@ internal fun InteractionsSection(
                 if (dangerous.isNotEmpty() || unsafe.isNotEmpty() || uncertain.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                 }
-                InteractionSubgroup("Low risk", low, substanceId, repo,
+                InteractionSubgroup("Low risk", low, substanceId, substancesById,
                     MaterialTheme.colorScheme.secondary,
                     Icons.Default.CheckCircle, onOpenSubstance)
             }
@@ -77,7 +77,7 @@ private fun InteractionSubgroup(
     label: String,
     interactions: List<Interaction>,
     substanceId: String,
-    repo: IJournalRepository,
+    substancesById: Map<String, Substance>,
     color: Color,
     icon: ImageVector,
     onOpenSubstance: (String) -> Unit,
@@ -88,8 +88,8 @@ private fun InteractionSubgroup(
     interactions.forEach { interaction ->
         val otherId = if (interaction.substanceAId == substanceId)
             interaction.substanceBId else interaction.substanceAId
-        val otherName = interactionSubstanceName(repo, otherId)
-        val canOpen = remember(otherId) { repo.getSubstance(otherId) != null }
+        val otherName = interactionSubstanceName(substancesById, otherId)
+        val canOpen = otherId in substancesById
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                 .then(if (canOpen) Modifier.clickable { onOpenSubstance(otherId) } else Modifier),
@@ -117,8 +117,8 @@ private fun InteractionSubgroup(
     }
 }
 
-internal fun interactionSubstanceName(repo: IJournalRepository, id: String): String {
-    val sub = repo.getSubstance(id)
+internal fun interactionSubstanceName(substancesById: Map<String, Substance>, id: String): String {
+    val sub = substancesById[id]
     if (sub != null) return sub.name
     if (id.startsWith("pwiki:")) {
         return id.removePrefix("pwiki:").replace("_", " ").replaceFirstChar { it.uppercase() }
