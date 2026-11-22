@@ -9,11 +9,12 @@ The Release workflow fails its version guard when these drift:
 | `versionName`        | `composeApp/build.gradle.kts` (android block), may carry an `-alpha` suffix |
 | `packageVersion`     | `composeApp/build.gradle.kts` (nativeDistributions), numeric only |
 | About card string    | `composeApp/src/commonMain/.../detail/SettingsInfoCards.kt` |
+| iOS `CFBundleShortVersionString` | `iosApp/iosApp/Info.plist` |
 | macOS `packageVersion` (intentionally different) | `composeApp/build.gradle.kts` (macOS block) |
 
 ## Cutting a release
 
-1. Bump all three surfaces together (same version, one commit).
+1. Bump all version surfaces together (same version, one commit).
 2. Push to master; CI, CodeQL and fdroid must be green.
 3. Optional dry run: Actions -> Release -> Run workflow. Builds MSI, DEB and
    DMG as workflow artifacts and publishes nothing.
@@ -22,8 +23,8 @@ The Release workflow fails its version guard when these drift:
    GitHub prerelease:
 
    ```bash
-   git tag v0.1.0-alpha
-   git push origin v0.1.0-alpha
+   git tag v0.2.0-alpha
+   git push origin v0.2.0-alpha
    ```
 
 5. The Release workflow re-checks the version guard, builds all three
@@ -82,7 +83,7 @@ workstation emulator; shipped builds stay arm-only.
   arm64. Artifacts are unsigned; right-click Open on first launch. The
   macOS block sets its own `packageVersion = "1.0.0"`: jpackage rejects a
   leading zero for the app bundle (Apple CFBundleShortVersionString rule),
-  so the Apple bundlers see 1.0.0 while everything else stays 0.1.0. Bump
+  so the Apple bundlers see 1.0.0 while everything else stays 0.2.0. Bump
   this value together with the other surfaces on a version change (any
   nonzero-first version).
 - **Windows signing on alpha tags**: a stable tag refuses to publish an

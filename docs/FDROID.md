@@ -40,7 +40,7 @@ sha256sum composeApp/build/outputs/apk/release/*.apk
 | No machine-specific paths in build files | yes |
 | JDK: F-Droid uses JDK 17 | yes (compileOptions VERSION_17) |
 | AGP/SDK resolved from `ANDROID_HOME` | yes (no sdk.dir needed) |
-| Version code / name in `defaultConfig` | yes (`versionCode 1`, `versionName 0.1.0-alpha`) |
+| Version code / name in `defaultConfig` | yes (`versionCode 2`, `versionName 0.2.0-alpha`) |
 | Release build reproducible | verified by CI workflow |
 | License metadata | GPL-3.0, LICENSE file at repo root |
 | Anti-features | none (no ads, no tracking, no non-free deps) |
@@ -49,7 +49,7 @@ sha256sum composeApp/build/outputs/apk/release/*.apk
 
 When ready to publish:
 
-1. Create a GitHub release tagged `v<versionName>` (e.g. `v0.1.0-alpha`). F-Droid
+1. Create a GitHub release tagged `v<versionName>` (e.g. `v0.2.0-alpha`). F-Droid
    tracks release tags via the `CurrentVersion` field.
 2. Fork `fdroid/fdroiddata` and add a metadata file:
    `metadata/app.journal.nepenthe.yml`:
@@ -76,16 +76,16 @@ Repo: https://github.com/Wolren/NepentheJournal.git
 Binaries: https://github.com/Wolren/NepentheJournal/releases/download/v%v/app-journal-nepenthe-%v.apk
 
 Builds:
-  - versionName: 0.1.0-alpha
-    versionCode: 1
-    commit: v0.1.0-alpha
+  - versionName: 0.2.0-alpha
+    versionCode: 2
+    commit: v0.2.0-alpha
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.1.0-alpha
-CurrentVersionCode: 1
+CurrentVersion: 0.2.0-alpha
+CurrentVersionCode: 2
 ```
 
    Adjust `subdir`, `prebuild`, and `Binaries` to the actual layout.

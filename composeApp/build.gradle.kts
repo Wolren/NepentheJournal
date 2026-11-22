@@ -193,12 +193,12 @@ android {
         applicationId = "app.journal.nepenthe"
         minSdk = 26
         targetSdk = 36
-        // Play rejects a reused code: CI passes the run number, local builds fall back to 1.
-        versionCode = providers.gradleProperty("nepenthe.versionCode").orNull?.toIntOrNull() ?: 1
+        // Play rejects a reused code: CI passes the run number, local builds fall back to the release code.
+        versionCode = providers.gradleProperty("nepenthe.versionCode").orNull?.toIntOrNull() ?: 2
         // The alpha suffix is the user-visible release stage: Android accepts it,
         // while packageVersion below stays numeric because jpackage (MSI/DEB/DMG)
         // parses it as a number.
-        versionName = "0.1.0-alpha"
+        versionName = "0.2.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     // Duplicate META-INF files from netty-codec-native-quic platform jars (5 identical LICENSE.jbzip2.txt) fail mergeReleaseJavaResource since the 2026-09 ktor/netty bumps; dedupe license copies.
@@ -299,7 +299,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg
             )
             packageName = "Nepenthe Journal"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.0"
             vendor = "Wolren"
             description = "Offline-first psychoactive substance session tracker"
             copyright = "Copyright (C) 2026 Wolren"
@@ -318,7 +318,7 @@ compose.desktop {
             }
             macOS {
                 iconFile.set(project.file("src/desktopMain/resources/icon.icns"))
-                // The macOS-scoped override feeds only the Apple bundlers; global packageVersion, versionName, the About card and the release tag stay 0.1.0.
+                // The macOS-scoped override feeds only the Apple bundlers; global packageVersion, versionName, the About card and the release tag stay 0.2.0.
                 packageVersion = "1.0.0"
                 // Signing and notarization switch on only when CI holds a Developer ID, so other builds still package.
                 val macSignIdentity = providers.environmentVariable("MACOS_SIGN_IDENTITY").orNull?.takeIf { it.isNotBlank() }

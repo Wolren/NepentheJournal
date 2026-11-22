@@ -8,6 +8,69 @@ Nepenthe Journal is free software under GPL-3.0-or-later.
 
 ## [Unreleased]
 
+## [0.2.0-alpha] - 2026-11-22
+
+The first hardening release after the public alpha. Sync, storage and imports
+got stricter, and the journal now survives crashes, planted key files and
+malformed backups.
+
+### Added
+
+- Hybrid logical clocks on every synced entity, with per-field clock registers
+  for sessions, doses and notes, so a pull merges field by field.
+- A pinned TLS connector for LAN sync on desktop, Android and iOS.
+- DPAPI-wrapped journal keys on Windows; the POSIX key file stays 0600.
+- Atomic journal saves on every platform, covered by a repeated-kill fuzz test.
+- Macrobenchmark suites for startup and scrolling, a generated Android baseline
+  profile, and R8 with resource shrinking on release builds.
+- A TLA+ model of the tombstone join and merge-law property tests.
+- Optional GPG signatures for the release checksums.
+
+### Changed
+
+- The library gate opens before the catalog payload decodes, and Android builds
+  the catalog after the first frame, so the first frame is not blocked by
+  pharmacology data.
+- Sync retries sign each attempt fresh; the pull and push cursors are separate.
+- Deletions no longer resurrect on pull, equal-timestamp conflicts break by
+  device origin, and session conflicts merge field by field.
+- Text conflicts keep both siblings instead of merging into one text.
+- Vault filenames are capped in UTF-8 bytes, and note matching prefers the id
+  and compares names without case.
+- Theme writes are coalesced across a slider drag and flushed on exit.
+- Imported text files and user settings accept a UTF-8 BOM.
+
+### Fixed
+
+- CSV export names a dose whose substance is missing, keeps thousands
+  separators and quotes, and formats dates consistently.
+- The vault export and import protect hand-written notes, rewrite children in
+  place, escape a pipe in an event label, and reject paths outside the vault.
+- Full-journal import validates notes and timeline events, caps substances and
+  interactions, and refuses orphan rows.
+- The DoseWiki trip report warns about doses it cannot name and elides blank
+  event labels.
+- Tolerance levels follow the clock instead of a stale cache, and the dashboard
+  refreshes them at day boundaries.
+- Interaction rows become clickable when the substance library loads late.
+- The export preview recovers when the library arrives while the dialog is open.
+- The search hint appears for a single character, and the live dose dialog
+  rejects an unparseable amount and links a typed name to an existing substance.
+- Sync bounds peer pull cursors, shares the WebSocket apply guard, caps the sync
+  log, and reports a lost peer by device id.
+- Light saves stop rewriting the recovery copy, startup no longer rewrites an
+  intact library, and a planted key file is quarantined.
+- Autosave honours the configured delay, the dashboard empty state waits for
+  loading, and the back guard no longer discards a draft.
+
+### Security
+
+- The desktop key file is adopted only when it opens the journal, and unproven
+  material is quarantined.
+- Vault writes stay inside the vault, imports carry row caps and time windows,
+  and sync uses pinned TLS on every platform.
+- A single-instance lock keeps two desktop processes off one journal.
+
 ## [0.1.0-alpha] - 2026-11-19
 
 First public alpha: desktop on Windows, macOS and Linux, and Android, from one
@@ -129,5 +192,6 @@ suite, but ships through no store channel in this release.
 - Store pipelines: fastlane metadata for Android, an F-Droid source-reproducibility
   gate, and a dispatch-only Google Play internal track upload.
 
-[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.1.0-alpha...HEAD
+[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.2.0-alpha...HEAD
+[0.2.0-alpha]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.2.0-alpha
 [0.1.0-alpha]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.1.0-alpha

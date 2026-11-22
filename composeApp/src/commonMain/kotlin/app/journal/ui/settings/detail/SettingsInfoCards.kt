@@ -20,7 +20,7 @@ internal fun AboutCardContent(aboutExpanded: Boolean, onToggle: () -> Unit) {
     CollapsibleSettingsCard(expanded = aboutExpanded, onToggle = onToggle,
         icon = Icons.Default.Info, title = "About"
     ) {
-        Text("Nepenthe Journal v0.1.0 (alpha)")
+        Text("Nepenthe Journal v0.2.0 (alpha)")
         Text("Offline-first psychoactive substance session tracker",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("by Wolren", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
