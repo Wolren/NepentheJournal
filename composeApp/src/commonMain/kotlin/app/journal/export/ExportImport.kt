@@ -6,7 +6,9 @@ import app.journal.data.JournalSnapshot
 import app.journal.log.Log
 import app.journal.model.Dose
 import app.journal.model.Medication
+import app.journal.model.Note
 import app.journal.model.Session
+import app.journal.model.TimelineEvent
 import app.journal.serde.AppJson
 import app.journal.sync.EntityTimePolicy
 import app.journal.util.currentTimeMillis
@@ -34,6 +36,7 @@ object ExportImport {
 
     const val MAX_IMPORT_FIELD_LEN = 65536
     const val MAX_IMPORT_TITLE_LEN = 500
+    const val MAX_IMPORT_LABEL_LEN = 200
     const val MAX_IMPORT_ID_LEN = 128
 
     /**
@@ -232,8 +235,14 @@ object ExportImport {
         val keptDoses = snapshot.doses.filter { dose ->
             dose.sessionId in validSessionIds && validateDose(dose, maxTimestamp).isEmpty()
         }
-        val keptNotes = snapshot.notes
-        val keptEvents = snapshot.timelineEvents
+        val keptNotes = snapshot.notes.filter { note ->
+            validateNote(note, maxTimestamp).isEmpty() &&
+                (note.sessionId == null || note.sessionId in validSessionIds)
+        }
+        val keptEvents = snapshot.timelineEvents.filter { event ->
+            validateTimelineEvent(event, maxTimestamp).isEmpty() &&
+                event.sessionId in validSessionIds
+        }
         val keptMedications = snapshot.medications.filter { validateMedication(it, maxTimestamp).isEmpty() }
 
         AppJson.apply(
@@ -256,6 +265,40 @@ object ExportImport {
         )
     }
 
+
+    /** Child rows carry the same caps and time window as sessions and doses. */
+    private fun validateNote(note: Note, maxTimestamp: Long): List<String> {
+        val errors = mutableListOf<String>()
+        if (!isValidId(note.id) || note.id.length > MAX_IMPORT_ID_LEN) errors.add("invalid note ID '${note.id}'")
+        if (note.body.length > MAX_IMPORT_FIELD_LEN) errors.add("note body too long")
+        if ((note.title?.length ?: 0) > MAX_IMPORT_TITLE_LEN) errors.add("note title too long")
+        if (note.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("note createdAt ${note.createdAt} out of valid range")
+        }
+        if (note.updatedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("note updatedAt ${note.updatedAt} out of valid range")
+        }
+        return errors
+    }
+
+    private fun validateTimelineEvent(event: TimelineEvent, maxTimestamp: Long): List<String> {
+        val errors = mutableListOf<String>()
+        if (!isValidId(event.id) || event.id.length > MAX_IMPORT_ID_LEN) {
+            errors.add("invalid timeline event ID '${event.id}'")
+        }
+        if (event.label.length > MAX_IMPORT_LABEL_LEN) errors.add("event label too long")
+        if ((event.body?.length ?: 0) > MAX_IMPORT_FIELD_LEN) errors.add("event body too long")
+        if (event.timestamp !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("event timestamp ${event.timestamp} out of valid range")
+        }
+        if (event.createdAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("event createdAt ${event.createdAt} out of valid range")
+        }
+        if (event.updatedAt !in MIN_VALID_TIMESTAMP..maxTimestamp) {
+            errors.add("event updatedAt ${event.updatedAt} out of valid range")
+        }
+        return errors
+    }
 
     /**
      * All validation errors for one session plus its doses: empty list means

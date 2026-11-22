@@ -2,7 +2,9 @@ package app.journal.export
 
 import app.journal.data.*
 import app.journal.model.*
+import app.journal.serde.AppJson
 import app.journal.util.currentTimeMillis
+import kotlinx.serialization.encodeToString
 import kotlin.test.*
 
 class ExportImportTest {
@@ -191,8 +193,49 @@ class ExportImportTest {
     }
 
     @Test
-    fun fullJournalImportAcceptsAUtf8Bom() {
+    fun fullJournalImportDropsInvalidNotesAndEvents() {
+        val ts = 1_700_000_000_000L
         val source = JournalRepository()
+        source.upsertSession(sampleSession("s:ok"))
+        source.upsertNote(Note(
+            id = "n:ok", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+            sessionId = "s:ok", body = "fine",
+        ))
+        source.upsertTimelineEvent(TimelineEvent(
+            id = "e:ok", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+            sessionId = "s:ok", timestamp = ts, eventType = TimelineEventType.ONSET, label = "fine",
+        ))
+        val snapshot = AppJson.json.decodeFromString<JournalSnapshot>(ExportImport.exportFullJournal(source))
+        val corrupted = snapshot.copy(
+            notes = snapshot.notes + Note(
+                id = "n:bad", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                sessionId = "s:ok", body = "epoch junk",
+            ) + Note(
+                id = "n:orphan", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+                sessionId = "s:missing", body = "orphan",
+            ),
+            timelineEvents = snapshot.timelineEvents + TimelineEvent(
+                id = "e:bad", createdAt = 0L, updatedAt = 0L, deviceOrigin = "test",
+                sessionId = "s:ok", timestamp = 0L, eventType = TimelineEventType.ONSET, label = "epoch junk",
+            ) + TimelineEvent(
+                id = "e:orphan", createdAt = ts, updatedAt = ts, deviceOrigin = "test",
+                sessionId = "s:missing", timestamp = ts, eventType = TimelineEventType.ONSET, label = "orphan",
+            ),
+        )
+
+        val target = JournalRepository()
+        val result = ExportImport.importFullJournal(target, AppJson.json.encodeToString(corrupted))
+
+        assertNull(result.error)
+        assertEquals(1, result.sessions)
+        assertEquals(1, result.notes, "an epoch note must be dropped")
+        assertEquals(1, result.timelineEvents, "an epoch event must be dropped")
+        assertEquals(listOf("n:ok"), target.notes.value.map { it.id })
+        assertEquals(listOf("e:ok"), target.timelineEvents.value.map { it.id })
+    }
+
+    @Test
+    fun fullJournalImportAcceptsAUtf8Bom() {        val source = JournalRepository()
         source.upsertSession(sampleSession("s:bom"))
         val json = ExportImport.exportFullJournal(source)
 
