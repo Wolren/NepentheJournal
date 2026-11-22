@@ -64,6 +64,26 @@ internal fun effectFilterOptions(articles: List<EffectArticle>): List<EffectFilt
 }
 
 /**
+ * Lowercased search text for one article, built once per loaded library.
+ * A query match must not lowercase every article body on every keystroke.
+ */
+internal class EffectSearchText(articles: List<EffectArticle>) {
+    internal var lowercaseCalls: Int = 0
+        private set
+
+    private val textByName: Map<String, String> = articles.associate { article ->
+        lowercaseCalls++
+        article.name to haystack(article)
+    }
+
+    fun matches(article: EffectArticle, needle: String): Boolean =
+        (textByName[article.name] ?: haystack(article)).contains(needle)
+
+    private fun haystack(article: EffectArticle): String =
+        "${article.name}\n${article.summary}\n${article.body}".lowercase()
+}
+
+/**
  * Filter by free text, then group by the first curated category the article
  * carries. Order is fixed (cognitive, physical, sensory, other) so the list
  * does not reshuffle between visits.
@@ -73,6 +93,7 @@ internal fun groupEffects(
     query: String,
     broad: String? = null,
     specific: String? = null,
+    searchText: EffectSearchText? = null,
 ): List<EffectGroup> {
     val needle = query.trim().lowercase()
     var matching = when {
@@ -82,7 +103,8 @@ internal fun groupEffects(
     }
     if (needle.isNotEmpty()) {
         matching = matching.filter { article ->
-            article.name.lowercase().contains(needle) ||
+            if (searchText != null) searchText.matches(article, needle)
+            else article.name.lowercase().contains(needle) ||
                 article.summary.lowercase().contains(needle) ||
                 article.body.lowercase().contains(needle)
         }
@@ -134,10 +156,13 @@ internal fun EffectsLibrary(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.Default) { EffectLibrary.ensureLoaded() }
     }
-    val groups = remember(articles, query, broad, specific) { groupEffects(articles, query, broad, specific) }
-    val showEmptyState = rememberEmptyStateVisible(isEmpty = articles.isEmpty() || groups.isEmpty())
+    val searchText = remember(articles) { EffectSearchText(articles) }
+    val filteredGroups = remember(articles, query, broad, specific, searchText) {
+        groupEffects(articles, query, broad, specific, searchText)
+    }
+    val showEmptyState = rememberEmptyStateVisible(isEmpty = articles.isEmpty() || filteredGroups.isEmpty())
 
-    if (groups.isEmpty()) {
+    if (filteredGroups.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (showEmptyState) {
                 Column(
@@ -162,7 +187,7 @@ internal fun EffectsLibrary(
     }
 
     LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        groups.forEach { group ->
+        filteredGroups.forEach { group ->
             item(key = "header:${group.label}") {
                 Text(
                     text = "${group.label} (${group.articles.size})",

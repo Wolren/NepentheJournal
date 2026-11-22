@@ -77,8 +77,27 @@ private fun events() = listOf(
 class DoseWikiTripReportTest {
 
     @Test
-    fun buildsPhaseSplitReportFromPerson() {
+    fun aDanglingDoseIsWarnedAboutAndNotSerialized() {
+        val dangling = doses().map { it.copy(substanceId = "sub:missing") }
         val report = buildDoseWikiReport(
+            session(), person(), dangling, substances(),
+            publishConsent = true, ageConfirmed = true
+        )
+
+        assertTrue(report.report.substances.isEmpty(), "an unknown substance cannot be named")
+        val check = report.check()
+        assertTrue(
+            check.warnings.any { it.contains("omitted") },
+            "the dropped dose must be surfaced as a warning, got: ${check.warnings}",
+        )
+        assertFalse(
+            report.toJsonString().contains("omitted"),
+            "the warning is local only and must not enter the intake payload",
+        )
+    }
+
+    @Test
+    fun buildsPhaseSplitReportFromPerson() {        val report = buildDoseWikiReport(
             session(), person(), doses(), substances(), events = events(),
             publishConsent = true, ageConfirmed = true
         )

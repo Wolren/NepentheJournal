@@ -13,6 +13,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -71,7 +72,10 @@ data class DoseWikiTripReport(
     val publish_consent: Boolean = false,
     val age_confirmed: Boolean = false,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS)
-    val website: String = ""
+    val website: String = "",
+    /** Doses whose substance is absent from the library: warned about locally, never sent. */
+    @Transient
+    val omittedSubstanceDoses: Int = 0
 ) {
     companion object {
         const val ERR_TITLE = "Title is required."
@@ -169,10 +173,13 @@ fun buildDoseWikiReport(
         setting = session.setting?.ifBlank { null }
     )
 
+    var omitted = 0
     val substances = doses.sortedBy { it.timestamp }.mapNotNull { dose ->
         val name = substancesById[dose.substanceId]?.name?.trim().orEmpty()
-        if (name.isEmpty()) null
-        else TripReportSubstance(
+        if (name.isEmpty()) {
+            omitted += 1
+            null
+        } else TripReportSubstance(
             name = name,
             dose = "${formatAmount(dose.amount)} ${dose.unit}".trim().ifEmpty { null },
             roa = dose.routeOfAdministration.trim().lowercase().ifEmpty { null }
@@ -218,7 +225,8 @@ fun buildDoseWikiReport(
         contact_email = person?.contactEmail?.trim()?.takeIf { it.isNotEmpty() },
         may_contact = person?.mayContact == true,
         publish_consent = publishConsent,
-        age_confirmed = ageConfirmed
+        age_confirmed = ageConfirmed,
+        omittedSubstanceDoses = omitted
     )
 }
 
@@ -247,6 +255,11 @@ fun DoseWikiTripReport.check(): TripReportCheck {
     }
     report.substances.forEach {
         if (it.dose.isNullOrBlank()) warnings.add("Substance ${it.name} has no dose.")
+    }
+    if (omittedSubstanceDoses > 0) {
+        warnings.add(
+            "$omittedSubstanceDoses dose(s) reference a substance missing from the library and were omitted."
+        )
     }
     val bytes = DoseWikiTripReport.json.encodeToString(this).encodeToByteArray().size
     if (bytes > DoseWikiTripReport.MAX_BODY_BYTES) {
