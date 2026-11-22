@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.journal.data.JournalRepository
@@ -44,7 +45,9 @@ internal fun QuickDoseDialog(
     val chosenSubstanceId = if (selectedSubstanceId.isNotBlank()) selectedSubstanceId
         else if (customSubstanceName.isNotBlank()) "live:${customSubstanceName.lowercase().replace(" ", "_")}"
         else ""
-    val canSubmit = chosenSubstanceId.isNotBlank() && amount.isNotBlank()
+    val parsedAmount = amount.toDoubleOrNull()
+    val amountValid = parsedAmount != null && parsedAmount.isFinite() && parsedAmount >= 0.0
+    val canSubmit = chosenSubstanceId.isNotBlank() && amountValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -91,10 +94,10 @@ internal fun QuickDoseDialog(
                 } else Text("No substances in database. Add one first.", color = MaterialTheme.colorScheme.error)
 
                 OutlinedTextField(value = customSubstanceName, onValueChange = { customSubstanceName = it; if (it.isNotBlank()) selectedSubstanceId = "" },
-                    label = { Text("Or type a new substance name") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = selectedSubstanceId.isBlank())
+                    label = { Text("Or type a new substance name") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("quick-dose-custom"), enabled = selectedSubstanceId.isBlank())
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") }, singleLine = true, modifier = Modifier.weight(1f).testTag("quick-dose-amount"))
                     OutlinedTextField(value = unit, onValueChange = { unit = it }, label = { Text("Unit") }, singleLine = true, modifier = Modifier.width(80.dp))
                 }
 
@@ -118,22 +121,28 @@ internal fun QuickDoseDialog(
         confirmButton = {
             AppTextButton(onClick = {
                 if (canSubmit) {
-                    if (selectedSubstanceId.isBlank() && customSubstanceName.isNotBlank()) {
-                        val now2 = currentTimeMillis()
-                        repo.upsertSubstance(Substance(id = "live:${customSubstanceName.lowercase().replace(" ", "_")}", name = customSubstanceName,
-                            createdAt = now2, updatedAt = now2, deviceOrigin = platformDeviceOrigin(), cachedAt = now2, sourceVersion = "live"))
-                        selectedSubstanceId = "live:${customSubstanceName.lowercase().replace(" ", "_")}"
-                    }
+                    val trimmedName = customSubstanceName.trim()
+                    // Typing a name that already exists must link to it, never fork a duplicate.
+                    val resolvedId = if (selectedSubstanceId.isNotBlank()) selectedSubstanceId
+                    else repo.substances.value.firstOrNull { it.name.equals(trimmedName, ignoreCase = true) }?.id
+                        ?: "live:${trimmedName.lowercase().replace(" ", "_")}".also { id ->
+                            val now2 = currentTimeMillis()
+                            repo.upsertSubstance(Substance(id = id, name = trimmedName,
+                                createdAt = now2, updatedAt = now2, deviceOrigin = platformDeviceOrigin(), cachedAt = now2, sourceVersion = "live"))
+                        }
+                    selectedSubstanceId = resolvedId
                     val doseTime = now - (doseMinutesAgo.toLongOrNull() ?: 0L) * 60000L
-                    repo.upsertDose(Dose(id = "dose:live:${now}_${session.id}", sessionId = session.id, substanceId = chosenSubstanceId,
-                        routeOfAdministration = route, amount = amount.toDoubleOrNull() ?: 0.0, unit = unit,
+                    repo.upsertDose(Dose(id = "dose:live:${now}_${session.id}", sessionId = session.id, substanceId = resolvedId,
+                        routeOfAdministration = route, amount = parsedAmount ?: 0.0, unit = unit,
                         timestamp = doseTime, createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                     val doseBody = listOfNotNull(
                         "$amount $unit $route".takeIf { it.isNotBlank() },
                         note.ifBlank { null }
                     ).joinToString("\n")
+                    val resolvedName = repo.substances.value.firstOrNull { it.id == resolvedId }?.name
+                        ?: trimmedName
                     repo.upsertTimelineEvent(TimelineEvent(id = "event:dose:${now}_${session.id}", sessionId = session.id,
-                        timestamp = doseTime, eventType = TimelineEventType.NOTE, label = "Dose: ${substances.find { it.id == chosenSubstanceId }?.name ?: customSubstanceName.ifBlank { chosenSubstanceId }}",
+                        timestamp = doseTime, eventType = TimelineEventType.NOTE, label = "Dose: $resolvedName",
                         body = doseBody.ifBlank { null }, createdAt = now, updatedAt = now, deviceOrigin = platformDeviceOrigin()))
                     onDismiss()
                 }
