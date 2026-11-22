@@ -119,7 +119,7 @@ fun SearchOverlay(
                 }
             }
 
-            if (query.length < 2 && hasSearched) {
+            if (query.isNotEmpty() && query.length < 2) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
