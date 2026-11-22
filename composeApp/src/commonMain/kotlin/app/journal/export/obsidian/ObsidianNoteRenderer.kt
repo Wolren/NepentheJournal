@@ -169,8 +169,8 @@ fun renderSessionToObsidianNote(
             appendLine("| ---- | ----- | ---- | --------- |")
             for (event in sortedEvents) {
                 val eventTime = formatTime(event.timestamp)
-                val eventLabel = if (event.eventType == TimelineEventType.NOTE) event.label
-                    else "**${event.label}**"
+                val eventLabel = if (event.eventType == TimelineEventType.NOTE) mdCell(event.label)
+                    else mdCell("**${event.label}**")
                 val body = event.body ?: ""
                 val intensity = event.intensity?.let { "${it}/10" } ?: ""
                 appendLine("| $eventTime | $eventLabel | ${mdCell(body)} | $intensity |")

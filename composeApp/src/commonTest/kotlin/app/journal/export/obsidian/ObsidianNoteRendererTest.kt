@@ -28,6 +28,31 @@ class ObsidianNoteRendererTest {
     )
 
     @Test
+    fun anEventLabelWithAPipeStaysInsideItsTableCell() {
+        val note = renderSessionToObsidianNote(
+            session = sampleSession(),
+            doses = emptyList(),
+            notes = emptyList(),
+            timelineEvents = listOf(
+                TimelineEvent(
+                    id = "e:pipe", createdAt = 1000L, updatedAt = 1000L,
+                    deviceOrigin = "test", sessionId = "s:test-123",
+                    timestamp = 1720728000000L,
+                    eventType = TimelineEventType.ONSET,
+                    label = "Come-up | peak",
+                )
+            ),
+            substanceNameResolver = substanceResolver,
+        )
+
+        val row = note.content.lines().first { "Come-up" in it }
+        assertTrue(
+            row.contains("Come-up \\| peak"),
+            "a pipe in a label must be escaped like a body cell, got: $row",
+        )
+    }
+
+    @Test
     fun rendersFullSession() {
         val note = renderSessionToObsidianNote(
             session = sampleSession(),
