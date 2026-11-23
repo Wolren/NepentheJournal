@@ -11,6 +11,11 @@ actual fun collectLogs(appDir: String): String {
 
         sb.appendLine("=== Nepenthe Journal Crash Log Bundle ===")
         sb.appendLine("Generated: ${System.currentTimeMillis()}")
+        // Release stacks are R8-mangled; the build that wrote them must be named here.
+        val appVersion = runCatching {
+            app.journal.NepentheApp.versionLabel(app.journal.NepentheApp.appContext)
+        }.getOrDefault("unknown")
+        sb.appendLine("App: Nepenthe Journal $appVersion")
         sb.appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
         sb.appendLine("Android: ${Build.VERSION.SDK_INT} (${Build.VERSION.RELEASE})")
         sb.appendLine()
