@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import app.journal.log.Log
+import app.journal.log.MainThreadStalls
 import app.journal.log.initLogging
 
 /**
@@ -20,6 +21,8 @@ class NepentheApp : Application() {
         super.onCreate()
         instance = this
         initLogging(filesDir.absolutePath)
+        // A freeze users only describe as "lag" needs a stack, and the log is the only surface they can export.
+        MainThreadStalls.start()
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
