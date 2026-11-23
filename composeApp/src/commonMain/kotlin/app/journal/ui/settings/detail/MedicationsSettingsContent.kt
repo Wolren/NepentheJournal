@@ -20,6 +20,7 @@ import app.journal.ui.components.AppTextButton
 import app.journal.util.currentTimeMillis
 import app.journal.util.formatDateShort
 import app.journal.util.platformDeviceOrigin
+import kotlinx.coroutines.delay
 
 private const val MAX_RENDERED_MEDICATIONS = 200
 
@@ -33,7 +34,15 @@ fun MedicationsSettingsContent(repo: IJournalRepository) {
     val medications by repo.medications.collectAsState(initial = emptyList())
     var editing by remember { mutableStateOf<Medication?>(null) }
     var creating by remember { mutableStateOf(false) }
-    val now = currentTimeMillis()
+    // A fresh millisecond value as a remember key re-sorted the list on every recomposition.
+    var nowMinute by remember { mutableStateOf(currentTimeMillis() / 60_000L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            nowMinute = currentTimeMillis() / 60_000L
+        }
+    }
+    val now = nowMinute * 60_000L
     val activeCount = medications.count { it.isActiveAt(now) }
     val ordered = remember(medications, now) {
         medications.sortedWith(compareByDescending<Medication> { it.isActiveAt(now) }.thenBy { it.displayName })

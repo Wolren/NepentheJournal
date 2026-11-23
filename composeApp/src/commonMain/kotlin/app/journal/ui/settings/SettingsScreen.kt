@@ -48,6 +48,8 @@ import app.journal.ui.settings.detail.SyncSettingsUiState
 import app.journal.ui.settings.detail.*
 import app.journal.ui.pet.CompanionCard
 import app.journal.ui.keybind.KeybindCard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,14 +154,15 @@ fun SettingsScreen(
     var logLines by remember {
         mutableStateOf(listOf<SyncLogEntry>(SyncLogEntry.Info("Sync engine ready")))
     }
-    var trustedDevices by remember { mutableStateOf(syncEngine.trustedDevices()) }
+    // The read hits the disk, so it must not run on the composition thread when Settings opens.
+    var trustedDevices by remember { mutableStateOf<List<TrustedDeviceInfo>>(emptyList()) }
 
     val dataViewModel = remember(repo, scope) { DataSettingsViewModel.create(repo, scope) }
     val fetchStatus by dataViewModel.fetchStatus.collectAsState()
     val isFetching by dataViewModel.isFetching.collectAsState()
 
     LaunchedEffect(status.pairedDeviceCount, status.isHosting) {
-        trustedDevices = syncEngine.trustedDevices()
+        trustedDevices = withContext(Dispatchers.Default) { syncEngine.trustedDevices() }
     }
 
     val scrollState = rememberLazyListState()

@@ -30,7 +30,9 @@ import app.journal.log.Log
 import app.journal.util.FilePicker
 import app.journal.util.ThemeImageStore
 import app.journal.util.isDesktopPlatform
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ThemeContent(
@@ -67,7 +69,11 @@ internal fun ThemeContent(
     applyTheme: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var userPresets by remember { mutableStateOf(ThemeStore.loadPresets()) }
+    // Reading the preset file on the composition thread drops a frame each time this card scrolls back in.
+    var userPresets by remember { mutableStateOf<List<ThemePreset>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        userPresets = withContext(Dispatchers.Default) { ThemeStore.loadPresets() }
+    }
     var presetName by remember { mutableStateOf("") }
     var importFailed by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
