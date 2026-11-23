@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,28 +58,32 @@ internal fun DataSettingsContent(
                 Text("Export / Import", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppOutlinedButton(onClick = { vm.exportSessionsJson() }, modifier = Modifier.weight(1f)) {
+                    AppOutlinedButton(onClick = { vm.exportSessionsJson() }, modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding) {
                         Icon(Icons.Default.FileDownload, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Export", maxLines = 1)
+                        DataButtonLabel("Export")
                     }
-                    AppOutlinedButton(onClick = { vm.importSessionsJson() }, modifier = Modifier.weight(1f)) {
+                    AppOutlinedButton(onClick = { vm.importSessionsJson() }, modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding) {
                         Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Import", maxLines = 1)
+                        DataButtonLabel("Import")
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppOutlinedButton(onClick = { vm.exportFullJournalJson() }, modifier = Modifier.weight(1f)) {
+                    AppOutlinedButton(onClick = { vm.exportFullJournalJson() }, modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding) {
                         Icon(Icons.Default.Schema, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Backup (full)", maxLines = 1)
+                        DataButtonLabel("Backup")
                     }
-                    AppOutlinedButton(onClick = { vm.importFullJournalJson() }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp))
+                    AppOutlinedButton(onClick = { vm.importFullJournalJson() }, modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding) {
+                        Icon(Icons.Default.Restore, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Import backup", maxLines = 1)
+                        DataButtonLabel("Restore")
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -92,20 +97,22 @@ internal fun DataSettingsContent(
                     AppOutlinedButton(
                         onClick = { passphraseAction = PassphraseAction.SEAL },
                         enabled = EncryptedBackup.isSupported,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding
                     ) {
                         Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Seal backup", maxLines = 1)
+                        DataButtonLabel("Seal backup")
                     }
                     AppOutlinedButton(
                         onClick = { passphraseAction = PassphraseAction.RESTORE },
                         enabled = EncryptedBackup.isSupported,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding
                     ) {
-                        Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.LockOpen, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Restore sealed", maxLines = 1)
+                        DataButtonLabel("Restore sealed")
                     }
                 }
                 Text(
@@ -121,13 +128,14 @@ internal fun DataSettingsContent(
                         else MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(12.dp)); HorizontalDivider(); Spacer(Modifier.height(8.dp))
-                Text("Backup", style = MaterialTheme.typography.labelLarge)
+                Text("Automatic backup", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppOutlinedButton(onClick = { vm.createBackup() }, modifier = Modifier.weight(1f)) {
+                    AppOutlinedButton(onClick = { vm.createBackup() }, modifier = Modifier.weight(1f),
+                        contentPadding = DataButtonPadding) {
                         Icon(Icons.Default.Backup, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Create Backup", maxLines = 1)
+                        DataButtonLabel("Create backup")
                     }
                 }
             }
@@ -148,6 +156,15 @@ internal fun DataSettingsContent(
 }
 
 internal enum class PassphraseAction { SEAL, RESTORE }
+
+/** Two buttons share a phone row, so the Material 24dp padding leaves too little room for a label. */
+private val DataButtonPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+
+/** A label that outgrows its button ellipsizes instead of clipping mid-glyph and pushing the icon left. */
+@Composable
+private fun DataButtonLabel(text: String) {
+    Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis, softWrap = false)
+}
 
 /** Asks for the backup passphrase; sealing asks twice so a typo cannot lock the file. */
 @Composable

@@ -55,6 +55,7 @@ fun AppButton(
     shape: androidx.compose.ui.graphics.Shape? = null,
     icon: ImageVector? = null,
     contentDescription: String? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -65,7 +66,7 @@ fun AppButton(
         colors = colors ?: ButtonDefaults.buttonColors(),
         interactionSource = interactionSource,
         shape = shape ?: MaterialTheme.shapes.medium,
-        contentPadding = ButtonDefaults.ContentPadding
+        contentPadding = contentPadding
     ) {
         IconSlot(icon, contentDescription)
         content()
@@ -85,6 +86,7 @@ fun AppOutlinedButton(
     shape: androidx.compose.ui.graphics.Shape? = null,
     icon: ImageVector? = null,
     contentDescription: String? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -95,7 +97,7 @@ fun AppOutlinedButton(
         colors = colors ?: ButtonDefaults.outlinedButtonColors(),
         interactionSource = interactionSource,
         shape = shape ?: MaterialTheme.shapes.medium,
-        contentPadding = ButtonDefaults.ContentPadding
+        contentPadding = contentPadding
     ) {
         IconSlot(icon, contentDescription)
         content()
@@ -115,6 +117,7 @@ fun AppTonalButton(
     shape: androidx.compose.ui.graphics.Shape? = null,
     icon: ImageVector? = null,
     contentDescription: String? = null,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -125,7 +128,7 @@ fun AppTonalButton(
         colors = colors ?: ButtonDefaults.filledTonalButtonColors(),
         interactionSource = interactionSource,
         shape = shape ?: MaterialTheme.shapes.medium,
-        contentPadding = ButtonDefaults.ContentPadding
+        contentPadding = contentPadding
     ) {
         IconSlot(icon, contentDescription)
         content()
