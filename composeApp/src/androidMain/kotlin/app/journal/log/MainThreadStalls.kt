@@ -13,7 +13,7 @@ import kotlin.concurrent.thread
 object MainThreadStalls {
 
     private const val SAMPLE_MS = 50L
-    private const val STALL_MS = 150L
+    private const val STALL_MS = 100L
     private const val MIN_LOG_GAP_MS = 2_000L
     private const val MAX_FRAMES = 24
 
