@@ -236,8 +236,13 @@ android {
                 if (providers.gradleProperty("nepenthe.emulatorAbi").isPresent) abiFilters += "x86_64"
             }
             // No upload keystore: a local release build is debug-signed for profiling; CI and Play use the real key.
-            signingConfig = if (hasUploadKeystore) signingConfigs.getByName("release")
-            else signingConfigs.getByName("debug")
+            // F-Droid compares two clean builds byte for byte, and a per-runner debug key would differ,
+            // so -Pnepenthe.noSign=true builds the unsigned APK that check hashes.
+            signingConfig = when {
+                hasUploadKeystore -> signingConfigs.getByName("release")
+                providers.gradleProperty("nepenthe.noSign").isPresent -> null
+                else -> signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

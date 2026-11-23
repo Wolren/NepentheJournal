@@ -30,7 +30,7 @@ jobs:
       # ships a licensed Android SDK; the CI android-build job builds with no
       - name: Build release APK
         run: |
-          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
+          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace -Pnepenthe.noSign=true
       - name: Hash the APK
         run: |
           sha256sum composeApp/build/outputs/apk/release/*.apk > apk-a.sha256
@@ -54,7 +54,7 @@ jobs:
       # ships a licensed Android SDK; the CI android-build job builds with no
       - name: Build release APK
         run: |
-          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace
+          ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace -Pnepenthe.noSign=true
       - name: Hash the APK
         run: |
           sha256sum composeApp/build/outputs/apk/release/*.apk > apk-b.sha256
