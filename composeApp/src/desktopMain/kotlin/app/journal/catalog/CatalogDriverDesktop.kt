@@ -41,9 +41,9 @@ actual object CatalogDriver {
         return target.absolutePath
     }
 
-    /** A short or empty copy from an interrupted launch must never be trusted. */
+    /** A short copy from an interrupted launch must never be trusted; SQLite may only grow a good one. */
     private fun File.isUsable(expectedSize: Long?): Boolean =
-        isFile && length() > 0L && (expectedSize == null || length() == expectedSize)
+        isFile && length() > 0L && (expectedSize == null || length() >= expectedSize)
 
     /** Each content version leaves a 16 MB copy behind, so keep only the one this build opens. */
     private fun pruneStaleCopies(dir: File, keep: String) {
