@@ -56,4 +56,19 @@ class SubstanceCatalogTest {
         assertTrue("drug-community" in sources, "drug.community rows need a source entry")
         assertTrue(sources.values.all { it.licence.isNotBlank() && it.url.isNotBlank() })
     }
+
+    @Test
+    fun bundledDatabaseAdvertisesTheGeneratedSchemaVersion() {
+        if (!available) return
+        val path = System.getProperty("nepenthe.catalog")
+        // A bundled file with an older user_version makes SQLDelight run a migration on first open.
+        java.sql.DriverManager.getConnection("jdbc:sqlite:$path").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("PRAGMA user_version").use { rows ->
+                    assertTrue(rows.next(), "user_version must be readable")
+                    assertEquals(app.journal.catalog.db.CatalogDatabase.Schema.version, rows.getLong(1))
+                }
+            }
+        }
+    }
 }

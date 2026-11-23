@@ -40,6 +40,18 @@ object CatalogSource {
     /** Fingerprint from the tiny bundled manifest, or null when this target cannot open the catalog. */
     fun bundledFingerprint(): String? = if (CatalogDriver.supported) cachedFingerprint else null
 
+    /**
+     * Byte size the extracted database copy must have, from the bundled manifest.
+     * A copy interrupted by a kill is short and every later launch would trust it.
+     */
+    fun sizeFrom(manifestText: String?): Long? {
+        val text = manifestText ?: return null
+        return runCatching {
+            AppJson.json.parseToJsonElement(text).jsonObject["sqlite_size_bytes"]
+                ?.jsonPrimitive?.content?.toLongOrNull()
+        }.getOrNull()
+    }
+
     private val cachedFingerprint: String? by lazy {
         runCatching {
             val text = readBundledResource("/manifest.json") ?: return@runCatching null
