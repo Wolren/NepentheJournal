@@ -860,11 +860,17 @@ def main() -> int:
         return 2
 
     connection, counts = build(args.sources, args.affinity)
+    # A silently shorter catalog is a library regression shipped to every device as an "update".
+    if counts["substances"] < TARGET_SUBSTANCES:
+        print(
+            f"substance catalog has {counts['substances']} substances, target is {TARGET_SUBSTANCES}",
+            file=sys.stderr,
+        )
+        return 4
     content_version = source_digest(args.sources, args.affinity)[:16]
     connection.execute("INSERT INTO meta VALUES('content_version', ?)", (content_version,))
     connection.execute("INSERT INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
-    # SQLDelight opens a bundled file with the schema version it generated (1), so the
-    # file must not advertise a newer version or Android treats it as a downgrade.
+    # SQLDelight opens a bundled file with the generated schema version (1); a newer user_version reads as a downgrade.
     connection.execute("PRAGMA user_version = 1")
     connection.commit()
 

@@ -349,6 +349,11 @@ jobs:
           echo "SDK: $SDK"
           grep -n "SecKeyCopyKeyExchangeResult" "$SDK/usr/include/Security/SecKey.h" | head -5 || echo "NOT FOUND in iOS simulator SDK SecKey.h"
 
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Compile iOS framework (simulator)
         run: |
           ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 --no-daemon

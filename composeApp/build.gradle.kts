@@ -196,9 +196,7 @@ android {
         targetSdk = 36
         // Play rejects a reused code: CI passes the run number, local builds fall back to the release code.
         versionCode = providers.gradleProperty("nepenthe.versionCode").orNull?.toIntOrNull() ?: 2
-        // The alpha suffix is the user-visible release stage: Android accepts it,
-        // while packageVersion below stays numeric because jpackage (MSI/DEB/DMG)
-        // parses it as a number.
+        // The alpha suffix is user-visible and Android accepts it; packageVersion stays numeric for jpackage.
         versionName = "0.2.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -237,8 +235,7 @@ android {
                 // The baseline profile generator runs on this workstation's x86_64 emulator.
                 if (providers.gradleProperty("nepenthe.emulatorAbi").isPresent) abiFilters += "x86_64"
             }
-            // Without the upload keystore a local release build is debug-signed so it can be
-            // installed for profiling; CI and Play still sign with the real key.
+            // No upload keystore: a local release build is debug-signed for profiling; CI and Play use the real key.
             signingConfig = if (hasUploadKeystore) signingConfigs.getByName("release")
             else signingConfigs.getByName("debug")
         }
@@ -290,9 +287,7 @@ compose.desktop {
         mainClass = "app.journal.MainKt"
         // Empty assistive_technologies: a stale system-wide Java Access Bridge registration makes AWT abort startup (AWTError, no window).
         jvmArgs("-Djavax.accessibility.assistive_technologies=")
-        // AppCDS was removed after measurement: with no archive yet in place AutoCreateSharedArchive
-        // stalled 16.3 s before the first frame (the archive only exists after a clean close), and
-        // it is invalidated by every update. Without it the first frame lands in ~1.5 s, every time.
+        // AppCDS measured 16.3 s to the first frame and 1.5 s without it; the archive never exists at launch.
         nativeDistributions {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
@@ -351,30 +346,36 @@ val generateSeedFingerprint by tasks.registering {
     description = "Generates SEED_BUNDLED_FINGERPRINT from the bundled seed and DoseWiki resources."
     val srcRoot = file("src")
     val canonicalDir = File(srcRoot, "desktopMain/resources")
-    val resourceNames = listOf("psychonautwiki_seed.json", "dosewiki_slim.json")
+    val hashedNames = listOf("psychonautwiki_seed.json", "dosewiki_slim.json")
+    // Every target reads its own copy, so a missing or drifted copy ships a different library.
+    val mirroredNames = hashedNames + listOf("effects.json", "dosewiki_taxonomy.json")
     val mirroredDirs = listOf("androidMain/assets", "iosMain/resources", "jvmMain/resources")
     val outDir = layout.buildDirectory.dir("generated/seedFingerprint").get().asFile
-    inputs.files(resourceNames.map { File(canonicalDir, it) })
-    inputs.files(mirroredDirs.flatMap { dir -> resourceNames.map { File(File(srcRoot, dir), it) } })
+    inputs.files(hashedNames.map { File(canonicalDir, it) })
+    inputs.files(mirroredDirs.flatMap { dir -> mirroredNames.map { File(File(srcRoot, dir), it) } })
     outputs.dir(outDir)
     doLast {
-        val canonical = resourceNames.map { File(canonicalDir, it) }
-        val missing = canonical.filterNot { it.isFile }
+        val missing = mirroredNames
+            .map { File(canonicalDir, it) }
+            .filterNot { it.isFile }
         if (missing.isNotEmpty()) {
             throw GradleException("Missing bundled resources: ${missing.joinToString { it.path }}")
         }
         mirroredDirs.forEach { dir ->
-            resourceNames.forEachIndexed { index, name ->
+            mirroredNames.forEach { name ->
                 val copy = File(File(srcRoot, dir), name)
-                if (copy.isFile && !copy.readBytes().contentEquals(canonical[index].readBytes())) {
+                if (!copy.isFile) {
+                    throw GradleException("$dir/$name is missing; every target ships its own copy.")
+                }
+                if (!copy.readBytes().contentEquals(File(canonicalDir, name).readBytes())) {
                     throw GradleException(
                         "$dir/$name differs from desktopMain/resources/$name; keep every bundled copy byte-identical."
                     )
                 }
             }
         }
-        val seedText = canonical[0].readText(Charsets.UTF_8)
-        val doseText = canonical[1].readText(Charsets.UTF_8)
+        val seedText = File(canonicalDir, hashedNames[0]).readText(Charsets.UTF_8)
+        val doseText = File(canonicalDir, hashedNames[1]).readText(Charsets.UTF_8)
         val hex = MessageDigest.getInstance("SHA-256")
             .digest((seedText + doseText).toByteArray(Charsets.UTF_8))
             .joinToString("") { byte -> byte.toInt().and(0xFF).toString(16).padStart(2, '0') }
