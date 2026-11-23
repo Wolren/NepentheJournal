@@ -8,6 +8,45 @@ Nepenthe Journal is free software under GPL-3.0-or-later.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
+The first stable release. Every packaged build now carries the reference
+catalog, a freeze can name itself in the log, and the Settings card fits a
+phone.
+
+### Added
+
+- A main-thread stall recorder: a task that blocks the UI thread for 100 ms
+  logs its sampled stack into the rolling log, so a freeze reported as "lag"
+  names the function that caused it.
+- Crash dumps and log bundles name the app version, device and Android build.
+  Releases publish their R8 mapping so an obfuscated stack can be retraced.
+- A test pins the bundled catalog's `user_version` to the generated schema, and
+  a Gradle check fails on a missing or drifted copy of any bundled resource.
+
+### Changed
+
+- CI and the release workflow build the substance catalog in every packaging
+  job. The release APK job fails when the built APK lacks the catalog.
+- The catalog builder refuses to write a library below the 1675-substance
+  target, so an upstream data regression cannot ship as an update.
+- Settings reads the theme presets and the trusted-device list off the UI
+  thread, and the medications list stops re-sorting on every recomposition.
+
+### Fixed
+
+- Packaged builds carried no reference catalog and silently fell back to 613
+  substances. The APK and the MSI, DEB and DMG images now ship all 1675.
+- A catalog copy interrupted by a kill left a short file that every later
+  launch trusted, pinning the app to the JSON-seed fallback. A short copy is
+  now detected and replaced, and old copies are pruned.
+- The Data card showed two buttons labelled "Import" on a narrow screen, and
+  content overran the button so it stopped being centered. The rows now read
+  Export / Import, Backup / Restore and Seal backup / Restore sealed, with
+  labels that fit.
+- iOS framework and screenshot workflows built without the catalog, so they
+  exercised the 613-substance fallback.
+
 ## [0.2.0-alpha] - 2026-11-22
 
 The first hardening release after the public alpha. Sync, storage and imports
@@ -192,6 +231,7 @@ suite, but ships through no store channel in this release.
 - Store pipelines: fastlane metadata for Android, an F-Droid source-reproducibility
   gate, and a dispatch-only Google Play internal track upload.
 
-[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.2.0-alpha...HEAD
+[Unreleased]: https://github.com/Wolren/NepentheJournal/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.3.0
 [0.2.0-alpha]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.2.0-alpha
 [0.1.0-alpha]: https://github.com/Wolren/NepentheJournal/releases/tag/v0.1.0-alpha

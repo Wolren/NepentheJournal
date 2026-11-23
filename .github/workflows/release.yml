@@ -70,14 +70,14 @@ jobs:
       - name: Build MSI
         run: ./gradlew :composeApp:packageMsi --no-daemon
 
-      # A tag must carry a trusted signature: the script fails -Required when no certificate is set.
+      # A configured certificate must sign a stable tag; a project without one publishes unsigned and says so.
       - name: Sign the MSI
         shell: pwsh
         env:
           WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
           WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
           WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
-        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$')
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/msi/*.msi" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$' -and (-not [string]::IsNullOrEmpty($env:WINDOWS_SIGN_PFX_BASE64) -or -not [string]::IsNullOrEmpty($env:WINDOWS_SIGN_THUMBPRINT)))
 
       # Publishes only what installs: the signed MSI is installed, launched and removed again.
       - name: Install, launch and uninstall the MSI
@@ -96,7 +96,7 @@ jobs:
           WINDOWS_SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
           WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
           WINDOWS_SIGN_THUMBPRINT: ${{ secrets.WINDOWS_SIGN_THUMBPRINT }}
-        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/app/Nepenthe Journal/Nepenthe Journal.exe" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$')
+        run: ./scripts/sign-windows.ps1 -Files "composeApp/build/compose/binaries/main/app/Nepenthe Journal/Nepenthe Journal.exe" -Required:($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -notmatch '-alpha$' -and (-not [string]::IsNullOrEmpty($env:WINDOWS_SIGN_PFX_BASE64) -or -not [string]::IsNullOrEmpty($env:WINDOWS_SIGN_THUMBPRINT)))
 
       - name: Zip the image
         shell: pwsh

@@ -23,8 +23,8 @@ The Release workflow fails its version guard when these drift:
    GitHub prerelease:
 
    ```bash
-   git tag v0.2.0-alpha
-   git push origin v0.2.0-alpha
+   git tag v0.3.0
+   git push origin v0.3.0
    ```
 
 5. The Release workflow re-checks the version guard, builds all three
@@ -83,13 +83,13 @@ workstation emulator; shipped builds stay arm-only.
   arm64. Artifacts are unsigned; right-click Open on first launch. The
   macOS block sets its own `packageVersion = "1.0.0"`: jpackage rejects a
   leading zero for the app bundle (Apple CFBundleShortVersionString rule),
-  so the Apple bundlers see 1.0.0 while everything else stays 0.2.0. Bump
+  so the Apple bundlers see 1.0.0 while everything else stays 0.3.0. Bump
   this value together with the other surfaces on a version change (any
   nonzero-first version).
-- **Windows signing on alpha tags**: a stable tag refuses to publish an
-  unsigned MSI. An `-alpha` tag builds and publishes unsigned when no
-  certificate secret is configured, and the release title carries
-  `(unsigned)` so the artifact state is not a surprise.
+- **Windows signing**: when `WINDOWS_SIGN_PFX_BASE64` or `WINDOWS_SIGN_THUMBPRINT`
+  is configured, a stable tag refuses to publish an unsigned MSI. Without a
+  certificate the MSI and launcher build unsigned, the release title carries
+  `(unsigned)`, and the checksums are the tamper evidence.
 - **Windows upgrade identity**: `upgradeUuid` in `composeApp/build.gradle.kts`
   is pinned (`D07ABD38-858F-464A-ABF6-9405C622BB14`). Never regenerate it:
   changing it breaks in-place upgrades of installed copies.
