@@ -254,6 +254,8 @@ object DataInitializer {
                     tryLoadSeedWithRetry(repo)
                 }
             } else {
+                // A build without the catalog falls back to the JSON seed: 613 substances instead of 1675.
+                Log.withTag("DataInit").w { "No bundled substance catalog; using the JSON seed instead" }
                 tryLoadSeedWithRetry(repo)
             }
 
@@ -308,8 +310,7 @@ object DataInitializer {
             logStartup(repo, startedAt, loadMs, libraryMs = currentTimeMillis() - buildStartedAt)
             _libraryReadyFlow.value = true
 
-            // The pharmacology blocks feed the substance detail screen only. Decoding them
-            // before the gate held the lists shut for another second on a phone.
+            // The pharmacology blocks feed substance detail only; decoding them before the gate shut the lists for a second.
             if (payloadDeferred) {
                 runCatching {
                     // The window is still composing right after the gate; give it the CPU first.

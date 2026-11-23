@@ -147,6 +147,12 @@ jobs:
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
 
+      # The catalog is a build artifact, not a checked-in file; a build without it silently ships 613 substances.
+      - name: Build the substance catalog
+        run: |
+          python scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build MSI
         run: ./gradlew :composeApp:packageMsi --no-daemon
 
@@ -198,6 +204,11 @@ jobs:
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: ${{ github.ref_name != 'master' }}
+
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
 
       - name: Build Android debug APK
         run: |
@@ -275,6 +286,11 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
 
       - name: Generate the baseline profile and run the benchmarks
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2

@@ -61,6 +61,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
         with:
           cache-read-only: true
+      # The catalog is a build artifact, not a checked-in file; a build without it silently ships 613 substances.
+      - name: Build the substance catalog
+        run: |
+          python scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build MSI
         run: ./gradlew :composeApp:packageMsi --no-daemon
 
@@ -160,6 +166,11 @@ jobs:
           keyPassword=$KEY_PASSWORD
           EOF
 
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build the release APK
         run: |
           set -euo pipefail
@@ -167,6 +178,9 @@ jobs:
           V=$(sed -n 's/^            packageVersion = "\([^"]*\)".*/\1/p' composeApp/build.gradle.kts)
           mkdir -p dist
           APK=$(ls composeApp/build/outputs/apk/release/*.apk | head -n 1)
+          # A release without the catalog silently ships 613 substances instead of 1675.
+          unzip -l "$APK" | grep -q 'assets/substances.sqlite' \
+            || { echo "::error::$APK ships without the substance catalog"; exit 1; }
           cp "$APK" "dist/Nepenthe-Journal-$V-android.apk"
           # An obfuscated crash stack is useless without this file, so it ships beside the APK.
           cp composeApp/build/outputs/mapping/release/mapping.txt "dist/Nepenthe-Journal-$V-android-mapping.txt"
@@ -195,6 +209,11 @@ jobs:
           cache-read-only: true
       - name: Ensure fakeroot (required by the jpackage DEB bundler)
         run: command -v fakeroot || (sudo apt-get update -q && sudo apt-get install -y fakeroot)
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build DEB
         run: ./gradlew :composeApp:packageDeb --no-daemon
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -247,6 +266,11 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           echo "MACOS_SIGN_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
 
       - name: Build DMG
         run: ./gradlew :composeApp:packageDmg --no-daemon
