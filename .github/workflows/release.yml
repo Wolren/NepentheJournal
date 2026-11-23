@@ -364,7 +364,7 @@ jobs:
             : > release-notes.md
           fi
           cat .github/release-header.md CHANGELOG.md >> release-notes.md
-          ASSETS="dist/*.msi dist/*.zip dist/*.deb dist/*.dmg dist/*.apk dist/SHA256SUMS.txt"
+          ASSETS="dist/*.msi dist/*.zip dist/*.deb dist/*.dmg dist/*.apk dist/*-mapping.txt dist/SHA256SUMS.txt"
           if [ -f dist/SHA256SUMS.txt.asc ]; then ASSETS="$ASSETS dist/SHA256SUMS.txt.asc"; fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
