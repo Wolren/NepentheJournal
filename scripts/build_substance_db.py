@@ -819,7 +819,8 @@ def source_digest(sources_dir: Path, affinity_path: Path = AFFINITY_PATH) -> str
     if affinity_path.exists():
         digest.update(affinity_path.read_bytes())
     digest.update(SCHEMA.encode("utf-8"))
-    digest.update(Path(__file__).read_bytes())
+    # Same commit, same version on every platform: a Windows checkout reads this file with CRLF.
+    digest.update(Path(__file__).read_bytes().replace(b"\r\n", b"\n"))
     return digest.hexdigest()
 
 
