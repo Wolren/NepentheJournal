@@ -28,6 +28,12 @@ jobs:
           java-version: "17"
       # android-actions/setup-android@v3 is deliberately absent: its default sdkmanager package list includes 'tools' ships a licensed Android SDK
       # ships a licensed Android SDK; the CI android-build job builds with no
+      # The catalog is a build artifact; without it the APK ships 613 substances instead of 1675.
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace -Pnepenthe.noSign=true
@@ -52,6 +58,12 @@ jobs:
           java-version: "17"
       # android-actions/setup-android@v3 is deliberately absent: its default sdkmanager package list includes 'tools' ships a licensed Android SDK
       # ships a licensed Android SDK; the CI android-build job builds with no
+      # The catalog is a build artifact; without it the APK ships 613 substances instead of 1675.
+      - name: Build the substance catalog
+        run: |
+          python3 scripts/build_substance_db.py
+          test -f build/substance-db/substances.sqlite
+
       - name: Build release APK
         run: |
           ./gradlew :composeApp:assembleRelease --no-daemon --stacktrace -Pnepenthe.noSign=true

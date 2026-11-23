@@ -79,6 +79,7 @@ Builds:
   - versionName: 0.3.0
     versionCode: 3
     commit: v0.3.0
+    prebuild: python3 scripts/build_substance_db.py
     gradle:
       - yes
 
